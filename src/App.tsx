@@ -5,6 +5,7 @@ import { ClassroomPeer } from './utils/classroomPeer';
 import type { Role, ClassroomMessage } from './utils/classroomPeer';
 import { checkCapture, createEmptyBoard } from './utils/gameLogic';
 import { Users, Video, Share2, Copy, Check } from 'lucide-react';
+import { VideoPanel } from './components/video';
 
 const BOARD_SIZE = 19;
 
@@ -182,8 +183,17 @@ function App() {
       </div>
 
       <div className="w-full lg:w-80 space-y-6">
+        {/* Video Panel */}
+        {(role === 'TEACHER' ? peerId : (connected && targetId)) && (
+          <VideoPanel
+            channelName={role === 'TEACHER' ? peerId : targetId}
+            enabled={true}
+          />
+        )}
+
         <div className="glass-panel p-6 space-y-6">
           <h3 className="text-xl font-bold border-b border-white/5 pb-4">Game Control</h3>
+
 
           <div className="flex justify-between items-center">
             <span className="text-zinc-400">Next Player</span>

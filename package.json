@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "agora-rtc-react": "^2.5.1",
+    "agora-rtc-sdk-ng": "^4.24.2",
     "clsx": "^2.1.1",
     "lucide-react": "^0.563.0",
     "peerjs": "^1.5.5",
