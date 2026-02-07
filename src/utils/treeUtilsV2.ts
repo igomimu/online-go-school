@@ -128,3 +128,90 @@ export const getMainPath = (root: GameNode): GameNode[] => {
     }
     return path;
 };
+
+// SGF Tree to GameTree conversion
+import type { SgfTreeNode } from './sgfUtils';
+
+export const convertSgfToGameTree = (
+    sgfNode: SgfTreeNode,
+    parent: GameNode | null,
+    boardSize: number,
+    startNumber: number,
+    initialBoard: BoardState // Board state *before* this node's move
+): GameNode => {
+
+    // 1. Determine local board state
+    // Apply setup (AB/AW) first if any
+    let currentBoard = initialBoard.map(row => row.map(cell => cell ? { ...cell } : null));
+
+    if (sgfNode.setup) {
+        // Apply AB/AW
+        // SGF coords "ab" -> 1-based logic
+        const place = (coords: string[], color: StoneColor) => {
+            const fromSgfCoord = (c: string) => c.toLowerCase().charCodeAt(0) - 96;
+            coords.forEach(c => {
+                if (c.length >= 2) {
+                    const x = fromSgfCoord(c[0]);
+                    const y = fromSgfCoord(c[1]);
+                    if (x >= 1 && x <= boardSize && y >= 1 && y <= boardSize) {
+                        currentBoard[y - 1][x - 1] = { color };
+                    }
+                }
+            });
+        };
+        if (sgfNode.setup.ab) place(sgfNode.setup.ab, 'BLACK');
+        if (sgfNode.setup.aw) place(sgfNode.setup.aw, 'WHITE');
+        if (sgfNode.setup.ae) {
+            // AE logic if needed (clearing stones)
+            const fromSgfCoord = (c: string) => c.toLowerCase().charCodeAt(0) - 96;
+            sgfNode.setup.ae.forEach(c => {
+                if (c.length >= 2) {
+                    const x = fromSgfCoord(c[0]);
+                    const y = fromSgfCoord(c[1]);
+                    if (x >= 1 && x <= boardSize && y >= 1 && y <= boardSize) {
+                        currentBoard[y - 1][x - 1] = null;
+                    }
+                }
+            });
+        }
+    }
+
+    // Apply Move if any
+    let nextNum = startNumber;
+    let actColor: StoneColor = parent ? (parent.activeColor === 'BLACK' ? 'WHITE' : 'BLACK') : 'BLACK';
+
+    if (sgfNode.move) {
+        const { x, y, color } = sgfNode.move;
+        actColor = color; // The one who played
+
+        // Logic similar to addMove
+        if (x >= 1 && x <= boardSize && y >= 1 && y <= boardSize) {
+            currentBoard[y - 1][x - 1] = { color, number: nextNum };
+            const { board: captured } = checkCapture(currentBoard, x, y, color, boardSize);
+            currentBoard = captured;
+            nextNum++;
+        }
+    }
+
+    const gameNode: GameNode = {
+        id: Math.random().toString(36).substr(2, 9),
+        parent,
+        children: [],
+        board: currentBoard,
+        nextNumber: nextNum,
+        activeColor: actColor,
+        boardSize,
+        markers: (sgfNode.markers || []).map(m => ({ ...m, type: m.type as 'LABEL' | 'SYMBOL' })),
+        move: sgfNode.move
+    };
+
+
+    // Recursively handle children
+    if (sgfNode.children && sgfNode.children.length > 0) {
+        gameNode.children = sgfNode.children.map(childSgf =>
+            convertSgfToGameTree(childSgf, gameNode, boardSize, nextNum, currentBoard)
+        );
+    }
+
+    return gameNode;
+};

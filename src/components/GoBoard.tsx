@@ -86,7 +86,10 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     const getStarPoints = (size: number) => {
         const s = Number(size);
         if (s === 19) return [[4, 4], [10, 4], [16, 4], [4, 10], [10, 10], [16, 10], [4, 16], [10, 16], [16, 16]];
+        if (s === 17) return [[4, 4], [9, 4], [14, 4], [4, 9], [9, 9], [14, 9], [4, 14], [9, 14], [14, 14]];
+        if (s === 15) return [[4, 4], [8, 4], [12, 4], [4, 8], [8, 8], [12, 8], [4, 12], [8, 12], [12, 12]];
         if (s === 13) return [[4, 4], [7, 4], [10, 4], [4, 7], [7, 7], [10, 7], [4, 10], [7, 10], [10, 10]];
+        if (s === 11) return [[3, 3], [6, 3], [9, 3], [3, 6], [6, 6], [9, 6], [3, 9], [6, 9], [9, 9]];
         if (s === 9) return [[3, 3], [7, 3], [5, 5], [3, 7], [7, 7]];
         return [];
     };
@@ -178,6 +181,66 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         }
     }
 
+    const markerElements = [];
+    if (markers) {
+        markers.forEach((marker, i) => {
+            const mx = MARGIN + (marker.x - 1) * CELL_SIZE;
+            const my = MARGIN + (marker.y - 1) * CELL_SIZE;
+            const stone = boardState[marker.y - 1]?.[marker.x - 1];
+            // If there is a stone, we need contrasting color (White on Black, Black on White)
+            // If no stone, default to black (or blue/red for emphasis?) - classic SGF is usually black on board.
+
+            let color = "black";
+            if (stone) {
+                color = stone.color === 'BLACK' ? 'white' : 'black';
+            }
+
+            const k = `m-${i}-${marker.x}-${marker.y}`;
+
+            if (marker.type === 'LABEL') {
+                markerElements.push(
+                    <text key={k} x={mx} y={my} dy=".35em" textAnchor="middle"
+                        fill={color}
+                        fontSize={FONT_SIZE * 0.8}
+                        fontWeight="bold"
+                        className="pointer-events-none"
+                    >
+                        {marker.value}
+                    </text>
+                );
+            } else if (marker.type === 'SYMBOL') {
+                const r = STONE_RADIUS * 0.6;
+                if (marker.value === 'TRI') {
+                    // Triangle
+                    const h = r * Math.sqrt(3) / 2;
+                    markerElements.push(
+                        <polygon key={k}
+                            points={`${mx},${my - r} ${mx + h},${my + r / 2} ${mx - h},${my + r / 2}`}
+                            fill="none" stroke={color} strokeWidth={2} className="pointer-events-none"
+                        />
+                    );
+                } else if (marker.value === 'CIR') {
+                    markerElements.push(
+                        <circle key={k} cx={mx} cy={my} r={r * 0.8} fill="none" stroke={color} strokeWidth={2} className="pointer-events-none" />
+                    );
+                } else if (marker.value === 'SQR') {
+                    const s = r * 1.2;
+                    markerElements.push(
+                        <rect key={k} x={mx - s / 2} y={my - s / 2} width={s} height={s} fill="none" stroke={color} strokeWidth={2} className="pointer-events-none" />
+                    );
+                } else if (marker.value === 'X') { // MA
+                    const s = r * 0.7;
+                    markerElements.push(
+                        <g key={k} stroke={color} strokeWidth={2} className="pointer-events-none">
+                            <line x1={mx - s} y1={my - s} x2={mx + s} y2={my + s} />
+                            <line x1={mx + s} y1={my - s} x2={mx - s} y2={my + s} />
+                        </g>
+                    );
+                }
+            }
+        });
+    }
+
     return (
         <svg
             ref={ref}
@@ -195,6 +258,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 <circle key={`star-${i}`} cx={MARGIN + (sx - 1) * CELL_SIZE} cy={MARGIN + (sy - 1) * CELL_SIZE} r={STAR_POINT_RADIUS} fill="#000000" />
             ))}
             {cells}
+            {markerElements}
         </svg>
     );
 });

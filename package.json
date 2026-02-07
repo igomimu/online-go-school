@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "open": "cd /mnt/c && cmd.exe /c 'start http://localhost:5173'",
+    "start": "npm run dev & sleep 3 && npm run open",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

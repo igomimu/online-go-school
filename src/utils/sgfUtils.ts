@@ -410,6 +410,7 @@ export function parseSGFTree(sgfContent: string): ParsedSGFTree {
                 pos++;
             }
 
+
             // Extract move from propBuffer
             const bMatch = propBuffer.match(/B\[([a-zA-Z]*)\]/);
             const wMatch = propBuffer.match(/W\[([a-zA-Z]*)\]/);
@@ -436,6 +437,50 @@ export function parseSGFTree(sgfContent: string): ParsedSGFTree {
                     node.move = { x, y, color: 'WHITE' };
                 }
             }
+
+            // Extract Markers
+            const extractMarkers = (tag: string, type: 'SYMBOL' | 'LABEL', getVal: (s: string) => string) => {
+                const regex = new RegExp(`${tag}((?:-?\\[[a-zA-Z0-9:]+\\])+)`, 'g');
+                let m;
+                while ((m = regex.exec(propBuffer)) !== null) {
+                    const block = m[1];
+                    const itemRegex = /\[([a-zA-Z0-9:]+)\]/g;
+                    let im;
+                    while ((im = itemRegex.exec(block)) !== null) {
+                        const content = im[1];
+                        // for LB it is "cc:Label"
+                        // for others it is "cc"
+                        let coord = content;
+                        let val = getVal(content);
+                        if (tag === 'LB') {
+                            const parts = content.split(':');
+                            if (parts.length >= 2) {
+                                coord = parts[0];
+                                val = parts.slice(1).join(':');
+                            } else {
+                                continue;
+                            }
+                        }
+
+                        if (coord.length >= 2) {
+                            const x = fromSgfCoord(coord[0]);
+                            const y = fromSgfCoord(coord[1]);
+                            if (x >= 1 && x <= size && y >= 1 && y <= size) {
+                                if (!node.markers) node.markers = [];
+                                node.markers.push({ x, y, type, value: val });
+                            }
+                        }
+                    }
+                }
+            };
+
+            extractMarkers('TR', 'SYMBOL', () => 'TRI');
+            extractMarkers('CR', 'SYMBOL', () => 'CIR');
+            extractMarkers('SQ', 'SYMBOL', () => 'SQR');
+            extractMarkers('MA', 'SYMBOL', () => 'X');
+            extractMarkers('M', 'SYMBOL', () => 'X'); // M is alias for MA in some files
+            extractMarkers('LB', 'LABEL', (s) => s); // Value parsed inside
+
         }
 
         // Now handle children: either more ; nodes or ( variations

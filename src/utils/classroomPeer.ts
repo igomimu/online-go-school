@@ -1,6 +1,13 @@
+import type { BoardState, StoneColor, Marker } from '../components/GoBoard';
 import Peer, { DataConnection } from 'peerjs';
 
 export type Role = 'TEACHER' | 'STUDENT';
+
+export interface BoardUpdatePayload {
+    boardState: BoardState;
+    nextColor: StoneColor;
+    markers?: Marker[];
+}
 
 export interface ClassroomMessage {
     type: 'BOARD_UPDATE' | 'SYNC_REQUEST' | 'CURSOR_MOVE';
