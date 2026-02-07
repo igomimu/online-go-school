@@ -1,5 +1,5 @@
 // Simplified GoBoard for Web
-import { forwardRef, useMemo } from 'react';
+import { forwardRef, useMemo, type ReactElement } from 'react';
 
 export interface ViewRange {
     minX: number;
@@ -67,6 +67,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     onDragStart,
     onDragMove,
     onDragEnd,
+    markers,
     readOnly = false,
 }, ref) => {
     const CELL_SIZE = 40;
@@ -181,7 +182,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         }
     }
 
-    const markerElements = [];
+    const markerElements: ReactElement[] = [];
     if (markers) {
         markers.forEach((marker, i) => {
             const mx = MARGIN + (marker.x - 1) * CELL_SIZE;
