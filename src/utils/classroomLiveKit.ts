@@ -2,7 +2,10 @@ import {
   Room,
   RoomEvent,
   RemoteParticipant,
+  RemoteTrack,
+  RemoteTrackPublication,
   ConnectionState,
+  Track,
   type Participant,
 } from 'livekit-client';
 import type { BoardState, StoneColor, Marker } from '../components/GoBoard';
@@ -23,9 +26,17 @@ export interface CursorPayload {
   identity: string;
 }
 
+export interface DrawingPayload {
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  type: 'line' | 'arrow';
+}
+
 export interface ClassroomMessage {
-  type: 'BOARD_UPDATE' | 'CURSOR_MOVE' | 'CURSOR_CLEAR';
-  payload: BoardUpdatePayload | CursorPayload | null;
+  type: 'BOARD_UPDATE' | 'CURSOR_MOVE' | 'CURSOR_CLEAR' | 'DRAW_UPDATE' | 'DRAW_CLEAR';
+  payload: BoardUpdatePayload | CursorPayload | DrawingPayload[] | null;
 }
 
 export interface ParticipantInfo {
@@ -90,6 +101,24 @@ export class ClassroomLiveKit {
       this.handlers.onActiveSpeakersChanged?.(speakers.map(s => s.identity));
     });
 
+    this.room.on(RoomEvent.TrackSubscribed, (
+      track: RemoteTrack,
+      _publication: RemoteTrackPublication,
+      participant: RemoteParticipant,
+    ) => {
+      if (track.kind === Track.Kind.Audio) {
+        const el = track.attach();
+        el.id = `audio-${participant.identity}`;
+        document.body.appendChild(el);
+      }
+    });
+
+    this.room.on(RoomEvent.TrackUnsubscribed, (
+      track: RemoteTrack,
+    ) => {
+      track.detach().forEach(el => el.remove());
+    });
+
     this.room.on(RoomEvent.TrackMuted, () => this.notifyParticipantsChanged());
     this.room.on(RoomEvent.TrackUnmuted, () => this.notifyParticipantsChanged());
   }
@@ -100,6 +129,8 @@ export class ClassroomLiveKit {
 
   async connect(url: string, token: string): Promise<void> {
     await this.room.connect(url, token);
+    // Resume audio context (required by browser autoplay policy)
+    await this.room.startAudio();
   }
 
   async disconnect(): Promise<void> {
@@ -150,7 +181,7 @@ export class ClassroomLiveKit {
   async broadcast(msg: ClassroomMessage): Promise<void> {
     const data = encoder.encode(JSON.stringify(msg));
     await this.room.localParticipant.publishData(data, {
-      reliable: msg.type === 'BOARD_UPDATE',
+      reliable: msg.type === 'BOARD_UPDATE' || msg.type === 'DRAW_UPDATE' || msg.type === 'DRAW_CLEAR',
       topic: msg.type,
     });
   }

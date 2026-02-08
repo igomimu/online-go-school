@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import GoBoard from './components/GoBoard';
+import type { Drawing } from './components/GoBoard';
 import AudioControls from './components/AudioControls';
 import MoveCounter from './components/MoveCounter';
 import ParticipantList from './components/ParticipantList';
@@ -17,6 +18,7 @@ import {
   Users, Video, Copy, Check, Upload,
   ChevronFirst, ChevronLast, ChevronLeft, ChevronRight,
   Grid3X3, GitBranch, Link, Settings, LogOut,
+  Pen, ArrowRight as ArrowRightIcon, Trash2,
 } from 'lucide-react';
 
 const BOARD_SIZES = [19, 17, 15, 13, 11, 9] as const;
@@ -48,6 +50,11 @@ function App() {
 
   // Cursor sharing (teacher -> students)
   const [teacherCursor, setTeacherCursor] = useState<{ x: number; y: number } | null>(null);
+
+  // Drawing overlay (teacher draws lines/arrows on the board)
+  const [drawings, setDrawings] = useState<Drawing[]>([]);
+  const [drawMode, setDrawMode] = useState<'off' | 'line' | 'arrow'>('off');
+  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
 
   // View State
   const boardState = currentNode.board;
@@ -203,6 +210,10 @@ function App() {
           }
         } else if (msg.type === 'CURSOR_CLEAR' && connectRole === 'STUDENT') {
           setTeacherCursor(null);
+        } else if (msg.type === 'DRAW_UPDATE' && connectRole === 'STUDENT' && Array.isArray(msg.payload)) {
+          setDrawings(msg.payload as Drawing[]);
+        } else if (msg.type === 'DRAW_CLEAR' && connectRole === 'STUDENT') {
+          setDrawings([]);
         }
       },
       onParticipantsChanged: (p: ParticipantInfo[]) => {
@@ -267,11 +278,42 @@ function App() {
   }, []);
 
   // Audio controls
+  const [audioDebug, setAudioDebug] = useState('');
+  const updateAudioDebug = useCallback(() => {
+    if (!classroomRef.current) return;
+    const audioEls = document.querySelectorAll('audio').length;
+    const remote = classroomRef.current.room.remoteParticipants.size;
+    const local = classroomRef.current.room.localParticipant;
+    const localAudio = local ? Array.from(local.audioTrackPublications.values()) : [];
+    const localInfo = `Local: ${localAudio.length} tracks (${localAudio.map(t => `${t.trackSid || 'no-sid'} ${t.isMuted ? 'muted' : 'live'}`).join(',')})`;
+    let trackInfo = '';
+    classroomRef.current.room.remoteParticipants.forEach((p) => {
+      const audioTracks = Array.from(p.audioTrackPublications.values());
+      trackInfo += `${p.identity}: ${audioTracks.length} tracks (${audioTracks.map(t => `${t.isSubscribed ? 'sub' : 'nosub'} ${t.isMuted ? 'mut' : 'live'}`).join(',')}); `;
+    });
+    setAudioDebug(`Mic: ${isMicEnabled ? 'ON' : 'OFF'}, ${localInfo}, AudioEls: ${audioEls}, Remote: ${remote}, [${trackInfo || 'none'}]`);
+  }, [isMicEnabled]);
+
   const handleToggleMic = async () => {
-    if (!classroomRef.current?.isConnected) return;
-    const enabled = await classroomRef.current.toggleMicrophone();
-    setIsMicEnabled(enabled);
+    if (!classroomRef.current?.isConnected) {
+      setAudioDebug('Not connected');
+      return;
+    }
+    try {
+      const enabled = await classroomRef.current.toggleMicrophone();
+      setIsMicEnabled(enabled);
+    } catch (err) {
+      setAudioDebug(`Mic error: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
+
+  // Auto-update audio debug every 2 seconds
+  useEffect(() => {
+    if (connectionState !== ConnectionState.Connected) return;
+    updateAudioDebug();
+    const interval = setInterval(updateAudioDebug, 2000);
+    return () => clearInterval(interval);
+  }, [connectionState, updateAudioDebug]);
 
   const handleToggleMute = () => {
     setIsMuted(prev => {
@@ -308,8 +350,56 @@ function App() {
     }
   }, [role]);
 
+  // Drawing handlers
+  const drawLastCell = useRef<{ x: number; y: number } | null>(null);
+
+  const handleDrawDragStart = useCallback((x: number, y: number) => {
+    if (role === 'TEACHER' && drawMode !== 'off') {
+      setDrawStart({ x, y });
+      drawLastCell.current = { x, y };
+    }
+  }, [role, drawMode]);
+
+  const handleDrawDragMove = useCallback((x: number, y: number) => {
+    if (role === 'TEACHER' && drawMode !== 'off') {
+      drawLastCell.current = { x, y };
+    }
+  }, [role, drawMode]);
+
+  const handleDrawDragEnd = useCallback(() => {
+    if (role === 'TEACHER' && drawMode !== 'off' && drawStart && drawLastCell.current) {
+      const end = drawLastCell.current;
+      if (drawStart.x !== end.x || drawStart.y !== end.y) {
+        const newDrawing: Drawing = {
+          fromX: drawStart.x,
+          fromY: drawStart.y,
+          toX: end.x,
+          toY: end.y,
+          type: drawMode,
+        };
+        const updated = [...drawings, newDrawing];
+        setDrawings(updated);
+        classroomRef.current?.broadcast({
+          type: 'DRAW_UPDATE',
+          payload: updated,
+        });
+      }
+      setDrawStart(null);
+      drawLastCell.current = null;
+    }
+  }, [role, drawMode, drawStart, drawings]);
+
+  const clearDrawings = useCallback(() => {
+    setDrawings([]);
+    classroomRef.current?.broadcast({
+      type: 'DRAW_CLEAR',
+      payload: null,
+    });
+  }, []);
+
   const handleCellClick = useCallback((x: number, y: number) => {
     if (role === 'STUDENT') return;
+    if (drawMode !== 'off') return; // drawing mode: clicks ignored
 
     if (boardState[y - 1][x - 1]) return;
 
@@ -328,7 +418,7 @@ function App() {
     );
 
     setCurrentNode(realNewNode);
-  }, [boardState, derivedNextColor, role, boardSize, currentNode]);
+  }, [boardState, derivedNextColor, role, boardSize, currentNode, drawMode]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).catch(() => {});
@@ -619,6 +709,38 @@ function App() {
           </div>
         </header>
 
+        {/* Connection Error */}
+        {connectionError && (
+          <div className="bg-red-500/20 border border-red-500/30 text-red-300 px-4 py-2 rounded-xl text-sm">
+            {connectionError}
+          </div>
+        )}
+
+        {/* Audio Debug */}
+        {audioDebug && (
+          <div className="bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 px-4 py-2 rounded-xl text-sm flex items-center gap-3">
+            <span className="flex-1">{audioDebug}</span>
+            <button
+              onClick={async () => {
+                try {
+                  await classroomRef.current?.room.startAudio();
+                  document.querySelectorAll('audio').forEach(el => {
+                    (el as HTMLAudioElement).muted = false;
+                    (el as HTMLAudioElement).volume = 1;
+                    (el as HTMLAudioElement).play().catch(() => {});
+                  });
+                  setAudioDebug(prev => prev + ' [Audio started!]');
+                } catch (e) {
+                  setAudioDebug(prev => prev + ` [Error: ${e}]`);
+                }
+              }}
+              className="px-3 py-1 bg-green-500/30 border border-green-500/50 rounded-lg text-green-300 text-xs whitespace-nowrap"
+            >
+              Start Audio
+            </button>
+          </div>
+        )}
+
         {/* Go Board */}
         <div className="glass-panel p-4 flex justify-center items-center shadow-2xl relative">
           {role === 'TEACHER' && currentNode.children.length > 1 && (
@@ -633,9 +755,13 @@ function App() {
             boardSize={boardSize}
             onCellClick={handleCellClick}
             markers={cursorMarkers}
+            drawings={drawings}
             readOnly={role === 'STUDENT'}
             onCellMouseEnter={handleCellMouseEnter}
             onCellMouseLeave={handleCellMouseLeave}
+            onDragStart={drawMode !== 'off' ? handleDrawDragStart : undefined}
+            onDragMove={drawMode !== 'off' ? handleDrawDragMove : undefined}
+            onDragEnd={drawMode !== 'off' ? handleDrawDragEnd : undefined}
           />
         </div>
 
@@ -654,6 +780,32 @@ function App() {
             <button onClick={goLast} disabled={currentNode.children.length === 0} className="p-3 glass-panel hover:bg-white/10 disabled:opacity-30">
               <ChevronLast />
             </button>
+
+            <div className="w-px bg-white/10 mx-1" />
+
+            <button
+              onClick={() => setDrawMode(drawMode === 'line' ? 'off' : 'line')}
+              className={`p-3 glass-panel hover:bg-white/10 ${drawMode === 'line' ? 'bg-red-500/20 text-red-400' : ''}`}
+              title="Draw line"
+            >
+              <Pen className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setDrawMode(drawMode === 'arrow' ? 'off' : 'arrow')}
+              className={`p-3 glass-panel hover:bg-white/10 ${drawMode === 'arrow' ? 'bg-red-500/20 text-red-400' : ''}`}
+              title="Draw arrow"
+            >
+              <ArrowRightIcon className="w-5 h-5" />
+            </button>
+            {drawings.length > 0 && (
+              <button
+                onClick={clearDrawings}
+                className="p-3 glass-panel hover:bg-white/10 text-zinc-400 hover:text-red-400"
+                title="Clear drawings"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
           </div>
         )}
 

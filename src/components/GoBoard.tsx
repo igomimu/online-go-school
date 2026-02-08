@@ -24,6 +24,14 @@ export interface Marker {
     value: string; // 'A'...'Z' or 'TRI','CIR','SQR','X'
 }
 
+export interface Drawing {
+    fromX: number;
+    fromY: number;
+    toX: number;
+    toY: number;
+    type: 'line' | 'arrow';
+}
+
 export interface GoBoardProps {
     boardState: BoardState;
     boardSize: number;
@@ -48,6 +56,7 @@ export interface GoBoardProps {
     onDragEnd?: () => void;
 
     markers?: Marker[];
+    drawings?: Drawing[];
     activeColor?: StoneColor;
     readOnly?: boolean;
 }
@@ -68,6 +77,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     onDragMove,
     onDragEnd,
     markers,
+    drawings,
     readOnly = false,
 }, ref) => {
     const CELL_SIZE = 40;
@@ -242,6 +252,27 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         });
     }
 
+    // Drawing overlay (lines & arrows)
+    const drawingElements: ReactElement[] = [];
+    if (drawings) {
+        drawings.forEach((d, i) => {
+            const x1 = MARGIN + (d.fromX - 1) * CELL_SIZE;
+            const y1 = MARGIN + (d.fromY - 1) * CELL_SIZE;
+            const x2 = MARGIN + (d.toX - 1) * CELL_SIZE;
+            const y2 = MARGIN + (d.toY - 1) * CELL_SIZE;
+            drawingElements.push(
+                <line
+                    key={`draw-${i}`}
+                    x1={x1} y1={y1} x2={x2} y2={y2}
+                    stroke="#e53e3e" strokeWidth={3} strokeLinecap="round"
+                    markerEnd={d.type === 'arrow' ? 'url(#arrowhead)' : undefined}
+                    className="pointer-events-none"
+                    opacity={0.85}
+                />
+            );
+        });
+    }
+
     return (
         <svg
             ref={ref}
@@ -252,6 +283,11 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             onMouseLeave={onDragEnd}
             onWheel={(e) => onBoardWheel?.(e.deltaY)}
         >
+            <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#e53e3e" />
+                </marker>
+            </defs>
             <rect x={viewBoxData.x} y={viewBoxData.y} width={viewBoxData.w} height={viewBoxData.h} fill={isMonochrome ? 'white' : '#DCB35C'} stroke="none" />
             {lines}
             {coords}
@@ -260,6 +296,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             ))}
             {cells}
             {markerElements}
+            {drawingElements}
         </svg>
     );
 });
