@@ -5,6 +5,56 @@ export function createEmptyBoard(size: number): BoardState {
 }
 
 /**
+ * 盤面のハッシュ生成（コウ検出用）
+ */
+export function boardHash(board: BoardState): string {
+    return board.map(row =>
+        row.map(cell => cell ? (cell.color === 'BLACK' ? 'B' : 'W') : '.').join('')
+    ).join('/');
+}
+
+/**
+ * 着手が合法か判定
+ * - 空点チェック
+ * - 自殺手チェック（取り石がある場合は合法）
+ * - コウチェック
+ */
+export function isLegalMove(
+    board: BoardState,
+    x: number, // 1-indexed
+    y: number, // 1-indexed
+    color: StoneColor,
+    size: number,
+    lastBoardHash?: string,
+): boolean {
+    // 空点チェック
+    if (board[y - 1][x - 1]) return false;
+
+    // 仮に置いてみる
+    const testBoard = board.map(row => row.map(cell => cell ? { ...cell } : null));
+    testBoard[y - 1][x - 1] = { color };
+
+    // 取り石チェック
+    const { board: afterCapture, capturedCount } = checkCapture(testBoard, x, y, color, size);
+
+    // 自殺手チェック（取り石がなく、自分の石が呼吸なしの場合）
+    if (capturedCount === 0) {
+        const group: { x: number; y: number }[] = [];
+        if (!hasLiberties(afterCapture, x - 1, y - 1, color, group)) {
+            return false;
+        }
+    }
+
+    // コウチェック
+    if (lastBoardHash) {
+        const newHash = boardHash(afterCapture);
+        if (newHash === lastBoardHash) return false;
+    }
+
+    return true;
+}
+
+/**
  * Checks for captured stones after a move.
  * Returns { board: BoardState, capturedCount: number }
  */

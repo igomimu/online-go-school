@@ -9,6 +9,7 @@ import {
   type Participant,
 } from 'livekit-client';
 import type { BoardState, StoneColor, Marker } from '../components/GoBoard';
+import type { GameMessageType } from '../types/game';
 
 export type Role = 'TEACHER' | 'STUDENT';
 
@@ -34,15 +35,25 @@ export interface DrawingPayload {
   type: 'line' | 'arrow';
 }
 
+// 既存 + 新規メッセージタイプ
+export type MessageType =
+  | 'BOARD_UPDATE'
+  | 'CURSOR_MOVE'
+  | 'CURSOR_CLEAR'
+  | 'DRAW_UPDATE'
+  | 'DRAW_CLEAR'
+  | GameMessageType;
+
 export interface ClassroomMessage {
-  type: 'BOARD_UPDATE' | 'CURSOR_MOVE' | 'CURSOR_CLEAR' | 'DRAW_UPDATE' | 'DRAW_CLEAR';
-  payload: BoardUpdatePayload | CursorPayload | DrawingPayload[] | null;
+  type: MessageType;
+  payload: unknown;
 }
 
 export interface ParticipantInfo {
   identity: string;
   isSpeaking: boolean;
   audioEnabled: boolean;
+  videoEnabled: boolean;
 }
 
 export type ClassroomEventHandler = {
@@ -56,6 +67,14 @@ export type ClassroomEventHandler = {
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+// 信頼性が必要なメッセージタイプ
+const RELIABLE_TYPES = new Set<string>([
+  'BOARD_UPDATE', 'DRAW_UPDATE', 'DRAW_CLEAR',
+  'GAME_CREATED', 'GAME_BOARD_UPDATE', 'GAME_ENDED',
+  'GAME_LIST_SYNC', 'REVIEW_START', 'REVIEW_END',
+  'AUDIO_CONTROL', 'MEDIA_CONTROL',
+]);
 
 export class ClassroomLiveKit {
   room: Room;
@@ -111,6 +130,9 @@ export class ClassroomLiveKit {
         el.id = `audio-${participant.identity}`;
         document.body.appendChild(el);
       }
+      if (track.kind === Track.Kind.Video) {
+        this.notifyParticipantsChanged();
+      }
     });
 
     this.room.on(RoomEvent.TrackUnsubscribed, (
@@ -129,7 +151,6 @@ export class ClassroomLiveKit {
 
   async connect(url: string, token: string): Promise<void> {
     await this.room.connect(url, token);
-    // Resume audio context (required by browser autoplay policy)
     await this.room.startAudio();
   }
 
@@ -152,26 +173,35 @@ export class ClassroomLiveKit {
   get participants(): ParticipantInfo[] {
     const list: ParticipantInfo[] = [];
 
-    // Local participant
     const local = this.room.localParticipant;
     if (local) {
       list.push({
         identity: local.identity,
         isSpeaking: local.isSpeaking,
         audioEnabled: local.isMicrophoneEnabled,
+        videoEnabled: local.isCameraEnabled,
       });
     }
 
-    // Remote participants
     this.room.remoteParticipants.forEach((p) => {
       list.push({
         identity: p.identity,
         isSpeaking: p.isSpeaking,
         audioEnabled: p.isMicrophoneEnabled,
+        videoEnabled: p.isCameraEnabled,
       });
     });
 
     return list;
+  }
+
+  // リモート参加者の名前一覧（先生を除く）
+  get remoteIdentities(): string[] {
+    const identities: string[] = [];
+    this.room.remoteParticipants.forEach((p) => {
+      identities.push(p.identity);
+    });
+    return identities;
   }
 
   get remoteParticipantCount(): number {
@@ -181,9 +211,27 @@ export class ClassroomLiveKit {
   async broadcast(msg: ClassroomMessage): Promise<void> {
     const data = encoder.encode(JSON.stringify(msg));
     await this.room.localParticipant.publishData(data, {
-      reliable: msg.type === 'BOARD_UPDATE' || msg.type === 'DRAW_UPDATE' || msg.type === 'DRAW_CLEAR',
+      reliable: RELIABLE_TYPES.has(msg.type),
       topic: msg.type,
     });
+  }
+
+  // 特定の参加者にメッセージ送信
+  async sendTo(msg: ClassroomMessage, identities: string[]): Promise<void> {
+    const data = encoder.encode(JSON.stringify(msg));
+    const destinations: RemoteParticipant[] = [];
+    this.room.remoteParticipants.forEach((p) => {
+      if (identities.includes(p.identity)) {
+        destinations.push(p);
+      }
+    });
+    if (destinations.length > 0) {
+      await this.room.localParticipant.publishData(data, {
+        reliable: RELIABLE_TYPES.has(msg.type),
+        topic: msg.type,
+        destinationIdentities: identities,
+      });
+    }
   }
 
   async enableMicrophone(): Promise<void> {
@@ -200,8 +248,18 @@ export class ClassroomLiveKit {
     return !current;
   }
 
+  async toggleCamera(): Promise<boolean> {
+    const current = this.room.localParticipant.isCameraEnabled;
+    await this.room.localParticipant.setCameraEnabled(!current);
+    return !current;
+  }
+
   get isMicrophoneEnabled(): boolean {
     return this.room.localParticipant?.isMicrophoneEnabled ?? false;
+  }
+
+  get isCameraEnabled(): boolean {
+    return this.room.localParticipant?.isCameraEnabled ?? false;
   }
 
   private notifyParticipantsChanged() {
