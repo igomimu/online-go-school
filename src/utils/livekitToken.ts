@@ -1,6 +1,3 @@
-import HmacSHA256 from 'crypto-js/hmac-sha256';
-import Base64 from 'crypto-js/enc-base64';
-
 export interface TokenOptions {
   apiKey: string;
   apiSecret: string;
@@ -9,10 +6,11 @@ export interface TokenOptions {
   canPublish?: boolean;
   canPublishData?: boolean;
   canSubscribe?: boolean;
+  useServerToken?: boolean;
 }
 
-function base64UrlEncode(str: string): string {
-  const bytes = new TextEncoder().encode(str);
+function base64UrlEncode(buf: ArrayBuffer | Uint8Array): string {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
   let binary = '';
   for (let i = 0; i < bytes.length; i++) {
     binary += String.fromCharCode(bytes[i]);
@@ -20,15 +18,15 @@ function base64UrlEncode(str: string): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function wordArrayToBase64Url(wordArray: CryptoJS.lib.WordArray): string {
-  return Base64.stringify(wordArray).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function strToBase64Url(str: string): string {
+  return base64UrlEncode(new TextEncoder().encode(str));
 }
 
-export async function generateToken(opts: TokenOptions): Promise<string> {
+async function generateTokenClient(opts: TokenOptions): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
 
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const payload = {
+  const header = JSON.stringify({ alg: 'HS256' });
+  const payload = JSON.stringify({
     video: {
       room: opts.roomName,
       roomJoin: true,
@@ -38,15 +36,42 @@ export async function generateToken(opts: TokenOptions): Promise<string> {
     },
     iss: opts.apiKey,
     sub: opts.identity,
-    nbf: now,
+    nbf: 0,
     exp: now + 6 * 3600,
-  };
+  });
 
-  const headerB64 = base64UrlEncode(JSON.stringify(header));
-  const payloadB64 = base64UrlEncode(JSON.stringify(payload));
+  const headerB64 = strToBase64Url(header);
+  const payloadB64 = strToBase64Url(payload);
   const signingInput = `${headerB64}.${payloadB64}`;
 
-  const signature = HmacSHA256(signingInput, opts.apiSecret);
+  const keyData = new TextEncoder().encode(opts.apiSecret);
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(signingInput));
 
-  return `${signingInput}.${wordArrayToBase64Url(signature)}`;
+  return `${signingInput}.${base64UrlEncode(signature)}`;
+}
+
+async function generateTokenServer(identity: string, roomName: string): Promise<string> {
+  const res = await fetch('/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identity, roomName }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Token generation failed');
+  }
+
+  const data = await res.json();
+  return data.token;
+}
+
+export async function fetchToken(opts: TokenOptions): Promise<string> {
+  if (opts.useServerToken) {
+    return generateTokenServer(opts.identity, opts.roomName);
+  }
+  return generateTokenClient(opts);
 }

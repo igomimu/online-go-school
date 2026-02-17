@@ -6,7 +6,7 @@ import { parseSGFTree } from './utils/sgfUtils';
 import { ClassroomLiveKit } from './utils/classroomLiveKit';
 import type { Role, ClassroomMessage, ParticipantInfo } from './utils/classroomLiveKit';
 import type { ViewMode, GameSession, SavedGame, AudioPermissions } from './types/game';
-import { generateToken } from './utils/livekitToken';
+import { fetchToken } from './utils/livekitToken';
 import { ConnectionState } from 'livekit-client';
 import { useGameManager } from './hooks/useGameManager';
 import { useGameView } from './hooks/useGameView';
@@ -26,9 +26,10 @@ function App() {
   const [userName, setUserName] = useState('');
 
   // LiveKit接続
-  const [livekitUrl, setLivekitUrl] = useState(() => localStorage.getItem('lk-url') || '');
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('lk-api-key') || '');
-  const [apiSecret, setApiSecret] = useState(() => localStorage.getItem('lk-api-secret') || '');
+  const [livekitUrl, setLivekitUrl] = useState(() => import.meta.env.VITE_LIVEKIT_URL || localStorage.getItem('lk-url') || '');
+  const [apiKey, setApiKey] = useState(() => import.meta.env.VITE_LIVEKIT_API_KEY || localStorage.getItem('lk-api-key') || '');
+  const [apiSecret, setApiSecret] = useState(() => import.meta.env.VITE_LIVEKIT_API_SECRET || localStorage.getItem('lk-api-secret') || '');
+  const useServerToken = !!import.meta.env.VITE_LIVEKIT_API_KEY;
   const [roomName, setRoomName] = useState('go-classroom');
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [connectionError, setConnectionError] = useState('');
@@ -224,7 +225,7 @@ function App() {
     });
 
     try {
-      const connectToken = await generateToken({
+      const connectToken = await fetchToken({
         apiKey,
         apiSecret,
         roomName,
@@ -232,6 +233,7 @@ function App() {
         canPublish: true,
         canPublishData: true,
         canSubscribe: true,
+        useServerToken,
       });
 
       await classroom.connect(livekitUrl, connectToken);
