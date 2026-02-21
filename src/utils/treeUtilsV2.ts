@@ -22,7 +22,7 @@ export const createNode = (
     move?: { x: number, y: number, color: StoneColor }
 ): GameNode => {
     return {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         parent,
         children: [],
         board,
@@ -194,7 +194,7 @@ export const convertSgfToGameTree = (
     }
 
     const gameNode: GameNode = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         parent,
         children: [],
         board: currentBoard,

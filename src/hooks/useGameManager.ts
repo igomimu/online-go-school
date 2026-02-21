@@ -21,6 +21,46 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
     });
   }, []);
 
+  // 対局終了
+  const endGame = useCallback((gameId: string, result: string) => {
+    const game = gamesRef.current.find(g => g.id === gameId);
+    if (!game) return;
+
+    updateGames(prev => prev.map(g => {
+      if (g.id !== gameId) return g;
+      return { ...g, status: 'finished', result };
+    }));
+
+    // SGF保存
+    const sgf = exportGameToSgf({
+      boardSize: game.boardSize,
+      handicap: game.handicap,
+      komi: game.komi,
+      blackPlayer: game.blackPlayer,
+      whitePlayer: game.whitePlayer,
+      result,
+      moves: game.moveHistory,
+      date: todaySgfDate(),
+    });
+
+    saveGame({
+      id: game.id,
+      date: todaySgfDate(),
+      blackPlayer: game.blackPlayer,
+      whitePlayer: game.whitePlayer,
+      boardSize: game.boardSize,
+      handicap: game.handicap,
+      komi: game.komi,
+      result,
+      sgf,
+    });
+
+    classroomRef.current?.broadcast({
+      type: 'GAME_ENDED',
+      payload: { gameId, result },
+    });
+  }, [classroomRef, updateGames]);
+
   // 対局作成
   const createGame = useCallback((opts: {
     blackPlayer: string;
@@ -42,7 +82,7 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
     }
 
     const game: GameSession = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       blackPlayer,
       whitePlayer,
       boardSize,
@@ -158,53 +198,13 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
         lastMove: passMove,
       } as GameBoardUpdatePayload,
     });
-  }, [classroomRef, updateGames]);
+  }, [classroomRef, updateGames, endGame]);
 
   // 投了処理
   const handleResign = useCallback((gameId: string, color: StoneColor) => {
     const winner = color === 'BLACK' ? 'W' : 'B';
     endGame(gameId, `${winner}+R`);
-  }, []);
-
-  // 対局終了
-  const endGame = useCallback((gameId: string, result: string) => {
-    const game = gamesRef.current.find(g => g.id === gameId);
-    if (!game) return;
-
-    updateGames(prev => prev.map(g => {
-      if (g.id !== gameId) return g;
-      return { ...g, status: 'finished', result };
-    }));
-
-    // SGF保存
-    const sgf = exportGameToSgf({
-      boardSize: game.boardSize,
-      handicap: game.handicap,
-      komi: game.komi,
-      blackPlayer: game.blackPlayer,
-      whitePlayer: game.whitePlayer,
-      result,
-      moves: game.moveHistory,
-      date: todaySgfDate(),
-    });
-
-    saveGame({
-      id: game.id,
-      date: todaySgfDate(),
-      blackPlayer: game.blackPlayer,
-      whitePlayer: game.whitePlayer,
-      boardSize: game.boardSize,
-      handicap: game.handicap,
-      komi: game.komi,
-      result,
-      sgf,
-    });
-
-    classroomRef.current?.broadcast({
-      type: 'GAME_ENDED',
-      payload: { gameId, result },
-    });
-  }, [classroomRef, updateGames]);
+  }, [endGame]);
 
   // メッセージハンドラ（生徒からの着手を受信）
   const handleGameMessage = useCallback((msg: ClassroomMessage, sender?: string) => {
