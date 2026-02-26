@@ -36,6 +36,13 @@ src/
 ## 未実装
 - SGFインポート/エクスポートUI、KataGo連携、認証、対局時計
 
+## UI/Design Standards
+→ 詳細は `~/.claude/CLAUDE.md` の「UI/Design Standards」セクションを参照
+- **Anti-AI Design**: グラデ・グロー・glassmorphism禁止、左揃え基調、装飾より情報
+- **統一デザイン言語**: shadcn/ui + Tailwind、Inter + Noto Sans JP、Lucide icons
+- **primary色**: indigo-600（教育、落ち着いた知性）
+- **参考**: Linear, Vercel Dashboard
+
 ## 環境変数
 - `VITE_AGORA_APP_ID=0cead207dab34dd188322c1725076f13`
 
