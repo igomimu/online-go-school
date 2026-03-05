@@ -2,8 +2,10 @@ import { Copy, Check, Upload, Users, Plus, BookOpen, Link } from 'lucide-react';
 import { useState, useRef } from 'react';
 import type { GameSession, SavedGame } from '../types/game';
 import type { ParticipantInfo } from '../utils/classroomLiveKit';
+import type { Student, Classroom } from '../types/classroom';
 import GameThumbnail from './GameThumbnail';
 import SavedGameList from './SavedGameList';
+import ClassroomSelector from './ClassroomSelector';
 
 interface LobbyProps {
   role: 'TEACHER' | 'STUDENT';
@@ -22,6 +24,13 @@ interface LobbyProps {
   // 対局選択
   onSelectGame: (gameId: string) => void;
   myIdentity: string;
+
+  // 生徒・教室データ
+  students?: Student[];
+  classrooms?: Classroom[];
+  selectedClassroomId?: string | null;
+  onSelectClassroom?: (id: string | null) => void;
+  onOpenStudentManager?: () => void;
 }
 
 export default function Lobby({
@@ -37,6 +46,11 @@ export default function Lobby({
   onSelectSavedGame,
   onSelectGame,
   myIdentity,
+  students = [],
+  classrooms = [],
+  selectedClassroomId,
+  onSelectClassroom,
+  onOpenStudentManager,
 }: LobbyProps) {
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -167,6 +181,19 @@ export default function Lobby({
           </div>
         )}
 
+        {/* 教室セレクター（先生のみ） */}
+        {role === 'TEACHER' && classrooms.length > 0 && onSelectClassroom && onOpenStudentManager && (
+          <div className="glass-panel p-4">
+            <ClassroomSelector
+              classrooms={classrooms}
+              students={students}
+              selectedClassroomId={selectedClassroomId ?? null}
+              onSelectClassroom={onSelectClassroom}
+              onOpenManager={onOpenStudentManager}
+            />
+          </div>
+        )}
+
         {/* 参加者一覧 */}
         <div className="glass-panel p-4 space-y-3">
           <h3 className="font-bold flex items-center gap-2 text-sm">
@@ -180,6 +207,8 @@ export default function Lobby({
               const inGame = games.some(g =>
                 g.status === 'playing' && (g.blackPlayer === p.identity || g.whitePlayer === p.identity)
               );
+              // 登録生徒の棋力を名前マッチで検索
+              const registered = students.find(s => s.name === p.identity);
               return (
                 <div
                   key={p.identity}
@@ -187,11 +216,18 @@ export default function Lobby({
                     isSpeaking ? 'bg-green-500/10 border border-green-500/20' : 'bg-white/5'
                   }`}
                 >
-                  <span className={isLocal ? 'font-semibold' : ''}>
-                    {p.identity}
-                    {isLocal && <span className="text-zinc-500 ml-1">(自分)</span>}
-                  </span>
-                  <span className="text-xs text-zinc-600">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={`truncate ${isLocal ? 'font-semibold' : ''}`}>
+                      {p.identity}
+                      {isLocal && <span className="text-zinc-500 ml-1">(自分)</span>}
+                    </span>
+                    {registered?.rank && (
+                      <span className="px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 text-xs font-mono shrink-0">
+                        {registered.rank}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-zinc-600 shrink-0 ml-1">
                     {inGame ? '対局中' : '待機中'}
                   </span>
                 </div>

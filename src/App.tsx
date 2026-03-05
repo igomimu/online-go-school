@@ -4,12 +4,14 @@ import type { GameNode } from './utils/treeUtilsV2';
 import { convertSgfToGameTree } from './utils/treeUtilsV2';
 import { parseSGFTree } from './utils/sgfUtils';
 import { ClassroomLiveKit } from './utils/classroomLiveKit';
-import type { Role, ClassroomMessage, ParticipantInfo } from './utils/classroomLiveKit';
+import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './utils/classroomLiveKit';
 import type { ViewMode, GameSession, SavedGame, AudioPermissions } from './types/game';
+import type { Student, Classroom } from './types/classroom';
 import { fetchToken } from './utils/livekitToken';
 import { ConnectionState } from 'livekit-client';
 import { useGameManager } from './hooks/useGameManager';
 import { useGameView } from './hooks/useGameView';
+import { loadStudents, loadClassrooms } from './utils/classroomStore';
 
 import Header from './components/Header';
 import Lobby from './components/Lobby';
@@ -18,6 +20,8 @@ import GameCreationDialog from './components/GameCreationDialog';
 import LectureBoard from './components/LectureBoard';
 import ReviewBoard from './components/ReviewBoard';
 import MediaControlPanel from './components/MediaControlPanel';
+import VideoTiles from './components/VideoTiles';
+import StudentManager from './components/StudentManager';
 
 import { Users, Video, Settings } from 'lucide-react';
 
@@ -50,6 +54,9 @@ function App() {
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [activeSpeakers, setActiveSpeakers] = useState<string[]>([]);
 
+  // ビデオ要素
+  const [videoElements, setVideoElements] = useState<Map<string, HTMLVideoElement>>(new Map());
+
   // 参加リンク
   const [studentJoinInfo, setStudentJoinInfo] = useState('');
 
@@ -67,6 +74,17 @@ function App() {
 
   // オーディオデバッグ
   const [audioDebug, setAudioDebug] = useState('');
+
+  // 生徒・教室データ
+  const [students, setStudents] = useState<Student[]>(() => loadStudents());
+  const [classrooms, setClassrooms] = useState<Classroom[]>(() => loadClassrooms());
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
+  const [showStudentManager, setShowStudentManager] = useState(false);
+
+  const reloadClassroomData = useCallback(() => {
+    setStudents(loadStudents());
+    setClassrooms(loadClassrooms());
+  }, []);
 
   const classroomRef = useRef<ClassroomLiveKit | null>(null);
 
@@ -224,6 +242,19 @@ function App() {
       },
     });
 
+    // ビデオトラック変更コールバック
+    classroom.onVideoTrackChanged = (info: VideoTrackInfo) => {
+      setVideoElements(prev => {
+        const next = new Map(prev);
+        if (info.element) {
+          next.set(info.identity, info.element);
+        } else {
+          next.delete(info.identity);
+        }
+        return next;
+      });
+    };
+
     try {
       const connectToken = await fetchToken({
         apiKey,
@@ -243,8 +274,10 @@ function App() {
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.set('url', livekitUrl);
         currentUrl.searchParams.set('room', roomName);
-        currentUrl.searchParams.set('key', apiKey);
-        currentUrl.searchParams.set('secret', apiSecret);
+        if (!useServerToken) {
+          currentUrl.searchParams.set('key', apiKey);
+          currentUrl.searchParams.set('secret', apiSecret);
+        }
         currentUrl.searchParams.set('role', 'STUDENT');
         setStudentJoinInfo(currentUrl.toString());
       }
@@ -262,11 +295,11 @@ function App() {
     const urlSecret = params.get('secret');
     const urlRole = params.get('role');
 
-    if (urlLkUrl && urlRoom && urlKey && urlSecret && urlRole === 'STUDENT') {
+    if (urlLkUrl && urlRoom && urlRole === 'STUDENT') {
       setLivekitUrl(urlLkUrl);
       setRoomName(urlRoom);
-      setApiKey(urlKey);
-      setApiSecret(urlSecret);
+      if (urlKey) setApiKey(urlKey);
+      if (urlSecret) setApiSecret(urlSecret);
       setRole('STUDENT');
       window.history.replaceState({}, '', window.location.pathname);
     }
@@ -353,6 +386,7 @@ function App() {
     setConnectionState(ConnectionState.Disconnected);
     setRole(null);
     setParticipants([]);
+    setVideoElements(new Map());
     setStudentJoinInfo('');
     setViewMode('lobby');
     setActiveGameId(null);
@@ -704,6 +738,14 @@ function App() {
         onDisconnect={handleDisconnect}
       />
 
+      {/* ビデオタイル */}
+      {videoElements.size > 0 && (
+        <VideoTiles
+          videoElements={videoElements}
+          localIdentity={classroomRef.current?.localIdentity ?? ''}
+        />
+      )}
+
       {/* 接続エラー */}
       {connectionError && (
         <div className="bg-red-500/20 border border-red-500/30 text-red-300 px-4 py-2 rounded-xl text-sm">
@@ -753,6 +795,11 @@ function App() {
             onSelectSavedGame={handleSelectSavedGame}
             onSelectGame={handleSelectGame}
             myIdentity={classroomRef.current?.localIdentity ?? userName}
+            students={students}
+            classrooms={classrooms}
+            selectedClassroomId={selectedClassroomId}
+            onSelectClassroom={setSelectedClassroomId}
+            onOpenStudentManager={() => setShowStudentManager(true)}
           />
         )}
 
@@ -822,6 +869,17 @@ function App() {
           teacherName={userName}
           onClose={() => setShowGameCreation(false)}
           onCreate={handleCreateGame}
+          registeredStudents={students}
+        />
+      )}
+
+      {/* 生徒・教室管理モーダル */}
+      {showStudentManager && (
+        <StudentManager
+          students={students}
+          classrooms={classrooms}
+          onDataChanged={reloadClassroomData}
+          onClose={() => setShowStudentManager(false)}
         />
       )}
     </div>

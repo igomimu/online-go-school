@@ -139,8 +139,8 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         const isBorder = i === 1 || i === boardSize;
         const width = isBorder ? BORDER_WIDTH : LINE_WIDTH;
 
-        lines.push(<line key={`v-${i}`} x1={pos} y1={start} x2={pos} y2={end} stroke="black" strokeWidth={width} strokeLinecap="square" shapeRendering="crispEdges" />);
-        lines.push(<line key={`h-${i}`} x1={start} y1={pos} x2={end} y2={pos} stroke="black" strokeWidth={width} strokeLinecap="square" shapeRendering="crispEdges" />);
+        lines.push(<line key={`v-${i}`} x1={pos} y1={start} x2={pos} y2={end} stroke="black" strokeWidth={width} strokeLinecap="square" shapeRendering="geometricPrecision" />);
+        lines.push(<line key={`h-${i}`} x1={start} y1={pos} x2={end} y2={pos} stroke="black" strokeWidth={width} strokeLinecap="square" shapeRendering="geometricPrecision" />);
     }
 
     const coords = [];
@@ -279,6 +279,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             viewBox={viewBoxData.str}
             xmlns="http://www.w3.org/2000/svg"
             className="select-none w-full h-auto max-w-[800px] mx-auto"
+            shapeRendering="geometricPrecision"
             onMouseUp={onDragEnd}
             onMouseLeave={onDragEnd}
             onWheel={(e) => onBoardWheel?.(e.deltaY)}

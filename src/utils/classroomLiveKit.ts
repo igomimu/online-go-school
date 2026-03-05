@@ -4,6 +4,7 @@ import {
   RemoteParticipant,
   RemoteTrack,
   RemoteTrackPublication,
+  LocalTrackPublication,
   ConnectionState,
   Track,
   type Participant,
@@ -65,6 +66,12 @@ export type ClassroomEventHandler = {
   onActiveSpeakersChanged?: (speakers: string[]) => void;
 };
 
+export interface VideoTrackInfo {
+  identity: string;
+  element: HTMLVideoElement | null;
+  isLocal: boolean;
+}
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -79,12 +86,19 @@ const RELIABLE_TYPES = new Set<string>([
 export class ClassroomLiveKit {
   room: Room;
   private handlers: ClassroomEventHandler = {};
+  private _videoElements = new Map<string, HTMLVideoElement>();
+  onVideoTrackChanged?: (info: VideoTrackInfo) => void;
 
   constructor() {
     this.room = new Room({
       adaptiveStream: true,
       dynacast: true,
       disconnectOnPageLeave: true,
+      audioCaptureDefaults: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
     });
     this.setupEventListeners();
   }
@@ -131,14 +145,64 @@ export class ClassroomLiveKit {
         document.body.appendChild(el);
       }
       if (track.kind === Track.Kind.Video) {
+        const el = track.attach() as HTMLVideoElement;
+        this._videoElements.set(participant.identity, el);
+        this.onVideoTrackChanged?.({
+          identity: participant.identity,
+          element: el,
+          isLocal: false,
+        });
         this.notifyParticipantsChanged();
       }
     });
 
     this.room.on(RoomEvent.TrackUnsubscribed, (
       track: RemoteTrack,
+      _publication: RemoteTrackPublication,
+      participant: RemoteParticipant,
     ) => {
       track.detach().forEach(el => el.remove());
+      if (track.kind === Track.Kind.Video) {
+        this._videoElements.delete(participant.identity);
+        this.onVideoTrackChanged?.({
+          identity: participant.identity,
+          element: null,
+          isLocal: false,
+        });
+      }
+    });
+
+    // ローカルビデオトラック公開時
+    this.room.on(RoomEvent.LocalTrackPublished, (
+      publication: LocalTrackPublication,
+    ) => {
+      const track = publication.track;
+      if (track && track.kind === Track.Kind.Video) {
+        const el = track.attach() as HTMLVideoElement;
+        const identity = this.room.localParticipant.identity;
+        this._videoElements.set(identity, el);
+        this.onVideoTrackChanged?.({
+          identity,
+          element: el,
+          isLocal: true,
+        });
+      }
+    });
+
+    this.room.on(RoomEvent.LocalTrackUnpublished, (
+      publication: LocalTrackPublication,
+    ) => {
+      const track = publication.track;
+      if (track && track.kind === Track.Kind.Video) {
+        track.detach().forEach(el => el.remove());
+        const identity = this.room.localParticipant.identity;
+        this._videoElements.delete(identity);
+        this.onVideoTrackChanged?.({
+          identity,
+          element: null,
+          isLocal: true,
+        });
+      }
     });
 
     this.room.on(RoomEvent.TrackMuted, () => this.notifyParticipantsChanged());
@@ -262,11 +326,23 @@ export class ClassroomLiveKit {
     return this.room.localParticipant?.isCameraEnabled ?? false;
   }
 
+  getLocalVideoElement(): HTMLVideoElement | undefined {
+    const identity = this.room.localParticipant?.identity;
+    return identity ? this._videoElements.get(identity) : undefined;
+  }
+
+  getVideoElements(): Map<string, HTMLVideoElement> {
+    return new Map(this._videoElements);
+  }
+
   private notifyParticipantsChanged() {
     this.handlers.onParticipantsChanged?.(this.participants);
   }
 
   destroy() {
+    // ビデオ要素のクリーンアップ
+    this._videoElements.forEach(el => el.remove());
+    this._videoElements.clear();
     this.room.disconnect();
   }
 }

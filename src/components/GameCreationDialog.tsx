@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import type { Student } from '../types/classroom';
+import { suggestHandicap } from '../types/classroom';
 
 interface GameCreationDialogProps {
-  students: string[];  // 利用可能な生徒名一覧
+  students: string[];  // 利用可能な生徒名一覧（LiveKit identity）
   teacherName: string;
   onClose: () => void;
   onCreate: (opts: {
@@ -12,6 +14,7 @@ interface GameCreationDialogProps {
     handicap: number;
     komi: number;
   }) => void;
+  registeredStudents?: Student[];  // 登録済み生徒データ（棋力表示用）
 }
 
 const BOARD_SIZES = [19, 13, 9];
@@ -21,6 +24,7 @@ export default function GameCreationDialog({
   teacherName,
   onClose,
   onCreate,
+  registeredStudents = [],
 }: GameCreationDialogProps) {
   // 「先生」も含めたプレイヤー候補
   const allPlayers = [teacherName, ...students];
@@ -30,6 +34,22 @@ export default function GameCreationDialog({
   const [boardSize, setBoardSize] = useState(19);
   const [handicap, setHandicap] = useState(0);
   const [komi, setKomi] = useState(6.5);
+
+  // 名前から登録生徒を検索
+  const getRank = (name: string): string => {
+    return registeredStudents.find(s => s.name === name)?.rank || '';
+  };
+
+  // 棋力差から置き石を自動提案
+  useEffect(() => {
+    const bRank = getRank(blackPlayer);
+    const wRank = getRank(whitePlayer);
+    if (bRank && wRank) {
+      const suggestion = suggestHandicap(bRank, wRank);
+      setHandicap(suggestion.handicap);
+      setKomi(suggestion.komi);
+    }
+  }, [blackPlayer, whitePlayer, registeredStudents]);
 
   const handleSubmit = () => {
     if (blackPlayer === whitePlayer) return;
@@ -48,29 +68,53 @@ export default function GameCreationDialog({
 
         {/* 黒番 */}
         <div>
-          <label className="block text-sm text-zinc-400 mb-1">黒番</label>
+          <label className="block text-sm text-zinc-400 mb-1">
+            黒番
+            {getRank(blackPlayer) && (
+              <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-xs font-mono">
+                {getRank(blackPlayer)}
+              </span>
+            )}
+          </label>
           <select
             value={blackPlayer}
             onChange={e => setBlackPlayer(e.target.value)}
             className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
           >
-            {allPlayers.map(p => (
-              <option key={p} value={p}>{p}{p === teacherName ? '（先生）' : ''}</option>
-            ))}
+            {allPlayers.map(p => {
+              const rank = getRank(p);
+              return (
+                <option key={p} value={p}>
+                  {p}{p === teacherName ? '（先生）' : ''}{rank ? ` [${rank}]` : ''}
+                </option>
+              );
+            })}
           </select>
         </div>
 
         {/* 白番 */}
         <div>
-          <label className="block text-sm text-zinc-400 mb-1">白番</label>
+          <label className="block text-sm text-zinc-400 mb-1">
+            白番
+            {getRank(whitePlayer) && (
+              <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-xs font-mono">
+                {getRank(whitePlayer)}
+              </span>
+            )}
+          </label>
           <select
             value={whitePlayer}
             onChange={e => setWhitePlayer(e.target.value)}
             className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
           >
-            {allPlayers.map(p => (
-              <option key={p} value={p}>{p}{p === teacherName ? '（先生）' : ''}</option>
-            ))}
+            {allPlayers.map(p => {
+              const rank = getRank(p);
+              return (
+                <option key={p} value={p}>
+                  {p}{p === teacherName ? '（先生）' : ''}{rank ? ` [${rank}]` : ''}
+                </option>
+              );
+            })}
           </select>
         </div>
 
