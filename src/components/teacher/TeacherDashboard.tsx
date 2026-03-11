@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { GameSession, AudioPermissions } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom } from '../../types/classroom';
@@ -10,6 +10,7 @@ import ChatPanel from './ChatPanel';
 import RoomTabs from './RoomTabs';
 import TeacherToolbar from './TeacherToolbar';
 import VideoTiles from '../VideoTiles';
+import ClassroomSettingsDialog from './ClassroomSettingsDialog';
 
 interface TeacherDashboardProps {
   participants: ParticipantInfo[];
@@ -32,6 +33,7 @@ interface TeacherDashboardProps {
   onLoadSgf: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onDisconnect: () => void;
   onOpenStudentManager: () => void;
+  onReloadData: () => void;
 }
 
 export default function TeacherDashboard({
@@ -55,7 +57,9 @@ export default function TeacherDashboard({
   onLoadSgf,
   onDisconnect,
   onOpenStudentManager,
+  onReloadData,
 }: TeacherDashboardProps) {
+  const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   // 教室が未選択で教室データがあれば最初の教室を自動選択
   useEffect(() => {
     if (!selectedClassroomId && classrooms.length > 0) {
@@ -229,6 +233,9 @@ export default function TeacherDashboard({
         onLoadSgf={onLoadSgf}
         onDisconnect={onDisconnect}
         onOpenStudentManager={onOpenStudentManager}
+        onEditClassroom={() => {
+          if (selectedClassroom) setEditingClassroom(selectedClassroom);
+        }}
       />
 
       {/* 部屋タブ（IGC最下部） */}
@@ -237,6 +244,19 @@ export default function TeacherDashboard({
         selectedClassroomId={selectedClassroomId}
         onSelectClassroom={onSelectClassroom}
       />
+
+      {/* 教室設定ダイアログ（生徒入替） */}
+      {editingClassroom && (
+        <ClassroomSettingsDialog
+          classroom={editingClassroom}
+          allStudents={students}
+          onSave={() => {
+            setEditingClassroom(null);
+            onReloadData();
+          }}
+          onClose={() => setEditingClassroom(null)}
+        />
+      )}
     </div>
   );
 }

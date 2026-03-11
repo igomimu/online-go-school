@@ -23,6 +23,7 @@ import MediaControlPanel from './components/MediaControlPanel';
 import VideoTiles from './components/VideoTiles';
 import StudentManager from './components/StudentManager';
 import TeacherDashboard from './components/teacher/TeacherDashboard';
+import ClassroomManager from './components/teacher/ClassroomManager';
 import { useChat } from './hooks/useChat';
 import { useNotificationSound } from './hooks/useNotificationSound';
 import type { ChatMessagePayload } from './types/chat';
@@ -47,6 +48,9 @@ function App() {
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
   const [showGameCreation, setShowGameCreation] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+
+  // 教師フェーズ: manage=教室管理, classroom=授業中
+  const [teacherPhase, setTeacherPhase] = useState<'manage' | 'classroom'>('manage');
 
   // 音声・映像
   const [isMicEnabled, setIsMicEnabled] = useState(false);
@@ -409,12 +413,17 @@ function App() {
     classroomRef.current?.destroy();
     classroomRef.current = null;
     setConnectionState(ConnectionState.Disconnected);
-    setRole(null);
     setParticipants([]);
     setVideoElements(new Map());
     setStudentJoinInfo('');
     setViewMode('lobby');
     setActiveGameId(null);
+    // 教師は教室管理ページに戻る、生徒はロール選択に戻る
+    if (role === 'TEACHER') {
+      setTeacherPhase('manage');
+    } else {
+      setRole(null);
+    }
   };
 
   const saveSettings = () => {
@@ -613,12 +622,8 @@ function App() {
           <button
             onClick={() => {
               if (!userName.trim()) return;
-              if (!livekitUrl || !apiKey || !apiSecret) {
-                setShowSettings(true);
-                return;
-              }
               setRole('TEACHER');
-              connectLiveKit('TEACHER', userName.trim());
+              setTeacherPhase('manage');
             }}
             className="glass-panel p-8 flex flex-col items-center gap-4 hover:bg-white/5 transition-all group"
           >
@@ -627,7 +632,7 @@ function App() {
             </div>
             <div className="text-center">
               <h3 className="text-2xl font-bold">先生</h3>
-              <p className="text-zinc-500 mt-2">教室を作成し授業を行います</p>
+              <p className="text-zinc-500 mt-2">教室を管理し授業を行います</p>
             </div>
             <div className="premium-button mt-4 w-full">先生として参加</div>
           </button>
@@ -706,6 +711,38 @@ function App() {
           </button>
         </div>
       </div>
+    );
+  }
+
+  // --- 教師: 教室管理ページ ---
+  if (role === 'TEACHER' && teacherPhase === 'manage') {
+    return (
+      <>
+        <ClassroomManager
+          students={students}
+          classrooms={classrooms}
+          onLaunchClassroom={(classroomId) => {
+            if (!livekitUrl || !apiKey || !apiSecret) {
+              setShowSettings(true);
+              return;
+            }
+            setSelectedClassroomId(classroomId);
+            setTeacherPhase('classroom');
+            connectLiveKit('TEACHER', userName.trim());
+          }}
+          onOpenSettings={() => setShowSettings(true)}
+          onOpenStudentManager={() => setShowStudentManager(true)}
+          onReloadData={reloadClassroomData}
+        />
+        {showStudentManager && (
+          <StudentManager
+            students={students}
+            classrooms={classrooms}
+            onDataChanged={reloadClassroomData}
+            onClose={() => setShowStudentManager(false)}
+          />
+        )}
+      </>
     );
   }
 
@@ -813,6 +850,7 @@ function App() {
             onLoadSgf={handleSgfLoadFromLobby}
             onDisconnect={handleDisconnect}
             onOpenStudentManager={() => setShowStudentManager(true)}
+            onReloadData={reloadClassroomData}
           />
         )}
 

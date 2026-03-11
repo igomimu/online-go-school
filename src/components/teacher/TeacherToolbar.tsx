@@ -7,6 +7,7 @@ interface TeacherToolbarProps {
   onLoadSgf: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onDisconnect: () => void;
   onOpenStudentManager: () => void;
+  onEditClassroom?: () => void;
 }
 
 // IGC風のボタン
@@ -37,6 +38,7 @@ export default function TeacherToolbar({
   onLoadSgf,
   onDisconnect,
   onOpenStudentManager,
+  onEditClassroom,
 }: TeacherToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
@@ -120,6 +122,7 @@ export default function TeacherToolbar({
         <input ref={fileInputRef} type="file" accept=".sgf" onChange={onLoadSgf} className="hidden" />
         <IgcButton label="SGF読込" color="#d0d0c8" onClick={() => fileInputRef.current?.click()} />
 
+        <IgcButton label="生徒入替" color="#f0e060" onClick={onEditClassroom} />
         <IgcButton label="生徒管理" color="#d0d0c8" onClick={onOpenStudentManager} />
 
         {studentJoinInfo && (
