@@ -1,8 +1,8 @@
-import type { GameSession, SavedGame, AudioPermissions } from '../../types/game';
+import { useEffect } from 'react';
+import type { GameSession, AudioPermissions } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
-import type { VideoTrackInfo } from '../../utils/classroomLiveKit';
 
 import StudentTable from './StudentTable';
 import BoardThumbnailGrid from './BoardThumbnailGrid';
@@ -69,6 +69,13 @@ export default function TeacherDashboard({
   onDisconnect,
   onOpenStudentManager,
 }: TeacherDashboardProps) {
+  // 教室が未選択で教室データがあれば最初の教室を自動選択
+  useEffect(() => {
+    if (!selectedClassroomId && classrooms.length > 0) {
+      onSelectClassroom(classrooms[0].id);
+    }
+  }, [selectedClassroomId, classrooms, onSelectClassroom]);
+
   // 教室フィルタリング
   const selectedClassroom = selectedClassroomId
     ? classrooms.find(c => c.id === selectedClassroomId)
@@ -118,7 +125,7 @@ export default function TeacherDashboard({
         />
       </div>
 
-      {/* 中央: 碁盤グリッド + 右サイドバー（ビデオ+チャット） */}
+      {/* 中央: 碁盤グリッド + 右サイドバー（ビデオ右上+チャット右下） */}
       <div className="flex-1 flex min-h-0">
         {/* 碁盤サムネイルグリッド */}
         <div className="flex-1 overflow-y-auto p-3">
@@ -130,19 +137,21 @@ export default function TeacherDashboard({
           />
         </div>
 
-        {/* 右サイドバー: ビデオ + チャット */}
+        {/* 右サイドバー */}
         <div className="w-72 border-l border-white/10 flex flex-col min-h-0 hidden lg:flex">
-          {/* ビデオ */}
-          {videoElements.size > 0 && (
-            <div className="border-b border-white/10 p-2">
+          {/* 右上: ビデオ映像 */}
+          <div className="border-b border-white/10 p-2 bg-black/30">
+            {videoElements.size > 0 ? (
               <VideoTiles
                 videoElements={videoElements}
                 localIdentity={localIdentity}
               />
-            </div>
-          )}
+            ) : (
+              <div className="text-xs text-zinc-600 text-center py-4">カメラOFFです</div>
+            )}
+          </div>
 
-          {/* チャット */}
+          {/* 右下: チャット */}
           <div className="flex-1 min-h-0">
             <ChatPanel
               messages={chatMessages}
