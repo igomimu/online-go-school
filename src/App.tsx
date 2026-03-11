@@ -733,15 +733,8 @@ function App() {
           onOpenSettings={() => setShowSettings(true)}
           onOpenStudentManager={() => setShowStudentManager(true)}
           onReloadData={reloadClassroomData}
+          onBack={() => setRole(null)}
         />
-        {showStudentManager && (
-          <StudentManager
-            students={students}
-            classrooms={classrooms}
-            onDataChanged={reloadClassroomData}
-            onClose={() => setShowStudentManager(false)}
-          />
-        )}
       </>
     );
   }
