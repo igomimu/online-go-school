@@ -7,8 +7,11 @@ import {
   addClassroom,
   deleteClassroom,
   importAll,
+  loadStudents,
+  saveStudents,
 } from '../../utils/classroomStore';
 import { parseIgcXml } from '../../utils/igcImport';
+import { fetchDojoNetStudents } from '../../utils/dojoSync';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
 
 interface ClassroomManagerProps {
@@ -44,7 +47,39 @@ export default function ClassroomManager({
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 道場アプリからネット生を同期
+  const handleDojoSync = async () => {
+    setSyncing(true);
+    setImportResult(null);
+    const result = await fetchDojoNetStudents();
+    if (result.error) {
+      setImportResult(`エラー: ${result.error}`);
+      setSyncing(false);
+      return;
+    }
+    // 既存の生徒とマージ（IDが同じなら上書き、なければ追加）
+    const existing = loadStudents();
+    const merged = [...existing];
+    let addedCount = 0;
+    let updatedCount = 0;
+    for (const s of result.students) {
+      const idx = merged.findIndex(e => e.id === s.id);
+      if (idx >= 0) {
+        merged[idx] = s;
+        updatedCount++;
+      } else {
+        merged.push(s);
+        addedCount++;
+      }
+    }
+    saveStudents(merged);
+    onReloadData();
+    setImportResult(`道場連携完了: ${result.students.length}名のネット生（追加${addedCount}名, 更新${updatedCount}名）`);
+    setSyncing(false);
+  };
 
   // 生徒フォーム
   const emptyForm: Student = { id: '', name: '', rank: '', internalRating: '', type: '', grade: '', country: '' };
@@ -217,6 +252,11 @@ export default function ClassroomManager({
             <div style={{ fontWeight: 'bold', marginBottom: 6 }}>データ登録</div>
             <input ref={fileInputRef} type="file" accept=".xml" onChange={handleImportFile} style={{ display: 'none' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <IgcButton
+                label={syncing ? '同期中...' : '道場アプリ連携（ネット生）'}
+                color="#ff9060"
+                onClick={syncing ? undefined : handleDojoSync}
+              />
               <IgcButton label="XMLインポート" color="#90d060" onClick={() => fileInputRef.current?.click()} />
               <IgcButton label="教室を追加" color="#60c0f0" onClick={handleAddClassroom} />
               <IgcButton label="生徒を追加" color="#f0c060" onClick={() => { setActiveTab('student'); startAddStudent(); }} />
