@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import {
-  Plus, BookOpen, Upload, LogOut, Link, Copy, Check,
-  Users, Settings,
+  Plus, BookOpen, Upload, LogOut, Link, Check,
+  Users,
 } from 'lucide-react';
 import { useState } from 'react';
 

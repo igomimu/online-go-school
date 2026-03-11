@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import type { GameSession, AudioPermissions } from '../../types/game';
+import type { GameSession, SavedGame, AudioPermissions } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
@@ -9,6 +9,7 @@ import BoardThumbnailGrid from './BoardThumbnailGrid';
 import ChatPanel from './ChatPanel';
 import RoomTabs from './RoomTabs';
 import TeacherToolbar from './TeacherToolbar';
+import SavedGameList from '../SavedGameList';
 import VideoTiles from '../VideoTiles';
 
 interface TeacherDashboardProps {
@@ -45,6 +46,7 @@ interface TeacherDashboardProps {
   onLoadSgf: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onDisconnect: () => void;
   onOpenStudentManager: () => void;
+  onSelectSavedGame: (game: SavedGame) => void;
 }
 
 export default function TeacherDashboard({
@@ -68,6 +70,7 @@ export default function TeacherDashboard({
   onLoadSgf,
   onDisconnect,
   onOpenStudentManager,
+  onSelectSavedGame,
 }: TeacherDashboardProps) {
   // 教室が未選択で教室データがあれば最初の教室を自動選択
   useEffect(() => {
@@ -151,7 +154,7 @@ export default function TeacherDashboard({
             )}
           </div>
 
-          {/* 右下: チャット */}
+          {/* 右中: チャット */}
           <div className="flex-1 min-h-0">
             <ChatPanel
               messages={chatMessages}
@@ -159,6 +162,12 @@ export default function TeacherDashboard({
               localIdentity={localIdentity}
               onSend={onChatSend}
             />
+          </div>
+
+          {/* 右下: 保存棋譜 */}
+          <div className="border-t border-white/10 p-2 max-h-32 overflow-y-auto">
+            <div className="text-xs text-zinc-400 font-medium mb-1">保存棋譜</div>
+            <SavedGameList onSelectGame={onSelectSavedGame} />
           </div>
         </div>
       </div>

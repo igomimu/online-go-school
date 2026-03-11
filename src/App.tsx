@@ -828,6 +828,7 @@ function App() {
             onLoadSgf={handleSgfLoadFromLobby}
             onDisconnect={handleDisconnect}
             onOpenStudentManager={() => setShowStudentManager(true)}
+            onSelectSavedGame={handleSelectSavedGame}
           />
         )}
 
