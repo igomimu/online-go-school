@@ -13,33 +13,20 @@ import SavedGameList from '../SavedGameList';
 import VideoTiles from '../VideoTiles';
 
 interface TeacherDashboardProps {
-  // 参加者
   participants: ParticipantInfo[];
   localIdentity: string;
-
-  // 生徒・教室データ
   students: Student[];
   classrooms: Classroom[];
   selectedClassroomId: string | null;
   onSelectClassroom: (id: string | null) => void;
-
-  // 対局
   games: GameSession[];
   onSelectGame: (gameId: string) => void;
-
-  // 音声制御
   audioPermissions: AudioPermissions;
   onToggleHear: (identity: string) => void;
   onToggleMic: (identity: string) => void;
-
-  // チャット
   chatMessages: ChatMessage[];
   onChatSend: (text: string, target: 'all' | string) => void;
-
-  // ビデオ
   videoElements: Map<string, HTMLVideoElement>;
-
-  // ツールバーアクション
   studentJoinInfo: string;
   onCreateGame: () => void;
   onStartLecture: () => void;
@@ -95,7 +82,6 @@ export default function TeacherDashboard({
       })
     : participants;
 
-  // フィルタされた生徒に関連する対局のみ
   const filteredGames = selectedClassroom
     ? games.filter(g => {
         const identities = filteredParticipants.map(p => p.identity);
@@ -103,20 +89,47 @@ export default function TeacherDashboard({
       })
     : games;
 
-  const remoteCount = participants.filter(p => p.identity !== localIdentity).length;
+  // タイトルバーのクラス名
+  const classroomName = selectedClassroom?.name || 'オンライン囲碁教室';
 
   return (
-    <div className="flex flex-col h-full gap-0">
-      {/* 部屋タブ */}
-      <RoomTabs
-        classrooms={classrooms}
-        selectedClassroomId={selectedClassroomId}
-        onSelectClassroom={onSelectClassroom}
-        participantCount={remoteCount}
-      />
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100vh',
+      background: '#d0d0c8',
+      color: '#333',
+      fontFamily: 'MS Gothic, "Noto Sans JP", monospace',
+      fontSize: 12,
+    }}>
+      {/* タイトルバー（IGC風） */}
+      <div style={{
+        background: '#3030a0',
+        color: 'white',
+        padding: '4px 10px',
+        fontSize: 13,
+        fontWeight: 'bold',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+      }}>
+        <span style={{
+          background: '#333',
+          color: 'white',
+          borderRadius: '50%',
+          width: 22,
+          height: 22,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 10,
+          fontWeight: 'bold',
+        }}>囲</span>
+        オンライン囲碁教室 〜 {classroomName}
+      </div>
 
       {/* 生徒一覧テーブル */}
-      <div className="border-b border-white/10 max-h-[30vh] overflow-y-auto">
+      <div style={{ maxHeight: '35vh', overflowY: 'auto', borderBottom: '2px solid #999' }}>
         <StudentTable
           participants={filteredParticipants}
           students={filteredStudents}
@@ -128,10 +141,10 @@ export default function TeacherDashboard({
         />
       </div>
 
-      {/* 中央: 碁盤グリッド + 右サイドバー（ビデオ右上+チャット右下） */}
-      <div className="flex-1 flex min-h-0">
+      {/* 中央: 碁盤グリッド + 右サイドバー（ビデオ+チャット） */}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {/* 碁盤サムネイルグリッド */}
-        <div className="flex-1 overflow-y-auto p-3">
+        <div style={{ flex: 1, overflowY: 'auto' }}>
           <BoardThumbnailGrid
             games={filteredGames}
             students={filteredStudents}
@@ -141,21 +154,66 @@ export default function TeacherDashboard({
         </div>
 
         {/* 右サイドバー */}
-        <div className="w-72 border-l border-white/10 flex flex-col min-h-0 hidden lg:flex">
-          {/* 右上: ビデオ映像 */}
-          <div className="border-b border-white/10 p-2 bg-black/30">
+        <div style={{
+          width: 280,
+          borderLeft: '2px solid #999',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          background: '#e8e8e0',
+        }}>
+          {/* 右上: ビデオ映像エリア（黒背景） */}
+          <div style={{
+            background: '#000',
+            minHeight: 180,
+            borderBottom: '1px solid #999',
+            position: 'relative',
+          }}>
             {videoElements.size > 0 ? (
-              <VideoTiles
-                videoElements={videoElements}
-                localIdentity={localIdentity}
-              />
+              <div style={{ padding: 4 }}>
+                <VideoTiles
+                  videoElements={videoElements}
+                  localIdentity={localIdentity}
+                />
+              </div>
             ) : (
-              <div className="text-xs text-zinc-600 text-center py-4">カメラOFFです</div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                color: '#555',
+                fontSize: 11,
+              }}>
+                カメラ映像
+              </div>
             )}
           </div>
 
-          {/* 右中: チャット */}
-          <div className="flex-1 min-h-0">
+          {/* 自分の映像を表示チェック + ボタン */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '4px 6px',
+            borderBottom: '1px solid #999',
+          }}>
+            <label style={{ fontSize: 11, flex: 1, color: '#333' }}>
+              <input type="checkbox" defaultChecked className="mr-1" />
+              自分の映像を表示
+            </label>
+            <button style={{
+              padding: '2px 8px', fontSize: 11, border: '1px solid #999',
+              background: '#e0f0e0', cursor: 'pointer',
+            }}>教室カメラ</button>
+            <button style={{
+              padding: '2px 8px', fontSize: 11, border: '1px solid #999',
+              background: '#e8e8e0', cursor: 'pointer',
+            }}>時間精算</button>
+          </div>
+
+          {/* チャット */}
+          <div style={{ flex: 1, minHeight: 0 }}>
             <ChatPanel
               messages={chatMessages}
               participants={participants}
@@ -163,16 +221,10 @@ export default function TeacherDashboard({
               onSend={onChatSend}
             />
           </div>
-
-          {/* 右下: 保存棋譜 */}
-          <div className="border-t border-white/10 p-2 max-h-32 overflow-y-auto">
-            <div className="text-xs text-zinc-400 font-medium mb-1">保存棋譜</div>
-            <SavedGameList onSelectGame={onSelectSavedGame} />
-          </div>
         </div>
       </div>
 
-      {/* ツールバー */}
+      {/* ツールバー（IGC最下部） */}
       <TeacherToolbar
         studentJoinInfo={studentJoinInfo}
         onCreateGame={onCreateGame}
@@ -180,6 +232,13 @@ export default function TeacherDashboard({
         onLoadSgf={onLoadSgf}
         onDisconnect={onDisconnect}
         onOpenStudentManager={onOpenStudentManager}
+      />
+
+      {/* 部屋タブ（IGC最下部） */}
+      <RoomTabs
+        classrooms={classrooms}
+        selectedClassroomId={selectedClassroomId}
+        onSelectClassroom={onSelectClassroom}
       />
     </div>
   );

@@ -11,39 +11,60 @@ export default function RoomTabs({
   classrooms,
   selectedClassroomId,
   onSelectClassroom,
-  participantCount,
 }: RoomTabsProps) {
+  // IGC: 最下部の部屋タブ「部屋1(1~)」「部屋2(11~)」形式
   return (
-    <div className="flex items-center gap-0.5 overflow-x-auto border-b border-white/10 px-1">
-      {/* 全員タブ */}
-      <button
-        onClick={() => onSelectClassroom(null)}
-        className={`px-3 py-1.5 text-sm whitespace-nowrap rounded-t transition-colors ${
-          selectedClassroomId === null
-            ? 'bg-indigo-600/20 text-indigo-300 border-b-2 border-indigo-500'
-            : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
-        }`}
-      >
-        全員
-        {participantCount != null && (
-          <span className="ml-1 text-xs text-zinc-500">({participantCount})</span>
-        )}
-      </button>
+    <div style={{
+      display: 'flex',
+      alignItems: 'flex-end',
+      gap: 0,
+      background: '#c0c0b8',
+      borderTop: '1px solid #999',
+      paddingLeft: 2,
+      fontFamily: 'MS Gothic, monospace',
+    }}>
+      {classrooms.map((cls, i) => {
+        const isSelected = selectedClassroomId === cls.id;
+        const startNum = i * 10 + 1;
+        return (
+          <button
+            key={cls.id}
+            onClick={() => onSelectClassroom(cls.id)}
+            style={{
+              padding: '4px 12px',
+              fontSize: 13,
+              fontWeight: 'bold',
+              border: '1px solid #999',
+              borderBottom: isSelected ? '1px solid #e8e8e0' : '1px solid #999',
+              background: isSelected ? '#e8e8e0' : '#d0d0c8',
+              cursor: 'pointer',
+              marginBottom: -1,
+              borderRadius: '4px 4px 0 0',
+              color: '#333',
+            }}
+          >
+            部屋{i + 1}({startNum}〜)
+          </button>
+        );
+      })}
 
-      {classrooms.map(cls => (
+      {classrooms.length === 0 && (
         <button
-          key={cls.id}
-          onClick={() => onSelectClassroom(cls.id)}
-          className={`px-3 py-1.5 text-sm whitespace-nowrap rounded-t transition-colors ${
-            selectedClassroomId === cls.id
-              ? 'bg-indigo-600/20 text-indigo-300 border-b-2 border-indigo-500'
-              : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
-          }`}
+          onClick={() => onSelectClassroom(null)}
+          style={{
+            padding: '4px 12px',
+            fontSize: 13,
+            fontWeight: 'bold',
+            border: '1px solid #999',
+            borderBottom: '1px solid #e8e8e0',
+            background: '#e8e8e0',
+            borderRadius: '4px 4px 0 0',
+            color: '#333',
+          }}
         >
-          {cls.name}
-          <span className="ml-1 text-xs text-zinc-500">({cls.studentIds.length})</span>
+          部屋1(1〜)
         </button>
-      ))}
+      )}
     </div>
   );
 }

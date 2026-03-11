@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send } from 'lucide-react';
 import type { ChatMessage } from '../../types/chat';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 
@@ -20,7 +19,6 @@ export default function ChatPanel({
   const [target, setTarget] = useState<'all' | string>('all');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 新しいメッセージで自動スクロール
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -48,13 +46,19 @@ export default function ChatPanel({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* 送信先 */}
-      <div className="px-3 py-2 border-b border-white/5">
+    <div className="flex flex-col h-full" style={{ background: '#e8e8e0', fontFamily: 'MS Gothic, monospace' }}>
+      {/* 送信先 + トークルーム */}
+      <div style={{ padding: '4px 6px', borderBottom: '1px solid #999', display: 'flex', alignItems: 'center', gap: 8 }}>
         <select
           value={target}
           onChange={e => setTarget(e.target.value)}
-          className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500"
+          style={{
+            flex: 1,
+            border: '1px solid #999',
+            background: 'white',
+            fontSize: 12,
+            padding: '2px 4px',
+          }}
         >
           <option value="all">生徒全員</option>
           {remoteParticipants.map(p => (
@@ -63,25 +67,34 @@ export default function ChatPanel({
             </option>
           ))}
         </select>
+        <label style={{ fontSize: 11, whiteSpace: 'nowrap', color: '#333' }}>
+          <input type="checkbox" className="mr-1" />
+          トークルーム
+        </label>
       </div>
 
       {/* メッセージ表示 */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-1 min-h-0">
-        {messages.length === 0 && (
-          <div className="text-xs text-zinc-600 text-center py-4">
-            チャットメッセージはここに表示されます
-          </div>
-        )}
+      <div
+        ref={scrollRef}
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          background: '#1a1a1a',
+          color: '#ccc',
+          padding: 4,
+          fontSize: 11,
+          minHeight: 0,
+        }}
+      >
         {messages.map(msg => {
           const isMe = msg.sender === localIdentity;
           const isPrivate = msg.target !== 'all';
           return (
-            <div key={msg.id} className={`text-xs ${isMe ? 'text-zinc-300' : 'text-zinc-200'}`}>
-              <span className="text-zinc-600">[{formatTime(msg.timestamp)}]</span>
+            <div key={msg.id}>
+              <span style={{ color: '#666' }}>[{formatTime(msg.timestamp)}]</span>
               {' '}
-              {isPrivate && <span className="text-indigo-400">(個別)</span>}
-              {' '}
-              <span className={isMe ? 'text-indigo-300' : 'text-amber-300'}>
+              {isPrivate && <span style={{ color: '#88f' }}>(個別)</span>}
+              <span style={{ color: isMe ? '#8cf' : '#fc8' }}>
                 {msg.sender}:
               </span>
               {' '}
@@ -91,22 +104,35 @@ export default function ChatPanel({
         })}
       </div>
 
-      {/* 入力 */}
-      <div className="p-2 border-t border-white/5 flex gap-1">
+      {/* 入力 + チャットボタン */}
+      <div style={{ display: 'flex', gap: 2, padding: 4, borderTop: '1px solid #999' }}>
         <input
           type="text"
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="メッセージ..."
-          className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1.5 text-xs focus:outline-none focus:border-indigo-500"
+          style={{
+            flex: 1,
+            border: '1px solid #999',
+            background: 'white',
+            fontSize: 11,
+            padding: '2px 4px',
+          }}
         />
         <button
           onClick={handleSend}
           disabled={!text.trim()}
-          className="px-2 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded text-white disabled:opacity-30 transition-colors"
+          style={{
+            padding: '2px 12px',
+            fontSize: 12,
+            fontWeight: 'bold',
+            border: '1px solid #999',
+            background: '#f0e0c0',
+            cursor: text.trim() ? 'pointer' : 'default',
+            opacity: text.trim() ? 1 : 0.5,
+          }}
         >
-          <Send className="w-3.5 h-3.5" />
+          チャット
         </button>
       </div>
     </div>

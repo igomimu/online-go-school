@@ -1,9 +1,4 @@
-import { useRef } from 'react';
-import {
-  Plus, BookOpen, Upload, LogOut, Link, Check,
-  Users,
-} from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 interface TeacherToolbarProps {
   studentJoinInfo: string;
@@ -12,6 +7,27 @@ interface TeacherToolbarProps {
   onLoadSgf: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onDisconnect: () => void;
   onOpenStudentManager: () => void;
+}
+
+// IGC風のボタン
+function IgcButton({ label, color, onClick }: { label: string; color?: string; onClick?: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '4px 14px',
+        fontSize: 12,
+        fontWeight: 'bold',
+        fontFamily: 'MS Gothic, monospace',
+        border: '1px solid #666',
+        background: color || '#d0d0c8',
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {label}
+    </button>
+  );
 }
 
 export default function TeacherToolbar({
@@ -32,51 +48,83 @@ export default function TeacherToolbar({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
+  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+  const dayStr = dayNames[now.getDay()];
+
   return (
-    <div className="flex items-center gap-2 flex-wrap px-2 py-2 border-t border-white/10 bg-white/[0.02]">
-      <button onClick={onCreateGame} className="premium-button flex items-center gap-1.5 text-sm px-3 py-1.5">
-        <Plus className="w-4 h-4" /> 対局作成
-      </button>
+    <div style={{ fontFamily: 'MS Gothic, monospace' }}>
+      {/* 上段: 教室ID + クリアボタン群 */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '3px 6px',
+        background: '#4040a0',
+        color: 'white',
+      }}>
+        <span style={{ fontWeight: 'bold', fontSize: 14, marginRight: 8 }}>教室ID</span>
+        <span style={{ fontWeight: 'bold', fontSize: 14, color: '#ffff00', marginRight: 16 }}>
+          オンライン囲碁教室
+        </span>
+        <div style={{ flex: 1 }} />
+        <IgcButton label="【音声M】クリア" color="#d8d0c0" />
+        <IgcButton label="【音声S】クリア" color="#d8d0c0" />
+        <IgcButton label="【共有】クリア" color="#d8d0c0" />
+        <IgcButton label="座席チェック" color="#ffa500" />
+      </div>
 
-      <button onClick={onStartLecture} className="secondary-button flex items-center gap-1.5 text-sm px-3 py-1.5">
-        <BookOpen className="w-4 h-4" /> 授業
-      </button>
+      {/* 下段: アクションボタン群 */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '3px 6px',
+        background: '#c0c0b8',
+      }}>
+        {/* マイクアイコン的な表示 */}
+        <span style={{ fontSize: 18, marginRight: 4 }}>🎤</span>
 
-      <input ref={fileInputRef} type="file" accept=".sgf" onChange={onLoadSgf} className="hidden" />
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        className="secondary-button flex items-center gap-1.5 text-sm px-3 py-1.5"
-      >
-        <Upload className="w-4 h-4" /> SGF読込
-      </button>
+        <IgcButton label="退室" color="#d0d0c8" onClick={onDisconnect} />
+        <IgcButton label="共有検討" color="#6090d0" onClick={onStartLecture} />
 
-      <button onClick={onOpenStudentManager} className="secondary-button flex items-center gap-1.5 text-sm px-3 py-1.5">
-        <Users className="w-4 h-4" /> 生徒管理
-      </button>
+        <div style={{ flex: 1 }} />
 
-      {/* 区切り */}
-      <div className="flex-1" />
+        <IgcButton label="対局作成" color="#90d060" onClick={onCreateGame} />
 
-      {/* 参加リンク */}
-      {studentJoinInfo && (
-        <button
-          onClick={copyLink}
-          className="secondary-button flex items-center gap-1.5 text-sm px-3 py-1.5"
-          title="生徒用参加リンクをコピー"
-        >
-          {copied
-            ? <><Check className="w-4 h-4 text-green-400" /> コピー済み</>
-            : <><Link className="w-4 h-4" /> 参加リンク</>
-          }
-        </button>
-      )}
+        <input ref={fileInputRef} type="file" accept=".sgf" onChange={onLoadSgf} className="hidden" />
+        <IgcButton label="SGF読込" color="#d0d0c8" onClick={() => fileInputRef.current?.click()} />
 
-      <button
-        onClick={onDisconnect}
-        className="flex items-center gap-1.5 text-sm px-3 py-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-      >
-        <LogOut className="w-4 h-4" /> 退室
-      </button>
+        <IgcButton label="生徒管理" color="#d0d0c8" onClick={onOpenStudentManager} />
+
+        {studentJoinInfo && (
+          <IgcButton
+            label={copied ? '✓ コピー済み' : '参加リンク'}
+            color={copied ? '#90ee90' : '#f0c060'}
+            onClick={copyLink}
+          />
+        )}
+
+        <IgcButton label="回線復旧" color="#ff6060" />
+        <IgcButton label="ビデオリセット" color="#d0a0d0" />
+        <IgcButton label="設定" color="#d0d0c8" />
+
+        {/* 日時表示 */}
+        <div style={{
+          marginLeft: 8,
+          fontSize: 12,
+          fontWeight: 'bold',
+          color: '#cc0000',
+          textAlign: 'right',
+          lineHeight: 1.2,
+        }}>
+          <div>{dateStr}（{dayStr}曜日）</div>
+          <div id="igc-clock" style={{ fontSize: 14 }}>
+            {now.toLocaleTimeString('ja-JP')}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
