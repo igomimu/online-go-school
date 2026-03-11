@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import type { GameSession, SavedGame, AudioPermissions } from '../../types/game';
+import type { GameSession, AudioPermissions } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
@@ -9,7 +9,6 @@ import BoardThumbnailGrid from './BoardThumbnailGrid';
 import ChatPanel from './ChatPanel';
 import RoomTabs from './RoomTabs';
 import TeacherToolbar from './TeacherToolbar';
-import SavedGameList from '../SavedGameList';
 import VideoTiles from '../VideoTiles';
 
 interface TeacherDashboardProps {
@@ -33,7 +32,6 @@ interface TeacherDashboardProps {
   onLoadSgf: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onDisconnect: () => void;
   onOpenStudentManager: () => void;
-  onSelectSavedGame: (game: SavedGame) => void;
 }
 
 export default function TeacherDashboard({
@@ -57,7 +55,6 @@ export default function TeacherDashboard({
   onLoadSgf,
   onDisconnect,
   onOpenStudentManager,
-  onSelectSavedGame,
 }: TeacherDashboardProps) {
   // 教室が未選択で教室データがあれば最初の教室を自動選択
   useEffect(() => {

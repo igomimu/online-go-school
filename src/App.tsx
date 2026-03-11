@@ -5,7 +5,7 @@ import { convertSgfToGameTree } from './utils/treeUtilsV2';
 import { parseSGFTree } from './utils/sgfUtils';
 import { ClassroomLiveKit } from './utils/classroomLiveKit';
 import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './utils/classroomLiveKit';
-import type { ViewMode, GameSession, SavedGame, AudioPermissions } from './types/game';
+import type { ViewMode, GameSession, AudioPermissions } from './types/game';
 import type { Student, Classroom } from './types/classroom';
 import { fetchToken } from './utils/livekitToken';
 import { ConnectionState } from 'livekit-client';
@@ -502,21 +502,6 @@ function App() {
     event.target.value = '';
   }, []);
 
-  // 保存棋譜から検討開始
-  const handleSelectSavedGame = useCallback((game: SavedGame) => {
-    const parsed = parseSGFTree(game.sgf);
-    const root = convertSgfToGameTree(parsed.root, null, parsed.size, 1, parsed.board);
-    setReviewRootNode(root);
-    setReviewCurrentNode(root);
-    setReviewBoardSize(parsed.size);
-    setViewMode('review');
-
-    classroomRef.current?.broadcast({
-      type: 'REVIEW_START',
-      payload: { sgf: game.sgf, boardSize: parsed.size },
-    });
-  }, []);
-
   // 授業モード開始
   const handleStartLecture = () => {
     setViewMode('lecture');
@@ -828,7 +813,6 @@ function App() {
             onLoadSgf={handleSgfLoadFromLobby}
             onDisconnect={handleDisconnect}
             onOpenStudentManager={() => setShowStudentManager(true)}
-            onSelectSavedGame={handleSelectSavedGame}
           />
         )}
 
