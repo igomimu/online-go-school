@@ -68,6 +68,30 @@ export default function TeacherToolbar({
         <span style={{ fontWeight: 'bold', fontSize: 14, color: '#ffff00', marginRight: 16 }}>
           オンライン囲碁教室
         </span>
+
+        {/* 生徒招待リンク */}
+        {studentJoinInfo && (
+          <button
+            onClick={copyLink}
+            title="クリックでコピー"
+            style={{
+              background: copied ? '#90ee90' : '#2020a0',
+              color: copied ? '#333' : '#aaccff',
+              border: '1px solid #6060c0',
+              borderRadius: 3,
+              padding: '1px 10px',
+              fontSize: 11,
+              cursor: 'pointer',
+              maxWidth: 400,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {copied ? '✓ リンクコピー済み' : `📋 生徒招待リンク: ${studentJoinInfo.substring(0, 50)}...`}
+          </button>
+        )}
+
         <div style={{ flex: 1 }} />
         <IgcButton label="【音声M】クリア" color="#d8d0c0" />
         <IgcButton label="【音声S】クリア" color="#d8d0c0" />
