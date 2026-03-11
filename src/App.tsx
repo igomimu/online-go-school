@@ -22,6 +22,10 @@ import ReviewBoard from './components/ReviewBoard';
 import MediaControlPanel from './components/MediaControlPanel';
 import VideoTiles from './components/VideoTiles';
 import StudentManager from './components/StudentManager';
+import TeacherDashboard from './components/teacher/TeacherDashboard';
+import { useChat } from './hooks/useChat';
+import { useNotificationSound } from './hooks/useNotificationSound';
+import type { ChatMessagePayload } from './types/chat';
 
 import { Users, Video, Settings } from 'lucide-react';
 
@@ -87,6 +91,12 @@ function App() {
   }, []);
 
   const classroomRef = useRef<ClassroomLiveKit | null>(null);
+
+  // チャット
+  const chat = useChat(classroomRef);
+
+  // 通知音
+  const notificationSound = useNotificationSound();
 
   // 先生用: 対局管理
   const gameManager = useGameManager(classroomRef);
@@ -224,12 +234,27 @@ function App() {
             setIsMicEnabled(false);
           }
         }
+
+        // チャットメッセージ
+        if (msg.type === 'CHAT_MESSAGE' && msg.payload) {
+          chat.handleChatMessage(msg.payload as ChatMessagePayload);
+          notificationSound.play('chat');
+        }
+
+        // 対局終了時の通知音
+        if (msg.type === 'GAME_ENDED') {
+          notificationSound.play('gameEnd');
+        }
       },
       onParticipantJoined: (identity: string) => {
         // 先生: 新参加者に対局一覧を送信
         if (connectRole === 'TEACHER') {
           gameManager.syncGamesToParticipant(identity);
         }
+        notificationSound.play('connect');
+      },
+      onParticipantLeft: (_identity: string) => {
+        notificationSound.play('disconnect');
       },
       onParticipantsChanged: (p: ParticipantInfo[]) => {
         setParticipants(p);
@@ -738,8 +763,8 @@ function App() {
         onDisconnect={handleDisconnect}
       />
 
-      {/* ビデオタイル */}
-      {videoElements.size > 0 && (
+      {/* ビデオタイル（教師ロビー時はTeacherDashboard内に表示） */}
+      {videoElements.size > 0 && !(role === 'TEACHER' && effectiveViewMode === 'lobby') && (
         <VideoTiles
           videoElements={videoElements}
           localIdentity={classroomRef.current?.localIdentity ?? ''}
@@ -780,8 +805,33 @@ function App() {
 
       {/* メインコンテンツ */}
       <div className="flex-1">
-        {/* ロビー */}
-        {effectiveViewMode === 'lobby' && (
+        {/* ロビー: 教師はTeacherDashboard、生徒はLobby */}
+        {effectiveViewMode === 'lobby' && role === 'TEACHER' && (
+          <TeacherDashboard
+            participants={participants}
+            localIdentity={classroomRef.current?.localIdentity ?? ''}
+            students={students}
+            classrooms={classrooms}
+            selectedClassroomId={selectedClassroomId}
+            onSelectClassroom={setSelectedClassroomId}
+            games={games}
+            onSelectGame={handleSelectGame}
+            audioPermissions={audioPermissions}
+            onToggleHear={handleToggleHear}
+            onToggleMic={handleToggleStudentMic}
+            chatMessages={chat.messages}
+            onChatSend={chat.sendMessage}
+            videoElements={videoElements}
+            studentJoinInfo={studentJoinInfo}
+            onCreateGame={() => setShowGameCreation(true)}
+            onStartLecture={handleStartLecture}
+            onLoadSgf={handleSgfLoadFromLobby}
+            onDisconnect={handleDisconnect}
+            onOpenStudentManager={() => setShowStudentManager(true)}
+          />
+        )}
+
+        {effectiveViewMode === 'lobby' && role === 'STUDENT' && (
           <Lobby
             role={role}
             participants={participants}
@@ -789,17 +839,12 @@ function App() {
             activeSpeakers={activeSpeakers}
             games={games}
             studentJoinInfo={studentJoinInfo}
-            onCreateGame={() => setShowGameCreation(true)}
-            onStartLecture={handleStartLecture}
-            onLoadSgf={handleSgfLoadFromLobby}
-            onSelectSavedGame={handleSelectSavedGame}
             onSelectGame={handleSelectGame}
             myIdentity={classroomRef.current?.localIdentity ?? userName}
             students={students}
             classrooms={classrooms}
             selectedClassroomId={selectedClassroomId}
             onSelectClassroom={setSelectedClassroomId}
-            onOpenStudentManager={() => setShowStudentManager(true)}
           />
         )}
 
@@ -848,8 +893,8 @@ function App() {
         )}
       </div>
 
-      {/* 先生用: 音声映像制御パネル（ロビー時のみ表示） */}
-      {role === 'TEACHER' && isConnected && effectiveViewMode === 'lobby' && participants.length > 1 && (
+      {/* 先生用: 音声映像制御パネル（ロビー以外のviewMode時に表示 — ロビーはTeacherDashboardのStudentTableで制御） */}
+      {role === 'TEACHER' && isConnected && effectiveViewMode !== 'lobby' && participants.length > 1 && (
         <div className="glass-panel p-4 space-y-3">
           <h3 className="font-bold text-sm">音声・映像制御</h3>
           <MediaControlPanel

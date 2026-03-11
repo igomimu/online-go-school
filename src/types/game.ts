@@ -62,7 +62,8 @@ export type GameMessageType =
   | 'REVIEW_START'
   | 'REVIEW_END'
   | 'AUDIO_CONTROL'
-  | 'MEDIA_CONTROL';
+  | 'MEDIA_CONTROL'
+  | 'CHAT_MESSAGE';
 
 export interface GameCreatedPayload {
   game: GameSession;
