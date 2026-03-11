@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import type { ChatMessage } from '../../types/chat';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
+import type { Student } from '../../types/classroom';
+import { getDisplayName } from '../../utils/identityUtils';
 
 interface ChatPanelProps {
   messages: ChatMessage[];
   participants: ParticipantInfo[];
+  students: Student[];
   localIdentity: string;
   onSend: (text: string, target: 'all' | string) => void;
 }
@@ -12,6 +15,7 @@ interface ChatPanelProps {
 export default function ChatPanel({
   messages,
   participants,
+  students,
   localIdentity,
   onSend,
 }: ChatPanelProps) {
@@ -63,7 +67,7 @@ export default function ChatPanel({
           <option value="all">生徒全員</option>
           {remoteParticipants.map(p => (
             <option key={p.identity} value={p.identity}>
-              {p.identity}
+              {getDisplayName(p.identity, students)}
             </option>
           ))}
         </select>
@@ -95,7 +99,7 @@ export default function ChatPanel({
               {' '}
               {isPrivate && <span style={{ color: '#88f' }}>(個別)</span>}
               <span style={{ color: isMe ? '#8cf' : '#fc8' }}>
-                {msg.sender}:
+                {getDisplayName(msg.sender, students)}:
               </span>
               {' '}
               {msg.text}

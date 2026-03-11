@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { Student } from '../types/classroom';
 import { suggestHandicap } from '../types/classroom';
+import { findStudentByIdentity, getDisplayName } from '../utils/identityUtils';
 
 interface GameCreationDialogProps {
   students: string[];  // 利用可能な生徒名一覧（LiveKit identity）
@@ -35,9 +36,15 @@ export default function GameCreationDialog({
   const [handicap, setHandicap] = useState(0);
   const [komi, setKomi] = useState(6.5);
 
-  // 名前から登録生徒を検索
-  const getRank = (name: string): string => {
-    return registeredStudents.find(s => s.name === name)?.rank || '';
+  // identity から登録生徒を検索
+  const getRank = (identity: string): string => {
+    return findStudentByIdentity(identity, registeredStudents)?.rank || '';
+  };
+
+  // identity → 表示名
+  const displayName = (identity: string): string => {
+    if (identity === teacherName) return identity;
+    return getDisplayName(identity, registeredStudents);
   };
 
   // 棋力差から置き石を自動提案
@@ -85,7 +92,7 @@ export default function GameCreationDialog({
               const rank = getRank(p);
               return (
                 <option key={p} value={p}>
-                  {p}{p === teacherName ? '（先生）' : ''}{rank ? ` [${rank}]` : ''}
+                  {displayName(p)}{p === teacherName ? '（先生）' : ''}{rank ? ` [${rank}]` : ''}
                 </option>
               );
             })}
@@ -111,7 +118,7 @@ export default function GameCreationDialog({
               const rank = getRank(p);
               return (
                 <option key={p} value={p}>
-                  {p}{p === teacherName ? '（先生）' : ''}{rank ? ` [${rank}]` : ''}
+                  {displayName(p)}{p === teacherName ? '（先生）' : ''}{rank ? ` [${rank}]` : ''}
                 </option>
               );
             })}

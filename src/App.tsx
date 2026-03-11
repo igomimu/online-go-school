@@ -8,6 +8,7 @@ import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './
 import type { ViewMode, GameSession, AudioPermissions } from './types/game';
 import type { Student, Classroom } from './types/classroom';
 import { fetchToken } from './utils/livekitToken';
+import { makeStudentIdentity } from './utils/identityUtils';
 import { ConnectionState } from 'livekit-client';
 import { useGameManager } from './hooks/useGameManager';
 import { useGameView } from './hooks/useGameView';
@@ -88,6 +89,9 @@ function App() {
   const [classrooms, setClassrooms] = useState<Classroom[]>(() => loadClassrooms());
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [showStudentManager, setShowStudentManager] = useState(false);
+
+  // 生徒ID認証（URLパラメータから）
+  const [studentId, setStudentId] = useState<string | null>(null);
 
   const reloadClassroomData = useCallback(() => {
     setStudents(loadStudents());
@@ -329,6 +333,13 @@ function App() {
       setRoomName(urlRoom);
       if (urlKey) setApiKey(urlKey);
       if (urlSecret) setApiSecret(urlSecret);
+      // 生徒ID認証
+      const urlStudentId = params.get('studentId');
+      const urlStudentName = params.get('studentName');
+      if (urlStudentId) {
+        setStudentId(urlStudentId);
+        if (urlStudentName) setUserName(decodeURIComponent(urlStudentName));
+      }
       setRole('STUDENT');
       window.history.replaceState({}, '', window.location.pathname);
     }
@@ -677,22 +688,34 @@ function App() {
             <div className="text-center text-blue-400">接続中...</div>
           ) : hasCredentials ? (
             <>
-              <div>
-                <label className="block text-sm text-zinc-400 mb-1">お名前</label>
-                <input
-                  type="text" value={userName} onChange={e => setUserName(e.target.value)}
-                  placeholder="お名前を入力"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              <div className="text-sm text-zinc-500">
-                ルーム: <span className="text-zinc-300">{roomName}</span>
-              </div>
+              {studentId ? (
+                /* 登録済み生徒: 名前は自動設定（読み取り専用） */
+                <div className="text-center space-y-2">
+                  <div className="text-lg font-bold text-white">{userName}</div>
+                  <div className="text-xs text-zinc-500">登録済み生徒として参加します</div>
+                </div>
+              ) : (
+                /* ゲスト: 名前を自由入力 */
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1">お名前</label>
+                  <input
+                    type="text" value={userName} onChange={e => setUserName(e.target.value)}
+                    placeholder="お名前を入力"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
               {connectionError && (
                 <div className="text-red-400 text-sm bg-red-500/10 px-3 py-2 rounded-lg">{connectionError}</div>
               )}
               <button
-                onClick={() => { if (userName.trim()) connectLiveKit('STUDENT', userName.trim()); }}
+                onClick={() => {
+                  if (!userName.trim()) return;
+                  const identity = studentId
+                    ? makeStudentIdentity(studentId)
+                    : userName.trim();
+                  connectLiveKit('STUDENT', identity);
+                }}
                 disabled={!userName.trim()}
                 className="premium-button w-full disabled:opacity-30"
               >

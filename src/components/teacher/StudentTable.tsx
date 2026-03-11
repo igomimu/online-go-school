@@ -1,6 +1,7 @@
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student } from '../../types/classroom';
 import type { GameSession, AudioPermissions } from '../../types/game';
+import { findStudentByIdentity, getDisplayName } from '../../utils/identityUtils';
 
 interface StudentTableProps {
   participants: ParticipantInfo[];
@@ -192,13 +193,13 @@ function buildRows(
   // 接続中の参加者を先に（先生以外）
   for (const p of participants) {
     if (p.identity === localIdentity) continue;
-    const student = students.find(s => s.name === p.identity) || null;
+    const student = findStudentByIdentity(p.identity, students) || null;
     const game = games.find(g =>
       (g.blackPlayer === p.identity || g.whitePlayer === p.identity)
     );
     rows.push({
       identity: p.identity,
-      displayName: p.identity,
+      displayName: getDisplayName(p.identity, students),
       isConnected: true,
       student,
       gameStatus: game?.status || null,

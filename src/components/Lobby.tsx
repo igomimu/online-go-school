@@ -3,6 +3,7 @@ import { useState, useRef } from 'react';
 import type { GameSession, SavedGame } from '../types/game';
 import type { ParticipantInfo } from '../utils/classroomLiveKit';
 import type { Student, Classroom } from '../types/classroom';
+import { findStudentByIdentity, getDisplayName } from '../utils/identityUtils';
 import GameThumbnail from './GameThumbnail';
 import SavedGameList from './SavedGameList';
 import ClassroomSelector from './ClassroomSelector';
@@ -207,8 +208,9 @@ export default function Lobby({
               const inGame = games.some(g =>
                 g.status === 'playing' && (g.blackPlayer === p.identity || g.whitePlayer === p.identity)
               );
-              // 登録生徒の棋力を名前マッチで検索
-              const registered = students.find(s => s.name === p.identity);
+              // 登録生徒の棋力をID/名前マッチで検索
+              const registered = findStudentByIdentity(p.identity, students);
+              const name = getDisplayName(p.identity, students);
               return (
                 <div
                   key={p.identity}
@@ -218,7 +220,7 @@ export default function Lobby({
                 >
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className={`truncate ${isLocal ? 'font-semibold' : ''}`}>
-                      {p.identity}
+                      {name}
                       {isLocal && <span className="text-zinc-500 ml-1">(自分)</span>}
                     </span>
                     {registered?.rank && (

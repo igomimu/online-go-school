@@ -3,6 +3,7 @@ import type { GameSession, AudioPermissions } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
+import { findStudentByIdentity } from '../../utils/identityUtils';
 
 import StudentTable from './StudentTable';
 import BoardThumbnailGrid from './BoardThumbnailGrid';
@@ -11,6 +12,7 @@ import RoomTabs from './RoomTabs';
 import TeacherToolbar from './TeacherToolbar';
 import VideoTiles from '../VideoTiles';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
+import StudentLinkGenerator from './StudentLinkGenerator';
 
 interface TeacherDashboardProps {
   participants: ParticipantInfo[];
@@ -60,6 +62,7 @@ export default function TeacherDashboard({
   onReloadData,
 }: TeacherDashboardProps) {
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
+  const [showStudentLinks, setShowStudentLinks] = useState(false);
   // 教室が未選択で教室データがあれば最初の教室を自動選択
   useEffect(() => {
     if (!selectedClassroomId && classrooms.length > 0) {
@@ -78,7 +81,7 @@ export default function TeacherDashboard({
 
   const filteredParticipants = selectedClassroom
     ? participants.filter(p => {
-        const student = students.find(s => s.name === p.identity);
+        const student = findStudentByIdentity(p.identity, students);
         return student ? selectedClassroom.studentIds.includes(student.id) : false;
       })
     : participants;
@@ -218,6 +221,7 @@ export default function TeacherDashboard({
             <ChatPanel
               messages={chatMessages}
               participants={participants}
+              students={filteredStudents}
               localIdentity={localIdentity}
               onSend={onChatSend}
             />
@@ -236,6 +240,7 @@ export default function TeacherDashboard({
         onEditClassroom={() => {
           if (selectedClassroom) setEditingClassroom(selectedClassroom);
         }}
+        onShowStudentLinks={() => setShowStudentLinks(true)}
       />
 
       {/* 部屋タブ（IGC最下部） */}
@@ -255,6 +260,14 @@ export default function TeacherDashboard({
             onReloadData();
           }}
           onClose={() => setEditingClassroom(null)}
+        />
+      )}
+
+      {/* 生徒リンク一覧 */}
+      {showStudentLinks && (
+        <StudentLinkGenerator
+          students={filteredStudents}
+          onClose={() => setShowStudentLinks(false)}
         />
       )}
     </div>

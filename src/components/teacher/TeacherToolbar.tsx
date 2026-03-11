@@ -8,6 +8,7 @@ interface TeacherToolbarProps {
   onDisconnect: () => void;
   onOpenStudentManager: () => void;
   onEditClassroom?: () => void;
+  onShowStudentLinks?: () => void;
 }
 
 // IGC風のボタン
@@ -39,6 +40,7 @@ export default function TeacherToolbar({
   onDisconnect,
   onOpenStudentManager,
   onEditClassroom,
+  onShowStudentLinks,
 }: TeacherToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
@@ -123,6 +125,7 @@ export default function TeacherToolbar({
         <IgcButton label="SGF読込" color="#d0d0c8" onClick={() => fileInputRef.current?.click()} />
 
         <IgcButton label="生徒入替" color="#f0e060" onClick={onEditClassroom} />
+        <IgcButton label="生徒リンク" color="#a0d0f0" onClick={onShowStudentLinks} />
         <IgcButton label="生徒管理" color="#d0d0c8" onClick={onOpenStudentManager} />
 
         {studentJoinInfo && (

@@ -213,8 +213,8 @@ export default function ClassroomSettingsDialog({
               <IgcArrowButton label="↑" onClick={moveUp} />
               <IgcArrowButton label="↓" onClick={moveDown} />
               <div style={{ height: 16 }} />
-              <IgcArrowButton label="→" onClick={moveToEnrolled} />
-              <IgcArrowButton label="←" onClick={moveToOther} />
+              <IgcArrowButton label="←" onClick={moveToEnrolled} />
+              <IgcArrowButton label="→" onClick={moveToOther} />
             </div>
 
             {/* 右: その他 */}
