@@ -919,6 +919,9 @@ function App() {
             syncedBoardSize={syncedBoardSize}
             teacherCursor={teacherCursor}
             syncedDrawings={syncedDrawings}
+            participants={participants}
+            students={students}
+            localIdentity={classroomRef.current?.localIdentity ?? ''}
           />
         )}
 

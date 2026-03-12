@@ -2,12 +2,14 @@ import { useState, useCallback, useRef, useMemo } from 'react';
 import GoBoard from './GoBoard';
 import type { Drawing, Marker, StoneColor } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
-import type { ClassroomLiveKit } from '../utils/classroomLiveKit';
+import type { ClassroomLiveKit, ParticipantInfo } from '../utils/classroomLiveKit';
+import type { Student } from '../types/classroom';
 import { createNode, addMove, getMainPath } from '../utils/treeUtilsV2';
 import { checkCapture, createEmptyBoard } from '../utils/gameLogic';
 import { parseSGFTree } from '../utils/sgfUtils';
 import type { SgfMetadata } from '../utils/sgfUtils';
 import { convertSgfToGameTree } from '../utils/treeUtilsV2';
+import { getDisplayName } from '../utils/identityUtils';
 import MoveCounter from './MoveCounter';
 import {
   ChevronFirst, ChevronLast, ChevronLeft, ChevronRight,
@@ -24,6 +26,10 @@ interface LectureBoardProps {
   syncedBoardSize?: number;
   teacherCursor?: { x: number; y: number } | null;
   syncedDrawings?: Drawing[];
+  // 参加者情報（先生用サイドバー）
+  participants?: ParticipantInfo[];
+  students?: Student[];
+  localIdentity?: string;
 }
 
 const BOARD_SIZES = [19, 17, 15, 13, 11, 9] as const;
@@ -36,6 +42,9 @@ export default function LectureBoard({
   syncedBoardSize,
   teacherCursor,
   syncedDrawings,
+  participants = [],
+  students = [],
+  localIdentity = '',
 }: LectureBoardProps) {
   // 先生用状態
   const [boardSize, setBoardSize] = useState(syncedBoardSize || 19);
@@ -377,6 +386,38 @@ export default function LectureBoard({
               碁盤をリセット
             </button>
           </div>
+
+          {/* 参加生徒リスト */}
+          {participants.length > 0 && (
+            <div className="glass-panel p-4 space-y-3">
+              <h3 className="font-bold border-b border-white/5 pb-2">
+                参加生徒 ({participants.filter(p => p.identity !== localIdentity).length})
+              </h3>
+              <div className="space-y-1 max-h-60 overflow-y-auto">
+                {participants
+                  .filter(p => p.identity !== localIdentity)
+                  .map(p => {
+                    const name = getDisplayName(p.identity, students);
+                    return (
+                      <div
+                        key={p.identity}
+                        className="flex items-center justify-between px-2 py-1.5 rounded bg-white/5 text-sm"
+                      >
+                        <span className="truncate">{name}</span>
+                        <button
+                          onClick={() => {
+                            // 生徒を個別に呼び出す（チャットで個別メッセージなど将来拡張用）
+                          }}
+                          className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-300 rounded hover:bg-blue-500/30"
+                        >
+                          選択
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
