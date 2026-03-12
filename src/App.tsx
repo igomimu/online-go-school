@@ -304,15 +304,21 @@ function App() {
       setConnectionError('');
 
       if (connectRole === 'TEACHER') {
-        const currentUrl = new URL(window.location.href);
-        currentUrl.searchParams.set('url', livekitUrl);
-        currentUrl.searchParams.set('room', roomName);
-        if (!useServerToken) {
+        // 教室URLは固定: 環境変数があればURLパラメータ不要
+        const baseUrl = `${window.location.origin}${window.location.pathname}`;
+        if (useServerToken) {
+          // 環境変数で接続情報を持つ → 固定URL
+          setStudentJoinInfo(`${baseUrl}?role=STUDENT`);
+        } else {
+          // ローカル開発: 接続情報をURLに含める
+          const currentUrl = new URL(baseUrl);
+          currentUrl.searchParams.set('url', livekitUrl);
+          currentUrl.searchParams.set('room', roomName);
           currentUrl.searchParams.set('key', apiKey);
           currentUrl.searchParams.set('secret', apiSecret);
+          currentUrl.searchParams.set('role', 'STUDENT');
+          setStudentJoinInfo(currentUrl.toString());
         }
-        currentUrl.searchParams.set('role', 'STUDENT');
-        setStudentJoinInfo(currentUrl.toString());
       }
     } catch (err) {
       setConnectionError(err instanceof Error ? err.message : '接続に失敗しました');
