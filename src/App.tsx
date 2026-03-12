@@ -867,6 +867,11 @@ function App() {
             onDisconnect={handleDisconnect}
             onOpenStudentManager={() => setShowStudentManager(true)}
             onReloadData={reloadClassroomData}
+            onCreateGames={(pairs) => {
+              for (const p of pairs) {
+                gameManager.createGame(p);
+              }
+            }}
           />
         )}
 

@@ -9,6 +9,7 @@ interface TeacherToolbarProps {
   onOpenStudentManager: () => void;
   onEditClassroom?: () => void;
   onShowStudentLinks?: () => void;
+  onAutoPairing?: () => void;
 }
 
 // IGC風のボタン
@@ -41,6 +42,7 @@ export default function TeacherToolbar({
   onOpenStudentManager,
   onEditClassroom,
   onShowStudentLinks,
+  onAutoPairing,
 }: TeacherToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
@@ -120,6 +122,7 @@ export default function TeacherToolbar({
         <div style={{ flex: 1 }} />
 
         <IgcButton label="対局作成" color="#90d060" onClick={onCreateGame} />
+        <IgcButton label="自動対局" color="#60c090" onClick={onAutoPairing} />
 
         <input ref={fileInputRef} type="file" accept=".sgf" onChange={onLoadSgf} className="hidden" />
         <IgcButton label="SGF読込" color="#d0d0c8" onClick={() => fileInputRef.current?.click()} />

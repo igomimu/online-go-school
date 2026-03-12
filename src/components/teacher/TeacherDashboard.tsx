@@ -13,6 +13,7 @@ import TeacherToolbar from './TeacherToolbar';
 import VideoTiles from '../VideoTiles';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
 import StudentLinkGenerator from './StudentLinkGenerator';
+import AutoPairingDialog from './AutoPairingDialog';
 
 interface TeacherDashboardProps {
   participants: ParticipantInfo[];
@@ -36,6 +37,7 @@ interface TeacherDashboardProps {
   onDisconnect: () => void;
   onOpenStudentManager: () => void;
   onReloadData: () => void;
+  onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number }[]) => void;
 }
 
 export default function TeacherDashboard({
@@ -60,9 +62,11 @@ export default function TeacherDashboard({
   onDisconnect,
   onOpenStudentManager,
   onReloadData,
+  onCreateGames,
 }: TeacherDashboardProps) {
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [showStudentLinks, setShowStudentLinks] = useState(false);
+  const [showAutoPairing, setShowAutoPairing] = useState(false);
   // 教室が未選択で教室データがあれば最初の教室を自動選択
   useEffect(() => {
     if (!selectedClassroomId && classrooms.length > 0) {
@@ -241,6 +245,7 @@ export default function TeacherDashboard({
           if (selectedClassroom) setEditingClassroom(selectedClassroom);
         }}
         onShowStudentLinks={() => setShowStudentLinks(true)}
+        onAutoPairing={() => setShowAutoPairing(true)}
       />
 
       {/* 部屋タブ（IGC最下部） */}
@@ -268,6 +273,17 @@ export default function TeacherDashboard({
         <StudentLinkGenerator
           students={filteredStudents}
           onClose={() => setShowStudentLinks(false)}
+        />
+      )}
+
+      {/* 自動ペアリング */}
+      {showAutoPairing && (
+        <AutoPairingDialog
+          connectedIdentities={participants.map(p => p.identity)}
+          students={filteredStudents}
+          teacherIdentity={localIdentity}
+          onClose={() => setShowAutoPairing(false)}
+          onCreateGames={onCreateGames}
         />
       )}
     </div>
