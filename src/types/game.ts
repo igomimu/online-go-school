@@ -1,6 +1,17 @@
 import type { BoardState, StoneColor } from '../components/GoBoard';
 
 // === 対局セッション ===
+export interface GameClock {
+  mainTimeSeconds: number;     // 持ち時間（秒）
+  byoyomiSeconds: number;      // 秒読み（秒）
+  byoyomiPeriods: number;      // 秒読み回数
+  blackTimeLeft: number;       // 黒残り時間（秒）
+  whiteTimeLeft: number;       // 白残り時間（秒）
+  blackByoyomiLeft: number;    // 黒秒読み残り回数
+  whiteByoyomiLeft: number;    // 白秒読み残り回数
+  lastTickTime: number | null; // 最後のtick時刻（ms）
+}
+
 export interface GameSession {
   id: string;
   blackPlayer: string;     // identity
@@ -17,6 +28,7 @@ export interface GameSession {
   whiteCaptures: number;
   result?: string;          // "B+R", "W+3.5"等
   lastBoardHash?: string;   // コウ検出用
+  clock?: GameClock;        // 対局時計（なければ時間無制限）
 }
 
 export interface GameMove {

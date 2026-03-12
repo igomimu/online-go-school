@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
-import type { GameSession, GameMove, GameMovePayload, GameBoardUpdatePayload } from '../types/game';
+import type { GameSession, GameMove, GameMovePayload, GameBoardUpdatePayload, GameClock } from '../types/game';
 import type { ClassroomLiveKit, ClassroomMessage } from '../utils/classroomLiveKit';
 import type { StoneColor } from '../components/GoBoard';
 import { createEmptyBoard, checkCapture, isLegalMove, boardHash } from '../utils/gameLogic';
 import { getHandicapStones } from '../utils/handicapStones';
 import { exportGameToSgf, todaySgfDate } from '../utils/sgfExport';
 import { saveGame } from '../utils/savedGames';
+import { switchClock, useGameClockTick } from './useGameClock';
 
 // 先生用：対局管理ロジック
 export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | null>) {
@@ -68,8 +69,9 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
     boardSize: number;
     handicap: number;
     komi: number;
+    clock?: GameClock;
   }) => {
-    const { blackPlayer, whitePlayer, boardSize, handicap, komi } = opts;
+    const { blackPlayer, whitePlayer, boardSize, handicap, komi, clock } = opts;
 
     let initialBoard = createEmptyBoard(boardSize);
 
@@ -95,6 +97,7 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
       moveHistory: [],
       blackCaptures: 0,
       whiteCaptures: 0,
+      clock: clock ? { ...clock, lastTickTime: Date.now() } : undefined,
     };
 
     updateGames(prev => [...prev, game]);
@@ -138,6 +141,7 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
         blackCaptures: g.blackCaptures + (color === 'BLACK' ? capturedCount : 0),
         whiteCaptures: g.whiteCaptures + (color === 'WHITE' ? capturedCount : 0),
         lastBoardHash: prevHash,
+        clock: g.clock ? switchClock(g.clock, color) : undefined,
       };
     }));
 
@@ -238,6 +242,22 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
       payload: { games: gamesRef.current },
     }, [identity]);
   }, [classroomRef]);
+
+  // 時計更新
+  const updateGameClock = useCallback((gameId: string, clock: GameClock) => {
+    updateGames(prev => prev.map(g =>
+      g.id === gameId ? { ...g, clock } : g
+    ));
+  }, [updateGames]);
+
+  // 時間切れ
+  const handleTimeUp = useCallback((gameId: string, color: 'BLACK' | 'WHITE') => {
+    const winner = color === 'BLACK' ? 'W' : 'B';
+    endGame(gameId, `${winner}+T`);
+  }, [endGame]);
+
+  // 1秒ごとの時計tick
+  useGameClockTick(games, updateGameClock, handleTimeUp);
 
   return {
     games,

@@ -3,6 +3,8 @@ import { X } from 'lucide-react';
 import type { Student } from '../types/classroom';
 import { suggestHandicap } from '../types/classroom';
 import { findStudentByIdentity, getDisplayName } from '../utils/identityUtils';
+import type { GameClock } from '../types/game';
+import { CLOCK_PRESETS, createClock } from '../hooks/useGameClock';
 
 interface GameCreationDialogProps {
   students: string[];  // 利用可能な生徒名一覧（LiveKit identity）
@@ -14,6 +16,7 @@ interface GameCreationDialogProps {
     boardSize: number;
     handicap: number;
     komi: number;
+    clock?: GameClock;
   }) => void;
   registeredStudents?: Student[];  // 登録済み生徒データ（棋力表示用）
 }
@@ -35,6 +38,7 @@ export default function GameCreationDialog({
   const [boardSize, setBoardSize] = useState(19);
   const [handicap, setHandicap] = useState(0);
   const [komi, setKomi] = useState(6.5);
+  const [clockPreset, setClockPreset] = useState(0); // index into CLOCK_PRESETS
 
   // identity から登録生徒を検索
   const getRank = (identity: string): string => {
@@ -60,7 +64,9 @@ export default function GameCreationDialog({
 
   const handleSubmit = () => {
     if (blackPlayer === whitePlayer) return;
-    onCreate({ blackPlayer, whitePlayer, boardSize, handicap, komi });
+    const preset = CLOCK_PRESETS[clockPreset];
+    const clock = createClock(preset.mainTime, preset.byoyomi, preset.periods);
+    onCreate({ blackPlayer, whitePlayer, boardSize, handicap, komi, clock });
   };
 
   return (
@@ -177,6 +183,20 @@ export default function GameCreationDialog({
             onChange={e => setKomi(parseFloat(e.target.value) || 0)}
             className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
           />
+        </div>
+
+        {/* 対局時計 */}
+        <div>
+          <label className="block text-sm text-zinc-400 mb-1">対局時計</label>
+          <select
+            value={clockPreset}
+            onChange={e => setClockPreset(Number(e.target.value))}
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+          >
+            {CLOCK_PRESETS.map((p, i) => (
+              <option key={i} value={i}>{p.label}</option>
+            ))}
+          </select>
         </div>
 
         <button

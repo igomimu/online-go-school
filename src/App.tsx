@@ -457,6 +457,7 @@ function App() {
     boardSize: number;
     handicap: number;
     komi: number;
+    clock?: import('./types/game').GameClock;
   }) => {
     gameManager.createGame(opts);
     setShowGameCreation(false);
@@ -853,7 +854,6 @@ function App() {
             selectedClassroomId={selectedClassroomId}
             onSelectClassroom={setSelectedClassroomId}
             games={games}
-            onSelectGame={handleSelectGame}
             audioPermissions={audioPermissions}
             onToggleHear={handleToggleHear}
             onToggleMic={handleToggleStudentMic}
@@ -872,6 +872,9 @@ function App() {
                 gameManager.createGame(p);
               }
             }}
+            onGameMove={handleGameMove}
+            onGamePass={handleGamePass}
+            onGameResign={handleGameResign}
           />
         )}
 

@@ -14,6 +14,7 @@ import VideoTiles from '../VideoTiles';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
 import StudentLinkGenerator from './StudentLinkGenerator';
 import AutoPairingDialog from './AutoPairingDialog';
+import GameObserverPanel from './GameObserverPanel';
 
 interface TeacherDashboardProps {
   participants: ParticipantInfo[];
@@ -23,7 +24,6 @@ interface TeacherDashboardProps {
   selectedClassroomId: string | null;
   onSelectClassroom: (id: string | null) => void;
   games: GameSession[];
-  onSelectGame: (gameId: string) => void;
   audioPermissions: AudioPermissions;
   onToggleHear: (identity: string) => void;
   onToggleMic: (identity: string) => void;
@@ -38,6 +38,9 @@ interface TeacherDashboardProps {
   onOpenStudentManager: () => void;
   onReloadData: () => void;
   onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number }[]) => void;
+  onGameMove: (gameId: string, x: number, y: number, color: 'BLACK' | 'WHITE') => void;
+  onGamePass: (gameId: string, color: 'BLACK' | 'WHITE') => void;
+  onGameResign: (gameId: string, color: 'BLACK' | 'WHITE') => void;
 }
 
 export default function TeacherDashboard({
@@ -48,7 +51,6 @@ export default function TeacherDashboard({
   selectedClassroomId,
   onSelectClassroom,
   games,
-  onSelectGame,
   audioPermissions,
   onToggleHear,
   onToggleMic,
@@ -63,10 +65,14 @@ export default function TeacherDashboard({
   onOpenStudentManager,
   onReloadData,
   onCreateGames,
+  onGameMove,
+  onGamePass,
+  onGameResign,
 }: TeacherDashboardProps) {
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [showStudentLinks, setShowStudentLinks] = useState(false);
   const [showAutoPairing, setShowAutoPairing] = useState(false);
+  const [observingGameId, setObservingGameId] = useState<string | null>(null);
   // 教室が未選択で教室データがあれば最初の教室を自動選択
   useEffect(() => {
     if (!selectedClassroomId && classrooms.length > 0) {
@@ -149,16 +155,28 @@ export default function TeacherDashboard({
         />
       </div>
 
-      {/* 中央: 碁盤グリッド + 右サイドバー（ビデオ+チャット） */}
+      {/* 中央: 碁盤グリッド/観戦 + 右サイドバー（ビデオ+チャット） */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        {/* 碁盤サムネイルグリッド */}
+        {/* 碁盤エリア: サムネイルグリッド or 観戦パネル */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          <BoardThumbnailGrid
-            games={filteredGames}
-            students={filteredStudents}
-            participants={filteredParticipants}
-            onSelectGame={onSelectGame}
-          />
+          {observingGameId && filteredGames.find(g => g.id === observingGameId) ? (
+            <GameObserverPanel
+              game={filteredGames.find(g => g.id === observingGameId)!}
+              students={filteredStudents}
+              localIdentity={localIdentity}
+              onMove={onGameMove}
+              onPass={onGamePass}
+              onResign={onGameResign}
+              onBack={() => setObservingGameId(null)}
+            />
+          ) : (
+            <BoardThumbnailGrid
+              games={filteredGames}
+              students={filteredStudents}
+              participants={filteredParticipants}
+              onSelectGame={(gameId) => setObservingGameId(gameId)}
+            />
+          )}
         </div>
 
         {/* 右サイドバー */}
