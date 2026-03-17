@@ -35,8 +35,8 @@
 ### 開発サーバー
 - **場所**: LEGION上で起動中
 - **ポート**: 5174
-- **Tailscale IP**: `100.120.126.60`
-- **アクセスURL**: `http://100.120.126.60:5174/`
+- **接続**: Cloudflare Tunnel経由 (`ssh legion`)
+- **アクセスURL**: `ssh -L 5174:localhost:5174 legion` → `http://localhost:5174/`
 
 ### 問題
 - YOGAProブラウザからアクセスすると真っ白な画面
@@ -107,13 +107,13 @@ npm run dev
 
 ### ネットワーク構成
 - **LEGION**:
-  - IP (Tailscale): `100.120.126.60`
+  - 接続: Cloudflare Tunnel経由 (`ssh legion` / `legion-ssh.mimura15.jp`)
   - 用途: 生徒の囲碁研究（KataGo常駐）
   - 開発時の注意: GPU負荷を考慮
 
 - **YOGAPro**:
-  - IP (Tailscale): `100.115.174.113`
   - 用途: 開発作業、ブラウザ確認
+  - LEGIONへのアクセス: SSHポートフォワーディング経由
 
 ## 📝 メモ
 

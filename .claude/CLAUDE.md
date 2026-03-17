@@ -4,7 +4,7 @@
 - **技術**: Vite + React + TypeScript + Agora RTC + PeerJS + Tailwind
 - **状態**: 開発中（中〜長期）
 - **開発サーバー**: LEGION (`npm run dev -- --host`)、ポート5174
-- **確認**: YOGAProブラウザから `http://100.120.126.60:5174/`
+- **確認**: `ssh -L 5174:localhost:5174 legion` → YOGAProブラウザから `http://localhost:5174/`
 
 ## 概要
 リアルタイムで先生と生徒が対局・検討できるオンライン囲碁教室プラットフォーム。
