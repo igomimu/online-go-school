@@ -1,9 +1,11 @@
+import { useMemo } from 'react';
 import GoBoard from '../GoBoard';
 import type { GameSession } from '../../types/game';
 import type { StoneColor } from '../GoBoard';
 import type { Student } from '../../types/classroom';
 import { getDisplayName } from '../../utils/identityUtils';
 import { formatTime } from '../../hooks/useGameClock';
+import { calculateTerritory, formatScoringResult } from '../../utils/scoring';
 
 interface GameObserverPanelProps {
   game: GameSession;
@@ -13,6 +15,8 @@ interface GameObserverPanelProps {
   onPass: (gameId: string, color: StoneColor) => void;
   onResign: (gameId: string, color: StoneColor) => void;
   onBack: () => void;
+  onScoringToggle?: (gameId: string, x: number, y: number) => void;
+  onScoringConfirm?: (gameId: string) => void;
 }
 
 export default function GameObserverPanel({
@@ -23,12 +27,33 @@ export default function GameObserverPanel({
   onPass,
   onResign,
   onBack,
+  onScoringToggle,
+  onScoringConfirm,
 }: GameObserverPanelProps) {
   const blackName = getDisplayName(game.blackPlayer, students);
   const whiteName = getDisplayName(game.whitePlayer, students);
   const isPlaying = game.status === 'playing';
+  const isScoring = game.status === 'scoring';
+
+  // Scoring state
+  const deadStonesSet = useMemo(() =>
+    new Set(game.scoringDeadStones || []),
+    [game.scoringDeadStones]
+  );
+
+  const scoringResult = useMemo(() => {
+    if (!isScoring) return null;
+    return calculateTerritory(
+      game.boardState, game.boardSize, deadStonesSet,
+      game.blackCaptures, game.whiteCaptures, game.komi,
+    );
+  }, [isScoring, game.boardState, game.boardSize, deadStonesSet, game.blackCaptures, game.whiteCaptures, game.komi]);
 
   const handleCellClick = (x: number, y: number) => {
+    if (isScoring) {
+      onScoringToggle?.(game.id, x, y);
+      return;
+    }
     if (!isPlaying) return;
     onMove(game.id, x, y, game.currentColor);
   };
@@ -85,7 +110,9 @@ export default function GameObserverPanel({
         <span style={{ color: '#ffff00', marginLeft: 'auto' }}>
           {isPlaying
             ? `${game.moveNumber}手目 ${game.currentColor === 'BLACK' ? '黒番' : '白番'}`
-            : `終局: ${game.result}`}
+            : isScoring
+              ? '整地中'
+              : `終局: ${game.result}`}
         </span>
       </div>
 
@@ -103,8 +130,10 @@ export default function GameObserverPanel({
             <GoBoard
               boardState={game.boardState}
               boardSize={game.boardSize}
-              onCellClick={isPlaying ? handleCellClick : undefined}
-              readOnly={!isPlaying}
+              onCellClick={(isPlaying || isScoring) ? handleCellClick : undefined}
+              readOnly={!isPlaying && !isScoring}
+              territoryMap={scoringResult?.territoryMap}
+              deadStones={deadStonesSet.size > 0 ? deadStonesSet : undefined}
             />
           </div>
         </div>
@@ -184,8 +213,57 @@ export default function GameObserverPanel({
             </div>
           </div>
 
+          {/* 整地モード: 得点表示 */}
+          {isScoring && scoringResult && (
+            <div style={{
+              background: '#fffff0',
+              border: '2px solid #cc9900',
+              padding: 6,
+            }}>
+              <div style={{ fontWeight: 'bold', color: '#996600', marginBottom: 4 }}>整地</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                <span>● 地</span>
+                <span style={{ fontWeight: 'bold' }}>{scoringResult.blackTerritory}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                <span>● 取石</span>
+                <span>{game.blackCaptures + scoringResult.deadWhiteStones}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontWeight: 'bold' }}>
+                <span>● 合計</span>
+                <span>{scoringResult.blackTotal}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                <span>○ 地</span>
+                <span style={{ fontWeight: 'bold' }}>{scoringResult.whiteTerritory}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                <span>○ 取石</span>
+                <span>{game.whiteCaptures + scoringResult.deadBlackStones}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                <span>○ コミ</span>
+                <span>{game.komi}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontWeight: 'bold' }}>
+                <span>○ 合計</span>
+                <span>{scoringResult.whiteTotal}</span>
+              </div>
+              <div style={{
+                textAlign: 'center',
+                fontWeight: 'bold',
+                color: '#0000cc',
+                fontSize: 13,
+                borderTop: '1px solid #ddd',
+                paddingTop: 4,
+              }}>
+                {formatScoringResult(scoringResult)}
+              </div>
+            </div>
+          )}
+
           {/* 操作ボタン */}
-          {isPlaying && (
+          {(isPlaying || isScoring) && (
             <div style={{
               background: '#f0f0e8',
               border: '1px solid #999',
@@ -195,32 +273,57 @@ export default function GameObserverPanel({
               gap: 4,
             }}>
               <div style={{ fontWeight: 'bold', marginBottom: 2 }}>先生操作</div>
-              <button
-                onClick={handlePass}
-                style={{
-                  padding: '4px 8px',
-                  border: '1px solid #666',
-                  background: '#d0d0c8',
-                  cursor: 'pointer',
-                  fontSize: 11,
-                  width: '100%',
-                }}
-              >
-                パス（{game.currentColor === 'BLACK' ? '黒' : '白'}）
-              </button>
-              <button
-                onClick={handleResign}
-                style={{
-                  padding: '4px 8px',
-                  border: '1px solid #666',
-                  background: '#f0c0c0',
-                  cursor: 'pointer',
-                  fontSize: 11,
-                  width: '100%',
-                }}
-              >
-                投了（{game.currentColor === 'BLACK' ? '黒' : '白'}）
-              </button>
+              {isPlaying && (
+                <>
+                  <button
+                    onClick={handlePass}
+                    style={{
+                      padding: '4px 8px',
+                      border: '1px solid #666',
+                      background: '#d0d0c8',
+                      cursor: 'pointer',
+                      fontSize: 11,
+                      width: '100%',
+                    }}
+                  >
+                    パス（{game.currentColor === 'BLACK' ? '黒' : '白'}）
+                  </button>
+                  <button
+                    onClick={handleResign}
+                    style={{
+                      padding: '4px 8px',
+                      border: '1px solid #666',
+                      background: '#f0c0c0',
+                      cursor: 'pointer',
+                      fontSize: 11,
+                      width: '100%',
+                    }}
+                  >
+                    投了（{game.currentColor === 'BLACK' ? '黒' : '白'}）
+                  </button>
+                </>
+              )}
+              {isScoring && (
+                <>
+                  <div style={{ fontSize: 10, color: '#666', marginBottom: 2 }}>
+                    死石をクリックしてマーク
+                  </div>
+                  <button
+                    onClick={() => onScoringConfirm?.(game.id)}
+                    style={{
+                      padding: '4px 8px',
+                      border: '1px solid #006600',
+                      background: '#c0f0c0',
+                      cursor: 'pointer',
+                      fontSize: 11,
+                      width: '100%',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    確定
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>

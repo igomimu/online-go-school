@@ -113,6 +113,7 @@ export default function StudentTable({
                 {/* 対局 */}
                 <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.gameStatus === 'playing' && '●'}
+                  {row.gameStatus === 'scoring' && '整'}
                   {row.gameStatus === 'finished' && '済'}
                 </td>
 
@@ -141,6 +142,9 @@ export default function StudentTable({
                 {/* 姓名 */}
                 <td className="px-1 py-0.5 border border-gray-400 text-left font-bold" style={{ color: row.isConnected ? '#cc0000' : '#333' }}>
                   {row.displayName}
+                  {!row.isConnected && row.gameStatus === 'playing' && (
+                    <span style={{ color: '#ff6600', fontSize: 10, marginLeft: 4 }}>⚠切断</span>
+                  )}
                 </td>
 
                 {/* 棋力 */}
@@ -178,7 +182,7 @@ interface StudentRow {
   displayName: string;
   isConnected: boolean;
   student: Student | null;
-  gameStatus: 'playing' | 'finished' | null;
+  gameStatus: 'playing' | 'scoring' | 'finished' | null;
 }
 
 function buildRows(

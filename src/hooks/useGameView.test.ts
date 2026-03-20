@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useGameView } from './useGameView';
 import { createEmptyBoard } from '../utils/gameLogic';
@@ -24,6 +24,10 @@ function createMockGame(overrides: Partial<GameSession> = {}): GameSession {
 }
 
 describe('useGameView', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   // === GAME_CREATED ===
   describe('GAME_CREATED', () => {
     it('対局が追加される', () => {

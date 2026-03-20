@@ -25,6 +25,7 @@ import VideoTiles from './components/VideoTiles';
 import StudentManager from './components/StudentManager';
 import TeacherDashboard from './components/teacher/TeacherDashboard';
 import ClassroomManager from './components/teacher/ClassroomManager';
+import ProblemBoard from './components/ProblemBoard';
 import { useChat } from './hooks/useChat';
 import { useNotificationSound } from './hooks/useNotificationSound';
 import type { ChatMessagePayload } from './types/chat';
@@ -81,6 +82,9 @@ function App() {
   const [reviewBoardSize, setReviewBoardSize] = useState(19);
   const [reviewTargetStudents, setReviewTargetStudents] = useState<string[]>([]);
 
+  // 詰碁モード用
+  const [activeProblem, setActiveProblem] = useState<import('./types/problem').Problem | null>(null);
+
   // オーディオデバッグ
   const [audioDebug, setAudioDebug] = useState('');
 
@@ -108,6 +112,13 @@ function App() {
 
   // 先生用: 対局管理
   const gameManager = useGameManager(classroomRef);
+
+  // 残り10秒警告音
+  useEffect(() => {
+    gameManager.onTimeWarning((_gameId, _color, _seconds) => {
+      notificationSound.play('timeWarning', 500);
+    });
+  }, [gameManager, notificationSound]);
 
   // 生徒用: 対局ビュー
   const gameView = useGameView();
@@ -209,6 +220,13 @@ function App() {
           setReviewBoardSize(p.boardSize);
           setViewMode('review');
         }
+        // 詰碁配信（生徒用）
+        if (msg.type === 'PROBLEM_ASSIGN' && connectRole === 'STUDENT' && msg.payload) {
+          const p = msg.payload as import('./types/problem').ProblemAssignPayload;
+          setActiveProblem(p.problem);
+          setViewMode('problem');
+        }
+
         if (msg.type === 'REVIEW_END' && connectRole === 'STUDENT') {
           setViewMode('lobby');
           setReviewRootNode(null);
@@ -255,13 +273,18 @@ function App() {
         }
       },
       onParticipantJoined: (identity: string) => {
-        // 先生: 新参加者に対局一覧を送信
+        // 先生: 新参加者に対局一覧を送信 + 時計再開
         if (connectRole === 'TEACHER') {
           gameManager.syncGamesToParticipant(identity);
+          gameManager.resumeClockForPlayer(identity);
         }
         notificationSound.play('connect');
       },
-      onParticipantLeft: (_identity: string) => {
+      onParticipantLeft: (identity: string) => {
+        // 先生: 切断した生徒の対局時計を停止
+        if (connectRole === 'TEACHER') {
+          gameManager.pauseClockForPlayer(identity);
+        }
         notificationSound.play('disconnect');
       },
       onParticipantsChanged: (p: ParticipantInfo[]) => {
@@ -504,6 +527,31 @@ function App() {
     }
   };
 
+  // 整地: 死石トグル
+  const handleScoringToggle = (gameId: string, x: number, y: number) => {
+    if (role === 'TEACHER') {
+      gameManager.toggleDeadStone(gameId, x, y);
+    }
+  };
+
+  // 詰碁: 配信
+  const handleProblemAssign = (problem: import('./types/problem').Problem) => {
+    if (role !== 'TEACHER') return;
+    setActiveProblem(problem);
+    setViewMode('problem');
+    classroomRef.current?.broadcast({
+      type: 'PROBLEM_ASSIGN',
+      payload: { problem, targetStudents: [] },
+    });
+  };
+
+  // 整地: 確定
+  const handleScoringConfirm = (gameId: string) => {
+    if (role === 'TEACHER') {
+      gameManager.confirmScoring(gameId);
+    }
+  };
+
   // SGF読込（ロビーから）
   const handleSgfLoadFromLobby = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -618,21 +666,22 @@ function App() {
   // --- ロール選択画面 ---
   if (!role) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-8">
-        <div className="text-center space-y-4">
-          <h1 className="text-6xl font-black bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">
-            囲碁教室
+      <div className="flex flex-col items-center min-h-screen py-12 gap-6">
+        <div className="text-center space-y-2">
+          <h1 className="text-5xl font-black bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">
+            三村囲碁オンライン
           </h1>
-          <p className="text-zinc-400 text-xl font-medium">オンライン囲碁指導プラットフォーム</p>
+          <p className="text-zinc-400 text-lg">オンライン囲碁指導プラットフォーム</p>
         </div>
 
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm px-4">
+          <label className="block text-sm text-zinc-400 mb-1 text-center">お名前</label>
           <input
             type="text"
             value={userName}
             onChange={e => setUserName(e.target.value)}
             placeholder="お名前を入力"
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-center text-lg focus:outline-none focus:border-blue-500"
+            className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-center text-lg focus:outline-none focus:border-blue-500"
           />
         </div>
 
@@ -881,6 +930,9 @@ function App() {
             onGameMove={handleGameMove}
             onGamePass={handleGamePass}
             onGameResign={handleGameResign}
+            onScoringToggle={handleScoringToggle}
+            onScoringConfirm={handleScoringConfirm}
+            onProblemAssign={handleProblemAssign}
           />
         )}
 
@@ -911,6 +963,8 @@ function App() {
             onResign={handleGameResign}
             onBack={handleBackToLobby}
             isTeacher={role === 'TEACHER'}
+            onScoringToggle={handleScoringToggle}
+            onScoringConfirm={handleScoringConfirm}
           />
         )}
 
@@ -945,6 +999,31 @@ function App() {
             targetStudents={reviewTargetStudents}
             onSetTargetStudents={setReviewTargetStudents}
             onBack={role === 'TEACHER' ? handleBackToLobby : undefined}
+          />
+        )}
+
+        {/* 詰碁モード */}
+        {effectiveViewMode === 'problem' && activeProblem && (
+          <ProblemBoard
+            problem={activeProblem}
+            isTeacher={role === 'TEACHER'}
+            onBack={() => {
+              setViewMode('lobby');
+              setActiveProblem(null);
+            }}
+            onResult={(result) => {
+              // 生徒: 結果を先生に送信
+              if (role === 'STUDENT') {
+                classroomRef.current?.broadcast({
+                  type: 'PROBLEM_RESULT',
+                  payload: {
+                    problemId: activeProblem.id,
+                    result,
+                    moveCount: 0,
+                  },
+                });
+              }
+            }}
           />
         )}
       </div>

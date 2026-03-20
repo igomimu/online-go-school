@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import type { GameSession, AudioPermissions } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
 import { findStudentByIdentity } from '../../utils/identityUtils';
+import { parseSGFTree } from '../../utils/sgfUtils';
+import { createEmptyBoard } from '../../utils/gameLogic';
+import type { Problem } from '../../types/problem';
+import type { StoneColor } from '../GoBoard';
 
 import StudentTable from './StudentTable';
 import BoardThumbnailGrid from './BoardThumbnailGrid';
@@ -41,6 +45,9 @@ interface TeacherDashboardProps {
   onGameMove: (gameId: string, x: number, y: number, color: 'BLACK' | 'WHITE') => void;
   onGamePass: (gameId: string, color: 'BLACK' | 'WHITE') => void;
   onGameResign: (gameId: string, color: 'BLACK' | 'WHITE') => void;
+  onScoringToggle: (gameId: string, x: number, y: number) => void;
+  onScoringConfirm: (gameId: string) => void;
+  onProblemAssign?: (problem: import('../../types/problem').Problem) => void;
 }
 
 export default function TeacherDashboard({
@@ -68,11 +75,49 @@ export default function TeacherDashboard({
   onGameMove,
   onGamePass,
   onGameResign,
+  onScoringToggle,
+  onScoringConfirm,
+  onProblemAssign,
 }: TeacherDashboardProps) {
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [showStudentLinks, setShowStudentLinks] = useState(false);
   const [showAutoPairing, setShowAutoPairing] = useState(false);
   const [observingGameId, setObservingGameId] = useState<string | null>(null);
+
+  // 詰碁SGF読み込み
+  const handleLoadProblem = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !onProblemAssign) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      if (!content) return;
+      try {
+        const parsed = parseSGFTree(content);
+        const root = parsed.root;
+        const boardSize = parsed.size || 19;
+        let correctColor: StoneColor = 'BLACK';
+        if (root.children.length > 0 && root.children[0].move) {
+          correctColor = root.children[0].move.color;
+        }
+        const problem: Problem = {
+          id: crypto.randomUUID(),
+          title: parsed.metadata?.gameName || file.name.replace(/\.sgf$/i, '') || '詰碁',
+          boardSize,
+          initialBoard: parsed.board || createEmptyBoard(boardSize),
+          correctColor,
+          sgfTree: root,
+          createdAt: new Date().toISOString(),
+        };
+        onProblemAssign(problem);
+      } catch (err) {
+        console.error('Problem SGF parse error:', err);
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  }, [onProblemAssign]);
+
   // 教室が未選択で教室データがあれば最初の教室を自動選択
   useEffect(() => {
     if (!selectedClassroomId && classrooms.length > 0) {
@@ -168,6 +213,8 @@ export default function TeacherDashboard({
               onPass={onGamePass}
               onResign={onGameResign}
               onBack={() => setObservingGameId(null)}
+              onScoringToggle={onScoringToggle}
+              onScoringConfirm={onScoringConfirm}
             />
           ) : (
             <BoardThumbnailGrid
@@ -259,6 +306,7 @@ export default function TeacherDashboard({
         onLoadSgf={onLoadSgf}
         onDisconnect={onDisconnect}
         onOpenStudentManager={onOpenStudentManager}
+        onLoadProblem={handleLoadProblem}
         onEditClassroom={() => {
           if (selectedClassroom) setEditingClassroom(selectedClassroom);
         }}

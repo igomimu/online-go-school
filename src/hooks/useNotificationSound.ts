@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 
-type SoundType = 'connect' | 'disconnect' | 'gameEnd' | 'chat';
+type SoundType = 'connect' | 'disconnect' | 'gameEnd' | 'chat' | 'timeWarning';
 
 // Web Audio APIで短い合成音を生成（音声ファイル不要）
 function playTone(frequency: number, duration: number, type: OscillatorType = 'sine', volume = 0.3) {
@@ -40,6 +40,7 @@ const SOUND_MAP: Record<SoundType, () => void> = {
     setTimeout(() => playTone(880, 0.3, 'sine', 0.3), 220);
   },
   chat: () => playTone(600, 0.1, 'sine', 0.15),                  // 軽いポップ音
+  timeWarning: () => playTone(1000, 0.12, 'square', 0.2),        // 短い高音ビープ
 };
 
 export function useNotificationSound() {

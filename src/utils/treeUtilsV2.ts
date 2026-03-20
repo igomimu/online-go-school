@@ -11,6 +11,7 @@ export interface GameNode {
     boardSize: number;
     markers: Marker[];
     move?: { x: number, y: number, color: StoneColor };
+    comment?: string;
 }
 
 export const createNode = (
@@ -19,7 +20,8 @@ export const createNode = (
     nextNumber: number,
     activeColor: StoneColor,
     boardSize: number,
-    move?: { x: number, y: number, color: StoneColor }
+    move?: { x: number, y: number, color: StoneColor },
+    comment?: string,
 ): GameNode => {
     return {
         id: crypto.randomUUID(),
@@ -30,7 +32,8 @@ export const createNode = (
         activeColor,
         boardSize,
         markers: [],
-        move
+        move,
+        comment,
     };
 };
 
@@ -202,7 +205,8 @@ export const convertSgfToGameTree = (
         activeColor: actColor,
         boardSize,
         markers: (sgfNode.markers || []).map(m => ({ ...m, type: m.type as 'LABEL' | 'SYMBOL' })),
-        move: sgfNode.move
+        move: sgfNode.move,
+        comment: sgfNode.comment,
     };
 
 

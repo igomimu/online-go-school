@@ -7,17 +7,45 @@ import { getHandicapStones } from '../utils/handicapStones';
 import { exportGameToSgf, todaySgfDate } from '../utils/sgfExport';
 import { saveGame } from '../utils/savedGames';
 import { switchClock, useGameClockTick } from './useGameClock';
+import { calculateTerritory, formatScoringResult } from '../utils/scoring';
+
+// --- 進行中の対局をlocalStorageに永続化 ---
+const ACTIVE_GAMES_KEY = 'go-school-active-games';
+
+function persistActiveGames(games: GameSession[]): void {
+  try {
+    // playing/scoring状態の対局のみ保存（finishedはSupabaseに保存済み）
+    const active = games.filter(g => g.status !== 'finished');
+    localStorage.setItem(ACTIVE_GAMES_KEY, JSON.stringify(active));
+  } catch { /* localStorage full — ignore */ }
+}
+
+function restoreActiveGames(): GameSession[] {
+  try {
+    const data = localStorage.getItem(ACTIVE_GAMES_KEY);
+    if (!data) return [];
+    const games = JSON.parse(data) as GameSession[];
+    // 時計を一時停止状態で復元（再接続後に再開）
+    return games.map(g => ({
+      ...g,
+      clock: g.clock ? { ...g.clock, lastTickTime: null } : undefined,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 // 先生用：対局管理ロジック
 export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | null>) {
-  const [games, setGames] = useState<GameSession[]>([]);
+  const [games, setGames] = useState<GameSession[]>(() => restoreActiveGames());
   const gamesRef = useRef<GameSession[]>([]);
 
-  // gamesRefを同期
+  // gamesRefを同期 + localStorageに永続化
   const updateGames = useCallback((updater: (prev: GameSession[]) => GameSession[]) => {
     setGames(prev => {
       const next = updater(prev);
       gamesRef.current = next;
+      persistActiveGames(next);
       return next;
     });
   }, []);
@@ -29,7 +57,7 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
 
     updateGames(prev => prev.map(g => {
       if (g.id !== gameId) return g;
-      return { ...g, status: 'finished', result };
+      return { ...g, status: 'finished', result, scoringDeadStones: undefined };
     }));
 
     // SGF保存
@@ -162,6 +190,76 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
     });
   }, [classroomRef, updateGames]);
 
+  // 整地モード開始
+  const enterScoring = useCallback((gameId: string) => {
+    updateGames(prev => prev.map(g => {
+      if (g.id !== gameId) return g;
+      return {
+        ...g,
+        status: 'scoring' as const,
+        scoringDeadStones: [],
+        clock: g.clock ? { ...g.clock, lastTickTime: null } : undefined, // 時計停止
+      };
+    }));
+
+    classroomRef.current?.broadcast({
+      type: 'SCORING_UPDATE',
+      payload: { gameId, deadStones: [], status: 'scoring' },
+    });
+  }, [classroomRef, updateGames]);
+
+  // 死石トグル
+  const toggleDeadStone = useCallback((gameId: string, x: number, y: number) => {
+    const game = gamesRef.current.find(g => g.id === gameId);
+    if (!game || game.status !== 'scoring') return;
+
+    // Only toggle if there's a stone at this position
+    const stone = game.boardState[y - 1]?.[x - 1];
+    if (!stone) return;
+
+    const key = `${x},${y}`;
+    const currentDead = new Set(game.scoringDeadStones || []);
+
+    // Find the group containing this stone and toggle the entire group
+    const group = findGroup(game.boardState, x - 1, y - 1, stone.color, game.boardSize);
+
+    const isCurrentlyDead = currentDead.has(key);
+    for (const pos of group) {
+      const groupKey = `${pos.x + 1},${pos.y + 1}`;
+      if (isCurrentlyDead) {
+        currentDead.delete(groupKey);
+      } else {
+        currentDead.add(groupKey);
+      }
+    }
+
+    const newDeadStones = Array.from(currentDead);
+
+    updateGames(prev => prev.map(g => {
+      if (g.id !== gameId) return g;
+      return { ...g, scoringDeadStones: newDeadStones };
+    }));
+
+    classroomRef.current?.broadcast({
+      type: 'SCORING_UPDATE',
+      payload: { gameId, deadStones: newDeadStones, status: 'scoring' },
+    });
+  }, [classroomRef, updateGames]);
+
+  // 整地確定
+  const confirmScoring = useCallback((gameId: string) => {
+    const game = gamesRef.current.find(g => g.id === gameId);
+    if (!game || game.status !== 'scoring') return;
+
+    const deadSet = new Set(game.scoringDeadStones || []);
+    const result = calculateTerritory(
+      game.boardState, game.boardSize, deadSet,
+      game.blackCaptures, game.whiteCaptures, game.komi,
+    );
+    const resultStr = formatScoringResult(result);
+    endGame(gameId, resultStr);
+  }, [endGame]);
+
   // パス処理
   const handlePass = useCallback((gameId: string, color: StoneColor) => {
     const game = gamesRef.current.find(g => g.id === gameId);
@@ -170,13 +268,20 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
 
     const passMove: GameMove = { x: 0, y: 0, color };
 
-    // 連続パスで終局
+    // 連続パスで整地モードへ
     const lastMove = game.moveHistory[game.moveHistory.length - 1];
     const isDoublePass = lastMove && lastMove.x === 0 && lastMove.y === 0;
 
     if (isDoublePass) {
-      // 終局
-      endGame(gameId, '双方パス');
+      // パスの手を記録してから整地モードへ
+      updateGames(prev => prev.map(g => {
+        if (g.id !== gameId) return g;
+        return {
+          ...g,
+          moveHistory: [...g.moveHistory, passMove],
+        };
+      }));
+      enterScoring(gameId);
       return;
     }
 
@@ -202,7 +307,7 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
         lastMove: passMove,
       } as GameBoardUpdatePayload,
     });
-  }, [classroomRef, updateGames, endGame]);
+  }, [classroomRef, updateGames, enterScoring]);
 
   // 投了処理
   const handleResign = useCallback((gameId: string, color: StoneColor) => {
@@ -256,8 +361,35 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
     endGame(gameId, `${winner}+T`);
   }, [endGame]);
 
+  // 残り10秒警告コールバック（外部から設定可能）
+  const timeWarningRef = useRef<((gameId: string, color: 'BLACK' | 'WHITE', seconds: number) => void) | null>(null);
+
+  const handleTimeWarning = useCallback((gameId: string, color: 'BLACK' | 'WHITE', seconds: number) => {
+    timeWarningRef.current?.(gameId, color, seconds);
+  }, []);
+
   // 1秒ごとの時計tick
-  useGameClockTick(games, updateGameClock, handleTimeUp);
+  useGameClockTick(games, updateGameClock, handleTimeUp, handleTimeWarning);
+
+  // 切断時に対局中の時計を停止
+  const pauseClockForPlayer = useCallback((identity: string) => {
+    updateGames(prev => prev.map(g => {
+      if (g.status !== 'playing' || !g.clock || g.clock.lastTickTime === null) return g;
+      if (g.blackPlayer !== identity && g.whitePlayer !== identity) return g;
+      return { ...g, clock: { ...g.clock, lastTickTime: null } };
+    }));
+  }, [updateGames]);
+
+  // 再接続時に時計を再開
+  const resumeClockForPlayer = useCallback((identity: string) => {
+    const now = Date.now();
+    updateGames(prev => prev.map(g => {
+      if (g.status !== 'playing' || !g.clock) return g;
+      if (g.blackPlayer !== identity && g.whitePlayer !== identity) return g;
+      if (g.clock.lastTickTime !== null) return g; // 既に動いている
+      return { ...g, clock: { ...g.clock, lastTickTime: now } };
+    }));
+  }, [updateGames]);
 
   return {
     games,
@@ -268,5 +400,51 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
     endGame,
     handleGameMessage,
     syncGamesToParticipant,
+    toggleDeadStone,
+    confirmScoring,
+    pauseClockForPlayer,
+    resumeClockForPlayer,
+    onTimeWarning: (cb: (gameId: string, color: 'BLACK' | 'WHITE', seconds: number) => void) => {
+      timeWarningRef.current = cb;
+    },
   };
+}
+
+/**
+ * Find all stones in a connected group (same color)
+ * Returns array of {x, y} positions (0-indexed)
+ */
+function findGroup(
+  board: import('../components/GoBoard').BoardState,
+  startX: number,
+  startY: number,
+  color: StoneColor,
+  boardSize: number,
+): { x: number; y: number }[] {
+  const visited = new Set<string>();
+  const group: { x: number; y: number }[] = [];
+  const stack = [{ x: startX, y: startY }];
+  visited.add(`${startX},${startY}`);
+
+  while (stack.length > 0) {
+    const { x, y } = stack.pop()!;
+    group.push({ x, y });
+
+    const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+    for (const [dx, dy] of dirs) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || nx >= boardSize || ny < 0 || ny >= boardSize) continue;
+      const key = `${nx},${ny}`;
+      if (visited.has(key)) continue;
+
+      const stone = board[ny][nx];
+      if (stone && stone.color === color) {
+        visited.add(key);
+        stack.push({ x: nx, y: ny });
+      }
+    }
+  }
+
+  return group;
 }

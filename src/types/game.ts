@@ -19,7 +19,7 @@ export interface GameSession {
   boardSize: number;        // 9, 13, 19
   handicap: number;         // 0-9
   komi: number;             // 6.5等
-  status: 'playing' | 'finished';
+  status: 'playing' | 'scoring' | 'finished';
   boardState: BoardState;
   currentColor: StoneColor;
   moveNumber: number;
@@ -29,6 +29,7 @@ export interface GameSession {
   result?: string;          // "B+R", "W+3.5"等
   lastBoardHash?: string;   // コウ検出用
   clock?: GameClock;        // 対局時計（なければ時間無制限）
+  scoringDeadStones?: string[]; // 整地モード: 死石座標 "x,y" (1-indexed)
 }
 
 export interface GameMove {
@@ -60,7 +61,7 @@ export interface AudioPermissions {
 }
 
 // === 画面状態 ===
-export type ViewMode = 'lobby' | 'game' | 'review' | 'lecture';
+export type ViewMode = 'lobby' | 'game' | 'review' | 'lecture' | 'problem';
 
 // === DataChannelメッセージ ===
 export type GameMessageType =
@@ -71,6 +72,9 @@ export type GameMessageType =
   | 'GAME_RESIGN'
   | 'GAME_ENDED'
   | 'GAME_LIST_SYNC'
+  | 'SCORING_UPDATE'
+  | 'PROBLEM_ASSIGN'
+  | 'PROBLEM_RESULT'
   | 'REVIEW_START'
   | 'REVIEW_END'
   | 'AUDIO_CONTROL'
@@ -121,6 +125,12 @@ export interface ReviewStartPayload {
   sgf: string;
   boardSize: number;
   targetStudents: string[];  // 空配列 = 全員
+}
+
+export interface ScoringUpdatePayload {
+  gameId: string;
+  deadStones: string[];   // "x,y" (1-indexed)
+  status: 'scoring';
 }
 
 export interface ReviewEndPayload {

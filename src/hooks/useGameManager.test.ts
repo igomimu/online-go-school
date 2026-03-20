@@ -27,6 +27,7 @@ describe('useGameManager', () => {
   beforeEach(() => {
     classroom = createMockClassroom();
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   // === 対局作成 ===
@@ -208,7 +209,7 @@ describe('useGameManager', () => {
       expect(game.moveHistory[0]).toEqual({ x: 0, y: 0, color: 'BLACK' });
     });
 
-    it('連続パスで終局する', () => {
+    it('連続パスで整地モードに入る', () => {
       const { result } = renderHook(() => useGameManager(classroom.ref));
 
       act(() => {
@@ -224,8 +225,35 @@ describe('useGameManager', () => {
       });
 
       const game = result.current.games[0];
+      expect(game.status).toBe('scoring');
+      expect(game.scoringDeadStones).toEqual([]);
+    });
+
+    it('整地確定で終局する', () => {
+      const { result } = renderHook(() => useGameManager(classroom.ref));
+
+      act(() => {
+        result.current.createGame(baseOpts);
+      });
+      const gameId = result.current.games[0].id;
+
+      // Double pass → scoring mode
+      act(() => {
+        result.current.handlePass(gameId, 'BLACK');
+      });
+      act(() => {
+        result.current.handlePass(gameId, 'WHITE');
+      });
+      expect(result.current.games[0].status).toBe('scoring');
+
+      // Confirm scoring
+      act(() => {
+        result.current.confirmScoring(gameId);
+      });
+
+      const game = result.current.games[0];
       expect(game.status).toBe('finished');
-      expect(game.result).toBe('双方パス');
+      expect(game.result).toBeDefined();
     });
 
     it('間に着手があれば連続パスにならない', () => {

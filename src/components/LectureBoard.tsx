@@ -13,7 +13,7 @@ import { getDisplayName } from '../utils/identityUtils';
 import MoveCounter from './MoveCounter';
 import {
   ChevronFirst, ChevronLast, ChevronLeft, ChevronRight,
-  GitBranch, Grid3X3, Pen, ArrowRight as ArrowRightIcon, Trash2, Upload,
+  GitBranch, Grid3X3, Pen, ArrowRight as ArrowRightIcon, Trash2, Upload, MessageSquare,
 } from 'lucide-react';
 
 interface LectureBoardProps {
@@ -315,6 +315,16 @@ export default function LectureBoard({
                 <Trash2 className="w-5 h-5" />
               </button>
             )}
+          </div>
+        )}
+
+        {/* コメント表示 */}
+        {currentNode.comment && (
+          <div className="glass-panel px-4 py-3">
+            <div className="flex items-start gap-2 text-sm">
+              <MessageSquare className="w-4 h-4 text-zinc-500 mt-0.5 flex-shrink-0" />
+              <div className="text-zinc-300 whitespace-pre-wrap">{currentNode.comment}</div>
+            </div>
           </div>
         )}
 

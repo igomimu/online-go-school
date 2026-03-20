@@ -9,6 +9,7 @@ export default defineConfig({
     host: true,
     port: 5175,
     strictPort: false,
+    allowedHosts: ['online.mimura15.jp'],
   },
   test: {
     globals: true,

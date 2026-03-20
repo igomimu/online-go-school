@@ -310,6 +310,7 @@ export interface SgfTreeNode {
     move?: SgfMove;
     setup?: { ab: string[], aw: string[], ae: string[] };
     markers?: { x: number, y: number, type: string, value: string }[];
+    comment?: string;
     children: SgfTreeNode[];
 }
 
@@ -480,6 +481,12 @@ export function parseSGFTree(sgfContent: string): ParsedSGFTree {
             extractMarkers('MA', 'SYMBOL', () => 'X');
             extractMarkers('M', 'SYMBOL', () => 'X'); // M is alias for MA in some files
             extractMarkers('LB', 'LABEL', (s) => s); // Value parsed inside
+
+            // コメント C[...]
+            const cMatch = propBuffer.match(/C\[((?:[^\]\\]|\\.)*)\]/s);
+            if (cMatch) {
+                node.comment = cMatch[1].replace(/\\]/g, ']').replace(/\\\\/g, '\\');
+            }
 
         }
 

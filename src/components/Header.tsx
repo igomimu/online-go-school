@@ -1,6 +1,7 @@
 import { LogOut, Volume2, VolumeX, Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import { ConnectionState } from 'livekit-client';
 import type { Role } from '../utils/classroomLiveKit';
+import RecordingControls from './RecordingControls';
 
 interface HeaderProps {
   role: Role;
@@ -90,6 +91,7 @@ export default function Header({
             )}
           </>
         )}
+        {role === 'TEACHER' && isConnected && <RecordingControls />}
         <button
           onClick={onDisconnect}
           className="p-2 text-zinc-500 hover:text-red-400 transition-colors"

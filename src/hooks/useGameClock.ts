@@ -33,14 +33,23 @@ export function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+// 残り時間が警告閾値以下かチェック
+export function isTimeLow(clock: GameClock, color: 'BLACK' | 'WHITE', threshold = 10): boolean {
+  const timeLeft = color === 'BLACK' ? clock.blackTimeLeft : clock.whiteTimeLeft;
+  return timeLeft > 0 && timeLeft <= threshold;
+}
+
 // 先生側で1秒ごとに時計を進めるhook
 export function useGameClockTick(
   games: GameSession[],
   updateGameClock: (gameId: string, clock: GameClock) => void,
   onTimeUp: (gameId: string, color: 'BLACK' | 'WHITE') => void,
+  onTimeWarning?: (gameId: string, color: 'BLACK' | 'WHITE', secondsLeft: number) => void,
 ) {
   const gamesRef = useRef(games);
   gamesRef.current = games;
+  // Track which warnings have been fired to avoid repeats
+  const warnedRef = useRef(new Set<string>());
 
   const tick = useCallback(() => {
     const now = Date.now();
@@ -81,6 +90,19 @@ export function useGameClockTick(
         }
       }
 
+      // 残り10秒警告
+      if (onTimeWarning && newTimeLeft <= 10 && newTimeLeft > 0) {
+        const warnKey = `${game.id}-${game.currentColor}-${Math.floor(newTimeLeft)}`;
+        if (!warnedRef.current.has(warnKey)) {
+          warnedRef.current.add(warnKey);
+          onTimeWarning(game.id, game.currentColor, Math.floor(newTimeLeft));
+          // 古い警告キーをクリーンアップ（100個以上溜まったら）
+          if (warnedRef.current.size > 100) {
+            warnedRef.current.clear();
+          }
+        }
+      }
+
       const newClock: GameClock = {
         ...game.clock,
         lastTickTime: now,
@@ -91,7 +113,7 @@ export function useGameClockTick(
 
       updateGameClock(game.id, newClock);
     }
-  }, [updateGameClock, onTimeUp]);
+  }, [updateGameClock, onTimeUp, onTimeWarning]);
 
   useEffect(() => {
     const interval = setInterval(tick, 1000);

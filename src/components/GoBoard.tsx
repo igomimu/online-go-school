@@ -1,5 +1,6 @@
 // Simplified GoBoard for Web
 import { forwardRef, useMemo, type ReactElement } from 'react';
+import type { TerritoryOwner } from '../utils/scoring';
 
 export interface ViewRange {
     minX: number;
@@ -59,6 +60,14 @@ export interface GoBoardProps {
     drawings?: Drawing[];
     activeColor?: StoneColor;
     readOnly?: boolean;
+
+    // Ghost stone (hover preview)
+    ghostPosition?: { x: number; y: number } | null;
+    ghostColor?: StoneColor;
+
+    // Scoring overlay
+    territoryMap?: TerritoryOwner[][];
+    deadStones?: Set<string>;       // "x,y" (1-indexed)
 }
 
 const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
@@ -79,6 +88,10 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     markers,
     drawings,
     readOnly = false,
+    ghostPosition,
+    ghostColor,
+    territoryMap,
+    deadStones,
 }, ref) => {
     const CELL_SIZE = 40;
     const MARGIN = 40;
@@ -192,6 +205,24 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         }
     }
 
+    // Ghost stone (hover preview)
+    let ghostElement: ReactElement | null = null;
+    if (ghostPosition && ghostColor && !boardState[ghostPosition.y - 1]?.[ghostPosition.x - 1]) {
+        const gx = MARGIN + (ghostPosition.x - 1) * CELL_SIZE;
+        const gy = MARGIN + (ghostPosition.y - 1) * CELL_SIZE;
+        const isBlack = ghostColor === 'BLACK';
+        ghostElement = (
+            <circle
+                key="ghost"
+                cx={gx} cy={gy} r={STONE_RADIUS}
+                fill={isBlack ? '#000000' : '#FFFFFF'}
+                stroke="#000000" strokeWidth={2}
+                opacity={0.35}
+                className="pointer-events-none"
+            />
+        );
+    }
+
     const markerElements: ReactElement[] = [];
     if (markers) {
         markers.forEach((marker, i) => {
@@ -252,6 +283,57 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         });
     }
 
+    // Territory overlay (scoring mode)
+    const territoryElements: ReactElement[] = [];
+    if (territoryMap) {
+        const TERR_SIZE = CELL_SIZE * 0.22;
+        for (let y = 1; y <= boardSize; y++) {
+            for (let x = 1; x <= boardSize; x++) {
+                const owner = territoryMap[y - 1]?.[x - 1];
+                if (!owner) continue;
+                const cx = MARGIN + (x - 1) * CELL_SIZE;
+                const cy = MARGIN + (y - 1) * CELL_SIZE;
+                const fill = owner === 'BLACK' ? '#000000' : '#FFFFFF';
+                const stroke = owner === 'BLACK' ? 'none' : '#000000';
+                territoryElements.push(
+                    <rect
+                        key={`terr-${x}-${y}`}
+                        x={cx - TERR_SIZE} y={cy - TERR_SIZE}
+                        width={TERR_SIZE * 2} height={TERR_SIZE * 2}
+                        fill={fill} stroke={stroke} strokeWidth={0.5}
+                        opacity={0.7}
+                        className="pointer-events-none"
+                    />
+                );
+            }
+        }
+    }
+
+    // Dead stone markers (X on dead stones)
+    const deadStoneElements: ReactElement[] = [];
+    if (deadStones && deadStones.size > 0) {
+        const DS = STONE_RADIUS * 0.55;
+        for (const key of deadStones) {
+            const [xStr, yStr] = key.split(',');
+            const x = parseInt(xStr);
+            const y = parseInt(yStr);
+            const cx = MARGIN + (x - 1) * CELL_SIZE;
+            const cy = MARGIN + (y - 1) * CELL_SIZE;
+            const stone = boardState[y - 1]?.[x - 1];
+            const color = stone?.color === 'BLACK' ? '#FF4444' : '#FF4444';
+            deadStoneElements.push(
+                <g key={`dead-${x}-${y}`} className="pointer-events-none">
+                    <circle cx={cx} cy={cy} r={STONE_RADIUS} fill="transparent" opacity={0.3}
+                        stroke={color} strokeWidth={2} />
+                    <line x1={cx - DS} y1={cy - DS} x2={cx + DS} y2={cy + DS}
+                        stroke={color} strokeWidth={2.5} />
+                    <line x1={cx + DS} y1={cy - DS} x2={cx - DS} y2={cy + DS}
+                        stroke={color} strokeWidth={2.5} />
+                </g>
+            );
+        }
+    }
+
     // Drawing overlay (lines & arrows)
     const drawingElements: ReactElement[] = [];
     if (drawings) {
@@ -296,6 +378,9 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 <circle key={`star-${i}`} cx={MARGIN + (sx - 1) * CELL_SIZE} cy={MARGIN + (sy - 1) * CELL_SIZE} r={STAR_POINT_RADIUS} fill="#000000" />
             ))}
             {cells}
+            {ghostElement}
+            {territoryElements}
+            {deadStoneElements}
             {markerElements}
             {drawingElements}
         </svg>

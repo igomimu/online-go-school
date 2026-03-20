@@ -2,8 +2,13 @@ import { useState, useCallback, useRef, useMemo } from 'react';
 import GoBoard from './GoBoard';
 import type { Drawing } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
+import { getMainPath } from '../utils/treeUtilsV2';
 import type { ParticipantInfo, ClassroomLiveKit } from '../utils/classroomLiveKit';
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2 } from 'lucide-react';
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare } from 'lucide-react';
+import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
+import { useAiAnalysis } from '../hooks/useAiAnalysis';
+import AiAnalysisPanel from './AiAnalysisPanel';
+import WinRateGraph from './WinRateGraph';
 
 interface ReviewBoardProps {
   rootNode: GameNode;
@@ -110,6 +115,47 @@ export default function ReviewBoard({
 
   const currentMoveNumber = currentNode.move ? currentNode.nextNumber - 1 : 0;
 
+  // 自動再生
+  const autoReplay = useAutoReplay(currentNode, onSetCurrentNode);
+
+  // AI分析: collect move history from root to current node
+  const moveHistory = useMemo(() => {
+    const moves: { x: number; y: number; color: 'BLACK' | 'WHITE' }[] = [];
+    let node: GameNode | null = currentNode;
+    const path: GameNode[] = [];
+    while (node) {
+      path.unshift(node);
+      node = node.parent;
+    }
+    for (const n of path) {
+      if (n.move) moves.push(n.move);
+    }
+    return moves;
+  }, [currentNode]);
+
+  const aiAnalysis = useAiAnalysis(currentNode, moveHistory, {
+    boardSize,
+    komi: 6.5, // Default; could be passed via props
+  });
+
+  // Build win rate graph data from main path
+  const winRateData = useMemo(() => {
+    if (!aiAnalysis.settings.enabled) return [];
+    const mainPath = getMainPath(rootNode);
+    const data: { moveNumber: number; winrate: number }[] = [];
+    for (const node of mainPath) {
+      const moveNum = node.move ? node.nextNumber - 1 : 0;
+      // We only have data for cached nodes
+      // For now, just show a flat line at 50 if no data
+      data.push({ moveNumber: moveNum, winrate: 50 });
+    }
+    // Override with actual result for current node
+    if (aiAnalysis.result) {
+      data.push({ moveNumber: currentMoveNumber, winrate: aiAnalysis.result.winrate });
+    }
+    return data;
+  }, [aiAnalysis.settings.enabled, aiAnalysis.result, rootNode, currentMoveNumber]);
+
   // 生徒選択
   const students = useMemo(() => {
     if (!participants || !localIdentity) return [];
@@ -213,6 +259,44 @@ export default function ReviewBoard({
           </div>
         )}
 
+        {/* 自動再生コントロール */}
+        {isTeacher && (
+          <div className="flex justify-center items-center gap-2">
+            <button
+              onClick={autoReplay.toggle}
+              className={`p-2 glass-panel hover:bg-white/10 ${autoReplay.isPlaying ? 'bg-blue-500/20 text-blue-400' : ''}`}
+              title={autoReplay.isPlaying ? '停止' : '自動再生'}
+            >
+              {autoReplay.isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+            </button>
+            <div className="flex gap-1">
+              {REPLAY_SPEEDS.map(s => (
+                <button
+                  key={s.value}
+                  onClick={() => autoReplay.setSpeed(s.value)}
+                  className={`px-2 py-1 text-xs rounded ${
+                    autoReplay.speed === s.value
+                      ? 'bg-blue-500/20 text-blue-400'
+                      : 'bg-white/5 text-zinc-500 hover:bg-white/10'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* コメント表示 */}
+        {currentNode.comment && (
+          <div className="glass-panel px-4 py-3">
+            <div className="flex items-start gap-2 text-sm">
+              <MessageSquare className="w-4 h-4 text-zinc-500 mt-0.5 flex-shrink-0" />
+              <div className="text-zinc-300 whitespace-pre-wrap">{currentNode.comment}</div>
+            </div>
+          </div>
+        )}
+
         {/* 変化選択 */}
         {isTeacher && currentNode.children.length > 1 && (
           <div className="flex justify-center gap-2 overflow-x-auto p-2">
@@ -229,7 +313,28 @@ export default function ReviewBoard({
         )}
       </div>
 
-      {/* サイドバー（先生のみ: 生徒選択） */}
+      {/* サイドバー（先生のみ） */}
+      {isTeacher && (
+        <div className="w-full lg:w-64 space-y-4">
+          {/* AI分析パネル */}
+          <AiAnalysisPanel
+            result={aiAnalysis.result}
+            isLoading={aiAnalysis.isLoading}
+            error={aiAnalysis.error}
+            settings={aiAnalysis.settings}
+            onUpdateSettings={aiAnalysis.updateSettings}
+            boardSize={boardSize}
+          />
+
+          {/* 勝率グラフ */}
+          {aiAnalysis.settings.enabled && winRateData.length > 0 && (
+            <WinRateGraph
+              data={winRateData}
+              currentMove={currentMoveNumber}
+            />
+          )}
+        </div>
+      )}
       {isTeacher && students.length > 0 && (
         <div className="w-full lg:w-64 space-y-4">
           <div className="glass-panel p-4 space-y-3">
