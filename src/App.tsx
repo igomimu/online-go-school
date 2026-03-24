@@ -13,8 +13,10 @@ import { ConnectionState } from 'livekit-client';
 import { useGameManager } from './hooks/useGameManager';
 import { useGameView } from './hooks/useGameView';
 import { loadStudents, loadClassrooms } from './utils/classroomStore';
+import { saveAccount } from './utils/authStore';
 
 import Header from './components/Header';
+import LoginScreen from './components/LoginScreen';
 import Lobby from './components/Lobby';
 import GameBoard from './components/GameBoard';
 import GameCreationDialog from './components/GameCreationDialog';
@@ -30,7 +32,7 @@ import { useChat } from './hooks/useChat';
 import { useNotificationSound } from './hooks/useNotificationSound';
 import type { ChatMessagePayload } from './types/chat';
 
-import { Users, Video, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 
 function App() {
   const [role, setRole] = useState<Role | null>(null);
@@ -94,8 +96,12 @@ function App() {
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [showStudentManager, setShowStudentManager] = useState(false);
 
-  // 生徒ID認証（URLパラメータから）
+  // 生徒ID認証
   const [studentId, setStudentId] = useState<string | null>(null);
+  // 教室ID（ログイン画面 or URLパラメータから）
+  const [studentClassroomId, setStudentClassroomId] = useState<string | null>(null);
+  // URLから事前設定された教室ID
+  const [prefilledClassroomId, setPrefilledClassroomId] = useState<string | undefined>(undefined);
 
   const reloadClassroomData = useCallback(() => {
     setStudents(loadStudents());
@@ -292,6 +298,10 @@ function App() {
       },
       onConnectionStateChanged: (state: ConnectionState) => {
         setConnectionState(state);
+        // 生徒接続成功時にアカウントを保存
+        if (state === ConnectionState.Connected && connectRole === 'STUDENT' && studentId && studentClassroomId) {
+          saveAccount(studentId, studentClassroomId);
+        }
       },
       onActiveSpeakersChanged: (speakers: string[]) => {
         setActiveSpeakers(speakers);
@@ -327,30 +337,39 @@ function App() {
       setConnectionError('');
 
       if (connectRole === 'TEACHER') {
-        // 教室URLは固定: 環境変数があればURLパラメータ不要
         const baseUrl = `${window.location.origin}${window.location.pathname}`;
+        // 教室IDをURLに含める（生徒はログイン画面で教室IDが自動入力される）
+        const cid = selectedClassroomId || '';
         if (useServerToken) {
-          // 環境変数で接続情報を持つ → 固定URL
-          setStudentJoinInfo(`${baseUrl}?role=STUDENT`);
+          setStudentJoinInfo(`${baseUrl}?classroomId=${cid}`);
         } else {
-          // ローカル開発: 接続情報をURLに含める
           const currentUrl = new URL(baseUrl);
           currentUrl.searchParams.set('url', livekitUrl);
           currentUrl.searchParams.set('room', roomName);
           currentUrl.searchParams.set('key', apiKey);
           currentUrl.searchParams.set('secret', apiSecret);
-          currentUrl.searchParams.set('role', 'STUDENT');
+          currentUrl.searchParams.set('classroomId', cid);
           setStudentJoinInfo(currentUrl.toString());
         }
       }
     } catch (err) {
       setConnectionError(err instanceof Error ? err.message : '接続に失敗しました');
     }
-  }, [apiKey, apiSecret, roomName, livekitUrl, gameManager, gameView]);
+  }, [apiKey, apiSecret, roomName, livekitUrl, gameManager, gameView, studentId, studentClassroomId, selectedClassroomId]);
 
   // URL params for student auto-join
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
+    // 新形式: ?classroomId=XXX (+ オプション studentId)
+    const urlClassroomId = params.get('classroomId');
+    if (urlClassroomId) {
+      setPrefilledClassroomId(urlClassroomId);
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+
+    // 旧形式: ?url=...&room=...&role=STUDENT（後方互換）
     const urlLkUrl = params.get('url');
     const urlRoom = params.get('room');
     const urlKey = params.get('key');
@@ -362,7 +381,6 @@ function App() {
       setRoomName(urlRoom);
       if (urlKey) setApiKey(urlKey);
       if (urlSecret) setApiSecret(urlSecret);
-      // 生徒ID認証
       const urlStudentId = params.get('studentId');
       const urlStudentName = params.get('studentName');
       if (urlStudentId) {
@@ -663,126 +681,89 @@ function App() {
     );
   }
 
-  // --- ロール選択画面 ---
+  // --- ログイン画面 ---
   if (!role) {
     return (
-      <div className="flex flex-col items-center min-h-screen py-12 gap-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-5xl font-black bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">
-            三村囲碁オンライン
-          </h1>
-          <p className="text-zinc-400 text-lg">オンライン囲碁指導プラットフォーム</p>
-        </div>
-
-        <div className="w-full max-w-sm px-4">
-          <label className="block text-sm text-zinc-400 mb-1 text-center">お名前</label>
-          <input
-            type="text"
-            value={userName}
-            onChange={e => setUserName(e.target.value)}
-            placeholder="お名前を入力"
-            className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-center text-lg focus:outline-none focus:border-blue-500"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl px-4">
-          <button
-            onClick={() => {
-              if (!userName.trim()) return;
-              setRole('TEACHER');
-              setTeacherPhase('manage');
-            }}
-            className="glass-panel p-8 flex flex-col items-center gap-4 hover:bg-white/5 transition-all group"
-          >
-            <div className="p-4 bg-blue-500/10 rounded-2xl group-hover:scale-110 transition-transform">
-              <Video className="w-10 h-10 text-blue-400" />
+      <>
+        <LoginScreen
+          prefilledClassroomId={prefilledClassroomId}
+          onStudentLogin={(sid, cid) => {
+            setStudentId(sid);
+            setStudentClassroomId(cid);
+            setRoomName(`go-${cid}`);
+            setUserName(sid); // 先生側で名前解決されるまでIDを表示名に
+            setRole('STUDENT');
+          }}
+          onTeacherLogin={() => {
+            setRole('TEACHER');
+            setTeacherPhase('manage');
+          }}
+        />
+        {/* LiveKit設定ダイアログ */}
+        {showSettings && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="glass-panel p-6 w-full max-w-lg space-y-4">
+              <h2 className="text-xl font-bold">LiveKit設定</h2>
+              <div>
+                <label className="block text-sm text-zinc-400 mb-1">LiveKit URL</label>
+                <input value={livekitUrl} onChange={e => setLivekitUrl(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label className="block text-sm text-zinc-400 mb-1">API Key</label>
+                <input value={apiKey} onChange={e => setApiKey(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label className="block text-sm text-zinc-400 mb-1">API Secret</label>
+                <input value={apiSecret} onChange={e => setApiSecret(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500" />
+              </div>
+              <div className="flex gap-3">
+                <button onClick={saveSettings} className="premium-button flex-1">保存</button>
+                <button onClick={() => setShowSettings(false)} className="secondary-button flex-1">キャンセル</button>
+              </div>
             </div>
-            <div className="text-center">
-              <h3 className="text-2xl font-bold">先生</h3>
-              <p className="text-zinc-500 mt-2">教室を管理し授業を行います</p>
-            </div>
-            <div className="premium-button mt-4 w-full">先生として参加</div>
-          </button>
-
-          <button
-            onClick={() => {
-              if (!userName.trim()) return;
-              setRole('STUDENT');
-            }}
-            className="glass-panel p-8 flex flex-col items-center gap-4 hover:bg-white/5 transition-all group"
-          >
-            <div className="p-4 bg-indigo-500/10 rounded-2xl group-hover:scale-110 transition-transform">
-              <Users className="w-10 h-10 text-indigo-400" />
-            </div>
-            <div className="text-center">
-              <h3 className="text-2xl font-bold">生徒</h3>
-              <p className="text-zinc-500 mt-2">先生のリンクから教室に参加します</p>
-            </div>
-            <div className="secondary-button mt-4 w-full">生徒として参加</div>
-          </button>
-        </div>
-
-        <button
-          onClick={() => setShowSettings(true)}
-          className="text-zinc-600 hover:text-zinc-400 text-sm flex items-center gap-1"
-        >
-          <Settings className="w-4 h-4" /> LiveKit設定
-        </button>
-      </div>
+          </div>
+        )}
+      </>
     );
   }
 
   // --- 生徒接続画面 ---
   if (role === 'STUDENT' && connectionState !== ConnectionState.Connected) {
     const hasCredentials = livekitUrl && apiKey && apiSecret && roomName;
+
+    // 接続情報があれば自動接続を試みる
+    if (hasCredentials && connectionState === ConnectionState.Disconnected && studentId) {
+      const identity = makeStudentIdentity(studentId);
+      connectLiveKit('STUDENT', identity);
+    }
+
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-6">
         <div className="glass-panel p-8 w-full max-w-lg space-y-6">
-          <h2 className="text-2xl font-bold text-center">教室に参加</h2>
+          <h2 className="text-2xl font-bold text-center">教室に接続中</h2>
 
           {connectionState === ConnectionState.Connecting ? (
             <div className="text-center text-blue-400">接続中...</div>
-          ) : hasCredentials ? (
-            <>
-              {studentId ? (
-                /* 登録済み生徒: 名前は自動設定（読み取り専用） */
-                <div className="text-center space-y-2">
-                  <div className="text-lg font-bold text-white">{userName}</div>
-                  <div className="text-xs text-zinc-500">登録済み生徒として参加します</div>
-                </div>
-              ) : (
-                /* ゲスト: 名前を自由入力 */
-                <div>
-                  <label className="block text-sm text-zinc-400 mb-1">お名前</label>
-                  <input
-                    type="text" value={userName} onChange={e => setUserName(e.target.value)}
-                    placeholder="お名前を入力"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-              )}
-              {connectionError && (
-                <div className="text-red-400 text-sm bg-red-500/10 px-3 py-2 rounded-lg">{connectionError}</div>
-              )}
+          ) : connectionError ? (
+            <div className="space-y-4">
+              <div className="text-red-400 text-sm bg-red-500/10 px-3 py-2 rounded-lg">{connectionError}</div>
               <button
                 onClick={() => {
-                  if (!userName.trim()) return;
-                  const identity = studentId
-                    ? makeStudentIdentity(studentId)
-                    : userName.trim();
-                  connectLiveKit('STUDENT', identity);
+                  setConnectionError('');
+                  if (studentId) connectLiveKit('STUDENT', makeStudentIdentity(studentId));
                 }}
-                disabled={!userName.trim()}
-                className="premium-button w-full disabled:opacity-30"
+                className="secondary-button w-full"
               >
-                参加する
+                再接続
               </button>
-            </>
-          ) : (
-            <div className="text-center text-zinc-400 space-y-4">
-              <p>先生から参加リンクを受け取ってください</p>
-              <p className="text-xs text-zinc-600">リンクには接続に必要な情報が含まれています</p>
             </div>
+          ) : !hasCredentials ? (
+            <div className="text-center text-zinc-400 space-y-4">
+              <p>接続情報がありません</p>
+              <p className="text-xs text-zinc-600">先生がまだ教室を開いていない可能性があります</p>
+            </div>
+          ) : (
+            <div className="text-center text-zinc-400">準備中...</div>
           )}
 
           <button onClick={handleDisconnect} className="text-zinc-600 hover:text-zinc-400 text-sm w-full text-center">
@@ -800,12 +781,13 @@ function App() {
         <ClassroomManager
           students={students}
           classrooms={classrooms}
-          onLaunchClassroom={(classroomId) => {
+          onLaunchClassroom={(launchClassroomId) => {
             if (!livekitUrl || !apiKey || !apiSecret) {
               setShowSettings(true);
               return;
             }
-            setSelectedClassroomId(classroomId);
+            setSelectedClassroomId(launchClassroomId);
+            setRoomName(`go-${launchClassroomId}`);
             setTeacherPhase('classroom');
             connectLiveKit('TEACHER', userName.trim());
           }}

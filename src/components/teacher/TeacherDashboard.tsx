@@ -338,6 +338,7 @@ export default function TeacherDashboard({
       {showStudentLinks && (
         <StudentLinkGenerator
           students={filteredStudents}
+          classroomId={selectedClassroomId || undefined}
           onClose={() => setShowStudentLinks(false)}
         />
       )}

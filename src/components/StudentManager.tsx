@@ -345,7 +345,7 @@ export default function StudentManager({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xml"
+                  accept=".xml,.igc"
                   onChange={handleImportFile}
                   className="hidden"
                 />
