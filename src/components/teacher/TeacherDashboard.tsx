@@ -149,7 +149,7 @@ export default function TeacherDashboard({
     : games;
 
   // タイトルバーのクラス名
-  const classroomName = selectedClassroom?.name || 'オンライン囲碁教室';
+  const classroomName = selectedClassroom?.name || '三村囲碁オンライン';
 
   return (
     <div style={{
@@ -184,7 +184,7 @@ export default function TeacherDashboard({
           fontSize: 10,
           fontWeight: 'bold',
         }}>囲</span>
-        オンライン囲碁教室 〜 {classroomName}
+        三村囲碁オンライン 〜 {classroomName}
       </div>
 
       {/* 生徒一覧テーブル */}

@@ -75,7 +75,7 @@ export default function TeacherToolbar({
       }}>
         <span style={{ fontWeight: 'bold', fontSize: 14, marginRight: 8 }}>教室ID</span>
         <span style={{ fontWeight: 'bold', fontSize: 14, color: '#ffff00', marginRight: 16 }}>
-          オンライン囲碁教室
+          三村囲碁オンライン
         </span>
 
         {/* 生徒招待リンク */}

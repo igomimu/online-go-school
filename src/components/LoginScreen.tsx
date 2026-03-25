@@ -133,13 +133,17 @@ export default function LoginScreen({
             </h2>
           </div>
 
-          <form onSubmit={handleTeacherSubmit} className="space-y-4">
+          <form onSubmit={handleTeacherSubmit} className="space-y-4" autoComplete="on">
+            {/* ブラウザのパスワード保存を有効にするための隠しユーザー名 */}
+            <input type="hidden" name="username" autoComplete="username" value="teacher" />
             <div>
               <label className="block text-sm text-zinc-400 mb-1">
                 {isNewTeacher ? '新しいパスワード' : 'パスワード'}
               </label>
               <input
                 type="password"
+                name="password"
+                autoComplete={isNewTeacher ? 'new-password' : 'current-password'}
                 value={teacherPw}
                 onChange={e => setTeacherPw(e.target.value)}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
@@ -186,7 +190,7 @@ export default function LoginScreen({
         <h1 className="text-4xl font-black bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">
           三村囲碁オンライン
         </h1>
-        <p className="text-zinc-400">オンライン囲碁教室</p>
+        <p className="text-zinc-400">オンライン囲碁指導プラットフォーム</p>
       </div>
 
       <div className="glass-panel p-8 w-full max-w-sm space-y-6">
@@ -279,6 +283,33 @@ export default function LoginScreen({
         className="text-zinc-600 hover:text-zinc-400 text-sm"
       >
         先生としてログイン →
+      </button>
+
+      {/* データインポート（JSON） */}
+      <button
+        onClick={() => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.json';
+          input.onchange = async (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (!file) return;
+            try {
+              const text = await file.text();
+              const data = JSON.parse(text);
+              if (data.students) localStorage.setItem('go-school-students', JSON.stringify(data.students));
+              if (data.classrooms) localStorage.setItem('go-school-classrooms', JSON.stringify(data.classrooms));
+              alert(`インポート完了: ${data.students?.length || 0}名の生徒、${data.classrooms?.length || 0}教室`);
+              window.location.reload();
+            } catch {
+              alert('JSONの読み込みに失敗しました');
+            }
+          };
+          input.click();
+        }}
+        className="text-zinc-700 hover:text-zinc-400 text-xs"
+      >
+        データインポート（JSON）
       </button>
     </div>
   );

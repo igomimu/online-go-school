@@ -42,7 +42,8 @@ function App() {
   const [livekitUrl, setLivekitUrl] = useState(() => import.meta.env.VITE_LIVEKIT_URL || localStorage.getItem('lk-url') || '');
   const [apiKey, setApiKey] = useState(() => import.meta.env.VITE_LIVEKIT_API_KEY || localStorage.getItem('lk-api-key') || '');
   const [apiSecret, setApiSecret] = useState(() => import.meta.env.VITE_LIVEKIT_API_SECRET || localStorage.getItem('lk-api-secret') || '');
-  const useServerToken = !!import.meta.env.VITE_LIVEKIT_API_KEY;
+  // Vercelデプロイ時のみサーバートークン（/api/token）を使用。dev serverではクライアント側生成
+  const useServerToken = !!import.meta.env.VITE_LIVEKIT_API_KEY && import.meta.env.PROD;
   const [roomName, setRoomName] = useState('go-classroom');
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [connectionError, setConnectionError] = useState('');
@@ -102,6 +103,9 @@ function App() {
   const [studentClassroomId, setStudentClassroomId] = useState<string | null>(null);
   // URLから事前設定された教室ID
   const [prefilledClassroomId, setPrefilledClassroomId] = useState<string | undefined>(undefined);
+
+  // 生徒自動接続の重複防止
+  const studentAutoConnectRef = useRef(false);
 
   const reloadClassroomData = useCallback(() => {
     setStudents(loadStudents());
@@ -391,6 +395,19 @@ function App() {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
+
+  // 生徒自動接続
+  useEffect(() => {
+    if (role === 'STUDENT' && connectionState === ConnectionState.Disconnected && studentId && !studentAutoConnectRef.current) {
+      if (livekitUrl && apiKey && apiSecret && roomName) {
+        studentAutoConnectRef.current = true;
+        connectLiveKit('STUDENT', makeStudentIdentity(studentId));
+      }
+    }
+    if (role !== 'STUDENT') {
+      studentAutoConnectRef.current = false;
+    }
+  }, [role, connectionState, studentId, livekitUrl, apiKey, apiSecret, roomName, connectLiveKit]);
 
   // キーボードナビゲーション（レビューモード用）
   useEffect(() => {
@@ -730,12 +747,6 @@ function App() {
   // --- 生徒接続画面 ---
   if (role === 'STUDENT' && connectionState !== ConnectionState.Connected) {
     const hasCredentials = livekitUrl && apiKey && apiSecret && roomName;
-
-    // 接続情報があれば自動接続を試みる
-    if (hasCredentials && connectionState === ConnectionState.Disconnected && studentId) {
-      const identity = makeStudentIdentity(studentId);
-      connectLiveKit('STUDENT', identity);
-    }
 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-6">
