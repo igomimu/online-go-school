@@ -7,6 +7,7 @@ import {
   hasTeacherPassword,
   setTeacherPassword,
   verifyTeacherPassword,
+  resetTeacherPassword,
 } from '../utils/authStore';
 import type { SavedAccount } from '../utils/authStore';
 
@@ -165,7 +166,25 @@ export default function LoginScreen({
             )}
 
             {teacherError && (
-              <p className="text-red-400 text-sm">{teacherError}</p>
+              <div className="space-y-1">
+                <p className="text-red-400 text-sm">{teacherError}</p>
+                {!isNewTeacher && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm('パスワードをリセットしますか？')) {
+                        resetTeacherPassword();
+                        setIsNewTeacher(true);
+                        setTeacherPw('');
+                        setTeacherError('');
+                      }
+                    }}
+                    className="text-zinc-500 hover:text-zinc-300 text-xs underline"
+                  >
+                    パスワードをリセット
+                  </button>
+                )}
+              </div>
             )}
 
             <button data-testid="teacher-login-button" type="submit" className="premium-button w-full">

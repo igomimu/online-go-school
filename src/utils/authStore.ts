@@ -82,3 +82,7 @@ export async function verifyTeacherPassword(password: string): Promise<boolean> 
   if (!stored) return false;
   return stored === await sha256(password);
 }
+
+export function resetTeacherPassword(): void {
+  localStorage.removeItem(TEACHER_PW_KEY);
+}
