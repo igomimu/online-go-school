@@ -90,6 +90,7 @@ export default function GameCreationDialog({
             )}
           </label>
           <select
+            data-testid="black-player-select"
             value={blackPlayer}
             onChange={e => setBlackPlayer(e.target.value)}
             className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
@@ -116,6 +117,7 @@ export default function GameCreationDialog({
             )}
           </label>
           <select
+            data-testid="white-player-select"
             value={whitePlayer}
             onChange={e => setWhitePlayer(e.target.value)}
             className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
@@ -200,6 +202,7 @@ export default function GameCreationDialog({
         </div>
 
         <button
+          data-testid="create-game-button"
           onClick={handleSubmit}
           disabled={blackPlayer === whitePlayer}
           className="premium-button w-full disabled:opacity-30"

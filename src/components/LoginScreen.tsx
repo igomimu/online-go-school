@@ -141,6 +141,7 @@ export default function LoginScreen({
                 {isNewTeacher ? '新しいパスワード' : 'パスワード'}
               </label>
               <input
+                data-testid="teacher-password-input"
                 type="password"
                 name="password"
                 autoComplete={isNewTeacher ? 'new-password' : 'current-password'}
@@ -167,7 +168,7 @@ export default function LoginScreen({
               <p className="text-red-400 text-sm">{teacherError}</p>
             )}
 
-            <button type="submit" className="premium-button w-full">
+            <button data-testid="teacher-login-button" type="submit" className="premium-button w-full">
               {isNewTeacher ? '設定して開始' : 'ログイン'}
             </button>
           </form>
@@ -251,6 +252,7 @@ export default function LoginScreen({
           <div>
             <label className="block text-sm text-zinc-400 mb-1">生徒ID</label>
             <input
+              data-testid="student-id-input"
               type="text"
               value={studentId}
               onChange={e => { setStudentId(e.target.value); setError(''); }}
@@ -262,6 +264,7 @@ export default function LoginScreen({
           <div>
             <label className="block text-sm text-zinc-400 mb-1">教室ID</label>
             <input
+              data-testid="classroom-id-input"
               type="text"
               value={classroomId}
               onChange={e => { setClassroomId(e.target.value); setError(''); }}
@@ -272,13 +275,14 @@ export default function LoginScreen({
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
 
-          <button type="submit" className="premium-button w-full">
+          <button data-testid="student-login-button" type="submit" className="premium-button w-full">
             参加する
           </button>
         </form>
       </div>
 
       <button
+        data-testid="teacher-mode-link"
         onClick={() => setMode('teacher')}
         className="text-zinc-600 hover:text-zinc-400 text-sm"
       >

@@ -14,10 +14,11 @@ interface TeacherToolbarProps {
 }
 
 // IGC風のボタン
-function IgcButton({ label, color, onClick }: { label: string; color?: string; onClick?: () => void }) {
+function IgcButton({ label, color, onClick, 'data-testid': testId }: { label: string; color?: string; onClick?: () => void; 'data-testid'?: string }) {
   return (
     <button
       onClick={onClick}
+      data-testid={testId}
       style={{
         padding: '4px 14px',
         fontSize: 12,
@@ -124,7 +125,7 @@ export default function TeacherToolbar({
 
         <div style={{ flex: 1 }} />
 
-        <IgcButton label="対局作成" color="#90d060" onClick={onCreateGame} />
+        <IgcButton label="対局作成" color="#90d060" onClick={onCreateGame} data-testid="create-game-toolbar-button" />
         <IgcButton label="自動対局" color="#60c090" onClick={onAutoPairing} />
 
         <input ref={fileInputRef} type="file" accept=".sgf" onChange={onLoadSgf} className="hidden" />

@@ -111,7 +111,7 @@ export default function GameBoard({
             <span className="text-zinc-600 text-sm">取{game.whiteCaptures}</span>
           </div>
         </div>
-        <div className="text-sm text-zinc-500">
+        <div data-testid="move-count" className="text-sm text-zinc-500">
           {game.status === 'playing'
             ? `${game.moveNumber}手目`
             : game.status === 'scoring'
@@ -241,7 +241,7 @@ export default function GameBoard({
 
       {/* ターン表示 */}
       {game.status === 'playing' && (
-        <div className="text-center text-sm text-zinc-500">
+        <div data-testid="turn-indicator" className="text-center text-sm text-zinc-500">
           {isMyTurn ? (
             <span className="text-blue-400 font-bold">あなたの番です</span>
           ) : isParticipant ? (

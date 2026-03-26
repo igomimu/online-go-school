@@ -161,7 +161,8 @@ function App() {
   }, [connectionState, updateAudioDebug]);
 
   // LiveKit接続
-  const connectLiveKit = useCallback(async (connectRole: Role, connectUserName: string) => {
+  const connectLiveKit = useCallback(async (connectRole: Role, connectUserName: string, overrideRoomName?: string) => {
+    const effectiveRoomName = overrideRoomName || roomName;
     const classroom = new ClassroomLiveKit();
     classroomRef.current = classroom;
 
@@ -329,7 +330,7 @@ function App() {
       const connectToken = await fetchToken({
         apiKey,
         apiSecret,
-        roomName,
+        roomName: effectiveRoomName,
         identity: connectUserName,
         canPublish: true,
         canPublishData: true,
@@ -349,7 +350,7 @@ function App() {
         } else {
           const currentUrl = new URL(baseUrl);
           currentUrl.searchParams.set('url', livekitUrl);
-          currentUrl.searchParams.set('room', roomName);
+          currentUrl.searchParams.set('room', effectiveRoomName);
           currentUrl.searchParams.set('key', apiKey);
           currentUrl.searchParams.set('secret', apiSecret);
           currentUrl.searchParams.set('classroomId', cid);
@@ -798,9 +799,10 @@ function App() {
               return;
             }
             setSelectedClassroomId(launchClassroomId);
-            setRoomName(`go-${launchClassroomId}`);
+            const newRoomName = `go-${launchClassroomId}`;
+            setRoomName(newRoomName);
             setTeacherPhase('classroom');
-            connectLiveKit('TEACHER', userName.trim());
+            connectLiveKit('TEACHER', userName.trim() || 'teacher', newRoomName);
           }}
           onOpenSettings={() => setShowSettings(true)}
           onOpenStudentManager={() => setShowStudentManager(true)}
@@ -1038,7 +1040,7 @@ function App() {
       {/* 対局作成ダイアログ */}
       {showGameCreation && role === 'TEACHER' && (
         <GameCreationDialog
-          students={classroomRef.current?.remoteIdentities ?? []}
+          students={participants.filter(p => p.identity !== (classroomRef.current?.localIdentity ?? '')).map(p => p.identity)}
           teacherName={userName}
           onClose={() => setShowGameCreation(false)}
           onCreate={handleCreateGame}

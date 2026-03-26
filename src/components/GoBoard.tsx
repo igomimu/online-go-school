@@ -177,6 +177,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 cells.push(
                     <rect
                         key={`click-${x}-${y}`}
+                        data-cell={`${x}-${y}`}
                         x={cx - CELL_SIZE / 2} y={cy - CELL_SIZE / 2}
                         width={CELL_SIZE} height={CELL_SIZE}
                         fill="transparent"
@@ -194,7 +195,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             if (stone) {
                 const isBlack = stone.color === 'BLACK';
                 cells.push(
-                    <g key={`s-group-${x}-${y}`} className="pointer-events-none">
+                    <g key={`s-group-${x}-${y}`} data-stone={`${x}-${y}`} className="pointer-events-none">
                         <circle cx={cx} cy={cy} r={STONE_RADIUS} fill={isBlack ? "#000000" : "#FFFFFF"} stroke="#000000" strokeWidth={2} />
                         {showNumbers && stone.number && (
                             <text x={cx} y={cy} dy=".35em" textAnchor="middle" fill={isBlack ? "#FFFFFF" : "#000000"} fontSize={FONT_SIZE} fontWeight="bold">{stone.number}</text>
@@ -358,6 +359,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     return (
         <svg
             ref={ref}
+            data-testid="go-board"
             viewBox={viewBoxData.str}
             xmlns="http://www.w3.org/2000/svg"
             className="select-none w-full h-auto max-w-[800px] mx-auto"
