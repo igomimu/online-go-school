@@ -163,6 +163,7 @@ function App() {
   // LiveKit接続
   const connectLiveKit = useCallback(async (connectRole: Role, connectUserName: string, overrideRoomName?: string) => {
     const effectiveRoomName = overrideRoomName || roomName;
+    classroomRef.current?.destroy();
     const classroom = new ClassroomLiveKit();
     classroomRef.current = classroom;
 

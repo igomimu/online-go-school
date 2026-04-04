@@ -78,7 +78,7 @@ export default function LectureBoard({
   const currentMoveNumber = effectiveNode.move ? effectiveNode.nextNumber - 1 : 0;
 
   // 碁盤同期
-  const broadcastBoard = useCallback((node: GameNode) => {
+  const broadcastBoard = useCallback((node: GameNode, overrideBoardSize?: number) => {
     if (isTeacher && classroomRef.current?.isConnected) {
       const nextColor: StoneColor = node.move
         ? (node.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
@@ -87,7 +87,7 @@ export default function LectureBoard({
         type: 'BOARD_UPDATE',
         payload: {
           boardState: node.board,
-          boardSize,
+          boardSize: overrideBoardSize ?? boardSize,
           nextColor,
           markers: node.markers,
           moveNumber: node.move ? node.nextNumber - 1 : 0,
@@ -182,7 +182,7 @@ export default function LectureBoard({
     setRootNode(newRoot);
     setCurrentNode(newRoot);
     setSgfMetadata(undefined);
-    broadcastBoard(newRoot);
+    broadcastBoard(newRoot, newSize);
   };
 
   // 描画

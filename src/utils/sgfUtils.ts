@@ -404,11 +404,26 @@ export function parseSGFTree(sgfContent: string): ParsedSGFTree {
         if (content[pos] === ';') {
             pos++; // Skip ;
 
-            // Parse properties until next ; or ( or )
+            // Parse properties until next ; or ( or ) (but skip over [...] values)
             let propBuffer = '';
-            while (pos < content.length && content[pos] !== ';' && content[pos] !== '(' && content[pos] !== ')') {
-                propBuffer += content[pos];
-                pos++;
+            let inBracket = false;
+            while (pos < content.length) {
+                const ch = content[pos];
+                if (inBracket) {
+                    if (ch === '\\' && pos + 1 < content.length) {
+                        propBuffer += ch + content[pos + 1];
+                        pos += 2;
+                        continue;
+                    }
+                    if (ch === ']') inBracket = false;
+                    propBuffer += ch;
+                    pos++;
+                } else {
+                    if (ch === '[') { inBracket = true; propBuffer += ch; pos++; continue; }
+                    if (ch === ';' || ch === '(' || ch === ')') break;
+                    propBuffer += ch;
+                    pos++;
+                }
             }
 
 

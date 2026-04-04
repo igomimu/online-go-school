@@ -278,9 +278,23 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
         if (g.id !== gameId) return g;
         return {
           ...g,
+          currentColor: color === 'BLACK' ? 'WHITE' : 'BLACK',
+          moveNumber: g.moveNumber + 1,
           moveHistory: [...g.moveHistory, passMove],
         };
       }));
+      classroomRef.current?.broadcast({
+        type: 'GAME_BOARD_UPDATE',
+        payload: {
+          gameId,
+          boardState: game.boardState,
+          currentColor: color === 'BLACK' ? 'WHITE' : 'BLACK',
+          moveNumber: game.moveNumber + 1,
+          blackCaptures: game.blackCaptures,
+          whiteCaptures: game.whiteCaptures,
+          lastMove: passMove,
+        } as GameBoardUpdatePayload,
+      });
       enterScoring(gameId);
       return;
     }

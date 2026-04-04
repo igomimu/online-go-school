@@ -89,6 +89,7 @@ export class ClassroomLiveKit {
   room: Room;
   private handlers: ClassroomEventHandler = {};
   private _videoElements = new Map<string, HTMLVideoElement>();
+  private _audioElements = new Map<string, HTMLAudioElement>();
   onVideoTrackChanged?: (info: VideoTrackInfo) => void;
 
   constructor() {
@@ -142,9 +143,10 @@ export class ClassroomLiveKit {
       participant: RemoteParticipant,
     ) => {
       if (track.kind === Track.Kind.Audio) {
-        const el = track.attach();
+        const el = track.attach() as HTMLAudioElement;
         el.id = `audio-${participant.identity}`;
         document.body.appendChild(el);
+        this._audioElements.set(participant.identity, el);
       }
       if (track.kind === Track.Kind.Video) {
         const el = track.attach() as HTMLVideoElement;
@@ -164,6 +166,9 @@ export class ClassroomLiveKit {
       participant: RemoteParticipant,
     ) => {
       track.detach().forEach(el => el.remove());
+      if (track.kind === Track.Kind.Audio) {
+        this._audioElements.delete(participant.identity);
+      }
       if (track.kind === Track.Kind.Video) {
         this._videoElements.delete(participant.identity);
         this.onVideoTrackChanged?.({
@@ -342,9 +347,11 @@ export class ClassroomLiveKit {
   }
 
   destroy() {
-    // ビデオ要素のクリーンアップ
+    // メディア要素のクリーンアップ
     this._videoElements.forEach(el => el.remove());
     this._videoElements.clear();
+    this._audioElements.forEach(el => el.remove());
+    this._audioElements.clear();
     this.room.disconnect();
   }
 }

@@ -132,11 +132,18 @@ export function switchClock(clock: GameClock, color: 'BLACK' | 'WHITE'): GameClo
     timeLeft = clock.byoyomiSeconds;
   }
 
+  // 相手側: mainTime=0で未初期化の場合、秒読み時間を設定
+  const opponentTimeLeft = isBlack ? clock.whiteTimeLeft : clock.blackTimeLeft;
+  let opponentTime = opponentTimeLeft;
+  if (opponentTime <= 0 && clock.mainTimeSeconds === 0 && clock.byoyomiPeriods > 0) {
+    opponentTime = clock.byoyomiSeconds;
+  }
+
   return {
     ...clock,
     lastTickTime: now,
     ...(isBlack
-      ? { blackTimeLeft: timeLeft }
-      : { whiteTimeLeft: timeLeft }),
+      ? { blackTimeLeft: timeLeft, whiteTimeLeft: opponentTime }
+      : { whiteTimeLeft: timeLeft, blackTimeLeft: opponentTime }),
   };
 }
