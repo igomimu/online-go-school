@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 
 interface TeacherToolbarProps {
   studentJoinInfo: string;
+  classroomId?: string | null;
+  classroomName?: string;
   onCreateGame: () => void;
   onStartLecture: () => void;
   onLoadSgf: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -37,6 +39,8 @@ function IgcButton({ label, color, onClick, 'data-testid': testId }: { label: st
 
 export default function TeacherToolbar({
   studentJoinInfo,
+  classroomId,
+  classroomName,
   onCreateGame,
   onStartLecture,
   onLoadSgf,
@@ -50,12 +54,20 @@ export default function TeacherToolbar({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const problemInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedClassroomId, setCopiedClassroomId] = useState(false);
 
   const copyLink = () => {
     if (!studentJoinInfo) return;
     navigator.clipboard.writeText(studentJoinInfo).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyClassroomId = () => {
+    if (!classroomId) return;
+    navigator.clipboard.writeText(classroomId).catch(() => {});
+    setCopiedClassroomId(true);
+    setTimeout(() => setCopiedClassroomId(false), 2000);
   };
 
   const now = new Date();
@@ -74,10 +86,29 @@ export default function TeacherToolbar({
         background: '#4040a0',
         color: 'white',
       }}>
-        <span style={{ fontWeight: 'bold', fontSize: 14, marginRight: 8 }}>教室ID</span>
-        <span style={{ fontWeight: 'bold', fontSize: 14, color: '#ffff00', marginRight: 16 }}>
-          三村囲碁オンライン
+        <span style={{ fontWeight: 'bold', fontSize: 14, marginRight: 6 }}>
+          {classroomName || '三村囲碁オンライン'}
         </span>
+        {classroomId && (
+          <button
+            onClick={copyClassroomId}
+            title="クリックで教室IDをコピー"
+            style={{
+              background: copiedClassroomId ? '#90ee90' : '#2020a0',
+              color: copiedClassroomId ? '#333' : '#ffff00',
+              border: '1px solid #6060c0',
+              borderRadius: 3,
+              padding: '1px 10px',
+              fontSize: 12,
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              marginRight: 16,
+              fontFamily: 'MS Gothic, monospace',
+            }}
+          >
+            {copiedClassroomId ? '✓ 教室IDコピー済み' : `教室ID: ${classroomId}`}
+          </button>
+        )}
 
         {/* 生徒招待リンク */}
         {studentJoinInfo && (

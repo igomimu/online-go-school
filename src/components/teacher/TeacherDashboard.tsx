@@ -301,6 +301,8 @@ export default function TeacherDashboard({
       {/* ツールバー（IGC最下部） */}
       <TeacherToolbar
         studentJoinInfo={studentJoinInfo}
+        classroomId={selectedClassroomId}
+        classroomName={selectedClassroom?.name}
         onCreateGame={onCreateGame}
         onStartLecture={onStartLecture}
         onLoadSgf={onLoadSgf}
