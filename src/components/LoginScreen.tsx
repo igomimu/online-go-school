@@ -179,7 +179,7 @@ export default function LoginScreen({
                         setTeacherError('');
                       }
                     }}
-                    className="text-zinc-500 hover:text-zinc-300 text-xs underline"
+                    className="text-blue-400 hover:text-blue-300 text-sm underline mt-2"
                   >
                     パスワードをリセット
                   </button>
