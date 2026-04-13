@@ -161,8 +161,9 @@ function App() {
   }, [connectionState, updateAudioDebug]);
 
   // LiveKit接続
-  const connectLiveKit = useCallback(async (connectRole: Role, connectUserName: string, overrideRoomName?: string) => {
+  const connectLiveKit = useCallback(async (connectRole: Role, connectUserName: string, overrideRoomName?: string, overrideClassroomId?: string) => {
     const effectiveRoomName = overrideRoomName || roomName;
+    const effectiveClassroomId = overrideClassroomId ?? selectedClassroomId ?? '';
     classroomRef.current?.destroy();
     const classroom = new ClassroomLiveKit();
     classroomRef.current = classroom;
@@ -344,17 +345,16 @@ function App() {
 
       if (connectRole === 'TEACHER') {
         const baseUrl = `${window.location.origin}${window.location.pathname}`;
-        // 教室IDをURLに含める（生徒はログイン画面で教室IDが自動入力される）
-        const cid = selectedClassroomId || '';
         if (useServerToken) {
-          setStudentJoinInfo(`${baseUrl}?classroomId=${cid}`);
+          setStudentJoinInfo(`${baseUrl}?classroomId=${effectiveClassroomId}`);
         } else {
           const currentUrl = new URL(baseUrl);
           currentUrl.searchParams.set('url', livekitUrl);
           currentUrl.searchParams.set('room', effectiveRoomName);
           currentUrl.searchParams.set('key', apiKey);
           currentUrl.searchParams.set('secret', apiSecret);
-          currentUrl.searchParams.set('classroomId', cid);
+          currentUrl.searchParams.set('classroomId', effectiveClassroomId);
+          currentUrl.searchParams.set('role', 'STUDENT');
           setStudentJoinInfo(currentUrl.toString());
         }
       }
@@ -367,33 +367,32 @@ function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
-    // 新形式: ?classroomId=XXX (+ オプション studentId)
     const urlClassroomId = params.get('classroomId');
-    if (urlClassroomId) {
-      setPrefilledClassroomId(urlClassroomId);
-      window.history.replaceState({}, '', window.location.pathname);
-      return;
-    }
-
-    // 旧形式: ?url=...&room=...&role=STUDENT（後方互換）
     const urlLkUrl = params.get('url');
     const urlRoom = params.get('room');
     const urlKey = params.get('key');
     const urlSecret = params.get('secret');
     const urlRole = params.get('role');
 
-    if (urlLkUrl && urlRoom && urlRole === 'STUDENT') {
-      setLivekitUrl(urlLkUrl);
-      setRoomName(urlRoom);
-      if (urlKey) setApiKey(urlKey);
-      if (urlSecret) setApiSecret(urlSecret);
+    if (urlClassroomId) setPrefilledClassroomId(urlClassroomId);
+
+    if (urlLkUrl) setLivekitUrl(urlLkUrl);
+    if (urlRoom) setRoomName(urlRoom);
+    if (urlKey) setApiKey(urlKey);
+    if (urlSecret) setApiSecret(urlSecret);
+
+    if (urlRole === 'STUDENT' && urlLkUrl && urlRoom) {
       const urlStudentId = params.get('studentId');
       const urlStudentName = params.get('studentName');
       if (urlStudentId) {
         setStudentId(urlStudentId);
         if (urlStudentName) setUserName(decodeURIComponent(urlStudentName));
       }
+      if (urlClassroomId) setStudentClassroomId(urlClassroomId);
       setRole('STUDENT');
+    }
+
+    if (urlClassroomId || urlLkUrl) {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
@@ -803,7 +802,7 @@ function App() {
             const newRoomName = `go-${launchClassroomId}`;
             setRoomName(newRoomName);
             setTeacherPhase('classroom');
-            connectLiveKit('TEACHER', userName.trim() || 'teacher', newRoomName);
+            connectLiveKit('TEACHER', userName.trim() || 'teacher', newRoomName, launchClassroomId);
           }}
           onOpenSettings={() => setShowSettings(true)}
           onOpenStudentManager={() => setShowStudentManager(true)}

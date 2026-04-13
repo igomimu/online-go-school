@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { ChevronDown, Trash2, Plus, Lock, ArrowLeft } from 'lucide-react';
 import {
   loadAccounts,
-  loadLastAccount,
   deleteAccount,
   hasTeacherPassword,
   setTeacherPassword,
@@ -45,14 +44,12 @@ export default function LoginScreen({
     // 自動ログイン: 保存済みアカウントが1つだけなら即接続
     if (saved.length === 1 && !prefilledClassroomId) {
       onStudentLogin(saved[0].studentId, saved[0].classroomId);
-      return;
-    }
-
-    // prefilled classroomId がある場合はフォームに入れるだけ（自動ログインしない）
-    if (prefilledClassroomId) {
-      setClassroomId(prefilledClassroomId);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (prefilledClassroomId) setClassroomId(prefilledClassroomId);
+  }, [prefilledClassroomId]);
 
   const refreshAccounts = () => setAccounts(loadAccounts());
 
