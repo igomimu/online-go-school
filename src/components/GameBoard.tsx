@@ -13,7 +13,7 @@ interface GameBoardProps {
 }
 
 export default function GameBoard({ gameId, myIdentity, isTeacher, onBack }: GameBoardProps) {
-  const live = useLiveGame(gameId, myIdentity);
+  const live = useLiveGame(gameId, myIdentity, !!isTeacher);
   const {
     game,
     boardState,

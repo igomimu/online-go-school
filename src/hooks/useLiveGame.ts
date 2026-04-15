@@ -93,7 +93,11 @@ export interface UseLiveGameResult {
   finishWithResult: (result: string) => Promise<void>;
 }
 
-export function useLiveGame(gameId: string | null, myIdentity: string): UseLiveGameResult {
+export function useLiveGame(
+  gameId: string | null,
+  myIdentity: string,
+  isTeacher: boolean = false,
+): UseLiveGameResult {
   const [game, setGame] = useState<LiveGameRow | null>(null);
   const [moves, setMoves] = useState<LiveMoveRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -167,22 +171,35 @@ export function useLiveGame(gameId: string | null, myIdentity: string): UseLiveG
   const myColor: StoneColor | null = isBlack ? 'BLACK' : isWhite ? 'WHITE' : null;
   const isMyTurn = isParticipant && myColor === derived.currentColor;
 
+  // 先生が観戦中は myColor が null のまま currentColor 側の生徒の identity を代筆する
+  const effectivePlayer = useMemo(() => {
+    if (!game) return null;
+    if (myColor) return { identity: myIdentity, color: myColor };
+    if (isTeacher) {
+      return {
+        identity: derived.currentColor === 'BLACK' ? game.black_player : game.white_player,
+        color: derived.currentColor,
+      };
+    }
+    return null;
+  }, [game, myColor, myIdentity, isTeacher, derived.currentColor]);
+
   const submitMoveFn = useCallback(
     async (x: number, y: number) => {
-      if (!game || !myColor) return;
-      const res = await apiSubmitMove(game.id, myIdentity, x, y, myColor);
+      if (!game || !effectivePlayer) return;
+      const res = await apiSubmitMove(game.id, effectivePlayer.identity, x, y, effectivePlayer.color);
       if (!res.ok) setError(res.error ?? 'submit failed');
     },
-    [game, myColor, myIdentity],
+    [game, effectivePlayer],
   );
 
   const submitPass = useCallback(async () => {
-    if (!game || !myColor) return;
-    // 連続パスなら整地へ（クライアントサイドで判定してサーバーに状態遷移依頼）
+    if (!game || !effectivePlayer) return;
+    // 連続パスなら整地へ（ローカルstate基準。Realtimeラグのためピタッと当たらない場合は先生が手動遷移可）
     const lastMove = derived.lastMove;
     const isSecondPass = lastMove && lastMove.x === 0 && lastMove.y === 0;
 
-    const res = await apiSubmitMove(game.id, myIdentity, 0, 0, myColor);
+    const res = await apiSubmitMove(game.id, effectivePlayer.identity, 0, 0, effectivePlayer.color);
     if (!res.ok) {
       setError(res.error ?? 'pass failed');
       return;
@@ -194,17 +211,17 @@ export function useLiveGame(gameId: string | null, myIdentity: string): UseLiveG
         setError(String(e));
       }
     }
-  }, [game, myColor, myIdentity, derived.lastMove]);
+  }, [game, effectivePlayer, derived.lastMove]);
 
   const submitResign = useCallback(async () => {
-    if (!game || !myColor) return;
-    const winner = myColor === 'BLACK' ? 'W' : 'B';
+    if (!game || !effectivePlayer) return;
+    const winner = effectivePlayer.color === 'BLACK' ? 'W' : 'B';
     try {
       await apiFinishGame(game.id, `${winner}+R`);
     } catch (e) {
       setError(String(e));
     }
-  }, [game, myColor]);
+  }, [game, effectivePlayer]);
 
   const enterScoringFn = useCallback(async () => {
     if (!game) return;
