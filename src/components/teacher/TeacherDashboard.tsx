@@ -42,11 +42,6 @@ interface TeacherDashboardProps {
   onOpenStudentManager: () => void;
   onReloadData: () => void;
   onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number }[]) => void;
-  onGameMove: (gameId: string, x: number, y: number, color: 'BLACK' | 'WHITE') => void;
-  onGamePass: (gameId: string, color: 'BLACK' | 'WHITE') => void;
-  onGameResign: (gameId: string, color: 'BLACK' | 'WHITE') => void;
-  onScoringToggle: (gameId: string, x: number, y: number) => void;
-  onScoringConfirm: (gameId: string) => void;
   onProblemAssign?: (problem: import('../../types/problem').Problem) => void;
 }
 
@@ -72,11 +67,6 @@ export default function TeacherDashboard({
   onOpenStudentManager,
   onReloadData,
   onCreateGames,
-  onGameMove,
-  onGamePass,
-  onGameResign,
-  onScoringToggle,
-  onScoringConfirm,
   onProblemAssign,
 }: TeacherDashboardProps) {
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
@@ -206,15 +196,10 @@ export default function TeacherDashboard({
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {observingGameId && filteredGames.find(g => g.id === observingGameId) ? (
             <GameObserverPanel
-              game={filteredGames.find(g => g.id === observingGameId)!}
+              gameId={observingGameId}
               students={filteredStudents}
               localIdentity={localIdentity}
-              onMove={onGameMove}
-              onPass={onGamePass}
-              onResign={onGameResign}
               onBack={() => setObservingGameId(null)}
-              onScoringToggle={onScoringToggle}
-              onScoringConfirm={onScoringConfirm}
             />
           ) : (
             <BoardThumbnailGrid

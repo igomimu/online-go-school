@@ -76,10 +76,9 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 // 信頼性が必要なメッセージタイプ
+// GAME_* は Supabase 権威型に移行済（2026-04-15）
 const RELIABLE_TYPES = new Set<string>([
   'BOARD_UPDATE', 'DRAW_UPDATE', 'DRAW_CLEAR',
-  'GAME_CREATED', 'GAME_BOARD_UPDATE', 'GAME_ENDED',
-  'GAME_LIST_SYNC', 'SCORING_UPDATE',
   'PROBLEM_ASSIGN', 'PROBLEM_RESULT',
   'REVIEW_START', 'REVIEW_END',
   'AUDIO_CONTROL', 'MEDIA_CONTROL', 'CHAT_MESSAGE',
@@ -223,6 +222,10 @@ export class ClassroomLiveKit {
   async connect(url: string, token: string): Promise<void> {
     await this.room.connect(url, token);
     await this.room.startAudio();
+    // 接続時点で既に room に存在する remote participants は
+    // ParticipantConnected イベントを発火させないため、明示的に初回同期を発火する。
+    // （後から参加する client 側で初期 participants が React state に反映されない問題の対策）
+    this.notifyParticipantsChanged();
   }
 
   async disconnect(): Promise<void> {

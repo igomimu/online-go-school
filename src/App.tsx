@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { Drawing } from './components/GoBoard';
 import type { GameNode } from './utils/treeUtilsV2';
 import { convertSgfToGameTree } from './utils/treeUtilsV2';
@@ -10,8 +10,8 @@ import type { Student, Classroom } from './types/classroom';
 import { fetchToken } from './utils/livekitToken';
 import { makeStudentIdentity } from './utils/identityUtils';
 import { ConnectionState } from 'livekit-client';
-import { useGameManager } from './hooks/useGameManager';
-import { useGameView } from './hooks/useGameView';
+import { useLiveGameList } from './hooks/useLiveGameList';
+import { liveRowToSession } from './utils/liveGameApi';
 import { loadStudents, loadClassrooms } from './utils/classroomStore';
 import { saveAccount } from './utils/authStore';
 
@@ -120,21 +120,17 @@ function App() {
   // 通知音
   const notificationSound = useNotificationSound();
 
-  // 先生用: 対局管理
-  const gameManager = useGameManager(classroomRef);
+  // Supabase権威型 対局リスト（先生・生徒共通、Realtime購読）
+  const effectiveClassroomId =
+    role === 'TEACHER' ? selectedClassroomId : studentClassroomId;
+  const liveGameList = useLiveGameList(effectiveClassroomId);
 
-  // 残り10秒警告音
-  useEffect(() => {
-    gameManager.onTimeWarning((_gameId, _color, _seconds) => {
-      notificationSound.play('timeWarning', 500);
-    });
-  }, [gameManager, notificationSound]);
-
-  // 生徒用: 対局ビュー
-  const gameView = useGameView();
-
-  // 現在の対局一覧（先生 or 生徒で分岐）
-  const games = role === 'TEACHER' ? gameManager.games : gameView.games;
+  // 旧GameSession形に変換（ロビー/サムネイル等の既存コンポーネント互換）
+  // 注意: boardState/moveNumber はプレースホルダ。実盤面は useLiveGame 経由で取得
+  const games = useMemo(
+    () => liveGameList.games.map(liveRowToSession),
+    [liveGameList.games],
+  );
 
   // 音声デバッグ更新
   const updateAudioDebug = useCallback(() => {
@@ -171,14 +167,8 @@ function App() {
     classroom.setHandlers({
       onMessage: (msg: ClassroomMessage, sender?: string) => {
         // 先生: 対局メッセージ処理
-        if (connectRole === 'TEACHER') {
-          gameManager.handleGameMessage(msg, sender);
-        }
-
-        // 生徒: 対局メッセージ処理
-        if (connectRole === 'STUDENT') {
-          gameView.handleGameMessage(msg);
-        }
+        // 対局関連メッセージはSupabase側で扱うのでここでは不要
+        void sender;
 
         // 授業/検討の碁盤同期（生徒用）
         if (msg.type === 'BOARD_UPDATE' && connectRole === 'STUDENT' && msg.payload) {
@@ -285,19 +275,10 @@ function App() {
           notificationSound.play('gameEnd');
         }
       },
-      onParticipantJoined: (identity: string) => {
-        // 先生: 新参加者に対局一覧を送信 + 時計再開
-        if (connectRole === 'TEACHER') {
-          gameManager.syncGamesToParticipant(identity);
-          gameManager.resumeClockForPlayer(identity);
-        }
+      onParticipantJoined: (_identity: string) => {
         notificationSound.play('connect');
       },
-      onParticipantLeft: (identity: string) => {
-        // 先生: 切断した生徒の対局時計を停止
-        if (connectRole === 'TEACHER') {
-          gameManager.pauseClockForPlayer(identity);
-        }
+      onParticipantLeft: (_identity: string) => {
         notificationSound.play('disconnect');
       },
       onParticipantsChanged: (p: ParticipantInfo[]) => {
@@ -361,7 +342,7 @@ function App() {
     } catch (err) {
       setConnectionError(err instanceof Error ? err.message : '接続に失敗しました');
     }
-  }, [apiKey, apiSecret, roomName, livekitUrl, gameManager, gameView, studentId, studentClassroomId, selectedClassroomId]);
+  }, [apiKey, apiSecret, roomName, livekitUrl, studentId, studentClassroomId, selectedClassroomId]);
 
   // URL params for student auto-join
   useEffect(() => {
@@ -515,8 +496,8 @@ function App() {
     setViewMode('game');
   };
 
-  // 対局作成
-  const handleCreateGame = (opts: {
+  // 対局作成（Supabase insert、Realtime経由で全員に配信）
+  const handleCreateGame = async (opts: {
     blackPlayer: string;
     whitePlayer: string;
     boardSize: number;
@@ -524,50 +505,8 @@ function App() {
     komi: number;
     clock?: import('./types/game').GameClock;
   }) => {
-    gameManager.createGame(opts);
+    await liveGameList.createGame(opts);
     setShowGameCreation(false);
-  };
-
-  // 対局中の着手（先生用ハンドラ）
-  const handleGameMove = (gameId: string, x: number, y: number, color: 'BLACK' | 'WHITE') => {
-    if (role === 'TEACHER') {
-      gameManager.handleMove(gameId, x, y, color);
-    } else {
-      // 生徒: 先生に着手を送信
-      classroomRef.current?.broadcast({
-        type: 'GAME_MOVE',
-        payload: { gameId, x, y, color },
-      });
-    }
-  };
-
-  const handleGamePass = (gameId: string, color: 'BLACK' | 'WHITE') => {
-    if (role === 'TEACHER') {
-      gameManager.handlePass(gameId, color);
-    } else {
-      classroomRef.current?.broadcast({
-        type: 'GAME_PASS',
-        payload: { gameId, color },
-      });
-    }
-  };
-
-  const handleGameResign = (gameId: string, color: 'BLACK' | 'WHITE') => {
-    if (role === 'TEACHER') {
-      gameManager.handleResign(gameId, color);
-    } else {
-      classroomRef.current?.broadcast({
-        type: 'GAME_RESIGN',
-        payload: { gameId, color },
-      });
-    }
-  };
-
-  // 整地: 死石トグル
-  const handleScoringToggle = (gameId: string, x: number, y: number) => {
-    if (role === 'TEACHER') {
-      gameManager.toggleDeadStone(gameId, x, y);
-    }
   };
 
   // 詰碁: 配信
@@ -579,13 +518,6 @@ function App() {
       type: 'PROBLEM_ASSIGN',
       payload: { problem, targetStudents: [] },
     });
-  };
-
-  // 整地: 確定
-  const handleScoringConfirm = (gameId: string) => {
-    if (role === 'TEACHER') {
-      gameManager.confirmScoring(gameId);
-    }
   };
 
   // SGF読込（ロビーから）
@@ -817,8 +749,13 @@ function App() {
   const isConnected = connectionState === ConnectionState.Connected;
 
   // 生徒が対局中なら自動的にゲーム画面に遷移
+  const myIdentityForGame = classroomRef.current?.localIdentity || userName;
   const myGame = role === 'STUDENT'
-    ? gameView.getMyGame(classroomRef.current?.localIdentity || userName)
+    ? games.find(
+        (g) =>
+          (g.status === 'playing' || g.status === 'scoring') &&
+          (g.blackPlayer === myIdentityForGame || g.whitePlayer === myIdentityForGame),
+      )
     : null;
 
   // 生徒の自動ビュー判定
@@ -917,16 +854,11 @@ function App() {
             onDisconnect={handleDisconnect}
             onOpenStudentManager={() => setShowStudentManager(true)}
             onReloadData={reloadClassroomData}
-            onCreateGames={(pairs) => {
+            onCreateGames={async (pairs) => {
               for (const p of pairs) {
-                gameManager.createGame(p);
+                await liveGameList.createGame(p);
               }
             }}
-            onGameMove={handleGameMove}
-            onGamePass={handleGamePass}
-            onGameResign={handleGameResign}
-            onScoringToggle={handleScoringToggle}
-            onScoringConfirm={handleScoringConfirm}
             onProblemAssign={handleProblemAssign}
           />
         )}
@@ -951,15 +883,10 @@ function App() {
         {/* 対局画面 */}
         {effectiveViewMode === 'game' && activeGame && (
           <GameBoard
-            game={activeGame}
+            gameId={activeGame.id}
             myIdentity={classroomRef.current?.localIdentity ?? userName}
-            onMove={handleGameMove}
-            onPass={handleGamePass}
-            onResign={handleGameResign}
-            onBack={handleBackToLobby}
             isTeacher={role === 'TEACHER'}
-            onScoringToggle={handleScoringToggle}
-            onScoringConfirm={handleScoringConfirm}
+            onBack={handleBackToLobby}
           />
         )}
 

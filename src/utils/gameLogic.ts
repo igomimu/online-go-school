@@ -133,3 +133,41 @@ function hasLiberties(
     }
     return false;
 }
+
+/**
+ * 連結した同色石のグループを全て返す (0-indexed)
+ */
+export function findGroup(
+    board: BoardState,
+    startX: number,
+    startY: number,
+    color: StoneColor,
+    boardSize: number,
+): { x: number; y: number }[] {
+    const visited = new Set<string>();
+    const group: { x: number; y: number }[] = [];
+    const stack = [{ x: startX, y: startY }];
+    visited.add(`${startX},${startY}`);
+
+    while (stack.length > 0) {
+        const { x, y } = stack.pop()!;
+        group.push({ x, y });
+
+        const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+        for (const [dx, dy] of dirs) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || nx >= boardSize || ny < 0 || ny >= boardSize) continue;
+            const key = `${nx},${ny}`;
+            if (visited.has(key)) continue;
+
+            const stone = board[ny][nx];
+            if (stone && stone.color === color) {
+                visited.add(key);
+                stack.push({ x: nx, y: ny });
+            }
+        }
+    }
+
+    return group;
+}

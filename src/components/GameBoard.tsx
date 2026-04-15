@@ -1,89 +1,109 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import GoBoard from './GoBoard';
-import type { GameSession } from '../types/game';
-import type { StoneColor } from './GoBoard';
-import { Flag, SkipForward, Check, Clock } from 'lucide-react';
+import { Flag, SkipForward, Check } from 'lucide-react';
 import { calculateTerritory, formatScoringResult } from '../utils/scoring';
-import { formatTime } from '../hooks/useGameClock';
+import { findGroup } from '../utils/gameLogic';
+import { useLiveGame } from '../hooks/useLiveGame';
 
 interface GameBoardProps {
-  game: GameSession;
+  gameId: string;
   myIdentity: string;
-  onMove: (gameId: string, x: number, y: number, color: StoneColor) => void;
-  onPass: (gameId: string, color: StoneColor) => void;
-  onResign: (gameId: string, color: StoneColor) => void;
-  onBack?: () => void;
   isTeacher?: boolean;
-  onScoringToggle?: (gameId: string, x: number, y: number) => void;
-  onScoringConfirm?: (gameId: string) => void;
+  onBack?: () => void;
 }
 
-export default function GameBoard({
-  game,
-  myIdentity,
-  onMove,
-  onPass,
-  onResign,
-  onBack,
-  isTeacher,
-  onScoringToggle,
-  onScoringConfirm,
-}: GameBoardProps) {
-  const isBlack = game.blackPlayer === myIdentity;
-  const isWhite = game.whitePlayer === myIdentity;
-  const isParticipant = isBlack || isWhite;
-  const isMyTurn = isParticipant && (
-    (isBlack && game.currentColor === 'BLACK') ||
-    (isWhite && game.currentColor === 'WHITE')
-  );
-  const myColor: StoneColor | null = isBlack ? 'BLACK' : isWhite ? 'WHITE' : null;
-  const isScoring = game.status === 'scoring';
-  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
-  const canPlay = game.status === 'playing' && (isMyTurn || isTeacher);
+export default function GameBoard({ gameId, myIdentity, isTeacher, onBack }: GameBoardProps) {
+  const live = useLiveGame(gameId, myIdentity);
+  const {
+    game,
+    boardState,
+    currentColor,
+    moveNumber,
+    blackCaptures,
+    whiteCaptures,
+    isMyTurn,
+    isParticipant,
+    loading,
+    error,
+    submitMove,
+    submitPass,
+    submitResign,
+    setDeadStones,
+    finishWithResult,
+  } = live;
 
-  // Scoring state
-  const deadStonesSet = useMemo(() =>
-    new Set(game.scoringDeadStones || []),
-    [game.scoringDeadStones]
+  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
+
+  const isScoring = game?.status === 'scoring';
+  const canPlay = game?.status === 'playing' && (isMyTurn || isTeacher);
+
+  const deadStonesSet = useMemo(
+    () => new Set(game?.scoring_dead_stones ?? []),
+    [game?.scoring_dead_stones],
   );
 
   const scoringResult = useMemo(() => {
-    if (!isScoring) return null;
+    if (!isScoring || !game) return null;
     return calculateTerritory(
-      game.boardState, game.boardSize, deadStonesSet,
-      game.blackCaptures, game.whiteCaptures, game.komi,
+      boardState,
+      game.board_size,
+      deadStonesSet,
+      blackCaptures,
+      whiteCaptures,
+      game.komi,
     );
-  }, [isScoring, game.boardState, game.boardSize, deadStonesSet, game.blackCaptures, game.whiteCaptures, game.komi]);
+  }, [isScoring, game, boardState, deadStonesSet, blackCaptures, whiteCaptures]);
 
-  const handleCellClick = (x: number, y: number) => {
-    if (isScoring) {
-      // In scoring mode: toggle dead stones (teacher only)
-      if (isTeacher && onScoringToggle) {
-        onScoringToggle(game.id, x, y);
+  const handleCellClick = useCallback(
+    (x: number, y: number) => {
+      if (!game) return;
+      if (isScoring) {
+        if (!isTeacher) return;
+        const stone = boardState[y - 1]?.[x - 1];
+        if (!stone) return;
+        const group = findGroup(boardState, x - 1, y - 1, stone.color, game.board_size);
+        const currentDead = new Set(game.scoring_dead_stones ?? []);
+        const firstKey = `${x},${y}`;
+        const isCurrentlyDead = currentDead.has(firstKey);
+        for (const pos of group) {
+          const k = `${pos.x + 1},${pos.y + 1}`;
+          if (isCurrentlyDead) currentDead.delete(k);
+          else currentDead.add(k);
+        }
+        setDeadStones(Array.from(currentDead));
+        return;
       }
-      return;
-    }
-    if (!isMyTurn && !isTeacher) return;
-    const color = isTeacher ? game.currentColor : myColor;
-    if (!color) return;
-    onMove(game.id, x, y, color);
-  };
+      if (!isMyTurn && !isTeacher) return;
+      // 先生は常に currentColor で打つ（指導対局で代打ちできる）
+      // 生徒は myColor === currentColor のときのみ到達
+      submitMove(x, y);
+    },
+    [game, isScoring, isTeacher, boardState, isMyTurn, submitMove, setDeadStones],
+  );
 
-  const handlePass = () => {
+  const handlePassClick = useCallback(() => {
     if (!isMyTurn && !isTeacher) return;
-    const color = isTeacher ? game.currentColor : myColor;
-    if (!color) return;
-    onPass(game.id, color);
-  };
+    submitPass();
+  }, [isMyTurn, isTeacher, submitPass]);
 
-  const handleResign = () => {
+  const handleResignClick = useCallback(() => {
     if (!isParticipant && !isTeacher) return;
-    const color = isTeacher ? game.currentColor : myColor;
-    if (!color) return;
-    if (confirm('投了しますか？')) {
-      onResign(game.id, color);
-    }
-  };
+    if (confirm('投了しますか？')) submitResign();
+  }, [isParticipant, isTeacher, submitResign]);
+
+  const handleScoringConfirm = useCallback(() => {
+    if (!scoringResult) return;
+    const resultStr = formatScoringResult(scoringResult);
+    finishWithResult(resultStr);
+  }, [scoringResult, finishWithResult]);
+
+  if (loading || !game) {
+    return (
+      <div className="glass-panel p-8 text-center text-zinc-500">
+        {error ? <span className="text-red-400">エラー: {error}</span> : '対局を読み込み中...'}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -97,88 +117,65 @@ export default function GameBoard({
           )}
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-black border border-white/20" />
-            <span className={game.currentColor === 'BLACK' ? 'font-bold text-white' : 'text-zinc-400'}>
-              {game.blackPlayer}
+            <span className={currentColor === 'BLACK' ? 'font-bold text-white' : 'text-zinc-400'}>
+              {game.black_player}
             </span>
-            <span className="text-zinc-600 text-sm">取{game.blackCaptures}</span>
+            <span className="text-zinc-600 text-sm">取{blackCaptures}</span>
           </div>
           <span className="text-zinc-600">vs</span>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-white border border-white/20" />
-            <span className={game.currentColor === 'WHITE' ? 'font-bold text-white' : 'text-zinc-400'}>
-              {game.whitePlayer}
+            <span className={currentColor === 'WHITE' ? 'font-bold text-white' : 'text-zinc-400'}>
+              {game.white_player}
             </span>
-            <span className="text-zinc-600 text-sm">取{game.whiteCaptures}</span>
+            <span className="text-zinc-600 text-sm">取{whiteCaptures}</span>
           </div>
         </div>
         <div data-testid="move-count" className="text-sm text-zinc-500">
           {game.status === 'playing'
-            ? `${game.moveNumber}手目`
+            ? `${moveNumber}手目`
             : game.status === 'scoring'
               ? '整地中'
-              : `終局: ${game.result}`}
+              : `終局: ${game.result ?? ''}`}
         </div>
       </div>
 
-      {/* 対局時計 */}
-      {game.clock && game.status === 'playing' && (
-        <div className="glass-panel px-4 py-2 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-zinc-500" />
-            <span className="w-3 h-3 rounded-full bg-black border border-white/20" />
-            <span className={`font-mono font-bold ${
-              game.clock.blackTimeLeft <= 10 && game.currentColor === 'BLACK'
-                ? 'text-red-400 animate-pulse' : 'text-white'
-            }`}>
-              {formatTime(game.clock.blackTimeLeft)}
-              {game.clock.byoyomiPeriods > 0 && (
-                <span className="text-zinc-500 text-xs ml-1">({game.clock.blackByoyomiLeft})</span>
-              )}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-white border border-white/20" />
-            <span className={`font-mono font-bold ${
-              game.clock.whiteTimeLeft <= 10 && game.currentColor === 'WHITE'
-                ? 'text-red-400 animate-pulse' : 'text-white'
-            }`}>
-              {formatTime(game.clock.whiteTimeLeft)}
-              {game.clock.byoyomiPeriods > 0 && (
-                <span className="text-zinc-500 text-xs ml-1">({game.clock.whiteByoyomiLeft})</span>
-              )}
-            </span>
-          </div>
-          {game.clock.lastTickTime === null && (
-            <span className="text-yellow-400 text-xs">一時停止中</span>
-          )}
+      {/* エラー表示 */}
+      {error && (
+        <div className="glass-panel px-3 py-2 text-sm text-red-400 bg-red-500/5">
+          {error}
         </div>
       )}
 
       {/* 碁盤 */}
       <div className="glass-panel p-4 flex justify-center">
         <GoBoard
-          boardState={game.boardState}
-          boardSize={game.boardSize}
+          boardState={boardState}
+          boardSize={game.board_size}
           onCellClick={
             isScoring
-              ? (isTeacher ? handleCellClick : undefined)
-              : (game.status === 'playing' ? handleCellClick : undefined)
+              ? isTeacher
+                ? handleCellClick
+                : undefined
+              : game.status === 'playing'
+                ? handleCellClick
+                : undefined
           }
           readOnly={
             isScoring
               ? !isTeacher
-              : (game.status !== 'playing' || (!isMyTurn && !isTeacher))
+              : game.status !== 'playing' || (!isMyTurn && !isTeacher)
           }
           onCellMouseEnter={canPlay ? (x, y) => setGhostPos({ x, y }) : undefined}
           onCellMouseLeave={canPlay ? () => setGhostPos(null) : undefined}
           ghostPosition={canPlay ? ghostPos : null}
-          ghostColor={canPlay ? game.currentColor : undefined}
+          ghostColor={canPlay ? currentColor : undefined}
           territoryMap={scoringResult?.territoryMap}
           deadStones={deadStonesSet.size > 0 ? deadStonesSet : undefined}
         />
       </div>
 
-      {/* 整地モード: 得点表示 + 操作ボタン */}
+      {/* 整地モード */}
       {isScoring && scoringResult && (
         <div className="space-y-3">
           <div className="glass-panel px-4 py-3">
@@ -190,14 +187,14 @@ export default function GameBoard({
                 <div className="text-zinc-400">黒</div>
                 <div className="text-white font-bold text-lg">{scoringResult.blackTotal}</div>
                 <div className="text-zinc-600 text-xs">
-                  地{scoringResult.blackTerritory} + 取{game.blackCaptures + scoringResult.deadWhiteStones}
+                  地{scoringResult.blackTerritory} + 取{blackCaptures + scoringResult.deadWhiteStones}
                 </div>
               </div>
               <div className="text-center">
                 <div className="text-zinc-400">白</div>
                 <div className="text-white font-bold text-lg">{scoringResult.whiteTotal}</div>
                 <div className="text-zinc-600 text-xs">
-                  地{scoringResult.whiteTerritory} + 取{game.whiteCaptures + scoringResult.deadBlackStones} + コミ{game.komi}
+                  地{scoringResult.whiteTerritory} + 取{whiteCaptures + scoringResult.deadBlackStones} + コミ{game.komi}
                 </div>
               </div>
               <div className="text-center">
@@ -206,12 +203,9 @@ export default function GameBoard({
               </div>
             </div>
           </div>
-          {isTeacher && onScoringConfirm && (
+          {isTeacher && (
             <div className="flex justify-center gap-3">
-              <button
-                onClick={() => onScoringConfirm(game.id)}
-                className="premium-button flex items-center gap-2 text-sm"
-              >
+              <button onClick={handleScoringConfirm} className="premium-button flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4" /> 確定
               </button>
             </div>
@@ -219,19 +213,19 @@ export default function GameBoard({
         </div>
       )}
 
-      {/* 操作ボタン (playing mode) */}
+      {/* 操作ボタン */}
       {game.status === 'playing' && (isParticipant || isTeacher) && (
         <div className="flex justify-center gap-3">
           {(isMyTurn || isTeacher) && (
             <button
-              onClick={handlePass}
+              onClick={handlePassClick}
               className="secondary-button flex items-center gap-2 text-sm"
             >
               <SkipForward className="w-4 h-4" /> パス
             </button>
           )}
           <button
-            onClick={handleResign}
+            onClick={handleResignClick}
             className="secondary-button flex items-center gap-2 text-sm border-red-500/20 hover:bg-red-500/10 hover:text-red-400"
           >
             <Flag className="w-4 h-4" /> 投了
@@ -247,7 +241,7 @@ export default function GameBoard({
           ) : isParticipant ? (
             '相手の番です'
           ) : (
-            `${game.currentColor === 'BLACK' ? game.blackPlayer : game.whitePlayer}の番`
+            `${currentColor === 'BLACK' ? game.black_player : game.white_player}の番`
           )}
         </div>
       )}
