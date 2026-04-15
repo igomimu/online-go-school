@@ -40,6 +40,17 @@ export default function GameCreationDialog({
   const [komi, setKomi] = useState(6.5);
   const [clockPreset, setClockPreset] = useState(0); // index into CLOCK_PRESETS
 
+  // ダイアログ開口後に生徒が参加したケースへの保険:
+  // 初期値が teacherName 固定のままで students propが埋まった瞬間、自動で生徒を選択し直す。
+  // ユーザーが既に選択済みの値は上書きしない。
+  useEffect(() => {
+    if (students.length > 0 && blackPlayer === teacherName && whitePlayer === teacherName) {
+      setBlackPlayer(students[0]);
+      if (students.length > 1) setWhitePlayer(students[1]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [students, teacherName]);
+
   // identity から登録生徒を検索
   const getRank = (identity: string): string => {
     return findStudentByIdentity(identity, registeredStudents)?.rank || '';

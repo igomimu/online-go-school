@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { TEST_CLASSROOM_ID, TEST_CLASSROOM_NAME, TEST_STUDENT_A } from './test-data';
+import { TEST_CLASSROOM_NAME, TEST_STUDENT_A, TEST_STUDENT_B } from './test-data';
 
 export async function clearAllData(page: Page): Promise<void> {
   await page.evaluate(() => localStorage.clear());
@@ -13,16 +13,21 @@ export async function setupTeacherPassword(page: Page, password: string): Promis
   }, password);
 }
 
-export async function setupClassroomData(page: Page): Promise<void> {
+/**
+ * 生徒A+B登録済み、指定classroomIdに両方所属した教室データを localStorage に書き込む。
+ * classroomId をテストごとに変えることで、同一LiveKit Room上でのstate混在を避ける。
+ */
+export async function setupClassroomData(page: Page, classroomId: string): Promise<void> {
   await page.evaluate(({ students, classrooms }) => {
     localStorage.setItem('go-school-students', JSON.stringify(students));
     localStorage.setItem('go-school-classrooms', JSON.stringify(classrooms));
   }, {
     students: [
       { id: TEST_STUDENT_A.id, name: TEST_STUDENT_A.name, rank: TEST_STUDENT_A.rank, internalRating: '', type: 'ネット生', grade: '', country: '' },
+      { id: TEST_STUDENT_B.id, name: TEST_STUDENT_B.name, rank: TEST_STUDENT_B.rank, internalRating: '', type: 'ネット生', grade: '', country: '' },
     ],
     classrooms: [
-      { id: TEST_CLASSROOM_ID, name: TEST_CLASSROOM_NAME, maxCapacity: 10, studentIds: [TEST_STUDENT_A.id] },
+      { id: classroomId, name: TEST_CLASSROOM_NAME, maxCapacity: 10, studentIds: [TEST_STUDENT_A.id, TEST_STUDENT_B.id] },
     ],
   });
 }

@@ -58,6 +58,8 @@ export default function StudentTable({
             return (
               <tr
                 key={row.identity || row.student?.id || `empty-${i}`}
+                data-connected={row.isConnected ? 'true' : 'false'}
+                data-student-id={row.student?.id || ''}
                 style={{ background: bgColor, cursor: row.isConnected ? 'pointer' : 'default' }}
                 onClick={() => row.isConnected && row.identity && onSelectStudent?.(row.identity)}
               >
