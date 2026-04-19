@@ -1,139 +1,63 @@
-# 開発進捗記録 - online-go-school
+# 開発進捗記録 — online-go-school（三村囲碁オンライン）
 
-## 📅 最終更新: 2026-02-03
+## 最終更新: 2026-04-20
 
-## ✅ 完了した作業
+## 現状（スナップショット）
 
-### 1. 環境設定
-- [x] `.env` ファイル作成
-  - Agora App ID設定: `0cead207dab34dd188322c1725076f13`
-  - KataGo設定（後回し）
-- [x] `.gitignore` 更新（.envを除外）
-- [x] `vite.config.ts` 更新（HMR設定追加）
+### Runtime
+- **Dev server**: LEGION の `npm run dev`、`http://localhost:5175/`
+- **公開URL**: `https://online.mimura15.jp/`（Cloudflare Tunnel → LEGION port 5175）
+- **本番デプロイ**: 未実施（Vercel 構成は準備済み）
 
-### 2. 実装確認
-- [x] 既存コードの確認
-  - `GoBoard.tsx`: 囲碁盤UI実装済み
-  - `VideoPanel.tsx`: Agoraビデオ通話UI実装済み
-  - `useAgoraClient.ts`: Agoraクライアント実装済み
-  - `classroomPeer.ts`: PeerJS P2P通信実装済み
-  - `sgfUtils.ts`: SGF処理（パース・生成）実装済み
-  - `gameLogic.ts`: 囲碁ルール（取り上げ判定）実装済み
+### 技術スタック（確定）
+- Vite 7 + React 19 + TypeScript 5.9 + Tailwind 4
+- LiveKit（映像音声＋データ、`livekit-client` + `@livekit/components-react`）
+- Supabase（対局の権威データ、dojo-app と共用プロジェクト）
+- LiveKit Server SDK で Vercel Function `api/token.ts` が JWT 発行
+- KataGo 連携（LEGIONサーバー、`katagoClient.ts`）
+- Vitest + Playwright E2E
 
-### 3. 基本機能の実装状況
-- ✅ Teacher/Student ロール切り替え
-- ✅ ビデオ通話機能（Agora）
-- ✅ 音声通話機能（Agora）
-- ✅ 囲碁盤UI（SVGベース）
-- ✅ P2P盤面同期（PeerJS）
-- ✅ 取り上げロジック
-- ⏸️ SGFインポート/エクスポート（UI未実装）
-- ❌ KataGo連携（後回し）
+### 実装済み
+- Teacher / Student ロール
+- LiveKit ビデオ・音声・データメッセージ
+- 囲碁盤 UI、分岐棋譜、描画、カーソル
+- **Supabase 権威型対局**（着手・時計・スコアリング・死石判定を Supabase row で管理）
+- 先生代打ち、複数生徒観戦、自動ペアリング
+- KataGo AI 分析、勝率グラフ
+- SGF / IGC インポート・エクスポート
+- 対局時計、チャット、画面録画
+- 詰碁問題、保存棋譜一覧
+- 生徒ID + 教室ID ログイン、先生パスワードリセット
+- Playwright E2E（multi-user-game, multi-student-game, reconnect）
 
-## 🚧 現在の状況
+### 未実装・次の一手
+1. **実運用デビュー**（最優先）: 既存生徒 1 人で試験レッスン → フィードバック → 穴埋め
+2. **dojo-app 導線**: 生徒向けアプリから「オンラインレッスン参加」へ
+3. **pokekata 連携**: Pocket KataGo の局面をレッスンに持ち込み
+4. **Vercel 本番化**: 現状の Tunnel 直接公開から Vercel へ
+5. `VITE_LIVEKIT_URL` の WSL2 IP 直打ち問題の恒久対処
 
-### 開発サーバー
-- **場所**: LEGION上で起動中
-- **ポート**: 5174
-- **接続**: Cloudflare Tunnel経由 (`ssh legion`)
-- **アクセスURL**: `ssh -L 5174:localhost:5174 legion` → `http://localhost:5174/`
+---
 
-### 問題
-- YOGAProブラウザからアクセスすると真っ白な画面
-- HTMLは正しく返されている
-- JavaScriptモジュール（`/src/main.tsx`）の読み込みに問題がある可能性
-- Vite HMR WebSocketの接続に問題がある可能性
+## アーキテクチャ変遷
 
-## 🎯 次のステップ（推奨）
+- **〜2026-02**: Agora RTC + PeerJS（No Backend）でプロトタイプ
+- **2026-03**: LiveKit 移行、生徒 ID + 教室 ID ログイン、Igo Campus 機能移植
+- **2026-04**:
+  - 先生パスワードリセット機能、LiveKit 再接続修正
+  - **Supabase 権威型対局への全面移行**（BOARD_UPDATE ブロードキャストから脱却）
+  - 先生代打ち復活、Playwright E2E 拡張
+  - Agora / PeerJS 依存は完全撤去
 
-### YOGAPro側でのセットアップ
+---
 
-**理由:**
-- YOGAPro = 開発用PC（CLAUDE.mdの方針）
-- ネットワーク問題を回避
-- 開発体験が最良
-
-**手順:**
-
-```bash
-# YOGAPro側で実行
-
-# 1. プロジェクトディレクトリへ移動
-cd /home/mimura/projects/online-go-school
-
-# 2. 依存関係インストール
-npm install
-
-# 3. .envファイルが存在するか確認
-cat .env
-# なければ、LEGION側からコピーするか、以下を作成:
-# VITE_AGORA_APP_ID=0cead207dab34dd188322c1725076f13
-
-# 4. 開発サーバー起動
-npm run dev
-
-# 5. ブラウザでアクセス
-# http://localhost:5173/ (または5174)
-```
-
-## 📋 テスト手順（サーバー起動後）
-
-### 基本動作確認
-
-1. **Teacher側（ブラウザ1）**
-   - `Instruction Mode` を選択
-   - カメラ・マイクの許可
-   - 表示されたPeer IDをコピー
-
-2. **Student側（ブラウザ2 / シークレットモード）**
-   - `Student Mode` を選択
-   - Teacher の Peer ID を入力
-   - `Join` ボタンをクリック
-
-3. **確認項目**
-   - [ ] ビデオが両方に表示される
-   - [ ] 音声が聞こえる
-   - [ ] Teacherが石を置くとStudentに同期される
-   - [ ] 取り上げが正しく動作する
-
-## 🔧 技術情報
-
-### 使用技術
-- **Frontend**: Vite + React + TypeScript
-- **Video/Audio**: Agora RTC SDK
-- **P2P Data**: PeerJS
-- **Styling**: Custom CSS (Glass morphism)
-- **Icons**: Lucide React
-
-### ネットワーク構成
-- **LEGION**:
-  - 接続: Cloudflare Tunnel経由 (`ssh legion` / `legion-ssh.mimura15.jp`)
-  - 用途: 生徒の囲碁研究（KataGo常駐）
-  - 開発時の注意: GPU負荷を考慮
-
-- **YOGAPro**:
-  - 用途: 開発作業、ブラウザ確認
-  - LEGIONへのアクセス: SSHポートフォワーディング経由
-
-## 📝 メモ
-
-### 重要な設計方針
-1. **AI機能（KataGo）は後回し**
-2. **基本機能を優先**: 顔を見て、声でやり取りして、囲碁が打てる
-3. **LEGIONのGPU負荷に配慮**: 日中は生徒の研究用
-
-### 既存の実装品質
-- 囲碁盤UI: 非常に洗練されている
-- SGFユーティリティ: 完全実装（分岐対応）
-- ビデオ通話: Agora統合済み
-- P2P通信: シンプルで効率的
-
-## 🔄 今後の開発タスク
-
-- [ ] YOGAPro側で開発サーバー起動・動作確認
-- [ ] ビデオ通話の完全テスト
-- [ ] 盤面同期の完全テスト
-- [ ] UIの改善（接続状態表示、エラーハンドリング）
-- [ ] SGFインポート/エクスポートUI追加
-- [ ] 対局時計機能（将来）
-- [ ] KataGo連携（将来）
+## 直近のコミット（参考、実態は git log で確認）
+- `94e637c` 2026-04-15 LEGION側既存作業の取り込み（E2E拡張 + 小改善）
+- `5e10960` fix(live-game): 先生の代打ちを復活
+- `5b349e0` feat(live-game): Supabase権威型対局システムへ移行
+- `e16d882` fix(student-login): 生徒招待リンク経由の接続を修復
+- `beb7067` fix(teacher): ツールバーに教室ID表示とワンタッチコピー
+- `e2c4207` style: 先生パスワードリセットリンクを視認しやすい色に変更
+- `78ce626` fix: LiveKit再接続時のdestroy、碁盤サイズ同期、秒読み初期化、パス処理改善
+- `25bc1bc` feat: 先生パスワードリセット機能追加
+- `738c7a0` feat: Playwright E2Eテスト基盤導入
