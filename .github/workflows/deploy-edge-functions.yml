@@ -6,12 +6,31 @@ on:
       - main
     paths:
       - 'supabase/functions/**'
+      - '.github/workflows/deploy-edge-functions.yml'
+  pull_request:
+    paths:
+      - 'supabase/functions/**'
   workflow_dispatch:
 
 jobs:
-  deploy:
+  test:
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.46.x
+
+      - name: Run Deno tests
+        run: deno test --allow-read --allow-env supabase/functions/
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,13 +40,8 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy Edge Functions
+      - name: Deploy validate_student_session
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: yzsyrtesydpulctjgdog
-        run: |
-          # Edge Functions は Stage 2 以降で追加される。
-          # 関数を追加したら、以下のコメントを外して1行ずつ追記する:
-          # supabase functions deploy issue_session --project-ref $SUPABASE_PROJECT_REF
-          # supabase functions deploy submit_move --project-ref $SUPABASE_PROJECT_REF
-          echo "No Edge Functions to deploy yet. Populated in Stage 2+."
+        run: supabase functions deploy validate_student_session --project-ref $SUPABASE_PROJECT_REF

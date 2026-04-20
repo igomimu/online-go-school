@@ -13,7 +13,7 @@ import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession } from './utils/liveGameApi';
 import { loadStudents, loadClassrooms } from './utils/classroomStore';
-import { saveAccount } from './utils/authStore';
+import { saveAccount, supabaseSignInStudent, supabaseSignOut } from './utils/authStore';
 
 import Header from './components/Header';
 import LoginScreen from './components/LoginScreen';
@@ -480,6 +480,7 @@ function App() {
       setTeacherPhase('manage');
     } else {
       setRole(null);
+      void supabaseSignOut();
     }
   };
 
@@ -643,6 +644,15 @@ function App() {
             setRoomName(`go-${cid}`);
             setUserName(sid); // 先生側で名前解決されるまでIDを表示名に
             setRole('STUDENT');
+            // Phase 0 Stage 2: Supabase Session 確立を並行実行。
+            // Hook OFF 期間中は失敗しても localStorage 認証で動作継続。
+            void supabaseSignInStudent(sid, cid).then(result => {
+              if (!result.ok) {
+                console.warn('[auth] Supabase sign-in failed (non-fatal):', result.error);
+              } else {
+                console.info('[auth] Supabase session established for', result.displayName ?? sid);
+              }
+            });
           }}
           onTeacherLogin={() => {
             setRole('TEACHER');

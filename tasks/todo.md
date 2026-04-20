@@ -37,39 +37,91 @@
 
 ---
 
-## Stage 2: 受付作り（`issue_session` Edge Function 新設）
+## Stage 2: 認証パス切替（Anonymous Sign-In + Auth Hook + validate_student_session）
 
-**目的**: 本人確認してJWTを発行する仕組みを作る。フロントからはまだ呼ばない（並行稼働）
+**目的**: 検証済みの identity を JWT claim に封入する仕組みを作る。フロントからはまだ呼ばない（並行稼働）。
 
-**作業**:
-- [ ] `issue_session` Edge Function 新設
-  - 生徒ルート: `studentId + classroomId + studentName` → dojo-app `students` と照合 → OK なら JWT 発行
-  - 先生ルート: `classroomId + password` → classrooms テーブル or 環境変数で照合 → OK なら JWT 発行
-- [ ] JWT claim 設計: `role` (student|teacher), `student_id` or `teacher_id`, `classroom_id`, `exp`, `iss`, `sub`
-- [ ] Supabase プロジェクトの JWT_SECRET を Edge Function に渡す（Supabase.functions secrets）
-- [ ] リフレッシュトークン機構も併設（期限切れ前の再発行）
-- [ ] Deno test で JWT 発行・検証ロジックをユニットテスト
+### 設計方針 pivot の経緯（2026-04-20）
+- 原計画「Custom JWT via Edge Function」は Supabase JWT_SECRET の1回以上の共有が必要
+- JWT_SECRET は Dashboard からのコピーでのみ取得可（Management API 不可、再発行は dojo-app が壊れるので不可）
+- ユーザー作業ゼロ方針と両立しないため、**自前発行を捨てて Supabase 発行 JWT に pivot**
+- 本質は「自前署名すること」ではなく「**claim の中身をサーバーが決める**」こと。これを Edge Function の metadata 上書き経路で担保する
 
-**検証**:
-- curl で `issue_session` を叩き、返ってくる JWT をデコードして claim が正しいことを確認
+### 新設計フロー
+1. フロント: `supabase.auth.signInAnonymously()` → metadata なしの anon user 作成（Supabase が自分の鍵で JWT 署名）
+2. フロント: Edge Function `validate_student_session` を Authorization: Bearer <jwt> で呼ぶ
+3. Edge Function: JWT から sub 取得 → dojo-app `students` 照合 → `auth.admin.updateUserById` で user_metadata に検証済み値を書き込み
+4. フロント: `supabase.auth.refreshSession()` で metadata 反映済みの新 JWT を取得
+5. Auth Hook (`public.custom_access_token_hook`) が user_metadata を claim トップレベルに昇格
+6. Stage 7 の RLS は `auth.jwt()->>'classroom_id'` 等で claim を読む
+
+### 完了済みの本番作業（2026-04-20）
+- [x] `public.custom_access_token_hook` 関数作成・権限設定（migration `20260420204425`、Management API で適用済み）
+- [x] `public.handle_new_user` 改修: anon ユーザーは profiles insert スキップ（migration `20260420211528`、適用済み）
+- [x] Anonymous Sign-In と Hook の一時有効化（確認後すぐ OFF に戻した。500エラー検証時）
+
+### 現在の状態
+- Anonymous Sign-In: **OFF**
+- Custom Access Token Hook: **OFF**（関数は本番に存在、URI設定は消してある）
+- dojo-app の Magic Link signup は従来通り動作（handle_new_user 改修で anon skip するだけ、通常ユーザーには影響なし）
+
+### classroom_id の検証省略（Option A 確定、2026-04-21）
+2026-04-21 の実装時、dojo-app `students` テーブルに `classroom_id` カラムが**存在しない**ことが判明（online-go-school の classroom は先生ブラウザの localStorage `go-school-classrooms` で管理されている）。Edge Function で classroom_id を照合する先が無い。
+
+方針: body の classroom_id は**検証せず**そのまま user_metadata に書き込む。
+- 現行 localStorage 認証と同じセキュリティレベル → regression なし
+- student_id の存在・active 検証が、現行認証に対する**本物の改善点**
+- Stage 7 RLS は `student_id` / `app_role` を主ゲートにし、`classroom_id` claim は UX グルーピング / defense-in-depth にとどめる（trust boundary として使わない）
+- Stage 4 の submit_move 改修では caller_identity を **JWT claim の student_id** から取得する（body 申告廃止）
+- 将来マルチ教室運用で真正性が必要になったら、Supabase に classroom テーブル新設（Phase 1 以降の判断）
+
+#### Security model: UUID moat 前提（load-bearing）
+Option A は「student_id を知っている者 = 正当な生徒」に帰着する。この前提は `students.id` が **UUID v4 で非 enumerable** であることに依存している。
+- 将来 `students.id` を「生徒番号001」のような人間可読・連番形式に変えると、本認証モデルは全崩壊する
+- `students.id` 形式を変更する提案が出たら、そのPRで Option A を再設計する（student_id とは別の secret を併用する等）
+- Stage 4 の submit_move 改修時にも同じ前提を再確認する
+
+### 残作業
+- [x] `validate_student_session` Edge Function 新設（2026-04-21、Option A 実装）
+  - body: `{ studentId, classroomId }`
+  - Authorization ヘッダーの JWT を Supabase auth で検証 → is_anonymous 確認 → sub 取得
+  - dojo-app `students` で照合（student_type='net', status='active'）
+  - OK なら service_role で `auth.admin.updateUserById(sub, { user_metadata: { student_id, classroom_id, app_role: 'student' } })`
+  - NG なら 401/403
+- [x] `.github/workflows/deploy-edge-functions.yml` のデプロイ対象を `validate_student_session` に差し替え（2026-04-21）
+- [x] `supabase/functions/issue_session/` 削除 + `scripts/gen-teacher-hash.mjs` 削除 + `bcryptjs` devDependency 削除（2026-04-21）
+- [ ] フロント側
+  - [ ] `authStore.ts` に Supabase Session 連携を追加
+  - [ ] ログインフロー: `signInAnonymously` → `validate_student_session` 呼び出し → `refreshSession`
+  - [ ] リロード復帰時は `supabase.auth.getSession()` 経由で自動復帰
+- [ ] Management API で Anonymous Sign-In と Hook を再有効化
+- [ ] dojo-app の Magic Link signup smoke test（Hook 再有効化後）
+
+### 先生認証は Stage 4 に延期
+- 理由: 先生パスワードの Edge Function secret 投入が再度ブロッカーになる。Stage 4 の submit_move 改修で classroom_id ベース権限判定と一緒にやる方が自然
+- 暫定: Stage 3 までは localStorage SHA-256 のまま。三村さん単独先生のため実質リスクゼロ
+
+### 検証（load-bearing check）
+- curl で `signInAnonymously` → `validate_student_session` → `refreshSession` を通し、新 JWT の claim に `student_id` / `classroom_id` / `app_role` が載ることを確認
 - 不正な studentId で 403 が返ることを確認
-- 発行された JWT を `supabase.auth.setSession()` で装着してクエリが投げられることを確認（手動）
+- dojo-app の Magic Link signup を smoke test（retired user でも retire されていない tester で再テスト）
 
-**想定時間**: 1日
+**想定時間**: 残り 0.5〜1日
 
 ---
 
-## Stage 3: フロント側 JWT 装着（service_role と共存期）
+## Stage 3: フロント側 Session 装着（service_role と共存期）
 
-**目的**: アプリを壊さずに JWT 装着機構を入れる。既存の service_role 経路と並行稼働
+**目的**: アプリを壊さずに Supabase Session 機構を入れる。既存の service_role 経路と並行稼働。
+
+**Stage 2 pivot の反映**: Stage 2 の新フロー（`signInAnonymously` + `validate_student_session` + `refreshSession`）で得た Session を supabase-js が自動で使う。`setSession` の手動装着は不要。
 
 **作業**:
-- [ ] `authStore.ts` に JWT 保存・期限管理を追加
-- [ ] ログイン成功時に `issue_session` を呼ぶフローを追加
-- [ ] `useLiveGame` 等で Supabase クライアント初期化時に `supabase.auth.setSession({ access_token, refresh_token })` を装着
-- [ ] リフレッシュ機構（期限切れ前に再発行）
-- [ ] JWT 装着状態を LocalStorage から復元（再読み込み対応）
-- [ ] `VITE_DOJO_SUPABASE_KEY` はまだ service_role のまま（共存期）
+- [ ] `authStore.ts` に Supabase Session の有無チェックと復帰処理を追加
+- [ ] ログインフローを Stage 2 の新フローに切替（生徒のみ先行、先生は Stage 4 まで localStorage SHA-256）
+- [ ] `useLiveGame` 等は既存の `supabase` client をそのまま使う（auth 状態で Authorization ヘッダーが自動付与される）
+- [ ] リロード時の自動復帰は supabase-js 標準（persistSession デフォルト）で成立する想定。要検証
+- [ ] `VITE_DOJO_SUPABASE_KEY` はまだ service_role のまま（共存期、Stage 8 で anon に切替）
 
 **検証**: 
 - ログイン後、ブラウザの DevTools で `localStorage` に JWT が保存されていることを確認
@@ -85,10 +137,28 @@
 
 **目的**: 着手のなりすまし問題を解消する（Phase 0 最重要セキュリティ修正）
 
+### 先生認証切替のリスク管理（着手前に必読）
+Stage 4 で先生（三村さん自身）の認証を localStorage SHA-256 → Supabase Session に切り替える。**ここにバグがあると三村さん自身がログインできず、当日のレッスンが飛ぶ**。以下を準備してから着手：
+
+1. **dual-auth 窓**: localStorage SHA-256 と Supabase Session を**両方並行稼働**させる期間を設ける。Stage 4 で先生認証を Supabase に追加するが、localStorage 経路は Stage 8 まで削除しない
+2. **切替はレッスン無い日**: Anonymous/Hook 再有効化、先生認証本番切替は **日曜夜 or 祝日昼間** など、翌日にレッスンが無い時間帯で実施
+3. **ロールバックコマンド事前準備**: 以下を実行前にターミナルにコピペできる状態で用意
+   ```bash
+   # Hook OFF ロールバック
+   curl -X PATCH "https://api.supabase.com/v1/projects/yzsyrtesydpulctjgdog/config/auth" \
+     -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+     -H "Content-Type: application/json" \
+     -H "User-Agent: supabase-cli/1.0.0" \
+     -d '{"hook_custom_access_token_enabled": false}'
+   ```
+4. **validate_teacher_session Edge Function の設計**: 先生パスワード照合を Edge Function 内で完結。secret は Edge Function 環境変数（TEACHER_PW_HASH）に投入
+
 **作業**:
+- [ ] `validate_teacher_session` Edge Function 新設（bcrypt で TEACHER_PW_HASH 照合 → 成功なら `app_role: 'teacher'`, `teacher_id` を user_metadata に書き込み）
+- [ ] 先生ログインフローに Supabase Session 確立を追加（localStorage SHA-256 と並行、両方成功で認可）
 - [ ] `submit_move` が Authorization ヘッダーの JWT を検証するよう改修
 - [ ] `caller_identity` を body から取るのをやめ、JWT claim の `student_id` / `teacher_id` から取得
-- [ ] 先生の代打ち（`role === 'teacher'` なら任意の `caller_identity` を受け付ける）の扱いを明示
+- [ ] 先生の代打ち（`app_role === 'teacher'` なら任意の `caller_identity` を受け付ける）の扱いを明示
 - [ ] 互換性のため JWT 無しリクエストも一時的に許可（警告ログ）← Stage 8 で削除
 - [ ] Deno test でなりすまし試行が 403 になることをテスト
 
@@ -198,6 +268,10 @@
 - [ ] `vercel.json` の環境変数・ビルド設定を本番想定で整備
 - [ ] Vercel Preview デプロイで最終動作確認（online.mimura15.jp は切り替えない）
 - [ ] Phase 0 の変更点を .claude/CLAUDE.md / AI_CONTEXT.md に反映
+- [ ] **anon user 清掃ポリシー策定**: 共用 Supabase の `auth.users` に生徒ログインごとに anon user が溜まる（1年で数千件規模）。dojo-app の `auth.users` 参照クエリに性能影響の可能性
+  - pg_cron で「30日以上未使用の anon user を削除」する定期ジョブを設置
+  - `delete from auth.users where is_anonymous = true and last_sign_in_at < now() - interval '30 days'`
+  - migration として commit、本番で dry-run → 件数確認 → 本番有効化
 
 **検証**: 全E2Eパス、Preview URLで手動確認OK
 
