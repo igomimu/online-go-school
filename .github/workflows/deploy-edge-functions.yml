@@ -25,7 +25,12 @@ jobs:
           deno-version: v1.46.x
 
       - name: Run Deno tests
-        run: deno test --allow-read --allow-env supabase/functions/
+        run: |
+          if find supabase/functions -name '*.test.ts' | grep -q .; then
+            deno test --allow-read --allow-env supabase/functions/
+          else
+            echo "No test files found, skipping"
+          fi
 
   deploy:
     needs: test
