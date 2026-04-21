@@ -49,4 +49,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: yzsyrtesydpulctjgdog
-        run: supabase functions deploy validate_student_session --project-ref $SUPABASE_PROJECT_REF
+        # --no-verify-jwt: platform 層の JWT 検証を無効化（Supabase 非対称鍵 ES256 を
+        # platform が unsupported と判定するため）。関数内で getUser(jwt) で検証するので
+        # 認証は維持される
+        run: supabase functions deploy validate_student_session --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF
