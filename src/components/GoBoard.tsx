@@ -362,7 +362,11 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             data-testid="go-board"
             viewBox={viewBoxData.str}
             xmlns="http://www.w3.org/2000/svg"
-            className="select-none w-full h-auto max-w-[800px] mx-auto"
+            className="select-none mx-auto block w-full max-w-[800px]"
+            style={{
+                aspectRatio: '1 / 1',
+                maxHeight: 'calc(100vh - 16rem)',
+            }}
             shapeRendering="geometricPrecision"
             onMouseUp={onDragEnd}
             onMouseLeave={onDragEnd}

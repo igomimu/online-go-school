@@ -3,10 +3,12 @@ import { useState, useRef } from 'react';
 import type { GameSession, SavedGame } from '../types/game';
 import type { ParticipantInfo } from '../utils/classroomLiveKit';
 import type { Student, Classroom } from '../types/classroom';
+import type { ChatMessage } from '../types/chat';
 import { findStudentByIdentity, getDisplayName } from '../utils/identityUtils';
 import GameThumbnail from './GameThumbnail';
 import SavedGameList from './SavedGameList';
 import ClassroomSelector from './ClassroomSelector';
+import ChatPanel from './teacher/ChatPanel';
 
 interface LobbyProps {
   role: 'TEACHER' | 'STUDENT';
@@ -32,6 +34,14 @@ interface LobbyProps {
   selectedClassroomId?: string | null;
   onSelectClassroom?: (id: string | null) => void;
   onOpenStudentManager?: () => void;
+
+  // 入室中の教室表示（生徒側の「部屋に入った」感を出すためのヘッダー用）
+  currentClassroomName?: string;
+  currentStudentName?: string;
+
+  // チャット（生徒側で表示）
+  chatMessages?: ChatMessage[];
+  onChatSend?: (text: string, target: 'all' | string) => void;
 }
 
 export default function Lobby({
@@ -52,6 +62,10 @@ export default function Lobby({
   selectedClassroomId,
   onSelectClassroom,
   onOpenStudentManager,
+  currentClassroomName,
+  currentStudentName,
+  chatMessages,
+  onChatSend,
 }: LobbyProps) {
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,7 +85,41 @@ export default function Lobby({
   );
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 w-full">
+    <div className="flex flex-col gap-6 w-full">
+      {/* 入室ヘッダー: どの教室に入ったか明示（生徒の「部屋に入った」感） */}
+      {role === 'STUDENT' && currentClassroomName && (
+        <div
+          className="glass-panel p-6 border-blue-400/40"
+          style={{
+            background: 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(99,102,241,0.12))',
+            boxShadow: '0 0 30px rgba(59,130,246,0.15)',
+          }}
+        >
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-blue-300 uppercase tracking-wider">
+                入室中
+              </p>
+              <h2 className="text-2xl sm:text-3xl font-bold text-white mt-1 truncate">
+                {currentClassroomName}
+              </h2>
+              <p className="text-sm text-zinc-300 mt-2">
+                先生がレッスンを始めるのを待ってください
+              </p>
+            </div>
+            {currentStudentName && (
+              <div className="text-right shrink-0">
+                <p className="text-xs text-zinc-400">ようこそ</p>
+                <p className="text-lg font-semibold text-white mt-0.5">
+                  {currentStudentName} さん
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col lg:flex-row gap-6 w-full">
       {/* メインエリア */}
       <div className="flex-1 space-y-4">
         {/* 自分の対局があればハイライト */}
@@ -245,6 +293,21 @@ export default function Lobby({
             <SavedGameList onSelectGame={onSelectSavedGame} />
           </div>
         )}
+
+        {/* チャット（生徒のみ。先生は TeacherDashboard 内で表示） */}
+        {role === 'STUDENT' && chatMessages && onChatSend && (
+          <div className="glass-panel p-0 overflow-hidden" style={{ height: 320 }}>
+            <ChatPanel
+              messages={chatMessages}
+              participants={participants}
+              students={students}
+              localIdentity={localIdentity}
+              onSend={onChatSend}
+              showTargetSelector={false}
+            />
+          </div>
+        )}
+      </div>
       </div>
     </div>
   );

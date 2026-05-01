@@ -4,6 +4,7 @@ import type { Drawing, Marker, StoneColor } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
 import type { ClassroomLiveKit, ParticipantInfo } from '../utils/classroomLiveKit';
 import type { Student } from '../types/classroom';
+import type { ChatMessage } from '../types/chat';
 import { createNode, addMove, getMainPath } from '../utils/treeUtilsV2';
 import { checkCapture, createEmptyBoard } from '../utils/gameLogic';
 import { parseSGFTree } from '../utils/sgfUtils';
@@ -11,6 +12,7 @@ import type { SgfMetadata } from '../utils/sgfUtils';
 import { convertSgfToGameTree } from '../utils/treeUtilsV2';
 import { getDisplayName } from '../utils/identityUtils';
 import MoveCounter from './MoveCounter';
+import ChatPanel from './teacher/ChatPanel';
 import {
   ChevronFirst, ChevronLast, ChevronLeft, ChevronRight,
   GitBranch, Grid3X3, Pen, ArrowRight as ArrowRightIcon, Trash2, Upload, MessageSquare,
@@ -30,6 +32,9 @@ interface LectureBoardProps {
   participants?: ParticipantInfo[];
   students?: Student[];
   localIdentity?: string;
+  // チャット
+  chatMessages?: ChatMessage[];
+  onChatSend?: (text: string, target: 'all' | string) => void;
 }
 
 const BOARD_SIZES = [19, 17, 15, 13, 11, 9] as const;
@@ -45,6 +50,8 @@ export default function LectureBoard({
   participants = [],
   students = [],
   localIdentity = '',
+  chatMessages,
+  onChatSend,
 }: LectureBoardProps) {
   // 先生用状態
   const [boardSize, setBoardSize] = useState(syncedBoardSize || 19);
@@ -240,8 +247,8 @@ export default function LectureBoard({
   }, [markers, teacherCursor, isTeacher]);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 w-full">
-      <div className="flex-1 space-y-4">
+    <div className="flex flex-col lg:flex-row gap-6 w-full lg:h-full lg:min-h-0">
+      <div className="flex-1 space-y-4 lg:min-h-0 lg:flex lg:flex-col lg:overflow-y-auto">
         {/* ヘッダー */}
         <div className="glass-panel px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -256,7 +263,7 @@ export default function LectureBoard({
         </div>
 
         {/* 碁盤 */}
-        <div className="glass-panel p-4 flex justify-center shadow-2xl relative">
+        <div className="glass-panel p-4 flex justify-center items-center shadow-2xl relative lg:flex-1 lg:min-h-0">
           {isTeacher && currentNode.children.length > 1 && (
             <div className="absolute top-4 right-4 flex items-center gap-2 bg-blue-500/20 px-3 py-1 rounded-full text-blue-300 text-sm">
               <GitBranch className="w-4 h-4" />
@@ -341,9 +348,11 @@ export default function LectureBoard({
         )}
       </div>
 
-      {/* サイドバー（先生のみ） */}
-      {isTeacher && (
-        <div className="w-full lg:w-80 space-y-4">
+      {/* サイドバー（先生は全パネル、生徒はチャットのみ） */}
+      {(isTeacher || (chatMessages && onChatSend)) && (
+        <div className="w-full lg:w-80 space-y-4 lg:overflow-y-auto lg:min-h-0">
+          {isTeacher && (
+            <>
           {/* SGF読込 */}
           <div className="glass-panel p-4 space-y-3">
             <h3 className="font-bold border-b border-white/5 pb-2">SGFライブラリ</h3>
@@ -414,18 +423,26 @@ export default function LectureBoard({
                         className="flex items-center justify-between px-2 py-1.5 rounded bg-white/5 text-sm"
                       >
                         <span className="truncate">{name}</span>
-                        <button
-                          onClick={() => {
-                            // 生徒を個別に呼び出す（チャットで個別メッセージなど将来拡張用）
-                          }}
-                          className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-300 rounded hover:bg-blue-500/30"
-                        >
-                          選択
-                        </button>
                       </div>
                     );
                   })}
               </div>
+            </div>
+          )}
+            </>
+          )}
+
+          {/* チャット（先生・生徒共通） */}
+          {chatMessages && onChatSend && (
+            <div className="glass-panel p-0 overflow-hidden" style={{ height: 320 }}>
+              <ChatPanel
+                messages={chatMessages}
+                participants={participants}
+                students={students}
+                localIdentity={localIdentity}
+                onSend={onChatSend}
+                showTargetSelector={isTeacher}
+              />
             </div>
           )}
         </div>

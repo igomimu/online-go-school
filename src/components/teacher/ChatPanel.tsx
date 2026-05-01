@@ -10,6 +10,8 @@ interface ChatPanelProps {
   students: Student[];
   localIdentity: string;
   onSend: (text: string, target: 'all' | string) => void;
+  // 生徒側など、宛先選択が不要な場合は false（常に 'all' で送信）
+  showTargetSelector?: boolean;
 }
 
 export default function ChatPanel({
@@ -18,6 +20,7 @@ export default function ChatPanel({
   students,
   localIdentity,
   onSend,
+  showTargetSelector = true,
 }: ChatPanelProps) {
   const [text, setText] = useState('');
   const [target, setTarget] = useState<'all' | string>('all');
@@ -51,31 +54,29 @@ export default function ChatPanel({
 
   return (
     <div className="flex flex-col h-full" style={{ background: '#e8e8e0', fontFamily: 'MS Gothic, monospace' }}>
-      {/* 送信先 + トークルーム */}
-      <div style={{ padding: '4px 6px', borderBottom: '1px solid #999', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <select
-          value={target}
-          onChange={e => setTarget(e.target.value)}
-          style={{
-            flex: 1,
-            border: '1px solid #999',
-            background: 'white',
-            fontSize: 12,
-            padding: '2px 4px',
-          }}
-        >
-          <option value="all">生徒全員</option>
-          {remoteParticipants.map(p => (
-            <option key={p.identity} value={p.identity}>
-              {getDisplayName(p.identity, students)}
-            </option>
-          ))}
-        </select>
-        <label style={{ fontSize: 11, whiteSpace: 'nowrap', color: '#333' }}>
-          <input type="checkbox" className="mr-1" />
-          トークルーム
-        </label>
-      </div>
+      {/* 送信先 + トークルーム（先生のみ） */}
+      {showTargetSelector && (
+        <div style={{ padding: '4px 6px', borderBottom: '1px solid #999', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <select
+            value={target}
+            onChange={e => setTarget(e.target.value)}
+            style={{
+              flex: 1,
+              border: '1px solid #999',
+              background: 'white',
+              fontSize: 12,
+              padding: '2px 4px',
+            }}
+          >
+            <option value="all">生徒全員</option>
+            {remoteParticipants.map(p => (
+              <option key={p.identity} value={p.identity}>
+                {getDisplayName(p.identity, students)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* メッセージ表示 */}
       <div

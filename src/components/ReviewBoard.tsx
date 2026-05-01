@@ -4,11 +4,14 @@ import type { Drawing } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
 import { getMainPath } from '../utils/treeUtilsV2';
 import type { ParticipantInfo, ClassroomLiveKit } from '../utils/classroomLiveKit';
+import type { Student } from '../types/classroom';
+import type { ChatMessage } from '../types/chat';
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare } from 'lucide-react';
 import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
 import { useAiAnalysis } from '../hooks/useAiAnalysis';
 import AiAnalysisPanel from './AiAnalysisPanel';
 import WinRateGraph from './WinRateGraph';
+import ChatPanel from './teacher/ChatPanel';
 
 interface ReviewBoardProps {
   rootNode: GameNode;
@@ -24,6 +27,11 @@ interface ReviewBoardProps {
   targetStudents?: string[];
   onSetTargetStudents?: (students: string[]) => void;
   onBack?: () => void;
+
+  // チャット
+  registeredStudents?: Student[];
+  chatMessages?: ChatMessage[];
+  onChatSend?: (text: string, target: 'all' | string) => void;
 }
 
 export default function ReviewBoard({
@@ -38,6 +46,9 @@ export default function ReviewBoard({
   targetStudents,
   onSetTargetStudents,
   onBack,
+  registeredStudents,
+  chatMessages,
+  onChatSend,
 }: ReviewBoardProps) {
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [drawMode, setDrawMode] = useState<'off' | 'line' | 'arrow'>('off');
@@ -157,7 +168,7 @@ export default function ReviewBoard({
   }, [aiAnalysis.settings.enabled, aiAnalysis.result, rootNode, currentMoveNumber]);
 
   // 生徒選択
-  const students = useMemo(() => {
+  const studentParticipants = useMemo(() => {
     if (!participants || !localIdentity) return [];
     return participants.filter(p => p.identity !== localIdentity);
   }, [participants, localIdentity]);
@@ -166,7 +177,7 @@ export default function ReviewBoard({
     if (!targetStudents || !onSetTargetStudents) return;
     if (targetStudents.length === 0) {
       // 全員選択状態から1人外す
-      const allNames = students.map(s => s.identity).filter(n => n !== identity);
+      const allNames = studentParticipants.map(s => s.identity).filter(n => n !== identity);
       onSetTargetStudents(allNames);
     } else if (targetStudents.includes(identity)) {
       onSetTargetStudents(targetStudents.filter(n => n !== identity));
@@ -180,8 +191,8 @@ export default function ReviewBoard({
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 w-full">
-      <div className="flex-1 space-y-4">
+    <div className="flex flex-col lg:flex-row gap-6 w-full lg:h-full lg:min-h-0">
+      <div className="flex-1 space-y-4 lg:min-h-0 lg:flex lg:flex-col lg:overflow-y-auto">
         {/* 検討/授業ヘッダー */}
         <div className="glass-panel px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -204,7 +215,7 @@ export default function ReviewBoard({
         </div>
 
         {/* 碁盤 */}
-        <div className="glass-panel p-4 flex justify-center shadow-2xl">
+        <div className="glass-panel p-4 flex justify-center items-center shadow-2xl lg:flex-1 lg:min-h-0">
           <GoBoard
             boardState={boardState}
             boardSize={boardSize}
@@ -315,7 +326,7 @@ export default function ReviewBoard({
 
       {/* サイドバー（先生のみ） */}
       {isTeacher && (
-        <div className="w-full lg:w-64 space-y-4">
+        <div className="w-full lg:w-64 space-y-4 lg:overflow-y-auto lg:min-h-0">
           {/* AI分析パネル */}
           <AiAnalysisPanel
             result={aiAnalysis.result}
@@ -335,8 +346,8 @@ export default function ReviewBoard({
           )}
         </div>
       )}
-      {isTeacher && students.length > 0 && (
-        <div className="w-full lg:w-64 space-y-4">
+      {isTeacher && studentParticipants.length > 0 && (
+        <div className="w-full lg:w-64 space-y-4 lg:overflow-y-auto lg:min-h-0">
           <div className="glass-panel p-4 space-y-3">
             <h3 className="font-bold text-sm">配信先の生徒</h3>
             <button
@@ -348,7 +359,7 @@ export default function ReviewBoard({
               全員に配信
             </button>
             <div className="space-y-1">
-              {students.map(s => {
+              {studentParticipants.map(s => {
                 const isSelected = !targetStudents || targetStudents.length === 0 || targetStudents.includes(s.identity);
                 return (
                   <button
@@ -363,6 +374,22 @@ export default function ReviewBoard({
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* チャット（先生・生徒共通） */}
+      {chatMessages && onChatSend && (
+        <div className="w-full lg:w-64 lg:overflow-y-auto lg:min-h-0">
+          <div className="glass-panel p-0 overflow-hidden" style={{ height: 320 }}>
+            <ChatPanel
+              messages={chatMessages}
+              participants={participants ?? []}
+              students={registeredStudents ?? []}
+              localIdentity={localIdentity ?? ''}
+              onSend={onChatSend}
+              showTargetSelector={isTeacher}
+            />
           </div>
         </div>
       )}

@@ -13,7 +13,7 @@ import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession } from './utils/liveGameApi';
 import { loadStudents, loadClassrooms } from './utils/classroomStore';
-import { saveAccount, supabaseSignInStudent, supabaseSignOut } from './utils/authStore';
+import { saveAccount, supabaseSignInStudent, supabaseSignOut, loadAccounts } from './utils/authStore';
 
 import Header from './components/Header';
 import LoginScreen from './components/LoginScreen';
@@ -132,6 +132,23 @@ function App() {
     [liveGameList.games],
   );
 
+  // 生徒側の Lobby ヘッダー用（どの教室に入ったか/自分の名前の表示）。
+  // 生徒のブラウザには先生が管理する classrooms/students は無いので、
+  // ログイン時に保存された SavedAccount の classroomName / studentName を使う
+  const currentClassroomName = useMemo(() => {
+    if (role !== 'STUDENT' || !studentClassroomId) return undefined;
+    const acct = loadAccounts().find(
+      a => a.classroomId === studentClassroomId && a.studentId === studentId,
+    );
+    return acct?.classroomName || studentClassroomId;
+  }, [role, studentClassroomId, studentId]);
+
+  const currentStudentName = useMemo(() => {
+    if (role !== 'STUDENT' || !studentId) return undefined;
+    const acct = loadAccounts().find(a => a.studentId === studentId);
+    return acct?.studentName || studentId;
+  }, [role, studentId]);
+
   // 音声デバッグ更新
   const updateAudioDebug = useCallback(() => {
     if (!classroomRef.current) return;
@@ -231,9 +248,12 @@ function App() {
         }
 
         if (msg.type === 'REVIEW_END' && connectRole === 'STUDENT') {
+          // 先生がロビーに戻った: 検討/授業/詰碁の全セッション状態をクリア
           setViewMode('lobby');
           setReviewRootNode(null);
           setReviewCurrentNode(null);
+          setSyncedNode(null);
+          setActiveProblem(null);
         }
 
         // 音声制御（生徒用）
@@ -693,8 +713,21 @@ function App() {
 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-6">
-        <div className="glass-panel p-8 w-full max-w-lg space-y-6">
-          <h2 className="text-2xl font-bold text-center">教室に接続中</h2>
+        <div
+          className="glass-panel p-8 w-full max-w-lg space-y-6 border-blue-400/40"
+          style={{
+            background: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.10))',
+          }}
+        >
+          <div className="text-center space-y-1">
+            <p className="text-xs font-medium text-blue-300 uppercase tracking-wider">接続先</p>
+            <h2 className="text-2xl font-bold text-white">
+              {currentClassroomName || '教室'}
+            </h2>
+            {currentStudentName && (
+              <p className="text-sm text-zinc-300">{currentStudentName} さん</p>
+            )}
+          </div>
 
           {connectionState === ConnectionState.Connecting ? (
             <div className="text-center text-blue-400">接続中...</div>
@@ -783,7 +816,7 @@ function App() {
     : undefined;
 
   return (
-    <div className="flex flex-col gap-4 w-full min-h-screen">
+    <div className="flex flex-col gap-4 w-full h-screen overflow-hidden">
       {/* ヘッダー */}
       <Header
         role={role}
@@ -840,7 +873,7 @@ function App() {
       )}
 
       {/* メインコンテンツ */}
-      <div className="flex-1">
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
         {/* ロビー: 教師はTeacherDashboard、生徒はLobby */}
         {effectiveViewMode === 'lobby' && role === 'TEACHER' && (
           <TeacherDashboard
@@ -887,6 +920,10 @@ function App() {
             classrooms={classrooms}
             selectedClassroomId={selectedClassroomId}
             onSelectClassroom={setSelectedClassroomId}
+            currentClassroomName={currentClassroomName}
+            currentStudentName={currentStudentName}
+            chatMessages={chat.messages}
+            onChatSend={chat.sendMessage}
           />
         )}
 
@@ -914,6 +951,8 @@ function App() {
             participants={participants}
             students={students}
             localIdentity={classroomRef.current?.localIdentity ?? ''}
+            chatMessages={chat.messages}
+            onChatSend={chat.sendMessage}
           />
         )}
 
@@ -931,6 +970,9 @@ function App() {
             targetStudents={reviewTargetStudents}
             onSetTargetStudents={setReviewTargetStudents}
             onBack={role === 'TEACHER' ? handleBackToLobby : undefined}
+            registeredStudents={students}
+            chatMessages={chat.messages}
+            onChatSend={chat.sendMessage}
           />
         )}
 
