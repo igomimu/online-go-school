@@ -30,6 +30,7 @@ interface DojoStudent {
   grade: string | null;
   address: string | null;
   kakuzuke: string | null;
+  birthdate: string | null;
 }
 
 export async function fetchDojoNetStudents(): Promise<{ students: Student[]; error?: string }> {
@@ -38,7 +39,7 @@ export async function fetchDojoNetStudents(): Promise<{ students: Student[]; err
   }
 
   try {
-    const url = `${DOJO_URL}/rest/v1/students?student_type=eq.net&status=eq.active&select=id,name,rank,student_type,grade,address,kakuzuke&order=name`;
+    const url = `${DOJO_URL}/rest/v1/students?student_type=eq.net&status=eq.active&select=id,name,rank,student_type,grade,address,kakuzuke,birthdate&order=name`;
     const res = await fetch(url, {
       headers: {
         'apikey': DOJO_KEY,
@@ -60,6 +61,7 @@ export async function fetchDojoNetStudents(): Promise<{ students: Student[]; err
       type: 'ネット生',
       grade: d.grade || '',
       country: d.address || '',
+      birthdate: d.birthdate || undefined,
     }));
 
     return { students };

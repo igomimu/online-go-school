@@ -12,6 +12,7 @@ import {
 } from '../../utils/classroomStore';
 import { parseIgcXml } from '../../utils/igcImport';
 import { fetchDojoNetStudents } from '../../utils/dojoSync';
+import { resolveGrade } from '../../utils/gradeCalc';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
 
 interface ClassroomManagerProps {
@@ -82,7 +83,7 @@ export default function ClassroomManager({
   };
 
   // 生徒フォーム
-  const emptyForm: Student = { id: '', name: '', rank: '', internalRating: '', type: '', grade: '', country: '' };
+  const emptyForm: Student = { id: '', name: '', rank: '', internalRating: '', type: '', grade: '', country: '', birthdate: '' };
   const [form, setForm] = useState<Student>(emptyForm);
 
   const startAddStudent = () => {
@@ -386,8 +387,24 @@ export default function ClassroomManager({
                         {TYPES.map(t => <option key={t} value={t}>{t || '--'}</option>)}
                       </select>
                     </FormField>
-                    <FormField label="学年" width={80}>
-                      <select value={form.grade} onChange={e => setForm(f => ({ ...f, grade: e.target.value }))} style={inputStyle}>
+                    <FormField label="生年月日" width={130}>
+                      <input
+                        type="date"
+                        value={form.birthdate || ''}
+                        onChange={e => setForm(f => ({ ...f, birthdate: e.target.value }))}
+                        style={inputStyle}
+                      />
+                    </FormField>
+                    <FormField
+                      label={form.birthdate ? `学年（自動:${resolveGrade(form.birthdate, '')}）` : '学年'}
+                      width={form.birthdate ? 160 : 80}
+                    >
+                      <select
+                        value={form.grade}
+                        onChange={e => setForm(f => ({ ...f, grade: e.target.value }))}
+                        disabled={!!form.birthdate}
+                        style={{ ...inputStyle, opacity: form.birthdate ? 0.5 : 1 }}
+                      >
                         {GRADES.map(g => <option key={g} value={g}>{g || '--'}</option>)}
                       </select>
                     </FormField>
@@ -442,7 +459,7 @@ export default function ClassroomManager({
                       <td style={{ ...cellStyle, textAlign: 'center' }}>{s.rank}</td>
                       <td style={{ ...cellStyle, textAlign: 'center', color: '#cc6600' }}>{s.internalRating}</td>
                       <td style={cellStyle}>{s.type}</td>
-                      <td style={{ ...cellStyle, textAlign: 'center' }}>{s.grade}</td>
+                      <td style={{ ...cellStyle, textAlign: 'center' }}>{resolveGrade(s.birthdate, s.grade)}</td>
                       <td style={cellStyle}>{s.country}</td>
                     </tr>
                   ))}

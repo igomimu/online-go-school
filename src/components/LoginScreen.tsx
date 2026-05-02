@@ -41,9 +41,14 @@ export default function LoginScreen({
     setAccounts(saved);
     setIsNewTeacher(!hasTeacherPassword());
 
-    // 自動ログイン: 保存済みアカウントが1つだけなら即接続
-    if (saved.length === 1 && !prefilledClassroomId) {
-      onStudentLogin(saved[0].studentId, saved[0].classroomId);
+    // 自動ログインは廃止（2026-04-22）: 生徒が「どの教室に入ったか」
+    // 判別できない問題があったため、必ずログイン画面で確認させる。
+    // 保存アカウントが1つだけなら pre-select だけはして、入力の手間は省く。
+    if (saved.length === 1) {
+      const a = saved[0];
+      setSelectedAccount(a);
+      setStudentId(a.studentId);
+      if (!prefilledClassroomId) setClassroomId(a.classroomId);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -287,12 +292,17 @@ export default function LoginScreen({
               placeholder="先生から受け取った教室ID"
               className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
             />
+            {selectedAccount?.classroomName && classroomId === selectedAccount.classroomId && (
+              <p className="mt-1 text-sm text-blue-300">
+                接続先: <span className="font-bold">{selectedAccount.classroomName}</span>
+              </p>
+            )}
           </div>
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
 
           <button data-testid="student-login-button" type="submit" className="premium-button w-full">
-            参加する
+            {selectedAccount?.classroomName ? `${selectedAccount.classroomName} に参加` : '参加する'}
           </button>
         </form>
       </div>

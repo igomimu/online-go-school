@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { X, Plus, Pencil, Trash2, Upload, Search } from 'lucide-react';
 import type { Student, Classroom } from '../types/classroom';
 import { parseIgcXml } from '../utils/igcImport';
+import { resolveGrade } from '../utils/gradeCalc';
 import {
   addStudent,
   updateStudent,
@@ -45,11 +46,11 @@ export default function StudentManager({
 
   // 新規/編集フォーム
   const [form, setForm] = useState<Student>({
-    id: '', name: '', rank: '', internalRating: '', type: '', grade: '', country: '',
+    id: '', name: '', rank: '', internalRating: '', type: '', grade: '', country: '', birthdate: '',
   });
 
   const startAdd = () => {
-    setForm({ id: `S${Date.now()}`, name: '', rank: '', internalRating: '', type: '', grade: '', country: '' });
+    setForm({ id: `S${Date.now()}`, name: '', rank: '', internalRating: '', type: '', grade: '', country: '', birthdate: '' });
     setEditingStudent(null);
     setIsAdding(true);
   };
@@ -183,8 +184,8 @@ export default function StudentManager({
                       {s.internalRating && (
                         <span className="text-xs text-zinc-500 shrink-0">{s.internalRating}</span>
                       )}
-                      {s.grade && (
-                        <span className="text-xs text-zinc-500 shrink-0">{s.grade}</span>
+                      {resolveGrade(s.birthdate, s.grade) && (
+                        <span className="text-xs text-zinc-500 shrink-0">{resolveGrade(s.birthdate, s.grade)}</span>
                       )}
                       {s.type && (
                         <span className="text-xs text-zinc-600 shrink-0">{s.type}</span>
@@ -243,7 +244,7 @@ export default function StudentManager({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm text-zinc-400 mb-1">種別</label>
                   <select
@@ -255,11 +256,31 @@ export default function StudentManager({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">学年</label>
+                  <label className="block text-sm text-zinc-400 mb-1">生年月日</label>
+                  <input
+                    type="date"
+                    value={form.birthdate || ''}
+                    onChange={e => setForm(f => ({ ...f, birthdate: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-1">
+                    学年
+                    {form.birthdate && (
+                      <span className="ml-2 text-xs text-zinc-500">
+                        （自動: {resolveGrade(form.birthdate, '')}）
+                      </span>
+                    )}
+                  </label>
                   <select
                     value={form.grade}
                     onChange={e => setForm(f => ({ ...f, grade: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    disabled={!!form.birthdate}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 disabled:opacity-40"
                   >
                     {GRADES.map(g => <option key={g} value={g}>{g || '未設定'}</option>)}
                   </select>

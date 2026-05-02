@@ -2,6 +2,7 @@ import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student } from '../../types/classroom';
 import type { GameSession, AudioPermissions } from '../../types/game';
 import { findStudentByIdentity, getDisplayName } from '../../utils/identityUtils';
+import { resolveGrade } from '../../utils/gradeCalc';
 
 interface StudentTableProps {
   participants: ParticipantInfo[];
@@ -159,9 +160,9 @@ export default function StudentTable({
                   {row.student?.type || ''}
                 </td>
 
-                {/* 学年 */}
+                {/* 学年（生年月日があれば自動計算、なければ手入力） */}
                 <td className="px-1 py-0.5 border border-gray-400 text-center">
-                  {row.student?.grade || ''}
+                  {resolveGrade(row.student?.birthdate, row.student?.grade ?? '')}
                 </td>
 
                 {/* 所在地 */}

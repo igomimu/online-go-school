@@ -145,7 +145,8 @@ export default function TeacherDashboard({
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      height: '100vh',
+      height: '100%',
+      minHeight: 0,
       background: '#d0d0c8',
       color: '#333',
       fontFamily: 'MS Gothic, "Noto Sans JP", monospace',

@@ -5,8 +5,9 @@ export interface Student {
   rank: string;           // "1D", "3K" 等（一般段級位）
   internalRating: string; // "R3" 等（内部レーティング）
   type: string;           // "ネット生", "教室生", "大人会員" 等
-  grade: string;          // "小4", "中2", "大人" 等
+  grade: string;          // "小4", "中2", "大人" 等（手入力・fallback）
   country: string;        // 所在地
+  birthdate?: string;     // 'YYYY-MM-DD'。登録されていれば学年は自動計算される
 }
 
 // === 教室 ===
