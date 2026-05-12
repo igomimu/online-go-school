@@ -192,6 +192,13 @@ export default function TeacherDashboard({
           localIdentity={localIdentity}
           onToggleHear={onToggleHear}
           onToggleMic={onToggleMic}
+          onOpenStudent={(identity) => {
+            // 対局中(playing)の生徒のみ来る前提（StudentTable 側で gate 済み）
+            const game = filteredGames.find(g =>
+              (g.blackPlayer === identity || g.whitePlayer === identity) && g.status === 'playing'
+            );
+            if (game) setObservingGameId(game.id);
+          }}
         />
       </div>
 

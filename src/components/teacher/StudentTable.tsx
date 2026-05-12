@@ -13,6 +13,7 @@ interface StudentTableProps {
   onToggleHear: (identity: string) => void;
   onToggleMic: (identity: string) => void;
   onSelectStudent?: (identity: string) => void;
+  onOpenStudent?: (studentIdentity: string) => void;
 }
 
 export default function StudentTable({
@@ -24,6 +25,7 @@ export default function StudentTable({
   onToggleHear,
   onToggleMic,
   onSelectStudent,
+  onOpenStudent,
 }: StudentTableProps) {
   const rows = buildRows(students, participants, games, localIdentity);
 
@@ -120,13 +122,19 @@ export default function StudentTable({
                   {row.gameStatus === 'finished' && '済'}
                 </td>
 
-                {/* 詳細 */}
+                {/* 詳細 — 対局中の生徒のみ観戦モードへ */}
                 <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.isConnected && (
                     <button
-                      className="px-1 text-xs border border-gray-500 bg-gray-100 hover:bg-gray-200"
+                      className={row.gameStatus === 'playing'
+                        ? "px-1 text-xs border border-gray-500 bg-gray-100 hover:bg-gray-200"
+                        : "px-1 text-xs border border-gray-300 bg-gray-50 text-gray-400 cursor-not-allowed"}
                       style={{ fontSize: 10 }}
-                      onClick={e => { e.stopPropagation(); }}
+                      disabled={row.gameStatus !== 'playing'}
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (row.gameStatus === 'playing' && row.identity) onOpenStudent?.(row.identity);
+                      }}
                     >
                       開く
                     </button>
