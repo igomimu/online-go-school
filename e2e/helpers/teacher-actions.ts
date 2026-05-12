@@ -32,6 +32,62 @@ export async function waitForStudentJoined(page: Page, studentId: string, timeou
 }
 
 /**
+ * 「回線復旧」ボタンをクリックして、ラベルが「復旧中...」に変わったあと
+ * 「回線復旧」に戻るまでを観測する。
+ * 非同期トグル（isReconnecting state）が動いていることを保証する。
+ */
+export async function clickReconnectAndWaitCycle(page: Page, timeout = 30_000): Promise<void> {
+  const button = page.locator('button').filter({ hasText: /回線復旧|復旧中/ });
+  // 押す前は「回線復旧」
+  await expect(button).toHaveText(/回線復旧/, { timeout: 5_000 });
+  await expect(button).toBeEnabled();
+  await button.click();
+  // 一瞬で「復旧中...」+ disabled
+  await expect(button).toHaveText(/復旧中/, { timeout: 3_000 });
+  await expect(button).toBeDisabled();
+  // 復旧完了後に元のラベルに戻る
+  await expect(button).toHaveText(/回線復旧/, { timeout });
+  await expect(button).toBeEnabled();
+}
+
+/**
+ * StudentTable で指定生徒の行の「開く」ボタンを取得する。
+ * disabled / enabled の状態確認や click に使う。
+ */
+export function getOpenStudentButton(page: Page, studentId: string) {
+  return page
+    .locator(`tr[data-student-id="${studentId}"]`)
+    .first()
+    .locator('button', { hasText: '開く' });
+}
+
+/**
+ * 観戦パネル（GameObserverPanel + GameBoard onBack有り）に遷移したことを確認する。
+ * GameObserverPanel 経由でしか出現しない「← 戻る」ボタンを目印に使う。
+ */
+export async function waitForObserverPanel(page: Page, timeout = 10_000): Promise<void> {
+  await expect(page.getByRole('button', { name: /戻る/ })).toBeVisible({ timeout });
+}
+
+/**
+ * 検討モードに突入するため、SGF読込ボタン経由で隠しfile inputにSGF文字列を流し込む。
+ * 9路 + 1手だけの最小SGFをデフォルトで使う。
+ */
+export async function loadSgfForReview(
+  page: Page,
+  sgf: string = '(;FF[4]GM[1]SZ[9];B[ee])',
+): Promise<void> {
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'SGF読込', exact: true }).click();
+  const chooser = await fileChooserPromise;
+  await chooser.setFiles({
+    name: 'review.sgf',
+    mimeType: 'application/x-go-sgf',
+    buffer: Buffer.from(sgf, 'utf-8'),
+  });
+}
+
+/**
  * 対局作成ダイアログを開いて条件を入れ、対局開始をクリック
  * expectedPlayersCount: 先生+参加生徒数（先生1+生徒2なら3）
  */
