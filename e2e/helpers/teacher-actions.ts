@@ -16,8 +16,8 @@ export async function loginAsTeacher(page: Page, password: string = TEST_TEACHER
  */
 export async function openClassroomAndConnect(page: Page): Promise<void> {
   await page.locator('button', { hasText: '開く' }).first().click();
-  // TeacherDashboardヘッダ到達
-  await page.getByText('三村囲碁オンライン', { exact: true }).waitFor({ timeout: 20_000 });
+  // TeacherDashboardヘッダ到達（実装時の表示は「囲」アイコン + 「三村囲碁オンライン 〜 <教室名>」）
+  await page.getByText(/三村囲碁オンライン.*〜/).waitFor({ timeout: 20_000 });
 }
 
 /**
