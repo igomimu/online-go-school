@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import GoBoard from './GoBoard';
-import type { Drawing } from './GoBoard';
+import type { Drawing, Marker } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
 import { getMainPath } from '../utils/treeUtilsV2';
 import type { ParticipantInfo, ClassroomLiveKit } from '../utils/classroomLiveKit';
@@ -56,7 +56,22 @@ export default function ReviewBoard({
   const drawLastCell = useRef<{ x: number; y: number } | null>(null);
 
   const boardState = currentNode.board;
-  const markers = currentNode.markers;
+  const nodeMarkers = currentNode.markers;
+
+  // AI候補手のハイライト座標（1-indexed）。盤面移動時に自動クリア
+  const [aiHighlight, setAiHighlight] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => { setAiHighlight(null); }, [currentNode]);
+
+  const markers = useMemo<Marker[] | undefined>(() => {
+    if (!aiHighlight) return nodeMarkers;
+    const overlay: Marker = { x: aiHighlight.x, y: aiHighlight.y, type: 'SYMBOL', value: 'SQR' };
+    return nodeMarkers ? [...nodeMarkers, overlay] : [overlay];
+  }, [nodeMarkers, aiHighlight]);
+
+  const handleHighlightMove = useCallback((x: number, y: number) => {
+    // 同じ手の再クリックでトグル解除（既存パターン: draw mode の re-toggle と同じ感覚）
+    setAiHighlight(prev => (prev && prev.x === x && prev.y === y ? null : { x, y }));
+  }, []);
 
   const goToRoot = () => onSetCurrentNode(rootNode);
   const goBack = () => {
@@ -335,6 +350,7 @@ export default function ReviewBoard({
             settings={aiAnalysis.settings}
             onUpdateSettings={aiAnalysis.updateSettings}
             boardSize={boardSize}
+            onHighlightMove={handleHighlightMove}
           />
 
           {/* 勝率グラフ */}
