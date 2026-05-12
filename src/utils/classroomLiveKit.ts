@@ -328,6 +328,14 @@ export class ClassroomLiveKit {
     return !current;
   }
 
+  async enableCamera(): Promise<void> {
+    await this.room.localParticipant.setCameraEnabled(true);
+  }
+
+  async disableCamera(): Promise<void> {
+    await this.room.localParticipant.setCameraEnabled(false);
+  }
+
   get isMicrophoneEnabled(): boolean {
     return this.room.localParticipant?.isMicrophoneEnabled ?? false;
   }

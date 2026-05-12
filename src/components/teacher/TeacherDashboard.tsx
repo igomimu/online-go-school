@@ -39,6 +39,8 @@ interface TeacherDashboardProps {
   onStartLecture: () => void;
   onLoadSgf: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onDisconnect: () => void;
+  onReconnect: () => void;
+  isReconnecting: boolean;
   onOpenStudentManager: () => void;
   onReloadData: () => void;
   onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number }[]) => void;
@@ -64,6 +66,8 @@ export default function TeacherDashboard({
   onStartLecture,
   onLoadSgf,
   onDisconnect,
+  onReconnect,
+  isReconnecting,
   onOpenStudentManager,
   onReloadData,
   onCreateGames,
@@ -293,6 +297,8 @@ export default function TeacherDashboard({
         onStartLecture={onStartLecture}
         onLoadSgf={onLoadSgf}
         onDisconnect={onDisconnect}
+        onReconnect={onReconnect}
+        isReconnecting={isReconnecting}
         onOpenStudentManager={onOpenStudentManager}
         onLoadProblem={handleLoadProblem}
         onEditClassroom={() => {

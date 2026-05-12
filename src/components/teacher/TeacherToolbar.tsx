@@ -8,6 +8,8 @@ interface TeacherToolbarProps {
   onStartLecture: () => void;
   onLoadSgf: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onDisconnect: () => void;
+  onReconnect: () => void;
+  isReconnecting: boolean;
   onOpenStudentManager: () => void;
   onEditClassroom?: () => void;
   onShowStudentLinks?: () => void;
@@ -16,10 +18,11 @@ interface TeacherToolbarProps {
 }
 
 // IGC風のボタン
-function IgcButton({ label, color, onClick, 'data-testid': testId }: { label: string; color?: string; onClick?: () => void; 'data-testid'?: string }) {
+function IgcButton({ label, color, onClick, disabled, 'data-testid': testId }: { label: string; color?: string; onClick?: () => void; disabled?: boolean; 'data-testid'?: string }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       data-testid={testId}
       style={{
         padding: '4px 14px',
@@ -28,7 +31,8 @@ function IgcButton({ label, color, onClick, 'data-testid': testId }: { label: st
         fontFamily: 'MS Gothic, monospace',
         border: '1px solid #666',
         background: color || '#d0d0c8',
-        cursor: 'pointer',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.6 : 1,
         whiteSpace: 'nowrap',
       }}
     >
@@ -45,6 +49,8 @@ export default function TeacherToolbar({
   onStartLecture,
   onLoadSgf,
   onDisconnect,
+  onReconnect,
+  isReconnecting,
   onOpenStudentManager,
   onEditClassroom,
   onShowStudentLinks,
@@ -181,7 +187,12 @@ export default function TeacherToolbar({
           />
         )}
 
-        <IgcButton label="回線復旧" color="#ff6060" />
+        <IgcButton
+          label={isReconnecting ? '復旧中...' : '回線復旧'}
+          color="#ff6060"
+          onClick={onReconnect}
+          disabled={isReconnecting}
+        />
         <IgcButton label="ビデオリセット" color="#d0a0d0" />
         <IgcButton label="設定" color="#d0d0c8" />
 

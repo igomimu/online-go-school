@@ -47,6 +47,7 @@ function App() {
   const [roomName, setRoomName] = useState('go-classroom');
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [connectionError, setConnectionError] = useState('');
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   // 画面状態
   const [viewMode, setViewMode] = useState<ViewMode>('lobby');
@@ -504,6 +505,37 @@ function App() {
     }
   };
 
+  // 回線復旧: 現在の Room を畳んで同じ識別情報で再接続。viewMode や teacherPhase は維持。
+  // 「ユーザー意図」のマイク/カメラ状態は React state を信じて復元する（getter は切断後に false を返すため）。
+  const handleReconnect = useCallback(async () => {
+    if (!role || isReconnecting) return;
+    const wantMic = isMicEnabled;
+    const wantCam = isCameraEnabled;
+    const identity = role === 'TEACHER'
+      ? (userName.trim() || 'teacher')
+      : (studentId ? makeStudentIdentity(studentId) : userName);
+    setIsReconnecting(true);
+    try {
+      // connectLiveKit が内部で旧 Room を destroy → new ClassroomLiveKit → connect する
+      setParticipants([]);
+      setVideoElements(new Map());
+      await connectLiveKit(role, identity, roomName, selectedClassroomId ?? studentClassroomId ?? '');
+      const classroom = classroomRef.current;
+      if (wantMic && classroom) {
+        await classroom.enableMicrophone();
+        setIsMicEnabled(true);
+      }
+      if (wantCam && classroom) {
+        await classroom.enableCamera();
+        setIsCameraEnabled(true);
+      }
+    } catch (err) {
+      setConnectionError(err instanceof Error ? err.message : '回線復旧に失敗しました');
+    } finally {
+      setIsReconnecting(false);
+    }
+  }, [role, isReconnecting, isMicEnabled, isCameraEnabled, userName, studentId, roomName, selectedClassroomId, studentClassroomId, connectLiveKit]);
+
   const saveSettings = () => {
     localStorage.setItem('lk-url', livekitUrl);
     localStorage.setItem('lk-api-key', apiKey);
@@ -895,6 +927,8 @@ function App() {
             onStartLecture={handleStartLecture}
             onLoadSgf={handleSgfLoadFromLobby}
             onDisconnect={handleDisconnect}
+            onReconnect={handleReconnect}
+            isReconnecting={isReconnecting}
             onOpenStudentManager={() => setShowStudentManager(true)}
             onReloadData={reloadClassroomData}
             onCreateGames={async (pairs) => {
