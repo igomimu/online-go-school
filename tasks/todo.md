@@ -316,3 +316,30 @@ Stage 4 で先生（三村さん自身）の認証を localStorage SHA-256 → S
 7. **Stage 10 で Vercel化**
 
 各 Stage の完了時点で git tag を切っておき、問題があれば戻れるようにする。
+
+---
+
+## Side Track: Windows版パリティ監査（2026-05-01）
+
+**目的**: 元WindowsソフトのUI・操作を正解として、ブラウザ版の見た目だけボタンを1機能ずつ実装済みに変える。
+
+**作成済み**:
+- [x] `reference/windows/` 参照素材置き場
+- [x] `tasks/windows-parity.md` 初期監査表
+- [x] `.logs/windows-parity-2026-05-01.md` 作業ログ
+
+**検証結果**:
+- [x] Node 22で `npm run build` 成功
+- [x] `npm test` は296件すべて成功
+- [x] `e2e/multi-user-game.spec.ts` はリトライなしで連続2回成功
+- [x] `e2e/multi-student-game.spec.ts` 成功
+
+**次の一手**:
+- [x] `GameBoard.test.tsx` 8件と `classroomLiveKit.test.ts` 1件を修正して、検証基盤を正常化
+- [x] 先生identity空文字により白番が空になる対局作成バグを修正
+- [x] 先生が白番参加者のとき黒番を代打ちできないバグを修正し、E2Eを追加
+- [x] 生徒側の対局配信/盤面初期読み込み待ちの揺れを修正
+- [x] 2026-05-16のネット囲碁学園授業録画を確認し、観察メモを `reference/windows/notes/` に追加
+- [ ] Windows版の操作録画・スクショ・XML/SGFサンプルを `reference/windows/` に投入（動画本体はOneDrive参照、XML/SGFは未投入）
+- [ ] 対局機能の残り（パス、投了、整地、棋譜保存）を1つずつE2E化
+- [ ] `回線復旧` と `ビデオリセット` から実装に着手
