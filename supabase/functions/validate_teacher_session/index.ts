@@ -1,24 +1,16 @@
-// online-go-school: validate_student_session
+// online-go-school: validate_teacher_session
 //
 // Anonymous Sign-In で作られた anon user の user_metadata に、検証済みの
-// student_id / classroom_id / app_role を書き込む Edge Function。
+// teacher_id / classroom_id / app_role = 'teacher' を書き込む Edge Function。
 //
 // フロー:
 //   1. フロントが supabase.auth.signInAnonymously() で anon user 作成
 //   2. その JWT を Authorization: Bearer ヘッダーで本関数に POST
 //   3. 本関数が JWT を検証 → sub (anon user uuid) 取得
-//   4. body の studentId を dojo-app students で照合
-//      (student_type='net', status='active')
+//   4. body の password をハッシュ化して環境変数 TEACHER_PASSWORD_HASH と照合
 //   5. service_role で auth.admin.updateUserById により user_metadata を上書き
 //   6. フロントが supabase.auth.refreshSession() で metadata 反映済み JWT を受ける
 //   7. custom_access_token_hook が user_metadata を JWT claim に昇格
-//
-// classroom_id について:
-//   dojo-app `students` に classroom_id カラムは存在しない。classroom は
-//   online-go-school の先生ブラウザ localStorage で管理されているため、
-//   本関数では classroom_id を検証せず body の値をそのまま user_metadata に
-//   書き込む。Stage 7 の RLS では student_id / app_role を主ゲートとし、
-//   classroom_id は UX グルーピング用途にとどめる。
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -29,8 +21,8 @@ const corsHeaders = {
 }
 
 interface ValidateRequest {
-  studentId: string
-  classroomId: string
+  password?: string
+  classroomId?: string
 }
 
 function json(body: unknown, status = 200) {
@@ -38,6 +30,12 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
+}
+
+// SHA-256 ハッシュ化ヘルパー
+async function sha256(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 Deno.serve(async (req) => {
@@ -63,19 +61,16 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: 'Invalid JSON' }, 400)
   }
-  if (!body.studentId || !body.classroomId) {
-    return json({ error: 'studentId and classroomId are required' }, 400)
-  }
-
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  if (!uuidRegex.test(body.studentId)) {
-    return json({ error: 'Invalid studentId format (must be UUID)' }, 400)
+  if (!body.password) {
+    return json({ error: 'password is required' }, 400)
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+  const expectedHash = Deno.env.get('TEACHER_PASSWORD_HASH')
+
+  if (!supabaseUrl || !anonKey || !serviceRoleKey || !expectedHash) {
     return json({ error: 'Server misconfigured' }, 500)
   }
 
@@ -90,29 +85,19 @@ Deno.serve(async (req) => {
     return json({ error: 'Only anonymous sessions can be validated' }, 403)
   }
 
-  // dojo-app students 照合
-  const admin = createClient(supabaseUrl, serviceRoleKey)
-  const { data: student, error: lookupErr } = await admin
-    .from('students')
-    .select('id, name, student_type, status')
-    .eq('id', body.studentId)
-    .eq('student_type', 'net')
-    .eq('status', 'active')
-    .maybeSingle()
-
-  if (lookupErr) {
-    return json({ error: 'Student lookup failed', detail: lookupErr.message }, 500)
-  }
-  if (!student) {
-    return json({ error: 'Student not found or inactive' }, 403)
+  // パスワード照合
+  const hashedInput = await sha256(body.password)
+  if (hashedInput !== expectedHash) {
+    return json({ error: 'Invalid teacher password' }, 403)
   }
 
   // user_metadata 上書き
+  const admin = createClient(supabaseUrl, serviceRoleKey)
   const { error: updateErr } = await admin.auth.admin.updateUserById(user.id, {
     user_metadata: {
-      student_id: student.id,
-      classroom_id: body.classroomId,
-      app_role: 'student',
+      teacher_id: user.id, // teacher_id として自身の UUID をセット
+      classroom_id: body.classroomId ?? 'global',
+      app_role: 'teacher',
     },
   })
   if (updateErr) {
@@ -121,8 +106,7 @@ Deno.serve(async (req) => {
 
   return json({
     ok: true,
-    display_name: student.name,
-    student_id: student.id,
-    classroom_id: body.classroomId,
+    teacher_id: user.id,
+    app_role: 'teacher',
   })
 })

@@ -179,7 +179,7 @@ describe('ClassroomLiveKit', () => {
       const publishData = classroom.room.localParticipant.publishData;
 
       await classroom.sendTo(
-        { type: 'GAME_LIST_SYNC', payload: { games: [] } },
+        { type: 'BOARD_UPDATE', payload: {} },
         ['たろう']
       );
 

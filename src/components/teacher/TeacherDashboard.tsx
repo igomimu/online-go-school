@@ -45,6 +45,10 @@ interface TeacherDashboardProps {
   onReloadData: () => void;
   onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number }[]) => void;
   onProblemAssign?: (problem: import('../../types/problem').Problem) => void;
+  onClearAudioM?: () => void;
+  onClearAudioS?: () => void;
+  onClearSharing?: () => void;
+  onResetVideo?: () => void;
 }
 
 export default function TeacherDashboard({
@@ -72,6 +76,10 @@ export default function TeacherDashboard({
   onReloadData,
   onCreateGames,
   onProblemAssign,
+  onClearAudioM,
+  onClearAudioS,
+  onClearSharing,
+  onResetVideo,
 }: TeacherDashboardProps) {
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [showStudentLinks, setShowStudentLinks] = useState(false);
@@ -313,6 +321,10 @@ export default function TeacherDashboard({
         }}
         onShowStudentLinks={() => setShowStudentLinks(true)}
         onAutoPairing={() => setShowAutoPairing(true)}
+        onClearAudioM={onClearAudioM}
+        onClearAudioS={onClearAudioS}
+        onClearSharing={onClearSharing}
+        onResetVideo={onResetVideo}
       />
 
       {/* 部屋タブ（IGC最下部） */}

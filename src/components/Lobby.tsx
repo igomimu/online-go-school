@@ -132,12 +132,23 @@ export default function Lobby({
                   {myGame.blackPlayer} vs {myGame.whitePlayer} ({myGame.moveNumber}手目)
                 </p>
               </div>
-              <button
-                onClick={() => onSelectGame(myGame.id)}
-                className="premium-button text-sm"
-              >
-                碁盤を開く
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onSelectGame(myGame.id)}
+                  className="premium-button text-sm"
+                >
+                  碁盤を開く
+                </button>
+                <button
+                  onClick={() => {
+                    const url = `${window.location.origin}${window.location.pathname}?mode=game&gameId=${myGame.id}&identity=${encodeURIComponent(myIdentity)}&role=${role}`;
+                    window.open(url, '_blank', 'width=1000,height=800,menubar=no,toolbar=no,location=no,status=no');
+                  }}
+                  className="secondary-button text-sm flex items-center gap-1 border-blue-500/30 hover:bg-blue-500/10"
+                >
+                  別ウィンドウで開く ↗
+                </button>
+              </div>
             </div>
           </div>
         )}

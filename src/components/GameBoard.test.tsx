@@ -1,8 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import GameBoard from './GameBoard';
 import { createEmptyBoard } from '../utils/gameLogic';
 import type { GameSession } from '../types/game';
+import { useLiveGame } from '../hooks/useLiveGame';
+
+// useLiveGame フックをモック化
+vi.mock('../hooks/useLiveGame', () => {
+  return {
+    useLiveGame: vi.fn(),
+  };
+});
 
 function createMockGame(overrides: Partial<GameSession> = {}): GameSession {
   return {
@@ -24,15 +32,79 @@ function createMockGame(overrides: Partial<GameSession> = {}): GameSession {
 }
 
 describe('GameBoard', () => {
+  const mockSubmitMove = vi.fn();
+  const mockSubmitPass = vi.fn();
+  const mockSubmitResign = vi.fn();
+  const mockSetDeadStones = vi.fn();
+  const mockFinishWithResult = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function setupMock(overrides: any = {}) {
+    const rawGame = overrides.game !== undefined ? overrides.game : createMockGame();
+    
+    const blackPlayerName = rawGame ? (rawGame.black_player || rawGame.blackPlayer) : '';
+    const whitePlayerName = rawGame ? (rawGame.white_player || rawGame.whitePlayer) : '';
+    const boardSize = rawGame ? (rawGame.board_size || rawGame.boardSize || 9) : 9;
+    const scoringDeadStones = rawGame ? (rawGame.scoring_dead_stones || rawGame.scoringDeadStones || []) : [];
+
+    const isBlack = blackPlayerName === 'たろう';
+    const isWhite = whitePlayerName === 'たろう';
+    const isParticipant = isBlack || isWhite;
+    const myColor = isBlack ? 'BLACK' : isWhite ? 'WHITE' : null;
+    const isMyTurn = isParticipant && myColor === (rawGame ? rawGame.currentColor : 'BLACK');
+
+    const mockGameRow = rawGame ? {
+      id: rawGame.id,
+      black_player: blackPlayerName,
+      white_player: whitePlayerName,
+      board_size: boardSize,
+      handicap: rawGame.handicap,
+      komi: rawGame.komi,
+      status: rawGame.status,
+      scoring_dead_stones: scoringDeadStones,
+      result: rawGame.result,
+    } : null;
+
+    const mockResult = {
+      game: mockGameRow,
+      boardState: rawGame ? (rawGame.boardState || rawGame.board_state || createEmptyBoard(boardSize)) : createEmptyBoard(boardSize),
+      currentColor: rawGame ? rawGame.currentColor : 'BLACK',
+      moveNumber: rawGame ? (rawGame.moveNumber !== undefined ? rawGame.moveNumber : rawGame.move_number || 0) : 0,
+      blackCaptures: rawGame ? (rawGame.blackCaptures !== undefined ? rawGame.blackCaptures : rawGame.black_captures || 0) : 0,
+      whiteCaptures: rawGame ? (rawGame.whiteCaptures !== undefined ? rawGame.whiteCaptures : rawGame.white_captures || 0) : 0,
+      lastMove: null,
+      moves: [],
+      myColor,
+      isParticipant,
+      isMyTurn,
+      loading: false,
+      error: null,
+      submitMove: mockSubmitMove,
+      submitPass: mockSubmitPass,
+      submitResign: mockSubmitResign,
+      enterScoring: vi.fn(),
+      setDeadStones: mockSetDeadStones,
+      finishWithResult: mockFinishWithResult,
+      ...overrides,
+    };
+
+    if (overrides.game !== undefined) {
+      mockResult.game = mockGameRow;
+    }
+
+    vi.mocked(useLiveGame).mockReturnValue(mockResult as any);
+  }
+
   it('対局情報を表示する', () => {
     const game = createMockGame();
+    setupMock({ game });
     render(
       <GameBoard
-        game={game}
+        gameId="game-1"
         myIdentity="たろう"
-        onMove={vi.fn()}
-        onPass={vi.fn()}
-        onResign={vi.fn()}
       />
     );
     expect(screen.getByText('たろう')).toBeInTheDocument();
@@ -42,13 +114,11 @@ describe('GameBoard', () => {
 
   it('自分の番のとき「あなたの番です」を表示', () => {
     const game = createMockGame({ currentColor: 'BLACK' });
+    setupMock({ game });
     render(
       <GameBoard
-        game={game}
+        gameId="game-1"
         myIdentity="たろう"
-        onMove={vi.fn()}
-        onPass={vi.fn()}
-        onResign={vi.fn()}
       />
     );
     expect(screen.getByText('あなたの番です')).toBeInTheDocument();
@@ -56,13 +126,11 @@ describe('GameBoard', () => {
 
   it('相手の番のとき「相手の番です」を表示', () => {
     const game = createMockGame({ currentColor: 'WHITE' });
+    setupMock({ game });
     render(
       <GameBoard
-        game={game}
+        gameId="game-1"
         myIdentity="たろう"
-        onMove={vi.fn()}
-        onPass={vi.fn()}
-        onResign={vi.fn()}
       />
     );
     expect(screen.getByText('相手の番です')).toBeInTheDocument();
@@ -70,49 +138,41 @@ describe('GameBoard', () => {
 
   it('パスボタンが自分の番のとき表示される', () => {
     const game = createMockGame({ currentColor: 'BLACK' });
-    const onPass = vi.fn();
+    setupMock({ game });
     render(
       <GameBoard
-        game={game}
+        gameId="game-1"
         myIdentity="たろう"
-        onMove={vi.fn()}
-        onPass={onPass}
-        onResign={vi.fn()}
       />
     );
     const passBtn = screen.getByText('パス');
     expect(passBtn).toBeInTheDocument();
     fireEvent.click(passBtn);
-    expect(onPass).toHaveBeenCalledWith('game-1', 'BLACK');
+    expect(mockSubmitPass).toHaveBeenCalled();
   });
 
   it('投了ボタンをクリック→confirmで呼ばれる', () => {
     const game = createMockGame({ currentColor: 'BLACK' });
-    const onResign = vi.fn();
+    setupMock({ game });
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(
       <GameBoard
-        game={game}
+        gameId="game-1"
         myIdentity="たろう"
-        onMove={vi.fn()}
-        onPass={vi.fn()}
-        onResign={onResign}
       />
     );
     fireEvent.click(screen.getByText('投了'));
-    expect(onResign).toHaveBeenCalledWith('game-1', 'BLACK');
+    expect(mockSubmitResign).toHaveBeenCalled();
     vi.restoreAllMocks();
   });
 
   it('終局時は結果を表示しボタンは非表示', () => {
     const game = createMockGame({ status: 'finished', result: 'B+R' });
+    setupMock({ game });
     render(
       <GameBoard
-        game={game}
+        gameId="game-1"
         myIdentity="たろう"
-        onMove={vi.fn()}
-        onPass={vi.fn()}
-        onResign={vi.fn()}
       />
     );
     expect(screen.getByText('終局: B+R')).toBeInTheDocument();
@@ -122,14 +182,12 @@ describe('GameBoard', () => {
 
   it('戻るボタンが機能する', () => {
     const game = createMockGame();
+    setupMock({ game });
     const onBack = vi.fn();
     render(
       <GameBoard
-        game={game}
+        gameId="game-1"
         myIdentity="たろう"
-        onMove={vi.fn()}
-        onPass={vi.fn()}
-        onResign={vi.fn()}
         onBack={onBack}
       />
     );
@@ -139,13 +197,11 @@ describe('GameBoard', () => {
 
   it('取り石数を表示する', () => {
     const game = createMockGame({ blackCaptures: 3, whiteCaptures: 5 });
+    setupMock({ game });
     render(
       <GameBoard
-        game={game}
+        gameId="game-1"
         myIdentity="たろう"
-        onMove={vi.fn()}
-        onPass={vi.fn()}
-        onResign={vi.fn()}
       />
     );
     expect(screen.getByText('取3')).toBeInTheDocument();
@@ -154,13 +210,11 @@ describe('GameBoard', () => {
 
   it('観戦者には操作ボタンが表示されない', () => {
     const game = createMockGame();
+    setupMock({ game, myColor: null, isParticipant: false, isMyTurn: false });
     render(
       <GameBoard
-        game={game}
+        gameId="game-1"
         myIdentity="観戦者"
-        onMove={vi.fn()}
-        onPass={vi.fn()}
-        onResign={vi.fn()}
       />
     );
     // 観戦者はパス・投了ボタンが出ない

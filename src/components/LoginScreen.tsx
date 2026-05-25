@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, Trash2, Plus, Lock, ArrowLeft } from 'lucide-react';
+import { ChevronDown, Trash2, Plus, Lock, ArrowLeft, RefreshCw } from 'lucide-react';
 import {
   loadAccounts,
   deleteAccount,
@@ -7,6 +7,8 @@ import {
   setTeacherPassword,
   verifyTeacherPassword,
   resetTeacherPassword,
+  supabaseSignInTeacher,
+  supabaseSignOut,
 } from '../utils/authStore';
 import type { SavedAccount } from '../utils/authStore';
 
@@ -108,6 +110,12 @@ export default function LoginScreen({
         return;
       }
       await setTeacherPassword(teacherPw);
+
+      const res = await supabaseSignInTeacher(teacherPw);
+      if (!res.ok) {
+        console.warn('[auth] Supabase teacher sign-in failed (non-fatal):', res.error);
+      }
+
       onTeacherLogin();
     } else {
       const ok = await verifyTeacherPassword(teacherPw);
@@ -115,6 +123,12 @@ export default function LoginScreen({
         setTeacherError('パスワードが違います');
         return;
       }
+
+      const res = await supabaseSignInTeacher(teacherPw);
+      if (!res.ok) {
+        console.warn('[auth] Supabase teacher sign-in failed (non-fatal):', res.error);
+      }
+
       onTeacherLogin();
     }
   };
@@ -316,31 +330,72 @@ export default function LoginScreen({
       </button>
 
       {/* データインポート（JSON） */}
-      <button
-        onClick={() => {
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.accept = '.json';
-          input.onchange = async (e) => {
-            const file = (e.target as HTMLInputElement).files?.[0];
-            if (!file) return;
+      <div className="flex flex-col items-center gap-3">
+        <button
+          onClick={() => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = async (e) => {
+              const file = (e.target as HTMLInputElement).files?.[0];
+              if (!file) return;
+              try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+                if (data.students) localStorage.setItem('go-school-students', JSON.stringify(data.students));
+                if (data.classrooms) localStorage.setItem('go-school-classrooms', JSON.stringify(data.classrooms));
+                alert(`インポート完了: ${data.students?.length || 0}名の生徒、${data.classrooms?.length || 0}教室`);
+                window.location.reload();
+              } catch {
+                alert('JSONの読み込みに失敗しました');
+              }
+            };
+            input.click();
+          }}
+          className="text-zinc-700 hover:text-zinc-400 text-xs underline"
+        >
+          データインポート（JSON）
+        </button>
+
+        <button
+          onClick={async (e) => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            btn.innerHTML = 'リセット中...';
+
+            // 1. Supabase 強制サインアウト
             try {
-              const text = await file.text();
-              const data = JSON.parse(text);
-              if (data.students) localStorage.setItem('go-school-students', JSON.stringify(data.students));
-              if (data.classrooms) localStorage.setItem('go-school-classrooms', JSON.stringify(data.classrooms));
-              alert(`インポート完了: ${data.students?.length || 0}名の生徒、${data.classrooms?.length || 0}教室`);
-              window.location.reload();
-            } catch {
-              alert('JSONの読み込みに失敗しました');
+              await supabaseSignOut();
+            } catch (err) {}
+
+            // 2. Service Worker 強制アンインストール
+            if ('serviceWorker' in navigator) {
+              try {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                for (const reg of regs) {
+                  await reg.unregister();
+                }
+              } catch (err) {}
             }
-          };
-          input.click();
-        }}
-        className="text-zinc-700 hover:text-zinc-400 text-xs"
-      >
-        データインポート（JSON）
-      </button>
+
+            // 3. Cache Storage 強制クリア
+            if ('caches' in window) {
+              try {
+                const keys = await caches.keys();
+                for (const key of keys) {
+                  await caches.delete(key);
+                }
+              } catch (err) {}
+            }
+
+            // 4. 強制リロード (サーバーから最新アセットを再取得)
+            window.location.reload();
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-white/5 rounded-lg transition-colors duration-150"
+        >
+          <RefreshCw className="w-3.5 h-3.5" /> 接続・キャッシュをリセット
+        </button>
+      </div>
     </div>
   );
 }

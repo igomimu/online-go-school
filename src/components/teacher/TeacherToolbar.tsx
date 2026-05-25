@@ -15,6 +15,10 @@ interface TeacherToolbarProps {
   onShowStudentLinks?: () => void;
   onAutoPairing?: () => void;
   onLoadProblem?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onClearAudioM?: () => void;
+  onClearAudioS?: () => void;
+  onClearSharing?: () => void;
+  onResetVideo?: () => void;
 }
 
 // IGC風のボタン
@@ -56,6 +60,10 @@ export default function TeacherToolbar({
   onShowStudentLinks,
   onAutoPairing,
   onLoadProblem,
+  onClearAudioM,
+  onClearAudioS,
+  onClearSharing,
+  onResetVideo,
 }: TeacherToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const problemInputRef = useRef<HTMLInputElement>(null);
@@ -140,9 +148,9 @@ export default function TeacherToolbar({
         )}
 
         <div style={{ flex: 1 }} />
-        <IgcButton label="【音声M】クリア" color="#d8d0c0" />
-        <IgcButton label="【音声S】クリア" color="#d8d0c0" />
-        <IgcButton label="【共有】クリア" color="#d8d0c0" />
+        <IgcButton label="【音声M】クリア" color="#d8d0c0" onClick={onClearAudioM} />
+        <IgcButton label="【音声S】クリア" color="#d8d0c0" onClick={onClearAudioS} />
+        <IgcButton label="【共有】クリア" color="#d8d0c0" onClick={onClearSharing} />
         <IgcButton label="座席チェック" color="#ffa500" />
       </div>
 
@@ -193,7 +201,7 @@ export default function TeacherToolbar({
           onClick={onReconnect}
           disabled={isReconnecting}
         />
-        <IgcButton label="ビデオリセット" color="#d0a0d0" />
+        <IgcButton label="ビデオリセット" color="#d0a0d0" onClick={onResetVideo} />
         <IgcButton label="設定" color="#d0d0c8" />
 
         {/* 日時表示 */}

@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
 import GoBoard from './GoBoard';
-import { Flag, SkipForward, Check } from 'lucide-react';
+import { Flag, SkipForward, Check, RefreshCw } from 'lucide-react';
 import { calculateTerritory, formatScoringResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { useLiveGame } from '../hooks/useLiveGame';
+import { getSupabase } from '../utils/liveGameApi';
 
 interface GameBoardProps {
   gameId: string;
@@ -131,19 +132,75 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack }: Gam
             <span className="text-zinc-600 text-sm">取{whiteCaptures}</span>
           </div>
         </div>
-        <div data-testid="move-count" className="text-sm text-zinc-500">
-          {game.status === 'playing'
-            ? `${moveNumber}手目`
-            : game.status === 'scoring'
-              ? '整地中'
-              : `終局: ${game.result ?? ''}`}
+        <div data-testid="move-count" className="text-sm text-zinc-500 flex items-center gap-3">
+          <span>
+            {game.status === 'playing'
+              ? `${moveNumber}手目`
+              : game.status === 'scoring'
+                ? '整地中'
+                : `終局: ${game.result ?? ''}`}
+          </span>
+          {!(new URLSearchParams(window.location.search).get('mode') === 'game') && (
+            <button
+              onClick={() => {
+                const role = isTeacher ? 'TEACHER' : 'STUDENT';
+                const url = `${window.location.origin}${window.location.pathname}?mode=game&gameId=${gameId}&identity=${encodeURIComponent(myIdentity)}&role=${role}`;
+                window.open(url, '_blank', 'width=1000,height=800,menubar=no,toolbar=no,location=no,status=no');
+              }}
+              className="text-xs bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 border border-blue-500/30 rounded px-2 py-0.5 transition-colors duration-150"
+            >
+              別ウィンドウ ↗
+            </button>
+          )}
         </div>
       </div>
 
       {/* エラー表示 */}
       {error && (
-        <div className="glass-panel px-3 py-2 text-sm text-red-400 bg-red-500/5">
-          {error}
+        <div className="glass-panel px-4 py-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <span className="font-bold">接続エラーが発生しました:</span> {error}
+            <p className="text-zinc-500 text-xs mt-1">※もしリロードしても消えない場合は、右側のリセットボタンをお試しください。大切な教室設定は消えません。</p>
+          </div>
+          <button
+            onClick={async (e) => {
+              const btn = e.currentTarget;
+              btn.disabled = true;
+              btn.innerHTML = 'リセット中...';
+              
+              // 1. Supabase 強制サインアウト
+              try {
+                const supabase = getSupabase();
+                await supabase.auth.signOut();
+              } catch (err) {}
+
+              // 2. Service Worker 強制アンインストール
+              if ('serviceWorker' in navigator) {
+                try {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  for (const reg of regs) {
+                    await reg.unregister();
+                  }
+                } catch (err) {}
+              }
+
+              // 3. Cache Storage 強制クリア
+              if ('caches' in window) {
+                try {
+                  const keys = await caches.keys();
+                  for (const key of keys) {
+                    await caches.delete(key);
+                  }
+                } catch (err) {}
+              }
+
+              // 4. 強制リロード (サーバーから最新アセットを再取得)
+              window.location.reload();
+            }}
+            className="flex items-center gap-1.5 shrink-0 px-3 py-1.5 text-xs bg-red-500/20 hover:bg-red-500/40 text-red-300 border border-red-500/30 rounded-lg transition-colors duration-150 font-bold"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> 接続・キャッシュをリセット
+          </button>
         </div>
       )}
 

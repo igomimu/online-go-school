@@ -143,11 +143,30 @@ export async function submitMove(
   color: StoneColor,
 ): Promise<SubmitMoveResult> {
   const url = `${import.meta.env.VITE_DOJO_SUPABASE_URL}/functions/v1/submit_move`;
-  const key = import.meta.env.VITE_DOJO_SUPABASE_KEY;
+  const sb = getSupabase();
+  
+  // 現在のセッションの JWT (access_token) を取得し、検証済みクレームがある場合のみ使用
+  let authHeader = import.meta.env.VITE_DOJO_SUPABASE_KEY; // フォールバック: service_role key
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data?.session?.access_token;
+    if (token) {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if (payload?.app_role === 'teacher' || payload?.app_role === 'student') {
+          authHeader = token;
+        }
+      }
+    }
+  } catch {
+    // セッション取得に失敗した場合はフォールバック
+  }
+
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${key}`,
+      'Authorization': `Bearer ${authHeader}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ game_id: gameId, caller_identity: callerIdentity, x, y, color }),

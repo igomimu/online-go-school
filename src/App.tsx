@@ -367,6 +367,9 @@ function App() {
 
   // URL params for student auto-join
   useEffect(() => {
+    // 起動時に既存の古い/壊れた認証セッションを強制クリア（ゾンビセッション対策）
+    void supabaseSignOut();
+
     const params = new URLSearchParams(window.location.search);
 
     const urlClassroomId = params.get('classroomId');
@@ -637,6 +640,77 @@ function App() {
       return updated;
     });
   };
+
+  const handleClearAudioM = async () => {
+    if (!classroomRef.current || !classroomRef.current.isConnected) return;
+    try {
+      setAudioDebug(prev => prev + ' [先生音声状態リセット]');
+      await classroomRef.current.room.localParticipant.setMicrophoneEnabled(true);
+      setIsMicEnabled(true);
+      setIsMuted(false);
+    } catch (err) {
+      console.error('Clear audio M error:', err);
+    }
+  };
+
+  const handleClearAudioS = () => {
+    if (!classroomRef.current || !classroomRef.current.isConnected) return;
+    setAudioDebug(prev => prev + ' [生徒音声状態リセット]');
+    const remoteIdentities = classroomRef.current.remoteIdentities;
+    if (remoteIdentities.length === 0) return;
+
+    setAudioPermissions(prev => {
+      const next = { ...prev };
+      remoteIdentities.forEach(identity => {
+        next[identity] = { canHear: true, micAllowed: true, cameraAllowed: true };
+        classroomRef.current?.sendTo(
+          { type: 'MEDIA_CONTROL', payload: { micAllowed: true, cameraAllowed: true } },
+          [identity]
+        );
+        classroomRef.current?.sendTo(
+          { type: 'AUDIO_CONTROL', payload: { canHear: true } },
+          [identity]
+        );
+      });
+      return next;
+    });
+  };
+
+  const handleResetVideo = useCallback(async () => {
+    if (!classroomRef.current || !classroomRef.current.isConnected) return;
+    try {
+      setAudioDebug(prev => prev + ' [ビデオリセット開始]');
+      await classroomRef.current.room.localParticipant.setCameraEnabled(false);
+      setIsCameraEnabled(false);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await classroomRef.current.room.localParticipant.setCameraEnabled(true);
+      setIsCameraEnabled(true);
+      setAudioDebug(prev => prev + ' [ビデオリセット成功]');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setAudioDebug(prev => prev + ` [ビデオリセットエラー: ${msg}]`);
+    }
+  }, []);
+
+  // --- 別タブ対局専用モード ---
+  const params = new URLSearchParams(window.location.search);
+  const isDedicatedGameMode = params.get('mode') === 'game';
+  const paramGameId = params.get('gameId');
+  const paramIdentity = params.get('identity');
+  const paramRole = params.get('role');
+
+  if (isDedicatedGameMode && paramGameId && paramIdentity) {
+    const isTeacherRole = paramRole === 'TEACHER';
+    return (
+      <div className="w-full h-screen bg-zinc-950 text-white p-4 overflow-y-auto">
+        <GameBoard
+          gameId={paramGameId}
+          myIdentity={decodeURIComponent(paramIdentity)}
+          isTeacher={isTeacherRole}
+        />
+      </div>
+    );
+  }
 
   // --- 設定モーダル ---
   if (showSettings) {
@@ -937,6 +1011,10 @@ function App() {
               }
             }}
             onProblemAssign={handleProblemAssign}
+            onClearAudioM={handleClearAudioM}
+            onClearAudioS={handleClearAudioS}
+            onClearSharing={() => setReviewTargetStudents([])}
+            onResetVideo={handleResetVideo}
           />
         )}
 
