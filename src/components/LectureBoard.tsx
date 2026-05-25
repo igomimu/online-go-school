@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import GoBoard from './GoBoard';
 import type { Drawing, Marker, StoneColor } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
@@ -170,6 +170,14 @@ export default function LectureBoard({
     setCurrentNode(curr);
     broadcastBoard(curr);
   };
+
+  // 授業モード開始時に初期盤面を生徒に同期し、生徒側のロビー待機画面を自動で授業画面に遷移させる
+  useEffect(() => {
+    if (isTeacher && currentNode) {
+      broadcastBoard(currentNode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // キーボードナビゲーション
   // (useEffectはApp.tsxで管理するか、ここでも追加可能)

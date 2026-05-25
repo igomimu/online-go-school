@@ -31,6 +31,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack }: Gam
     submitResign,
     setDeadStones,
     finishWithResult,
+    resetGame,
   } = live;
 
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
@@ -307,6 +308,34 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack }: Gam
       {game.status === 'finished' && game.result && (
         <div className="text-center text-sm text-zinc-400">
           結果: <span className="text-white font-bold">{game.result}</span>
+        </div>
+      )}
+
+      {/* 先生用管理者機能 */}
+      {isTeacher && (
+        <div className="flex flex-col sm:flex-row justify-center gap-3 mt-4 pt-2 border-t border-white/5">
+          {game.status !== 'finished' && (
+            <button
+              onClick={async () => {
+                if (confirm('この対局を強制終了し、生徒の「対局中」状態を解除します（打った石は残ります）。よろしいですか？')) {
+                  await finishWithResult('強制終局');
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded-lg transition-colors duration-150 font-bold"
+            >
+              対局を強制終了する（状態の解除）
+            </button>
+          )}
+          <button
+            onClick={async () => {
+              if (confirm('この対局のすべての石を片付け、0手目（初期状態）に戻します。よろしいですか？')) {
+                await resetGame();
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-500/20 hover:bg-red-500/40 text-red-300 border border-red-500/30 rounded-lg transition-colors duration-150 font-bold"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> 対局を初期状態（0手目）に戻す
+          </button>
         </div>
       )}
     </div>

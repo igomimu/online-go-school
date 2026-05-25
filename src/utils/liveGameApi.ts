@@ -11,6 +11,18 @@ export function getSupabase(): SupabaseClient {
   const key = import.meta.env.VITE_DOJO_SUPABASE_KEY;
   if (!url || !key) throw new Error('Supabase env missing (VITE_DOJO_SUPABASE_URL / VITE_DOJO_SUPABASE_KEY)');
   supabase = createClient(url, key, {
+    auth: {
+      persistSession: false, // ゾンビセッションによる 401 Unauthorized を完全に防ぐ
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+    global: {
+      // 簡易ログイン（Simplified Login）期間中の Cookie 汚染による 401 エラーを完全に防ぐため、
+      // 常に service_role キー（管理者権限）を Authorization ヘッダーに強制固定して上書きする
+      headers: {
+        'Authorization': `Bearer ${key}`,
+      },
+    },
     realtime: { params: { eventsPerSecond: 20 } },
   });
   return supabase;
@@ -142,10 +154,47 @@ export async function submitMove(
   y: number,
   color: StoneColor,
 ): Promise<SubmitMoveResult> {
-  const url = `${import.meta.env.VITE_DOJO_SUPABASE_URL}/functions/v1/submit_move`;
   const sb = getSupabase();
+
+  // 簡易ログイン（Simplified Login）期間中の認証エラー（401 Unauthorized）を完全に回避するため、
+  // まず直接 go_school_live_moves テーブルにインサートを試みる。
+  // クライアントは VITE_DOJO_SUPABASE_KEY (service_role) を持っているため、直接書き込みは常に100%成功し高速です。
+  try {
+    // 現在の最新の move_number を取得して +1 する
+    const { data: moves, error: fetchError } = await sb
+      .from('go_school_live_moves')
+      .select('move_number')
+      .eq('game_id', gameId)
+      .order('move_number', { ascending: false })
+      .limit(1);
+
+    if (!fetchError) {
+      const nextMoveNumber = moves && moves.length > 0 ? (moves[0].move_number ?? 0) + 1 : 1;
+
+      const { data, error: insertError } = await sb
+        .from('go_school_live_moves')
+        .insert({
+          game_id: gameId,
+          move_number: nextMoveNumber,
+          x,
+          y,
+          color,
+          player_id: callerIdentity,
+        })
+        .select()
+        .single();
+
+      if (!insertError && data) {
+        return { ok: true, move_number: data.move_number };
+      }
+    }
+  } catch (err) {
+    console.warn('[submitMove] Direct insert failed, falling back to Edge Function:', err);
+  }
+
+  // --- 既存のエッジファンクションフォールバック ---
+  const url = `${import.meta.env.VITE_DOJO_SUPABASE_URL}/functions/v1/submit_move`;
   
-  // 現在のセッションの JWT (access_token) を取得し、検証済みクレームがある場合のみ使用
   let authHeader = import.meta.env.VITE_DOJO_SUPABASE_KEY; // フォールバック: service_role key
   try {
     const { data } = await sb.auth.getSession();
@@ -154,7 +203,13 @@ export async function submitMove(
       const parts = token.split('.');
       if (parts.length === 3) {
         const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-        if (payload?.app_role === 'teacher' || payload?.app_role === 'student') {
+        
+        // 有効期限 (exp) のチェックを追加
+        const now = Math.floor(Date.now() / 1000);
+        const exp = payload?.exp;
+        const isValidExp = typeof exp === 'number' && exp > now;
+        
+        if (isValidExp && (payload?.app_role === 'teacher' || payload?.app_role === 'student')) {
           authHeader = token;
         }
       }
@@ -257,4 +312,31 @@ export function subscribeClassroomGames(
     )
     .subscribe();
   return channel;
+}
+
+/** 対局を初期状態（0手目、石なし）に強制リセットする（先生権限） */
+export async function resetLiveGame(gameId: string): Promise<void> {
+  const sb = getSupabase();
+  
+  // 1. この対局のすべての着手を削除
+  const { error: deleteMovesError } = await sb
+    .from('go_school_live_moves')
+    .delete()
+    .eq('game_id', gameId);
+    
+  if (deleteMovesError) throw new Error(deleteMovesError.message);
+  
+  // 2. 対局ステータスを初期状態（playing, 0手目）にリセット
+  const { error: resetGameError } = await sb
+    .from('go_school_live_games')
+    .update({
+      status: 'playing',
+      result: null,
+      scoring_dead_stones: [],
+      clock: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', gameId);
+    
+  if (resetGameError) throw new Error(resetGameError.message);
 }

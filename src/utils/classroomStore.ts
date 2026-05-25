@@ -56,8 +56,25 @@ export function loadClassrooms(): Classroom[] {
   }
 }
 
+// 重複登録を自動検知して排除するクリーンアップヘルパー
+export function cleanupDuplicateStudentsInClassrooms(classrooms: Classroom[]): Classroom[] {
+  const seenStudentIds = new Set<string>();
+  return classrooms.map(c => {
+    const uniqueStudentIds = c.studentIds.filter(sid => {
+      if (seenStudentIds.has(sid)) {
+        return false;
+      }
+      seenStudentIds.add(sid);
+      return true;
+    });
+    return { ...c, studentIds: uniqueStudentIds };
+  });
+}
+
 export function saveClassrooms(classrooms: Classroom[]): void {
-  localStorage.setItem(CLASSROOMS_KEY, JSON.stringify(classrooms));
+  // 保存時に重複を自動排除
+  const cleaned = cleanupDuplicateStudentsInClassrooms(classrooms);
+  localStorage.setItem(CLASSROOMS_KEY, JSON.stringify(cleaned));
 }
 
 export function addClassroom(classroom: Classroom): void {
@@ -67,7 +84,16 @@ export function addClassroom(classroom: Classroom): void {
 }
 
 export function updateClassroom(updated: Classroom): void {
-  const classrooms = loadClassrooms().map(c => c.id === updated.id ? updated : c);
+  // 排他所属（リアルタイム移動）: 更新対象の教室に含まれている生徒は、他のすべての教室から自動削除する
+  const classrooms = loadClassrooms().map(c => {
+    if (c.id === updated.id) {
+      return updated;
+    }
+    return {
+      ...c,
+      studentIds: c.studentIds.filter(sid => !updated.studentIds.includes(sid)),
+    };
+  });
   saveClassrooms(classrooms);
 }
 

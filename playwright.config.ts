@@ -1,14 +1,17 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const baseURL = process.env.BASE_URL || 'http://localhost:5175';
+const isProduction = process.env.NODE_ENV === 'production' || !!process.env.BASE_URL;
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
-  retries: 1,
+  retries: isProduction ? 0 : 1,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:5175',
+    baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
@@ -22,10 +25,10 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
+  webServer: !process.env.BASE_URL ? {
     command: 'npm run dev',
     url: 'http://localhost:5175',
     reuseExistingServer: true,
     timeout: 30_000,
-  },
+  } : undefined,
 });

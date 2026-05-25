@@ -215,6 +215,10 @@ export default function LoginScreen({
             <ArrowLeft className="w-4 h-4" /> 戻る
           </button>
         </div>
+
+        <div className="text-[10px] text-zinc-600 select-none font-mono mt-2">
+          Build: {__BUILD_TIME__} ({__COMMIT_HASH__})
+        </div>
       </div>
     );
   }
@@ -368,6 +372,15 @@ export default function LoginScreen({
               await supabaseSignOut();
             } catch (err) {}
 
+            // 1.5 既存データの重複生徒を自動排他クリーンアップ
+            try {
+              const { loadClassrooms, saveClassrooms } = await import('../utils/classroomStore');
+              const clses = loadClassrooms();
+              if (clses.length > 0) {
+                saveClassrooms(clses); // 保存時に自動で cleanup される
+              }
+            } catch (err) {}
+
             // 2. Service Worker 強制アンインストール
             if ('serviceWorker' in navigator) {
               try {
@@ -395,6 +408,10 @@ export default function LoginScreen({
         >
           <RefreshCw className="w-3.5 h-3.5" /> 接続・キャッシュをリセット
         </button>
+      </div>
+
+      <div className="text-[10px] text-zinc-600 select-none font-mono mt-2">
+        Build: {__BUILD_TIME__} ({__COMMIT_HASH__})
       </div>
     </div>
   );

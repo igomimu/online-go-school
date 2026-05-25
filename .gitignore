@@ -32,3 +32,9 @@ dist-ssr
 # Playwright
 playwright-report/
 test-results/
+.env*.local
+
+# Generated and Local files
+public/version.json
+*.png
+.env.production

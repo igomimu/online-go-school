@@ -1,19 +1,7 @@
 import type { SavedGame } from '../types/game';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getSupabase } from './liveGameApi';
 
 const STORAGE_KEY = 'go-school-saved-games';
-
-// --- Supabase ---
-let supabase: SupabaseClient | null = null;
-
-function getSupabase(): SupabaseClient | null {
-  if (supabase) return supabase;
-  const url = import.meta.env.VITE_DOJO_SUPABASE_URL;
-  const key = import.meta.env.VITE_DOJO_SUPABASE_KEY;
-  if (!url || !key) return null;
-  supabase = createClient(url, key);
-  return supabase;
-}
 
 // --- localStorage (キャッシュ兼フォールバック) ---
 

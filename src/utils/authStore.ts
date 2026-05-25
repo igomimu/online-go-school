@@ -109,9 +109,6 @@ export async function supabaseSignInStudent(
   _classroomId: string,
 ): Promise<SupabaseSessionResult> {
   try {
-    const supabase = getSupabase();
-    // 既存のセッションがあればログアウトして確実にクリーンアップ
-    await supabase.auth.signOut().catch(() => {});
     return { ok: true, displayName: studentId };
   } catch {
     return { ok: true, displayName: studentId };
@@ -123,8 +120,6 @@ export async function supabaseSignInTeacher(
   _classroomId: string = 'global',
 ): Promise<SupabaseSessionResult> {
   try {
-    const supabase = getSupabase();
-    await supabase.auth.signOut().catch(() => {});
     return { ok: true, displayName: '先生' };
   } catch {
     return { ok: true, displayName: '先生' };

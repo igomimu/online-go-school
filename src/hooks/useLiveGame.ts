@@ -10,6 +10,7 @@ import {
   enterScoring as apiEnterScoring,
   updateDeadStones as apiUpdateDeadStones,
   finishGame as apiFinishGame,
+  resetLiveGame as apiResetLiveGame,
   type LiveGameRow,
   type LiveMoveRow,
 } from '../utils/liveGameApi';
@@ -91,6 +92,7 @@ export interface UseLiveGameResult {
   enterScoring: () => Promise<void>;
   setDeadStones: (deadStones: string[]) => Promise<void>;
   finishWithResult: (result: string) => Promise<void>;
+  resetGame: () => Promise<void>;
 }
 
 export function useLiveGame(
@@ -256,6 +258,15 @@ export function useLiveGame(
     [game],
   );
 
+  const resetGame = useCallback(async () => {
+    if (!game) return;
+    try {
+      await apiResetLiveGame(game.id);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [game]);
+
   return {
     game,
     boardState: derived.boardState,
@@ -276,5 +287,6 @@ export function useLiveGame(
     enterScoring: enterScoringFn,
     setDeadStones,
     finishWithResult,
+    resetGame,
   };
 }

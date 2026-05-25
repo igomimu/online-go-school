@@ -12,6 +12,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="囲碁オンライン" />
     <title>三村囲碁オンライン</title>
+    <script>
+      // PWA の Service Worker 更新時に自動でページをスーパーリロードする自己治癒スクリプト
+      if ('serviceWorker' in navigator) {
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true;
+            window.location.reload();
+          }
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
