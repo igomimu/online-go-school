@@ -40,10 +40,6 @@ function App() {
 
   // LiveKit接続
   const [livekitUrl, setLivekitUrl] = useState(() => import.meta.env.VITE_LIVEKIT_URL || localStorage.getItem('lk-url') || '');
-  const [apiKey, setApiKey] = useState(() => import.meta.env.VITE_LIVEKIT_API_KEY || localStorage.getItem('lk-api-key') || '');
-  const [apiSecret, setApiSecret] = useState(() => import.meta.env.VITE_LIVEKIT_API_SECRET || localStorage.getItem('lk-api-secret') || '');
-  // Vercelデプロイ時のみサーバートークン（/api/token）を使用。dev serverではクライアント側生成
-  const useServerToken = !!import.meta.env.VITE_LIVEKIT_API_KEY && import.meta.env.PROD;
   const [roomName, setRoomName] = useState('go-classroom');
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [connectionError, setConnectionError] = useState('');
@@ -331,15 +327,14 @@ function App() {
     };
 
     try {
+      // URLから 'token' (一時参加トークン) を取得
+      const params = new URLSearchParams(window.location.search);
+      const urlToken = params.get('token') || undefined;
+
       const connectToken = await fetchToken({
-        apiKey,
-        apiSecret,
         roomName: effectiveRoomName,
         identity: connectUserName,
-        canPublish: true,
-        canPublishData: true,
-        canSubscribe: true,
-        useServerToken,
+        token: urlToken,
       });
 
       await classroom.connect(livekitUrl, connectToken);
@@ -347,23 +342,12 @@ function App() {
 
       if (connectRole === 'TEACHER') {
         const baseUrl = `${window.location.origin}${window.location.pathname}`;
-        if (useServerToken) {
-          setStudentJoinInfo(`${baseUrl}?classroomId=${effectiveClassroomId}`);
-        } else {
-          const currentUrl = new URL(baseUrl);
-          currentUrl.searchParams.set('url', livekitUrl);
-          currentUrl.searchParams.set('room', effectiveRoomName);
-          currentUrl.searchParams.set('key', apiKey);
-          currentUrl.searchParams.set('secret', apiSecret);
-          currentUrl.searchParams.set('classroomId', effectiveClassroomId);
-          currentUrl.searchParams.set('role', 'STUDENT');
-          setStudentJoinInfo(currentUrl.toString());
-        }
+        setStudentJoinInfo(`${baseUrl}?classroomId=${effectiveClassroomId}`);
       }
     } catch (err) {
       setConnectionError(err instanceof Error ? err.message : '接続に失敗しました');
     }
-  }, [apiKey, apiSecret, roomName, livekitUrl, studentId, studentClassroomId, selectedClassroomId]);
+  }, [roomName, livekitUrl, studentId, studentClassroomId, selectedClassroomId]);
 
   // URL params for student auto-join
   useEffect(() => {
@@ -375,18 +359,15 @@ function App() {
     const urlClassroomId = params.get('classroomId');
     const urlLkUrl = params.get('url');
     const urlRoom = params.get('room');
-    const urlKey = params.get('key');
-    const urlSecret = params.get('secret');
     const urlRole = params.get('role');
+    const urlToken = params.get('token');
 
     if (urlClassroomId) setPrefilledClassroomId(urlClassroomId);
 
     if (urlLkUrl) setLivekitUrl(urlLkUrl);
     if (urlRoom) setRoomName(urlRoom);
-    if (urlKey) setApiKey(urlKey);
-    if (urlSecret) setApiSecret(urlSecret);
 
-    if (urlRole === 'STUDENT' && urlLkUrl && urlRoom) {
+    if (urlRole === 'STUDENT' && urlRoom) {
       const urlStudentId = params.get('studentId');
       const urlStudentName = params.get('studentName');
       if (urlStudentId) {
@@ -397,7 +378,7 @@ function App() {
       setRole('STUDENT');
     }
 
-    if (urlClassroomId || urlLkUrl) {
+    if (urlClassroomId || urlLkUrl || urlToken) {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
@@ -405,7 +386,7 @@ function App() {
   // 生徒自動接続
   useEffect(() => {
     if (role === 'STUDENT' && connectionState === ConnectionState.Disconnected && studentId && !studentAutoConnectRef.current) {
-      if (livekitUrl && apiKey && apiSecret && roomName) {
+      if (livekitUrl && roomName) {
         studentAutoConnectRef.current = true;
         connectLiveKit('STUDENT', makeStudentIdentity(studentId));
       }
@@ -413,7 +394,7 @@ function App() {
     if (role !== 'STUDENT') {
       studentAutoConnectRef.current = false;
     }
-  }, [role, connectionState, studentId, livekitUrl, apiKey, apiSecret, roomName, connectLiveKit]);
+  }, [role, connectionState, studentId, livekitUrl, roomName, connectLiveKit]);
 
   // キーボードナビゲーション（レビューモード用）
   useEffect(() => {
@@ -541,8 +522,6 @@ function App() {
 
   const saveSettings = () => {
     localStorage.setItem('lk-url', livekitUrl);
-    localStorage.setItem('lk-api-key', apiKey);
-    localStorage.setItem('lk-api-secret', apiSecret);
     setShowSettings(false);
   };
 
@@ -731,18 +710,7 @@ function App() {
                 placeholder="wss://your-app.livekit.cloud"
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500" />
             </div>
-            <div>
-              <label className="block text-sm text-zinc-400 mb-1">APIキー</label>
-              <input type="text" value={apiKey} onChange={e => setApiKey(e.target.value)}
-                placeholder="APIxxxxxxx"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500" />
-            </div>
-            <div>
-              <label className="block text-sm text-zinc-400 mb-1">APIシークレット</label>
-              <input type="password" value={apiSecret} onChange={e => setApiSecret(e.target.value)}
-                placeholder="シークレットキー"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500" />
-            </div>
+
             <div>
               <label className="block text-sm text-zinc-400 mb-1">ルーム名</label>
               <input type="text" value={roomName} onChange={e => setRoomName(e.target.value)}
@@ -794,14 +762,7 @@ function App() {
                 <label className="block text-sm text-zinc-400 mb-1">LiveKit URL</label>
                 <input value={livekitUrl} onChange={e => setLivekitUrl(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500" />
               </div>
-              <div>
-                <label className="block text-sm text-zinc-400 mb-1">API Key</label>
-                <input value={apiKey} onChange={e => setApiKey(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm text-zinc-400 mb-1">API Secret</label>
-                <input value={apiSecret} onChange={e => setApiSecret(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500" />
-              </div>
+
               <div className="flex gap-3">
                 <button onClick={saveSettings} className="premium-button flex-1">保存</button>
                 <button onClick={() => setShowSettings(false)} className="secondary-button flex-1">キャンセル</button>
@@ -815,7 +776,7 @@ function App() {
 
   // --- 生徒接続画面 ---
   if (role === 'STUDENT' && connectionState !== ConnectionState.Connected) {
-    const hasCredentials = livekitUrl && apiKey && apiSecret && roomName;
+    const hasCredentials = !!(livekitUrl && roomName);
 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-6">
@@ -875,7 +836,7 @@ function App() {
           students={students}
           classrooms={classrooms}
           onLaunchClassroom={(launchClassroomId) => {
-            if (!livekitUrl || !apiKey || !apiSecret) {
+            if (!livekitUrl) {
               setShowSettings(true);
               return;
             }
@@ -1132,7 +1093,7 @@ function App() {
       {showGameCreation && role === 'TEACHER' && (
         <GameCreationDialog
           students={participants.filter(p => p.identity !== (classroomRef.current?.localIdentity ?? '')).map(p => p.identity)}
-          teacherName={userName}
+          teacherName={classroomRef.current?.localIdentity || userName || '先生'}
           onClose={() => setShowGameCreation(false)}
           onCreate={handleCreateGame}
           registeredStudents={students}

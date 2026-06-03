@@ -86,9 +86,6 @@ Deno.serve(async (req) => {
     return json({ error: 'Invalid or expired token' }, 401)
   }
   const user = userResult.user
-  if (!user.is_anonymous) {
-    return json({ error: 'Only anonymous sessions can be validated' }, 403)
-  }
 
   // dojo-app students 照合
   const admin = createClient(supabaseUrl, serviceRoleKey)

@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const baseURL = process.env.BASE_URL || 'http://localhost:5175';
+const baseURL = process.env.BASE_URL || 'http://localhost:3000';
 const isProduction = process.env.NODE_ENV === 'production' || !!process.env.BASE_URL;
 
 export default defineConfig({
@@ -25,10 +25,5 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: !process.env.BASE_URL ? {
-    command: 'npm run dev',
-    url: 'http://localhost:5175',
-    reuseExistingServer: true,
-    timeout: 30_000,
-  } : undefined,
+  webServer: undefined,
 });

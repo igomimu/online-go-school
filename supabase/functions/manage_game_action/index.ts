@@ -72,13 +72,10 @@ Deno.serve(async (req) => {
     }
   }
 
-  // 互換性警告: 認証情報（JWT）がないリクエストの場合、並行稼働期間中は警告を出して実行を許可
+  // 認証情報の厳密な検証（並行稼働期間終了）
   const hasAuth = isServiceRole || isTeacher || validatedStudentId !== null
-  if (!hasAuth && !authHeader) {
-    console.warn(`[manage_game_action] Warning: Request without JWT for action: ${action}. Permitted during dual-auth transition.`);
-  } else if (!hasAuth) {
-    // JWTが存在するのに認証情報が得られない場合は拒否
-    return json({ error: 'Forbidden: Invalid authenticated session' }, 403)
+  if (!hasAuth) {
+    return json({ error: 'Forbidden: Invalid or missing authenticated session' }, 403)
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey)

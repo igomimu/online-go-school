@@ -33,6 +33,11 @@ test.describe('TeacherToolbar / StudentTable 配線検証', () => {
     teacherPage = await teacherContext.newPage();
     studentPage = await studentContext.newPage();
 
+    teacherPage.on('console', msg => console.log(`[Teacher Console] ${msg.type()}: ${msg.text()}`));
+    teacherPage.on('pageerror', err => console.error('[Teacher Page Error]', err));
+    studentPage.on('console', msg => console.log(`[Student Console] ${msg.type()}: ${msg.text()}`));
+    studentPage.on('pageerror', err => console.error('[Student Page Error]', err));
+
     await teacherPage.goto('/');
     await clearAllData(teacherPage);
     await setupTeacherPassword(teacherPage, TEST_TEACHER_PASSWORD);

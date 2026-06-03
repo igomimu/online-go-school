@@ -57,3 +57,4 @@ jobs:
           supabase functions deploy validate_teacher_session --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF
           supabase functions deploy fetch_students --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF
           supabase functions deploy manage_game_action --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF
+          supabase functions deploy submit_move --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF

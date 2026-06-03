@@ -89,10 +89,11 @@ async function executeGameAction(
   gameId?: string,
   params?: any
 ): Promise<any> {
+  console.log("[executeGameAction] action:", action, "params:", params);
   const sb = getSupabase();
   const url = `${import.meta.env.VITE_DOJO_SUPABASE_URL}/functions/v1/manage_game_action`;
   
-  let authHeader = import.meta.env.VITE_DOJO_SUPABASE_KEY; // フォールバック: service_role key
+  let authHeader = '';
   try {
     const { data } = await sb.auth.getSession();
     const token = data?.session?.access_token;
@@ -113,12 +114,21 @@ async function executeGameAction(
     // セッション取得に失敗した場合はフォールバック
   }
 
+  // 開発/テスト環境のみ、セッションがない場合に VITE_DOJO_SUPABASE_KEY をフォールバックとして付与
+  if (!authHeader && import.meta.env.DEV) {
+    authHeader = import.meta.env.VITE_DOJO_SUPABASE_KEY || '';
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (authHeader) {
+    headers['Authorization'] = `Bearer ${authHeader}`;
+  }
+
   const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${authHeader}`,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({ action, game_id: gameId, params }),
   });
   const body = await res.json().catch(() => ({}));
@@ -248,7 +258,7 @@ export async function submitMove(
   // --- 既存のエッジファンクションフォールバック ---
   const url = `${import.meta.env.VITE_DOJO_SUPABASE_URL}/functions/v1/submit_move`;
   
-  let authHeader = import.meta.env.VITE_DOJO_SUPABASE_KEY; // フォールバック: service_role key
+  let authHeader = '';
   try {
     const { data } = await sb.auth.getSession();
     const token = data?.session?.access_token;
@@ -269,6 +279,11 @@ export async function submitMove(
     }
   } catch {
     // セッション取得に失敗した場合はフォールバック
+  }
+
+  // 開発/テスト環境のみ、セッションがない場合に VITE_DOJO_SUPABASE_KEY をフォールバックとして付与
+  if (!authHeader && import.meta.env.DEV) {
+    authHeader = import.meta.env.VITE_DOJO_SUPABASE_KEY || '';
   }
 
   const res = await fetch(url, {
