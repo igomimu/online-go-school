@@ -116,7 +116,7 @@ async function executeGameAction(
 
   // 開発/テスト環境のみ、セッションがない場合に VITE_DOJO_SUPABASE_KEY をフォールバックとして付与
   if (!authHeader && import.meta.env.DEV) {
-    authHeader = (import.meta.env.VITE_DOJO_SUPABASE_KEY || '').replace(/^"|"$/g, '');
+    authHeader = (import.meta.env.VITE_DOJO_SUPABASE_KEY || '').replace(/^"|"$/g, '').trim();
   }
 
   const headers: Record<string, string> = {
@@ -283,7 +283,7 @@ export async function submitMove(
 
   // 開発/テスト環境のみ、セッションがない場合に VITE_DOJO_SUPABASE_KEY をフォールバックとして付与
   if (!authHeader && import.meta.env.DEV) {
-    authHeader = (import.meta.env.VITE_DOJO_SUPABASE_KEY || '').replace(/^"|"$/g, '');
+    authHeader = (import.meta.env.VITE_DOJO_SUPABASE_KEY || '').replace(/^"|"$/g, '').trim();
   }
 
   const res = await fetch(url, {
