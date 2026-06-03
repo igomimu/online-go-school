@@ -1,33 +1,43 @@
-# 【決定版】実行プラン：秘密鍵撤去・認証認可・Vercel本番化（Stage 1〜10 完全準拠）
+# 【決定版】実行プラン：秘密鍵・APIキー撤去・認証認可・Vercel本番化（Stage 1〜10 完全準拠）
 
-このプランは、指摘されたすべてのセキュリティ脆弱性（P0: 特権キー露出、LiveKit Secret 漏洩、トークン認可抜け / P1: 自動ログイン不整合、教室ID対応）を解決するため、プロジェクト内の [todo.md](file:///home/mimura/projects/online-go-school/tasks/todo.md) に定義されている **Stage 1〜10 の開発工程を完全な前提**として取り込み、再構築した本番化プランです。
+このプランは、指摘されたすべてのセキュリティ脆弱性（P0: 特権キー露出、LiveKit Secret 漏洩、トークン認可抜け / P1: 自動ログイン不整合、教室ID対応）を解決するため、プロジェクト内の [todo.md](file:///home/mimura/online-go-school/tasks/todo.md) に定義されている **Stage 1〜10 の開発工程を完全な前提**として取り込み、再構築した本番化プランです。
 
 ---
 
 ## 1. 解決すべき主要課題と修正方針
 
-### P0-1: `VITE_LIVEKIT_API_SECRET` のフロント露出の完全廃止 (Stage 8 前倒し)
-* **現状**: [App.tsx](file:///home/mimura/projects/online-go-school/src/App.tsx) が `VITE_LIVEKIT_API_SECRET` を直接読んでおり、Vercel登録時にフロントJSに焼き込まれる。
-* **修正方針**: クライアントから API Secret への参照を完全に削除します。本番環境では `VITE_LIVEKIT_URL` と `VITE_LIVEKIT_API_KEY` のみフロントに公開し、シークレットは **`LIVEKIT_API_SECRET` (接頭辞なし)** として Vercel Function (`api/token.ts`) 専用に設定します。
+### P0-1: `VITE_LIVEKIT_API_KEY`/`VITE_LIVEKIT_API_SECRET` のフロント露出の完全廃止 (Stage 8 前倒し)
+* **現状**: [App.tsx](file:///home/mimura/online-go-school/src/App.tsx) が `VITE_LIVEKIT_API_SECRET` を直接読んでおり、Vercel登録時にフロントJSに焼き込まれる。
+* **修正方針**: クライアントから API キーおよび API シークレットへの参照を完全に削除します。本番環境のフロントエンドに公開するのは **`VITE_LIVEKIT_URL` のみ**とし、LiveKitへの接続情報である API キーと Secret は、フロントには露出させず、VITE_ 接頭辞のない **`LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET`** として Vercel Function (`api/token.ts`) 専用に設定します。
 
 ### P0-2: `VITE_DOJO_SUPABASE_KEY` (service_role) のフロント露出廃止と RLS 移行 (Stage 2〜8 前倒し)
-* **現状**: [liveGameApi.ts](file:///home/mimura/projects/online-go-school/src/utils/liveGameApi.ts) が `service_role` キーを使用して直接の特権書き込みを行っている。
+* **現状**: [liveGameApi.ts](file:///home/mimura/online-go-school/src/utils/liveGameApi.ts) が `service_role` キーを使用して直接の特権書き込みを行っている。
 * **修正方針**: 
   * クライアントが使用する `VITE_DOJO_SUPABASE_KEY` を、管理者権限の `service_role` キーから、安全な **`anon` キー（公開用鍵）** へ完全に切り替えます。
+  * **【重要】書き込み権限の制限**: 対局の作成・更新・削除などの書き込み操作は、RLSによる直接操作を一切許容せず、**原則DBレベルで拒否（INSERT/UPDATE/DELETEは不可）**に設定します。全ての書き込み操作（着手、時計更新、整地等）は、JWT認証と権限検証を伴う **Supabase Edge Function（`submit_move` 等）へ完全に一本化** します。SELECT（読み取り）のみを RLS で適切に保護した anon 鍵で許可する設計とします。
   * `todo.md` に沿い、フロントは `supabase.auth.signInAnonymously()` でセッションを作成後、Edge Function `validate_student_session` / `validate_teacher_session` を呼び出し、サーバーサイドで検証された student_id などの `app_role` metadata を取得します。
-  * 対局の状態更新は、RLS ポリシーで適切に保護された `anon` 鍵による操作、あるいは Edge Function (`submit_move` 等) に全面的に移行します。
 
 ### P0-3: `/api/token` の一時参加トークン検証と認可設計 (Stage 8 前倒し)
-* **現状**: [api/token.ts](file:///home/mimura/projects/online-go-school/api/token.ts) がリクエストの identity や roomName を検証なしで信用し、誰にでも LiveKit JWT を発行する。
+* **現状**: [api/token.ts](file:///home/mimura/online-go-school/api/token.ts) がリクエストの identity や roomName を検証なしで信用し、誰にでも LiveKit JWT を発行する。
 * **修正方針**:
-  * `dojo-app` 側でオンライン授業参加ボタン押下時に、短命の「一時参加トークン」を Edge Function 等を介して発行します。
-  * `api/token.ts` は、リクエストに含まれるこの一時トークンを Supabase を介して検証し、正当な生徒または先生であると確認できた場合にのみ、適切なロールの LiveKit JWT を発行する認可ロジックを追加します。
+  * `dojo-app` 側でオンライン授業参加ボタン押下時に、DB（Supabase）の専用テーブルに短命の「一時参加トークン」を発行します。
+  * **トークンテーブル仕様**:
+    * `token_hash` (URLに1度だけ載せる `raw_token` の SHA-256 ハッシュ値 `sha256(raw_token)`、主キー。生のトークンはDBに保存しない)
+    * `student_id` (生徒ID、外部キー)
+    * `online_classroom_id` (オンライン教室のID、またはdojo-appのclasses.idとのマッピング値)
+    * `expires_at` (有効期限、**5〜10分**の短命 TTL)
+    * `used_at` (使用日時、使用済みか否かの判定用)
+    * `issued_by` (トークンを発行したユーザーまたはシステムID)
+  * **アトミックなワンタイム使用検証（競合対策）**: 
+    * `api/token.ts` 側で SELECT してから used_at を検証・更新するのではなく、以下の条件付きUPDATEを1回でアトミックに実行します。
+      `UPDATE tokens SET used_at = now() WHERE token_hash = ? AND used_at IS NULL AND expires_at > now() RETURNING *;`
+    * この更新クエリを実行し、実際に1行更新されて `RETURNING *` からトークン行が返ってきた場合のみ、対応する `studentId`/`classroomId` で LiveKit JWT を署名・発行します。期限切れや使用済みトークンの場合は更新行が0となり、即時 401/403 で拒否します。
 
 ### P1-1: 自動ログインと接続フローの不整合解消 (Stage 8 前倒し)
 * **現状**: 生徒自動接続処理において `apiSecret` を要求する古いロジックが残っており、秘密鍵を撤去すると接続できなくなる。
 * **修正方針**:
   * `useServerToken` が有効な場合は、接続時にクライアント側での `apiKey`/`apiSecret` の要求を完全にスキップします。
-  * `VITE_LIVEKIT_URL` ＋ `roomName` ＋ `/api/token` から取得した `signed join token` だけで LiveKit ルームに接続できるように [App.tsx](file:///home/mimura/projects/online-go-school/src/App.tsx) の接続シーケンスを改修します。
+  * `VITE_LIVEKIT_URL` ＋ `roomName` ＋ `/api/token` から取得した `signed join token` だけで LiveKit ルームに接続できるように [App.tsx](file:///home/mimura/online-go-school/src/App.tsx) の接続シーケンスを改修します。
 
 ### P1-2: `classroomId` のマッピング設計
 * **現状**: `dojo-app` 側の `classes.id` と、`online-go-school` 側で先生ブラウザの localStorage 等で管理している `classroom_id` が同一とは限らない。
@@ -44,7 +54,7 @@
 * **Stage 0**:
   * 現在 `online.mimura15.jp` で公開されている Cloudflare Tunnel の `online-go-school` ルート（dev server への転送）を一旦停止し、外部からのアクセスを遮断します（実生徒の運用はまだ開始されていないため実害なし）。
   * 開発中の疎通・動作確認は、`ssh -L 5175:localhost:5175 legion` のローカルポートフォワードを用いてローカルPCブラウザから `localhost:5175` にアクセスして行います。
-  * これにより、Stage 1〜8 の改修作業期間中に `service_role` キーが漏洩するリスクをゼロにします。
+  * これにより、Stage 1〜8 の改修作業期間中に `service_role` キーが外部から新規露出するリスクを止めます（既に露出した可能性がある古いキーの無効化・ローテーション等は、別途 Stage 8 以降で `service_role` 鍵を無効化する形で対処します）。
 
 ### 【フェーズ1】並行稼働・認証基盤の整備（Stage 1〜3）
 * **Stage 1 (完了済み)**: supabase migration / Edge Function 開発基盤の整備。
