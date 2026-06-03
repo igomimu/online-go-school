@@ -1,3 +1,4 @@
+import { getSupabase } from './liveGameApi';
 import type { Student } from '../types/classroom';
 
 const DOJO_URL = import.meta.env.VITE_DOJO_SUPABASE_URL;
@@ -34,24 +35,45 @@ interface DojoStudent {
 }
 
 export async function fetchDojoNetStudents(): Promise<{ students: Student[]; error?: string }> {
-  if (!DOJO_URL || !DOJO_KEY) {
+  if (!DOJO_URL) {
     return { students: [], error: '道場アプリの接続情報が設定されていません (.env)' };
   }
 
   try {
-    const url = `${DOJO_URL}/rest/v1/students?student_type=eq.net&status=eq.active&select=id,name,rank,student_type,grade,address,kakuzuke,birthdate&order=name`;
-    const res = await fetch(url, {
-      headers: {
-        'apikey': DOJO_KEY,
-        'Authorization': `Bearer ${DOJO_KEY}`,
-      },
-    });
+    const supabase = getSupabase();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+
+    let res: Response;
+    if (token) {
+      const url = `${DOJO_URL}/functions/v1/fetch_students`;
+      res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    } else {
+      // 従来の直接 REST API (並行稼働フォールバック)
+      if (!DOJO_KEY) {
+        return { students: [], error: '道場アプリの接続キーが設定されていません (.env)' };
+      }
+      const url = `${DOJO_URL}/rest/v1/students?student_type=eq.net&status=eq.active&select=id,name,rank,student_type,grade,address,kakuzuke,birthdate&order=name`;
+      res = await fetch(url, {
+        headers: {
+          'apikey': DOJO_KEY,
+          'Authorization': `Bearer ${DOJO_KEY}`,
+        },
+      });
+    }
 
     if (!res.ok) {
       return { students: [], error: `道場API エラー: ${res.status} ${res.statusText}` };
     }
 
-    const data: DojoStudent[] = await res.json();
+    const body = await res.json();
+    const data: DojoStudent[] = token ? (body.students || []) : body;
 
     const students: Student[] = data.map(d => ({
       id: d.id,

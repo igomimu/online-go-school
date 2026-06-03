@@ -84,7 +84,67 @@ export interface CreateLiveGameOpts {
   clock?: GameClock;
 }
 
+async function executeGameAction(
+  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset',
+  gameId?: string,
+  params?: any
+): Promise<any> {
+  const sb = getSupabase();
+  const url = `${import.meta.env.VITE_DOJO_SUPABASE_URL}/functions/v1/manage_game_action`;
+  
+  let authHeader = import.meta.env.VITE_DOJO_SUPABASE_KEY; // フォールバック: service_role key
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data?.session?.access_token;
+    if (token) {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const now = Math.floor(Date.now() / 1000);
+        const exp = payload?.exp;
+        const isValidExp = typeof exp === 'number' && exp > now;
+        
+        if (isValidExp && (payload?.app_role === 'teacher' || payload?.app_role === 'student')) {
+          authHeader = token;
+        }
+      }
+    }
+  } catch {
+    // セッション取得に失敗した場合はフォールバック
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${authHeader}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action, game_id: gameId, params }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  return body;
+}
+
 export async function createLiveGame(opts: CreateLiveGameOpts): Promise<LiveGameRow> {
+  try {
+    const res = await executeGameAction('create', undefined, {
+      classroom_id: opts.classroomId,
+      black_player: opts.blackPlayer,
+      white_player: opts.whitePlayer,
+      board_size: opts.boardSize,
+      handicap: opts.handicap,
+      komi: opts.komi,
+      clock: opts.clock ?? null,
+    });
+    if (res && res.game) {
+      return res.game as LiveGameRow;
+    }
+  } catch (err) {
+    console.warn('[createLiveGame] Edge Function failed, falling back to direct query:', err);
+  }
+
+  // --- 従来の直接クエリ（フォールバック） ---
   const { data, error } = await getSupabase()
     .from('go_school_live_games')
     .insert({
@@ -226,6 +286,14 @@ export async function submitMove(
 
 /** 整地モード突入（先生権限、trust-based） */
 export async function enterScoring(gameId: string): Promise<void> {
+  try {
+    await executeGameAction('enter_scoring', gameId);
+    return;
+  } catch (err) {
+    console.warn('[enterScoring] Edge Function failed, falling back to direct query:', err);
+  }
+
+  // --- フォールバック ---
   const { error } = await getSupabase()
     .from('go_school_live_games')
     .update({ status: 'scoring', scoring_dead_stones: [], updated_at: new Date().toISOString() })
@@ -234,6 +302,14 @@ export async function enterScoring(gameId: string): Promise<void> {
 }
 
 export async function updateDeadStones(gameId: string, deadStones: string[]): Promise<void> {
+  try {
+    await executeGameAction('update_dead_stones', gameId, { dead_stones: deadStones });
+    return;
+  } catch (err) {
+    console.warn('[updateDeadStones] Edge Function failed, falling back to direct query:', err);
+  }
+
+  // --- フォールバック ---
   const { error } = await getSupabase()
     .from('go_school_live_games')
     .update({ scoring_dead_stones: deadStones, updated_at: new Date().toISOString() })
@@ -242,6 +318,14 @@ export async function updateDeadStones(gameId: string, deadStones: string[]): Pr
 }
 
 export async function finishGame(gameId: string, result: string): Promise<void> {
+  try {
+    await executeGameAction('finish', gameId, { result });
+    return;
+  } catch (err) {
+    console.warn('[finishGame] Edge Function failed, falling back to direct query:', err);
+  }
+
+  // --- フォールバック ---
   const { error } = await getSupabase()
     .from('go_school_live_games')
     .update({ status: 'finished', result, updated_at: new Date().toISOString() })
@@ -250,6 +334,14 @@ export async function finishGame(gameId: string, result: string): Promise<void> 
 }
 
 export async function updateClock(gameId: string, clock: GameClock): Promise<void> {
+  try {
+    await executeGameAction('update_clock', gameId, { clock });
+    return;
+  } catch (err) {
+    console.warn('[updateClock] Edge Function failed, falling back to direct query:', err);
+  }
+
+  // --- フォールバック ---
   const { error } = await getSupabase()
     .from('go_school_live_games')
     .update({ clock, updated_at: new Date().toISOString() })
@@ -307,8 +399,16 @@ export function subscribeClassroomGames(
   return channel;
 }
 
-/** 対局を初期状態（0手目、石なし）に強制リセットする（先生権限） */
+/** 对局を初期状態（0手目、石なし）に強制リセットする（先生権限） */
 export async function resetLiveGame(gameId: string): Promise<void> {
+  try {
+    await executeGameAction('reset', gameId);
+    return;
+  } catch (err) {
+    console.warn('[resetLiveGame] Edge Function failed, falling back to direct query:', err);
+  }
+
+  // --- フォールバック ---
   const sb = getSupabase();
   
   // 1. この対局のすべての着手を削除
@@ -319,7 +419,7 @@ export async function resetLiveGame(gameId: string): Promise<void> {
     
   if (deleteMovesError) throw new Error(deleteMovesError.message);
   
-  // 2. 対局ステータスを初期状態（playing, 0手目）にリセット
+  // 2. 对局ステータスを初期状態（playing, 0手目）にリセット
   const { error: resetGameError } = await sb
     .from('go_school_live_games')
     .update({
