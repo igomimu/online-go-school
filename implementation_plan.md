@@ -40,12 +40,19 @@
 
 本番公開に向け、`todo.md` に基づき以下の順序で段階的にデプロイ可能な状態を維持しながら実装を進めます。
 
+### 【フェーズ0】即時セキュリティ窓の閉鎖（Stage 1 着手前）
+* **Stage 0**:
+  * 現在 `online.mimura15.jp` で公開されている Cloudflare Tunnel の `online-go-school` ルート（dev server への転送）を一旦停止し、外部からのアクセスを遮断します（実生徒の運用はまだ開始されていないため実害なし）。
+  * 開発中の疎通・動作確認は、`ssh -L 5175:localhost:5175 legion` のローカルポートフォワードを用いてローカルPCブラウザから `localhost:5175` にアクセスして行います。
+  * これにより、Stage 1〜8 の改修作業期間中に `service_role` キーが漏洩するリスクをゼロにします。
+
 ### 【フェーズ1】並行稼働・認証基盤の整備（Stage 1〜3）
 * **Stage 1 (完了済み)**: supabase migration / Edge Function 開発基盤の整備。
 * **Stage 2**:
   * `validate_student_session` Edge Function の稼働確認。
   * フロント側 `authStore.ts` に Supabase Session 連携を追加。
   * `signInAnonymously` → `validate_student_session` → `refreshSession` による新 JWT 取得フローの実装。
+  * **【新規追加】`tasks/todo.md` の更新**: `dojo_class_id` ↔ `online_classroom_id` のマッピング新設に関して、`todo.md` 側の記載（Option A）との整合を取る追記・設計変更を行います。
 * **Stage 3**:
   * `authStore.ts` の復帰処理、supabase-js 標準の session 復帰への移行。
   * この段階ではまだ `VITE_DOJO_SUPABASE_KEY` に `service_role` を残し、アプリを壊さずに並行稼働させます。
@@ -53,18 +60,21 @@
 ### 【フェーズ2】特権キーの排除と Edge Function 権限保護（Stage 4〜7）
 * **Stage 4**:
   * 先生用 `validate_teacher_session` Edge Function を新設（パスワード照合をサーバーサイドで完結）。
+  * **【実行タイミングの厳守】**: 本作業は三村先生ご自身がログイン不能になるリスクを排除するため、**翌日にレッスンのない日（日曜日夜または祝日等）**に実施します。
+  * localStorage SHA-256 と Supabase Session の **dual-auth 並行稼働**（Stage 8 まで旧経路を残す）を徹底し、ログイン不能バグ時のロールバック手段を確保します。
   * `submit_move` Edge Function を改修し、Authorization ヘッダーの JWT から identity を取得するよう変更（body 申告を廃止し、なりすましを防ぐ）。
   * 先生の代打ち権限（`app_role === 'teacher'` のみ許容）を明示的に保護。
 * **Stage 5 & 6**:
   * `createLiveGame`, `updateClock` 等の残りの書き込み操作、および `dojoSync.ts`（students直読み）を Edge Function 呼び出しに移行。
 * **Stage 7**:
-  * `go_school_live_games`, `go_school_live_moves` テーブルの RLS（Row Level Security）を有効化し、`auth.jwt()->>'classroom_id'` や `teacher` ロールに基づく SELECT / WRITE ポリシーを設定・適用。
+  * `go_school_live_games`, `go_school_live_moves` テーブルの RLS（Row Level Security）を有効化し、`auth.jwt()->>'classroom_id'` や `teacher` ロールに基づく SELECT（読み取り）ポリシーのみを設定・適用します。
+  * **【原則拒否】**: DBレベルで INSERT / UPDATE / DELETE などの直接の書き込み操作は一切許容せず、すべて拒否に設定します（すべて Edge Function 経由の書き込みに一本化）。
 
 ### 【フェーズ3】鍵の完全撤去と認可の実装（Stage 8）
 * **Stage 8**:
   * `VITE_DOJO_SUPABASE_KEY` を安全な `anon` キーに切り替え、`service_role` キーをフロント JS から完全撤去。
-  * `App.tsx` から `apiSecret` の参照、クエリパラメータ `secret` の生成・読み取り処理を削除。
-  * `api/token.ts` に **「dojo-app の短命トークン検証」** による LiveKit JWT 発行の認可制限を追加。
+  * `App.tsx` から `apiSecret` および `VITE_LIVEKIT_API_KEY` の参照、クエリパラメータ `secret` の生成・読み取り処理を削除。本番フロントが参照する環境変数は `VITE_LIVEKIT_URL` のみに整理します。
+  * `api/token.ts` に **「dojo-app の短命トークン検証（DBトークンテーブルでのUUID/TTL/ワンタイム検証）」** による LiveKit JWT 発行の認可制限を追加。
   * `VITE_LIVEKIT_URL` + room + token のみで入室するクライアント接続フローへの移行。
 
 ### 【フェーズ4】検証と Vercel デプロイ（Stage 9〜10）
@@ -72,5 +82,5 @@
   * Playwright E2E テストにセキュリティ違反のテスト（別教室JWTアクセス時の403等）を拡充。
   * `dist/` 配下のビルド成果物に対し、`grep` スキャンを実行し、`service_role` や `apiSecret` の値が焼き込まれていないか厳密に確認。
 * **Stage 10**:
-  * Vercel プロジェクトに `VITE_` 接頭辞のない `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` および公開用の `VITE_LIVEKIT_URL` / `VITE_LIVEKIT_API_KEY` を登録。
+  * Vercel プロジェクトに `VITE_` 接頭辞のない `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` および公開用の **`VITE_LIVEKIT_URL` のみ** を登録。**`VITE_LIVEKIT_API_KEY` および `VITE_LIVEKIT_API_SECRET` は絶対に Vercel 上でフロント用（VITE_）として登録・公開しない。**
   * `vercel.json` 本番設定を投入し、DNS（`online.mimura15.jp`）を切り替える。

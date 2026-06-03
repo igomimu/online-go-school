@@ -65,21 +65,16 @@
 - Custom Access Token Hook: **OFF**（関数は本番に存在、URI設定は消してある）
 - dojo-app の Magic Link signup は従来通り動作（handle_new_user 改修で anon skip するだけ、通常ユーザーには影響なし）
 
-### classroom_id の検証省略（Option A 確定、2026-04-21）
-2026-04-21 の実装時、dojo-app `students` テーブルに `classroom_id` カラムが**存在しない**ことが判明（online-go-school の classroom は先生ブラウザの localStorage `go-school-classrooms` で管理されている）。Edge Function で classroom_id を照合する先が無い。
-
-方針: body の classroom_id は**検証せず**そのまま user_metadata に書き込む。
-- 現行 localStorage 認証と同じセキュリティレベル → regression なし
-- student_id の存在・active 検証が、現行認証に対する**本物の改善点**
-- Stage 7 RLS は `student_id` / `app_role` を主ゲートにし、`classroom_id` claim は UX グルーピング / defense-in-depth にとどめる（trust boundary として使わない）
-- Stage 4 の submit_move 改修では caller_identity を **JWT claim の student_id** から取得する（body 申告廃止）
-- 将来マルチ教室運用で真正性が必要になったら、Supabase に classroom テーブル新設（Phase 1 以降の判断）
+### classroom_id の検証省略（Option A）からマッピング新設への移行（2026-06-03 再設計）
+2026-04-21の実装時、dojo-app `students` テーブルに `classroom_id` カラムが存在しないため検証を省略する方針（Option A）としましたが、2026-06-03の再設計において、`dojo-app` からのワンタップ自動ログイン連携 (P1-2) に伴いこの方針をアップデートします。
+* **変更点**: DB（Supabase）上に `dojo_class_id`（dojo-appのclasses.id）と `online_classroom_id`（online-go-schoolの教室ID）を紐付けるマッピングデータ（またはテーブル）を定義・新設し、classroom_id の真正性を検証・マッピング可能にします。
 
 #### Security model: UUID moat 前提（load-bearing）
 Option A は「student_id を知っている者 = 正当な生徒」に帰着する。この前提は `students.id` が **UUID v4 で非 enumerable** であることに依存している。
 - 将来 `students.id` を「生徒番号001」のような人間可読・連番形式に変えると、本認証モデルは全崩壊する
 - `students.id` 形式を変更する提案が出たら、そのPRで Option A を再設計する（student_id とは別の secret を併用する等）
 - Stage 4 の submit_move 改修時にも同じ前提を再確認する
+- **【2026-06-03 追加】短命トークン連携**: 自動ログイン時には、後述の短命トークン（ワンタイム・TTL制限付き）を発行・検証し、セッション確立のセキュリティを多層で保護します。
 
 ### 残作業
 - [x] `validate_student_session` Edge Function 新設（2026-04-21、Option A 実装）
@@ -235,24 +230,27 @@ Stage 4 で先生（三村さん自身）の認証を localStorage SHA-256 → S
 
 ---
 
-## Stage 8: キーを anon (publishable) に切り替え、service_role 廃止
+## Stage 8: キーを anon (publishable) に切り替え、service_role 廃止、LiveKit認証の強化
 
-**目的**: マスターキー完全撤去
+**目的**: マスターキー完全撤去とワンタイムトークン認可の導入
 
 **作業**:
 - [ ] `.env` の `VITE_DOJO_SUPABASE_KEY` を `sb_publishable_...` に変更
-- [ ] `VITE_LIVEKIT_API_KEY` / `VITE_LIVEKIT_API_SECRET` をフロントから削除
+- [ ] `VITE_LIVEKIT_API_KEY` / `VITE_LIVEKIT_API_SECRET` をフロントから削除（本番フロントが参照するのは `VITE_LIVEKIT_URL` のみとする）
 - [ ] `livekitToken.ts` のフロント直発行コード削除、`api/token.ts` 経由一本化
-- [ ] `api/token.ts` も JWT 検証追加（先生と該当プレイヤーだけが LiveKit 部屋に入れる）
+- [ ] `api/token.ts` に **「一時参加トークン検証（ワンタイム使用・TTL付きDB検証）」** を追加
+  - `dojo-app` から遷移時に発行される短命トークン（`token_hash`）をSupabaseの専用テーブルで照合し、有効期限内（5〜10分）かつ未使用（`used_at is NULL`）であることを検証。
+  - 検証通過後、トークンを使用済み（`used_at = now()`）に更新し、対応する `studentId`/`classroomId` で LiveKit JWT を署名・発行する。
 - [ ] Stage 4 で残した互換コード（JWT 無しリクエスト許可）を削除
 - [ ] dev server / E2E を全て anon key で動かして動作確認
 
 **検証**:
 - `.env` に service_role key を戻さなくてもアプリ全体が動くこと
 - ブラウザで公開されている JS バンドルに service_role が含まれていないこと（`grep service_role dist/` で確認）
+- フロントJSに `apiSecret` や `VITE_LIVEKIT_API_KEY` の値が含まれていないこと（`dist/` 以下の漏洩スキャン）
 - E2E 全通過
 
-**想定時間**: 半日
+**想定時間**: 半日〜1日
 
 ---
 
