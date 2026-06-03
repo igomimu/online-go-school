@@ -12,16 +12,9 @@ export function getSupabase(): SupabaseClient {
   if (!url || !key) throw new Error('Supabase env missing (VITE_DOJO_SUPABASE_URL / VITE_DOJO_SUPABASE_KEY)');
   supabase = createClient(url, key, {
     auth: {
-      persistSession: false, // ゾンビセッションによる 401 Unauthorized を完全に防ぐ
-      autoRefreshToken: false,
+      persistSession: true, // セッションを永続化し、リロード後も維持する
+      autoRefreshToken: true,
       detectSessionInUrl: false,
-    },
-    global: {
-      // 簡易ログイン（Simplified Login）期間中の Cookie 汚染による 401 エラーを完全に防ぐため、
-      // 常に service_role キー（管理者権限）を Authorization ヘッダーに強制固定して上書きする
-      headers: {
-        'Authorization': `Bearer ${key}`,
-      },
     },
     realtime: { params: { eventsPerSecond: 20 } },
   });

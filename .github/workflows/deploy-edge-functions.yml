@@ -52,4 +52,6 @@ jobs:
         # --no-verify-jwt: platform 層の JWT 検証を無効化（Supabase 非対称鍵 ES256 を
         # platform が unsupported と判定するため）。関数内で getUser(jwt) で検証するので
         # 認証は維持される
-        run: supabase functions deploy validate_student_session --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF
+        run: |
+          supabase functions deploy validate_student_session --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF
+          supabase functions deploy validate_teacher_session --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF

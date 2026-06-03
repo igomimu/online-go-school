@@ -106,22 +106,100 @@ export interface SupabaseSessionResult {
 
 export async function supabaseSignInStudent(
   studentId: string,
-  _classroomId: string,
+  classroomId: string,
 ): Promise<SupabaseSessionResult> {
   try {
-    return { ok: true, displayName: studentId };
-  } catch {
+    const supabase = getSupabase();
+    
+    // 1. 匿名サインイン
+    const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
+    if (authError || !authData.session) {
+      console.warn('[Supabase Auth] Anonymous sign-in failed, falling back:', authError);
+      return { ok: true, displayName: studentId }; // 並行稼働用のフォールバック
+    }
+    
+    const token = authData.session.access_token;
+    const supabaseUrl = import.meta.env.VITE_DOJO_SUPABASE_URL;
+    
+    // 2. validate_student_session Edge Function の呼び出し
+    const fnUrl = `${supabaseUrl}/functions/v1/validate_student_session`;
+    const res = await fetch(fnUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ studentId, classroomId }),
+    });
+    
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      console.warn('[Supabase Auth] Student validation failed, falling back:', errBody.error || res.status);
+      return { ok: true, displayName: studentId }; // 並行稼働用のフォールバック
+    }
+    
+    const result = await res.json();
+    
+    // 3. セッションを更新して新しい JWT を取得 (メタデータ反映)
+    const { error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError) {
+      console.warn('[Supabase Auth] Session refresh failed, falling back:', refreshError);
+      return { ok: true, displayName: result.display_name || studentId };
+    }
+    
+    return {
+      ok: true,
+      displayName: result.display_name || studentId,
+    };
+  } catch (err) {
+    console.warn('[Supabase Auth] Unexpected error in student sign-in, falling back:', err);
     return { ok: true, displayName: studentId };
   }
 }
 
 export async function supabaseSignInTeacher(
-  _password: string,
-  _classroomId: string = 'global',
+  password: string,
+  classroomId: string = 'global',
 ): Promise<SupabaseSessionResult> {
   try {
-    return { ok: true, displayName: '先生' };
-  } catch {
+    const supabase = getSupabase();
+    
+    // 1. 匿名サインイン
+    const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
+    if (authError || !authData.session) {
+      console.warn('[Supabase Auth] Anonymous sign-in failed (teacher), falling back:', authError);
+      return { ok: true, displayName: '先生' }; // 並行稼働用フォールバック
+    }
+    
+    const token = authData.session.access_token;
+    const supabaseUrl = import.meta.env.VITE_DOJO_SUPABASE_URL;
+    
+    // 2. validate_teacher_session Edge Function の呼び出し
+    const fnUrl = `${supabaseUrl}/functions/v1/validate_teacher_session`;
+    const res = await fetch(fnUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ password, classroomId }),
+    });
+    
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      console.warn('[Supabase Auth] Teacher validation failed, falling back:', errBody.error || res.status);
+      return { ok: true, displayName: '先生' }; // 並行稼働用フォールバック
+    }
+    
+    // 3. セッションを更新して新しい JWT を取得 (メタデータ反映)
+    await supabase.auth.refreshSession();
+    
+    return {
+      ok: true,
+      displayName: '先生',
+    };
+  } catch (err) {
+    console.warn('[Supabase Auth] Unexpected error in teacher sign-in, falling back:', err);
     return { ok: true, displayName: '先生' };
   }
 }
