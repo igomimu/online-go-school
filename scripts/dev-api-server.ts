@@ -27,6 +27,18 @@ try {
   console.warn('Failed to load .env file:', e);
 }
 
+// --- dev 専用 env エイリアス ---
+// 本番(Vercel)では LIVEKIT_API_KEY 等の「VITE_ 接頭辞なし」サーバー側名を直接設定する。
+// 一方 dev の .env はフロント(vite)用に VITE_ 接頭辞付きしか持たないため、
+// api/token.ts が読むサーバー側名へここで橋渡しする（本番コードは無改変のまま）。
+process.env.LIVEKIT_API_KEY ||= process.env.VITE_LIVEKIT_API_KEY;
+process.env.LIVEKIT_API_SECRET ||= process.env.VITE_LIVEKIT_API_SECRET;
+process.env.SUPABASE_URL ||= process.env.VITE_DOJO_SUPABASE_URL;
+// dev: VITE_DOJO_SUPABASE_KEY は Stage 8 完了まで service_role（role claim 確認済み）
+process.env.SUPABASE_SERVICE_ROLE_KEY ||= process.env.VITE_DOJO_SUPABASE_KEY;
+// dev fallback: getUser(jwt) の gateway apikey 用。本番は専用 anon key を設定する
+process.env.SUPABASE_ANON_KEY ||= process.env.VITE_DOJO_SUPABASE_KEY;
+
 const server = http.createServer(async (req, res) => {
   // CORS ヘッダー
   res.setHeader('Access-Control-Allow-Origin', '*');
