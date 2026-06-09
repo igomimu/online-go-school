@@ -1,5 +1,5 @@
 // 生徒ログイン情報のlocalStorage管理
-import { getSupabase } from './liveGameApi';
+import { getSupabase, functionsBaseUrl } from './liveGameApi';
 
 const ACCOUNTS_KEY = 'go-school-accounts';
 const TEACHER_PW_KEY = 'go-school-teacher-pw';
@@ -119,10 +119,9 @@ export async function supabaseSignInStudent(
     }
     
     const token = authData.session.access_token;
-    const supabaseUrl = import.meta.env.VITE_DOJO_SUPABASE_URL;
-    
+
     // 2. validate_student_session Edge Function の呼び出し
-    const fnUrl = `${supabaseUrl}/functions/v1/validate_student_session`;
+    const fnUrl = `${functionsBaseUrl()}/validate_student_session`;
     const res = await fetch(fnUrl, {
       method: 'POST',
       headers: {
@@ -172,10 +171,9 @@ export async function supabaseSignInTeacher(
     }
     
     const token = authData.session.access_token;
-    const supabaseUrl = import.meta.env.VITE_DOJO_SUPABASE_URL;
-    
+
     // 2. validate_teacher_session Edge Function の呼び出し
-    const fnUrl = `${supabaseUrl}/functions/v1/validate_teacher_session`;
+    const fnUrl = `${functionsBaseUrl()}/validate_teacher_session`;
     const res = await fetch(fnUrl, {
       method: 'POST',
       headers: {

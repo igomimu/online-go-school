@@ -1,4 +1,4 @@
-import { getSupabase } from './liveGameApi';
+import { getSupabase, functionsBaseUrl } from './liveGameApi';
 import type { Student } from '../types/classroom';
 
 const DOJO_URL = import.meta.env.VITE_DOJO_SUPABASE_URL;
@@ -46,7 +46,7 @@ export async function fetchDojoNetStudents(): Promise<{ students: Student[]; err
 
     let res: Response;
     if (token) {
-      const url = `${DOJO_URL}/functions/v1/fetch_students`;
+      const url = `${functionsBaseUrl()}/fetch_students`;
       res = await fetch(url, {
         method: 'POST',
         headers: {
