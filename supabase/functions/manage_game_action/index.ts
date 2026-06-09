@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { studentMatchesPlayer } from '../_shared/identity.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -92,9 +93,13 @@ Deno.serve(async (req) => {
       return json({ error: 'Game not found' }, 404)
     }
 
-    // 生徒の場合は対局者本人のみ許可
+    // 生徒の場合は対局者本人のみ許可。
+    // black_player/white_player は `sid:<uuid>`、JWT の student_id は bare UUID。
+    // studentMatchesPlayer が prefix の有無を吸収して照合する。
     if (!isServiceRole && !isTeacher) {
-      const isPlayer = game.black_player === validatedStudentId || game.white_player === validatedStudentId
+      const isPlayer =
+        studentMatchesPlayer(validatedStudentId, game.black_player) ||
+        studentMatchesPlayer(validatedStudentId, game.white_player)
       if (!isPlayer) {
         return json({ error: 'Forbidden: You are not a player of this game' }, 403)
       }

@@ -1,6 +1,7 @@
 // online-go-school 対局着手の権威的バリデーション
 // identity / 手番 / move_number 連番のみ検証。合法手判定はクライアント責務。
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { studentMatchesPlayer, toStudentIdentity } from '../_shared/identity.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -86,8 +87,9 @@ Deno.serve(async (req) => {
   }
 
   // なりすまし防止: 生徒の場合は認証済み student_id を強制使用。それ以外は body 申告値を信用。
+  // player_id は black_player/white_player と同じ `sid:<uuid>` 形式で保存する（toStudentIdentity）。
   const callerIdToUse = (!isServiceRole && !isTeacher && validatedCallerId)
-    ? validatedCallerId
+    ? toStudentIdentity(validatedCallerId)
     : caller_identity
 
   // 認証情報の厳密な検証（並行稼働期間終了）
@@ -115,9 +117,9 @@ Deno.serve(async (req) => {
     return json({ error: `Game status is ${game.status}, not playing` }, 409)
   }
 
-  // 2. identity と color の整合性チェック
+  // 2. identity と color の整合性チェック（sid: prefix の有無を吸収して照合）
   const expectedIdentity = color === 'BLACK' ? game.black_player : game.white_player
-  if (callerIdToUse !== expectedIdentity && !isTeacher && !isServiceRole) {
+  if (!isTeacher && !isServiceRole && !studentMatchesPlayer(callerIdToUse, expectedIdentity)) {
     return json({
       error: 'Identity does not match the requested color',
       caller: callerIdToUse,
