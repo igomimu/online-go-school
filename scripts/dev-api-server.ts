@@ -4,39 +4,45 @@ import fs from 'fs';
 import path from 'path';
 import handler from '../api/token';
 
-// .env ファイルの手動ロード
-try {
-  const envPath = path.resolve(process.cwd(), '.env');
-  if (fs.existsSync(envPath)) {
-    const envConfig = fs.readFileSync(envPath, 'utf-8');
-    envConfig.split('\n').forEach(line => {
-      const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
-      if (match) {
-        const key = match[1];
-        let value = match[2] || '';
-        if (value.startsWith('"') && value.endsWith('"')) {
-          value = value.slice(1, -1);
-        } else if (value.startsWith("'") && value.endsWith("'")) {
-          value = value.slice(1, -1);
+function loadEnvFile(filePath: string) {
+  try {
+    if (fs.existsSync(filePath)) {
+      const envConfig = fs.readFileSync(filePath, 'utf-8');
+      envConfig.split('\n').forEach(line => {
+        const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+        if (match) {
+          const key = match[1];
+          let value = match[2] || '';
+          if (value.startsWith('"') && value.endsWith('"')) {
+            value = value.slice(1, -1);
+          } else if (value.startsWith("'") && value.endsWith("'")) {
+            value = value.slice(1, -1);
+          }
+          process.env[key] = value;
         }
-        process.env[key] = value;
-      }
-    });
+      });
+    }
+  } catch (e) {
+    console.warn(`Failed to load env file ${filePath}:`, e);
   }
-} catch (e) {
-  console.warn('Failed to load .env file:', e);
 }
+
+// .env (VITE_ prefixed, frontend vars)
+loadEnvFile(path.resolve(process.cwd(), '.env'));
+// ~/.secrets/supabase-dojo-service.env (SUPABASE_SERVICE_ROLE_KEY for server-side use)
+loadEnvFile(path.join(process.env.HOME || '', '.secrets', 'supabase-dojo-service.env'));
 
 // --- dev 専用 env エイリアス ---
 // 本番(Vercel)では LIVEKIT_API_KEY 等の「VITE_ 接頭辞なし」サーバー側名を直接設定する。
 // 一方 dev の .env はフロント(vite)用に VITE_ 接頭辞付きしか持たないため、
 // api/token.ts が読むサーバー側名へここで橋渡しする（本番コードは無改変のまま）。
+// 本番(Vercel)では VITE_ 接頭辞なしの変数名をそのまま使う。
+// dev の .env はフロント向けに VITE_ 接頭辞付きのため、ここで橋渡しする。
 process.env.LIVEKIT_API_KEY ||= process.env.VITE_LIVEKIT_API_KEY;
 process.env.LIVEKIT_API_SECRET ||= process.env.VITE_LIVEKIT_API_SECRET;
 process.env.SUPABASE_URL ||= process.env.VITE_DOJO_SUPABASE_URL;
-// dev: VITE_DOJO_SUPABASE_KEY は Stage 8 完了まで service_role（role claim 確認済み）
-process.env.SUPABASE_SERVICE_ROLE_KEY ||= process.env.VITE_DOJO_SUPABASE_KEY;
-// dev fallback: getUser(jwt) の gateway apikey 用。本番は専用 anon key を設定する
+// SUPABASE_SERVICE_ROLE_KEY は ~/.secrets/supabase-dojo-service.env から取得済み
+// VITE_DOJO_SUPABASE_KEY は publishable key なので service_role の代替にはならない
 process.env.SUPABASE_ANON_KEY ||= process.env.VITE_DOJO_SUPABASE_KEY;
 
 const server = http.createServer(async (req, res) => {

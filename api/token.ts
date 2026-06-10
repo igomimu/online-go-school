@@ -94,12 +94,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // 互換性警告: 開発初期や移行期間中、認証情報も一時トークンもないリクエストの場合
-  if (!authorized && !rawToken && !authHeader) {
-    console.warn(`[token-auth] Warning: Request without credentials from identity: ${identity}. Permitted during dual-auth transition.`);
-    authorized = true; // 並行稼働期間中は一時的に許可
-  }
-
+  // 認証情報も一時トークンもないリクエストは拒否する。
+  // （以前は dual-auth 移行期間として authorized=true にしていたが、
+  //  先生・生徒とも Supabase セッション（app_role claim）または dojo-app 一時トークンで
+  //  認証されるようになったため、無認証フォールバックを撤去した。2026-06-09）
   if (!authorized) {
     return res.status(403).json({ error: 'Forbidden: Unauthorized to join this room' });
   }
