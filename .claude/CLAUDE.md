@@ -2,7 +2,7 @@
 
 ## 基本情報
 - **技術**: Vite 7 + React 19 + TypeScript 5.9 + Tailwind 4 + LiveKit + Supabase
-- **状態**: 開発中（実運用デビュー前、コード側は本番投入可能レベルまで到達）
+- **状態**: ✅ 中核フロー（ログイン→対局作成→着手→同期）が実認証チェーンで成立（2026-06-13 根治、E2E 11/11 本物の緑）。断絶3点（生徒ログインのレース / authStore の握りつぶしフォールバック / 先生PWの二重真実）を修正済み。先生PWは `~/.secrets/online-go-school-teacher.env`（サーバー側 `TEACHER_PASSWORD_HASH` と整合、E2E は `TEST_TEACHER_PASSWORD` で注入）。残: Vercel再公開（要Go）/ 実生徒との試験レッスン。詳細は `PROGRESS.md` と auto-memory `projects/online-go-school.md`。
 - **Dev server**: LEGION で `npm run dev`（vite.config.ts で port 5175・host true 設定済み）
 - **公開URL**: `https://online.mimura15.jp/`（Cloudflare Tunnel 経由で LEGION の dev server にルーティング）
 - **YOGAProから見る場合**: 公開URL、または `ssh -L 5175:localhost:5175 legion`

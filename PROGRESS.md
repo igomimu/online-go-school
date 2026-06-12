@@ -1,6 +1,18 @@
 # 開発進捗記録 — online-go-school（三村囲碁オンライン）
 
-## 最終更新: 2026-04-20
+## 最終更新: 2026-06-13
+
+## ✅ 解決済み (2026-06-13): 「実際には対局できない」を根治、E2E 11/11 本物の緑
+6/12 の「認証チェーン断絶」診断を実機検証した結果と修正:
+- **Hook は本番で有効だった**（`hook_custom_access_token_enabled=true` を Management API で確認）。6/12 の「Hook 未有効が最有力」仮説は否定。
+- **実際の断絶点は3つ**で、全て修正済み:
+  1. **生徒ログインのレース**: `App.tsx` が `void supabaseSignInStudent(...)` でサインイン完了を**待たずに**入室 → メタデータ昇格前の匿名JWTで `/api/token` を叩き LiveKit 入室 403。→ LoginScreen でサインイン完了を待ってから入室する方式に変更。
+  2. **握りつぶしフォールバック**: `authStore.ts` が全失敗を `return {ok:true}` で隠蔽。→ 撤去。失敗は ok:false+理由でログイン画面に表示しブロック。
+  3. **先生PWの二重真実**: ローカル localStorage 照合が通れば入室でき、本番 `TEACHER_PASSWORD_HASH`（旧ハッシュの元PWは記録なし＝誰も知らない）との照合失敗は隠蔽されていた。→ サーバー認証必須化＋本番ハッシュを既知PWで再設定（PWは `~/.secrets/online-go-school-teacher.env`、旧ハッシュも同ファイルに控え）。
+- **E2E 11/11 緑**（実先生PW・実生徒UUID・本番Edge Functions・RLS有効・publishableキー経由＝虚偽の緑要素なし）。unit 321/321、tsc クリーン。
+- no-op UI 削除: 「座席チェック」「設定」(TeacherToolbar)、「自分の映像を表示」「教室カメラ」「時間精算」(TeacherDashboard)。IGC模倣の機能なしUI。
+- インフラ変更: 匿名サインイン rate limit 30→300/時（E2E連投対策、Management API、旧値30）。
+- 残課題: 既存lint負債53件（react-hooks系は挙動変更リスクあり保留）/ Vercel再公開（三村さんのGo待ち）/ 生徒1人との試験レッスン（A/Vは人間確認）。
 
 ## 現状（スナップショット）
 
