@@ -90,13 +90,11 @@ export function resetTeacherPassword(): void {
 
 // === Supabase Session 連携（Phase 0 Stage 2〜）===
 //
-// 生徒ログイン時に Anonymous Sign-In → validate_student_session → refreshSession の
-// 3 ステップで Supabase 発行 JWT を確立する。既存の localStorage 認証と並行稼働し、
-// 本番の Hook / Anonymous Sign-In が OFF でもフロントは壊れない（並行稼働期間中は
-// 失敗を警告ログに留め、localStorage 経路でセッションを維持）。
-//
-// Stage 8 で service_role key → publishable key 切替後、Supabase Session が primary
-// になる。それまでは補助的な位置付け。
+// ログイン時に Anonymous Sign-In → validate_*_session → refreshSession の
+// 3 ステップで Supabase 発行 JWT を確立する。Supabase Session が認可の primary
+// （LiveKit 入室・対局の作成/着手すべてこの JWT が必須）のため、
+// どのステップの失敗も ok:false で呼び出し元へ返し、ログインをブロックする。
+// （旧・並行稼働期の「失敗しても ok:true」フォールバックは 2026-06-13 撤去）
 
 export interface SupabaseSessionResult {
   ok: boolean;
@@ -114,8 +112,8 @@ export async function supabaseSignInStudent(
     // 1. 匿名サインイン
     const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
     if (authError || !authData.session) {
-      console.warn('[Supabase Auth] Anonymous sign-in failed, falling back:', authError);
-      return { ok: true, displayName: studentId }; // 並行稼働用のフォールバック
+      console.error('[Supabase Auth] Anonymous sign-in failed:', authError);
+      return { ok: false, error: 'サーバーに接続できません（匿名サインイン失敗）' };
     }
     
     const token = authData.session.access_token;
@@ -133,8 +131,14 @@ export async function supabaseSignInStudent(
     
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
-      console.warn('[Supabase Auth] Student validation failed, falling back:', errBody.error || res.status);
-      return { ok: true, displayName: studentId }; // 並行稼働用のフォールバック
+      console.error('[Supabase Auth] Student validation failed:', errBody.error || res.status);
+      await supabase.auth.signOut().catch(() => {});
+      return {
+        ok: false,
+        error: res.status === 403
+          ? '生徒IDが確認できません。IDを確かめてください'
+          : `生徒確認に失敗しました（${errBody.error || res.status}）`,
+      };
     }
     
     const result = await res.json();
@@ -142,8 +146,8 @@ export async function supabaseSignInStudent(
     // 3. セッションを更新して新しい JWT を取得 (メタデータ反映)
     const { error: refreshError } = await supabase.auth.refreshSession();
     if (refreshError) {
-      console.warn('[Supabase Auth] Session refresh failed, falling back:', refreshError);
-      return { ok: true, displayName: result.display_name || studentId };
+      console.error('[Supabase Auth] Session refresh failed:', refreshError);
+      return { ok: false, error: 'セッション更新に失敗しました。もう一度お試しください' };
     }
     
     return {
@@ -151,8 +155,8 @@ export async function supabaseSignInStudent(
       displayName: result.display_name || studentId,
     };
   } catch (err) {
-    console.warn('[Supabase Auth] Unexpected error in student sign-in, falling back:', err);
-    return { ok: true, displayName: studentId };
+    console.error('[Supabase Auth] Unexpected error in student sign-in:', err);
+    return { ok: false, error: 'ログイン処理でエラーが発生しました' };
   }
 }
 
@@ -166,8 +170,8 @@ export async function supabaseSignInTeacher(
     // 1. 匿名サインイン
     const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
     if (authError || !authData.session) {
-      console.warn('[Supabase Auth] Anonymous sign-in failed (teacher), falling back:', authError);
-      return { ok: true, displayName: '先生' }; // 並行稼働用フォールバック
+      console.error('[Supabase Auth] Anonymous sign-in failed (teacher):', authError);
+      return { ok: false, error: 'サーバーに接続できません（匿名サインイン失敗）' };
     }
     
     const token = authData.session.access_token;
@@ -185,20 +189,30 @@ export async function supabaseSignInTeacher(
     
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
-      console.warn('[Supabase Auth] Teacher validation failed, falling back:', errBody.error || res.status);
-      return { ok: true, displayName: '先生' }; // 並行稼働用フォールバック
+      console.error('[Supabase Auth] Teacher validation failed:', errBody.error || res.status);
+      await supabase.auth.signOut().catch(() => {});
+      return {
+        ok: false,
+        error: res.status === 403
+          ? 'パスワードがサーバーと一致しません'
+          : `先生認証に失敗しました（${errBody.error || res.status}）`,
+      };
     }
     
     // 3. セッションを更新して新しい JWT を取得 (メタデータ反映)
-    await supabase.auth.refreshSession();
-    
+    const { error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError) {
+      console.error('[Supabase Auth] Session refresh failed (teacher):', refreshError);
+      return { ok: false, error: 'セッション更新に失敗しました。もう一度お試しください' };
+    }
+
     return {
       ok: true,
       displayName: '先生',
     };
   } catch (err) {
-    console.warn('[Supabase Auth] Unexpected error in teacher sign-in, falling back:', err);
-    return { ok: true, displayName: '先生' };
+    console.error('[Supabase Auth] Unexpected error in teacher sign-in:', err);
+    return { ok: false, error: 'ログイン処理でエラーが発生しました' };
   }
 }
 

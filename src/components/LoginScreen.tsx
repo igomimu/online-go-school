@@ -7,6 +7,7 @@ import {
   setTeacherPassword,
   verifyTeacherPassword,
   resetTeacherPassword,
+  supabaseSignInStudent,
   supabaseSignInTeacher,
   supabaseSignOut,
 } from '../utils/authStore';
@@ -31,6 +32,7 @@ export default function LoginScreen({
   const [classroomId, setClassroomId] = useState(prefilledClassroomId || '');
   const [selectedAccount, setSelectedAccount] = useState<SavedAccount | null>(null);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   // 先生
   const [teacherPw, setTeacherPw] = useState('');
@@ -85,12 +87,24 @@ export default function LoginScreen({
     }
   };
 
-  const handleStudentSubmit = (e: React.FormEvent) => {
+  const handleStudentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     const sid = studentId.trim();
     const cid = classroomId.trim();
     if (!sid || !cid) {
       setError('生徒IDと教室IDを入力してください');
+      return;
+    }
+    // Supabase Session の確立を待ってから入室する。
+    // （以前は入室と並行実行していたため、メタデータ昇格前の匿名 JWT で
+    //   /api/token を叩いて LiveKit 入室が 403 になるレースがあった）
+    setSubmitting(true);
+    setError('');
+    const res = await supabaseSignInStudent(sid, cid);
+    setSubmitting(false);
+    if (!res.ok) {
+      setError(res.error || 'ログインに失敗しました');
       return;
     }
     onStudentLogin(sid, cid);
@@ -111,9 +125,12 @@ export default function LoginScreen({
       }
       await setTeacherPassword(teacherPw);
 
+      // サーバー側（validate_teacher_session）の認証が通らない限り入室させない。
+      // localStorage のパスワードはオフラインUX用のキャッシュにすぎず、権威はサーバー。
       const res = await supabaseSignInTeacher(teacherPw);
       if (!res.ok) {
-        console.warn('[auth] Supabase teacher sign-in failed (non-fatal):', res.error);
+        setTeacherError(res.error || 'サーバー認証に失敗しました');
+        return;
       }
 
       onTeacherLogin();
@@ -126,7 +143,8 @@ export default function LoginScreen({
 
       const res = await supabaseSignInTeacher(teacherPw);
       if (!res.ok) {
-        console.warn('[auth] Supabase teacher sign-in failed (non-fatal):', res.error);
+        setTeacherError(res.error || 'サーバー認証に失敗しました');
+        return;
       }
 
       onTeacherLogin();
@@ -319,8 +337,8 @@ export default function LoginScreen({
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
 
-          <button data-testid="student-login-button" type="submit" className="premium-button w-full">
-            {selectedAccount?.classroomName ? `${selectedAccount.classroomName} に参加` : '参加する'}
+          <button data-testid="student-login-button" type="submit" disabled={submitting} className="premium-button w-full disabled:opacity-60">
+            {submitting ? '確認中...' : selectedAccount?.classroomName ? `${selectedAccount.classroomName} に参加` : '参加する'}
           </button>
         </form>
       </div>
@@ -370,7 +388,7 @@ export default function LoginScreen({
             // 1. Supabase 強制サインアウト
             try {
               await supabaseSignOut();
-            } catch (err) {}
+            } catch { /* best-effort */ }
 
             // 1.5 既存データの重複生徒を自動排他クリーンアップ
             try {
@@ -379,7 +397,7 @@ export default function LoginScreen({
               if (clses.length > 0) {
                 saveClassrooms(clses); // 保存時に自動で cleanup される
               }
-            } catch (err) {}
+            } catch { /* best-effort */ }
 
             // 2. Service Worker 強制アンインストール
             if ('serviceWorker' in navigator) {
@@ -388,7 +406,7 @@ export default function LoginScreen({
                 for (const reg of regs) {
                   await reg.unregister();
                 }
-              } catch (err) {}
+              } catch { /* best-effort */ }
             }
 
             // 3. Cache Storage 強制クリア
@@ -398,7 +416,7 @@ export default function LoginScreen({
                 for (const key of keys) {
                   await caches.delete(key);
                 }
-              } catch (err) {}
+              } catch { /* best-effort */ }
             }
 
             // 4. 強制リロード (サーバーから最新アセットを再取得)

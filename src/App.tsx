@@ -13,7 +13,7 @@ import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession } from './utils/liveGameApi';
 import { loadStudents, loadClassrooms } from './utils/classroomStore';
-import { saveAccount, supabaseSignInStudent, supabaseSignOut, loadAccounts } from './utils/authStore';
+import { saveAccount, supabaseSignOut, loadAccounts } from './utils/authStore';
 
 import Header from './components/Header';
 import LoginScreen from './components/LoginScreen';
@@ -292,10 +292,10 @@ function App() {
           notificationSound.play('gameEnd');
         }
       },
-      onParticipantJoined: (_identity: string) => {
+      onParticipantJoined: () => {
         notificationSound.play('connect');
       },
-      onParticipantLeft: (_identity: string) => {
+      onParticipantLeft: () => {
         notificationSound.play('disconnect');
       },
       onParticipantsChanged: (p: ParticipantInfo[]) => {
@@ -733,20 +733,12 @@ function App() {
         <LoginScreen
           prefilledClassroomId={prefilledClassroomId}
           onStudentLogin={(sid, cid) => {
+            // Supabase Session は LoginScreen 側で確立済み（失敗時はここに来ない）
             setStudentId(sid);
             setStudentClassroomId(cid);
             setRoomName(`go-${cid}`);
             setUserName(sid); // 先生側で名前解決されるまでIDを表示名に
             setRole('STUDENT');
-            // Phase 0 Stage 2: Supabase Session 確立を並行実行。
-            // Hook OFF 期間中は失敗しても localStorage 認証で動作継続。
-            void supabaseSignInStudent(sid, cid).then(result => {
-              if (!result.ok) {
-                console.warn('[auth] Supabase sign-in failed (non-fatal):', result.error);
-              } else {
-                console.info('[auth] Supabase session established for', result.displayName ?? sid);
-              }
-            });
           }}
           onTeacherLogin={() => {
             setRole('TEACHER');
