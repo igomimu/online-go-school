@@ -151,7 +151,6 @@ export default function TeacherToolbar({
         <IgcButton label="【音声M】クリア" color="#d8d0c0" onClick={onClearAudioM} />
         <IgcButton label="【音声S】クリア" color="#d8d0c0" onClick={onClearAudioS} />
         <IgcButton label="【共有】クリア" color="#d8d0c0" onClick={onClearSharing} />
-        <IgcButton label="座席チェック" color="#ffa500" />
       </div>
 
       {/* 下段: アクションボタン群 */}
@@ -202,7 +201,6 @@ export default function TeacherToolbar({
           disabled={isReconnecting}
         />
         <IgcButton label="ビデオリセット" color="#d0a0d0" onClick={onResetVideo} />
-        <IgcButton label="設定" color="#d0d0c8" />
 
         {/* 日時表示 */}
         <div style={{

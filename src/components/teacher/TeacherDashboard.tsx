@@ -269,28 +269,6 @@ export default function TeacherDashboard({
             )}
           </div>
 
-          {/* 自分の映像を表示チェック + ボタン */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '4px 6px',
-            borderBottom: '1px solid #999',
-          }}>
-            <label style={{ fontSize: 11, flex: 1, color: '#333' }}>
-              <input type="checkbox" defaultChecked className="mr-1" />
-              自分の映像を表示
-            </label>
-            <button style={{
-              padding: '2px 8px', fontSize: 11, border: '1px solid #999',
-              background: '#e0f0e0', cursor: 'pointer',
-            }}>教室カメラ</button>
-            <button style={{
-              padding: '2px 8px', fontSize: 11, border: '1px solid #999',
-              background: '#e8e8e0', cursor: 'pointer',
-            }}>時間精算</button>
-          </div>
-
           {/* チャット */}
           <div style={{ flex: 1, minHeight: 0 }}>
             <ChatPanel
