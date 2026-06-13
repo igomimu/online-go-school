@@ -12,7 +12,14 @@
 - **E2E 11/11 緑**（実先生PW・実生徒UUID・本番Edge Functions・RLS有効・publishableキー経由＝虚偽の緑要素なし）。unit 321/321、tsc クリーン。
 - no-op UI 削除: 「座席チェック」「設定」(TeacherToolbar)、「自分の映像を表示」「教室カメラ」「時間精算」(TeacherDashboard)。IGC模倣の機能なしUI。
 - インフラ変更: 匿名サインイン rate limit 30→300/時（E2E連投対策、Management API、旧値30）。
-- 残課題: 既存lint負債53件（react-hooks系は挙動変更リスクあり保留）/ Vercel再公開（三村さんのGo待ち）/ 生徒1人との試験レッスン（A/Vは人間確認）。
+- 残課題: 既存lint負債53件（react-hooks系は挙動変更リスクあり保留）/ 生徒1人との試験レッスン（A/Vは人間確認）。
+
+## ✅ Vercel再公開完了 (2026-06-13)
+`online.mimura15.jp` を Tunnel(LEGION dev server) → **Vercel production** へ切替。
+- Vercel project `prj_y5WHUn1KXyNoj7IDf8gsQRVgAZXT`、env 7本設定（client=publishable / server=新sb_secret）。LiveKitはCloud（公開到達可）。
+- 検証グリーン: 公開バンドルに service_role/sb_secret 無し（publishableのみ）、`/api/token` 無認証403・生徒JWT 200・別教室room 403（認可境界OK）、ログイン→token発行フルチェーンOK、HTTP200/server:Vercel/TLS発行済。
+- ⚠️ Cloudflare zone_id がドリフト（旧`95954a...`はSTALE、現`d60e8e4e03c31b8f9ae993978c155d6b`）。TF apply不能のため CF API 直で record `c9cc6fa0...` を PUT 切替。詳細・ロールバック手順は auto-memory `projects/online-go-school.md`。
+- KataGo(`localhost:2718`)はAI分析専用で公開未対応＝分析機能のみ非動作（対局は影響なし）。
 
 ## 現状（スナップショット）
 
