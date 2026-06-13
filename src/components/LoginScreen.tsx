@@ -3,10 +3,7 @@ import { ChevronDown, Trash2, Plus, Lock, ArrowLeft, RefreshCw } from 'lucide-re
 import {
   loadAccounts,
   deleteAccount,
-  hasTeacherPassword,
   setTeacherPassword,
-  verifyTeacherPassword,
-  resetTeacherPassword,
   supabaseSignInStudent,
   supabaseSignInTeacher,
   supabaseSignOut,
@@ -36,14 +33,11 @@ export default function LoginScreen({
 
   // 先生
   const [teacherPw, setTeacherPw] = useState('');
-  const [teacherPwConfirm, setTeacherPwConfirm] = useState('');
-  const [isNewTeacher, setIsNewTeacher] = useState(false);
   const [teacherError, setTeacherError] = useState('');
 
   useEffect(() => {
     const saved = loadAccounts();
     setAccounts(saved);
-    setIsNewTeacher(!hasTeacherPassword());
 
     // 自動ログインは廃止（2026-04-22）: 生徒が「どの教室に入ったか」
     // 判別できない問題があったため、必ずログイン画面で確認させる。
@@ -112,43 +106,24 @@ export default function LoginScreen({
 
   const handleTeacherSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     setTeacherError('');
 
-    if (isNewTeacher) {
-      if (teacherPw.length < 4) {
-        setTeacherError('4文字以上で設定してください');
-        return;
-      }
-      if (teacherPw !== teacherPwConfirm) {
-        setTeacherError('パスワードが一致しません');
-        return;
-      }
-      await setTeacherPassword(teacherPw);
-
-      // サーバー側（validate_teacher_session）の認証が通らない限り入室させない。
-      // localStorage のパスワードはオフラインUX用のキャッシュにすぎず、権威はサーバー。
-      const res = await supabaseSignInTeacher(teacherPw);
-      if (!res.ok) {
-        setTeacherError(res.error || 'サーバー認証に失敗しました');
-        return;
-      }
-
-      onTeacherLogin();
-    } else {
-      const ok = await verifyTeacherPassword(teacherPw);
-      if (!ok) {
-        setTeacherError('パスワードが違います');
-        return;
-      }
-
-      const res = await supabaseSignInTeacher(teacherPw);
-      if (!res.ok) {
-        setTeacherError(res.error || 'サーバー認証に失敗しました');
-        return;
-      }
-
-      onTeacherLogin();
+    // サーバー（validate_teacher_session の TEACHER_PASSWORD_HASH）が唯一の権威。
+    // localStorage はキャッシュにすぎず、照合ゲートには使わない。
+    // （旧実装はローカル照合が先に走り、サーバー側のPW変更後に正しいPWでも
+    //   「パスワードが違います」で弾かれてログイン不能になった）
+    setSubmitting(true);
+    const res = await supabaseSignInTeacher(teacherPw);
+    setSubmitting(false);
+    if (!res.ok) {
+      setTeacherError(res.error || 'サーバー認証に失敗しました');
+      return;
     }
+
+    // 認証成功 → ローカルキャッシュをサーバーと同期
+    await setTeacherPassword(teacherPw);
+    onTeacherLogin();
   };
 
   if (mode === 'teacher') {
@@ -163,23 +138,19 @@ export default function LoginScreen({
         <div className="glass-panel p-8 w-full max-w-sm space-y-6">
           <div className="flex items-center gap-2">
             <Lock className="w-5 h-5 text-blue-400" />
-            <h2 className="text-xl font-bold">
-              {isNewTeacher ? '先生パスワード設定' : '先生ログイン'}
-            </h2>
+            <h2 className="text-xl font-bold">先生ログイン</h2>
           </div>
 
           <form onSubmit={handleTeacherSubmit} className="space-y-4" autoComplete="on">
             {/* ブラウザのパスワード保存を有効にするための隠しユーザー名 */}
             <input type="hidden" name="username" autoComplete="username" value="teacher" />
             <div>
-              <label className="block text-sm text-zinc-400 mb-1">
-                {isNewTeacher ? '新しいパスワード' : 'パスワード'}
-              </label>
+              <label className="block text-sm text-zinc-400 mb-1">パスワード</label>
               <input
                 data-testid="teacher-password-input"
                 type="password"
                 name="password"
-                autoComplete={isNewTeacher ? 'new-password' : 'current-password'}
+                autoComplete="current-password"
                 value={teacherPw}
                 onChange={e => setTeacherPw(e.target.value)}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
@@ -187,42 +158,10 @@ export default function LoginScreen({
               />
             </div>
 
-            {isNewTeacher && (
-              <div>
-                <label className="block text-sm text-zinc-400 mb-1">確認</label>
-                <input
-                  type="password"
-                  value={teacherPwConfirm}
-                  onChange={e => setTeacherPwConfirm(e.target.value)}
-                  className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            )}
+            {teacherError && <p className="text-red-400 text-sm">{teacherError}</p>}
 
-            {teacherError && (
-              <div className="space-y-1">
-                <p className="text-red-400 text-sm">{teacherError}</p>
-                {!isNewTeacher && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm('パスワードをリセットしますか？')) {
-                        resetTeacherPassword();
-                        setIsNewTeacher(true);
-                        setTeacherPw('');
-                        setTeacherError('');
-                      }
-                    }}
-                    className="text-blue-400 hover:text-blue-300 text-sm underline mt-2"
-                  >
-                    パスワードをリセット
-                  </button>
-                )}
-              </div>
-            )}
-
-            <button data-testid="teacher-login-button" type="submit" className="premium-button w-full">
-              {isNewTeacher ? '設定して開始' : 'ログイン'}
+            <button data-testid="teacher-login-button" type="submit" disabled={submitting} className="premium-button w-full disabled:opacity-60">
+              {submitting ? '確認中...' : 'ログイン'}
             </button>
           </form>
 
