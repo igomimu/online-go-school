@@ -34,10 +34,9 @@ describe('useGameManager', () => {
   describe('createGame', () => {
     it('対局を作成し一覧に追加される', () => {
       const { result } = renderHook(() => useGameManager(classroom.ref));
-      let game: ReturnType<typeof result.current.createGame>;
 
       act(() => {
-        game = result.current.createGame(baseOpts);
+        result.current.createGame(baseOpts);
       });
 
       expect(result.current.games).toHaveLength(1);

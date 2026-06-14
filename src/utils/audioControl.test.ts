@@ -357,7 +357,7 @@ describe('音声制御フロー', () => {
       expect(remotes.get('teacher')!.audioTrackPublications.get('audio-1')!.track!.mediaStreamTrack.enabled).toBe(false);
 
       // ON
-      perms = toggleHear('たろう', perms, sendTo);
+      toggleHear('たろう', perms, sendTo);
       handleAudioControl(
         sendTo.mock.calls[1][0].payload as { canHear: boolean },
         remotes,

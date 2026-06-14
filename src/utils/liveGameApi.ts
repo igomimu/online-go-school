@@ -123,8 +123,8 @@ async function getRoleAuthToken(sb: SupabaseClient): Promise<string | null> {
 async function executeGameAction(
   action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset',
   gameId?: string,
-  params?: any
-): Promise<any> {
+  params?: Record<string, unknown>
+): Promise<Record<string, unknown>> {
   console.log("[executeGameAction] action:", action, "params:", params);
   const sb = getSupabase();
   const url = `${functionsBaseUrl()}/manage_game_action`;

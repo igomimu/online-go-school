@@ -181,7 +181,7 @@ export default function ReviewBoard({
     if (toolMode === 'play') {
       if (boardState[y - 1]?.[x - 1]) return;
 
-      let newBoard = boardState.map(row => row.map(cell => cell ? { ...cell } : null));
+      const newBoard = boardState.map(row => row.map(cell => cell ? { ...cell } : null));
       const derivedNextColor: StoneColor = currentNode.move
         ? (currentNode.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
         : 'BLACK';

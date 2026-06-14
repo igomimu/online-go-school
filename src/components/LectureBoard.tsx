@@ -211,7 +211,7 @@ export default function LectureBoard({
     if (toolMode === 'play') {
       if (boardState[y - 1]?.[x - 1]) return;
 
-      let newBoard = boardState.map(row => row.map(cell => cell ? { ...cell } : null));
+      const newBoard = boardState.map(row => row.map(cell => cell ? { ...cell } : null));
       newBoard[y - 1][x - 1] = { color: derivedNextColor, number: currentNode.nextNumber };
 
       const { board: capturedBoard } = checkCapture(newBoard, x, y, derivedNextColor, boardSize);

@@ -7,7 +7,7 @@ import { execSync } from 'child_process'
 let commitHash = 'unknown'
 try {
   commitHash = execSync('git rev-parse --short HEAD').toString().trim()
-} catch (e) {
+} catch {
   commitHash = 'no-git'
 }
 

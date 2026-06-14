@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 import { TEST_STUDENT_A, TEST_STUDENT_B, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
 import { setupTeacherPassword, setupClassroomData, clearAllData } from './helpers/setup';
 import { loginAsTeacher, openClassroomAndConnect, waitForStudentJoined, createGame } from './helpers/teacher-actions';
@@ -38,7 +38,7 @@ test('本番URLでの対局作成時のコンソールエラーとAPIエラー�
       let bodyText = '';
       try {
         bodyText = await response.text();
-      } catch (e) {}
+      } catch {}
       logs.push(`[TEACHER_RESPONSE_ERR] ${response.request().method()} ${response.url()} -> Status ${status}: ${bodyText.substring(0, 500)}`);
     }
   });

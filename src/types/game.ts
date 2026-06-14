@@ -133,9 +133,8 @@ export interface ScoringUpdatePayload {
   status: 'scoring';
 }
 
-export interface ReviewEndPayload {
-  // empty
-}
+// 検討終了の合図。ペイロードは不要（空オブジェクト）。
+export type ReviewEndPayload = Record<string, never>;
 
 export interface AudioControlPayload {
   canHear: boolean;

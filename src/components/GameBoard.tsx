@@ -173,7 +173,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack }: Gam
               try {
                 const supabase = getSupabase();
                 await supabase.auth.signOut();
-              } catch (err) {}
+              } catch { /* ベストエフォート: 失敗は無視 */ }
 
               // 2. Service Worker 強制アンインストール
               if ('serviceWorker' in navigator) {
@@ -182,7 +182,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack }: Gam
                   for (const reg of regs) {
                     await reg.unregister();
                   }
-                } catch (err) {}
+                } catch { /* ベストエフォート: 失敗は無視 */ }
               }
 
               // 3. Cache Storage 強制クリア
@@ -192,7 +192,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack }: Gam
                   for (const key of keys) {
                     await caches.delete(key);
                   }
-                } catch (err) {}
+                } catch { /* ベストエフォート: 失敗は無視 */ }
               }
 
               // 4. 強制リロード (サーバーから最新アセットを再取得)

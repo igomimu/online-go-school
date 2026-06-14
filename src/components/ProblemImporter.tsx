@@ -19,7 +19,7 @@ export default function ProblemImporter({ onImport }: ProblemImporterProps) {
 
       // Determine the initial board state from setup stones
       const boardSize = parsed.size || 19;
-      let initialBoard = parsed.board || createEmptyBoard(boardSize);
+      const initialBoard = parsed.board || createEmptyBoard(boardSize);
 
       // Determine correct color: first move's color in the tree
       let correctColor: StoneColor = 'BLACK';

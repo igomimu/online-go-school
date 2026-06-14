@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ConnectionState } from 'livekit-client';
 
 // livekit-clientをモック
 vi.mock('livekit-client', () => {

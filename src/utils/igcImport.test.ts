@@ -16,7 +16,7 @@ const sampleXml = `<?xml version="1.0" encoding="utf-8"?>
     </User>
     <User>
       <strID>SM002</strID>
-      <strFullName>鈴木　花子</strFullName>
+      <strFullName>鈴木\u3000花子</strFullName>
       <strSex>F</strSex>
       <strRank>1K</strRank>
       <strUserDefRank>R15</strUserDefRank>
@@ -69,7 +69,7 @@ describe('parseIgcXml', () => {
 
   it('全角スペースを正規化する', () => {
     const result = parseIgcXml(sampleXml);
-    // "鈴木　花子" → "鈴木 花子"
+    // 全角スペース(U+3000)を半角に正規化: "鈴木"+U+3000+"花子" → "鈴木 花子"
     expect(result.students[1].name).toBe('鈴木 花子');
   });
 

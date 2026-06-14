@@ -101,7 +101,7 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
   }) => {
     const { blackPlayer, whitePlayer, boardSize, handicap, komi, clock } = opts;
 
-    let initialBoard = createEmptyBoard(boardSize);
+    const initialBoard = createEmptyBoard(boardSize);
 
     // 置石配置
     if (handicap >= 2) {

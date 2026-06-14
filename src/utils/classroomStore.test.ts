@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  loadStudents, saveStudents, addStudent, updateStudent, deleteStudent, getStudent,
-  loadClassrooms, saveClassrooms, addClassroom, updateClassroom, deleteClassroom, getClassroom,
+  loadStudents, addStudent, updateStudent, deleteStudent, getStudent,
+  loadClassrooms, addClassroom, updateClassroom, deleteClassroom, getClassroom,
   importAll,
 } from './classroomStore';
 import type { Student, Classroom } from '../types/classroom';
