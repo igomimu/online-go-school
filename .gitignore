@@ -38,3 +38,6 @@ test-results/
 public/version.json
 *.png
 .env.production
+
+# Vercel (machine-local project link; deploy uses VERCEL_ORG_ID/PROJECT_ID env)
+.vercel
