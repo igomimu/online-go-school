@@ -6,6 +6,8 @@ import {
   openClassroomAndConnect,
   waitForStudentJoined,
   createGame,
+  getOpenStudentButton,
+  waitForObserverPanel,
 } from './helpers/teacher-actions';
 import {
   loginAsStudent,
@@ -87,6 +89,12 @@ test.describe('先生1+生徒2 対局フルシナリオ', () => {
       expectedPlayersCount: 3, // 先生 + 生徒2
     });
 
+    // === 先生が観戦パネル（GameBoard）に入る ===
+    const openBtn = getOpenStudentButton(teacherPage, TEST_STUDENT_A.id);
+    await expect(openBtn).toBeEnabled({ timeout: 10_000 });
+    await openBtn.click();
+    await waitForObserverPanel(teacherPage);
+
     // === 両生徒が対局画面に遷移 ===
     await Promise.all([
       enterAssignedGame(studentAPage),
@@ -124,5 +132,17 @@ test.describe('先生1+生徒2 対局フルシナリオ', () => {
     // 整地モード突入: move-count表示が「整地中」に切り替わる
     await expect(studentAPage.getByTestId('move-count')).toContainText('整地中', { timeout: 10_000 });
     await expect(studentBPage.getByTestId('move-count')).toContainText('整地中', { timeout: 10_000 });
+
+    // === 先生: 死石を指定 (5,5) ===
+    // 先生が (5,5) の白石セルをクリックして死石としてマークする
+    await teacherPage.locator('[data-cell="5-5"]').click();
+
+    // 先生: 確定ボタンをクリックして終局させる
+    await teacherPage.getByRole('button', { name: '確定' }).click();
+
+    // === 終局結果の確認 ===
+    // 生徒双方の画面で結果が表示されることを確認（先生はダッシュボードに戻るためアサート対象外）
+    await expect(studentAPage.locator('text=結果:')).toBeVisible({ timeout: 15_000 });
+    await expect(studentBPage.locator('text=結果:')).toBeVisible({ timeout: 15_000 });
   });
 });
