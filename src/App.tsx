@@ -993,9 +993,9 @@ function App() {
         )}
 
         {/* 対局画面 */}
-        {effectiveViewMode === 'game' && activeGame && (
+        {effectiveViewMode === 'game' && activeGameId && (
           <GameBoard
-            gameId={activeGame.id}
+            gameId={activeGameId}
             myIdentity={classroomRef.current?.localIdentity ?? userName}
             isTeacher={role === 'TEACHER'}
             onBack={handleBackToLobby}

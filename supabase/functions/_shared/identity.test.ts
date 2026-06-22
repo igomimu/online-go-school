@@ -1,5 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { stripSid, toStudentIdentity, studentMatchesPlayer, STUDENT_PREFIX } from './identity';
+import { describe, it } from "https://deno.land/std@0.224.0/testing/bdd.ts";
+import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { stripSid, toStudentIdentity, studentMatchesPlayer, STUDENT_PREFIX } from './identity.ts';
+
+const expect = (actual: any) => ({
+  toBe: (expected: any) => assertEquals(actual, expected),
+});
 
 const UUID = 'd3c90fa1-b1a2-4c3d-8e4f-5a6b7c8d9e0f';
 const SID = `${STUDENT_PREFIX}${UUID}`;

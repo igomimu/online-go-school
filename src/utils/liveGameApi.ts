@@ -223,7 +223,10 @@ export async function submitMove(
     body: JSON.stringify({ game_id: gameId, caller_identity: callerIdentity, x, y, color }),
   });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) return { ok: false, error: body.error || `HTTP ${res.status}` };
+  if (!res.ok) {
+    console.error("[liveGameApi SUBMIT ERROR BODY]", JSON.stringify(body));
+    return { ok: false, error: body.error || `HTTP ${res.status}` };
+  }
   return { ok: true, move_number: body.move_number };
 }
 
