@@ -72,8 +72,8 @@ test.describe('先生1+生徒2 対局フルシナリオ', () => {
 
     // === 生徒2人が並行ログイン ===
     await Promise.all([
-      loginAsStudent(studentAPage, { studentId: TEST_STUDENT_A.id, classroomId }),
-      loginAsStudent(studentBPage, { studentId: TEST_STUDENT_B.id, classroomId }),
+      loginAsStudent(studentAPage, { studentCode: TEST_STUDENT_A.code, classroomId }),
+      loginAsStudent(studentBPage, { studentCode: TEST_STUDENT_B.code, classroomId }),
     ]);
 
     // === 先生側で両生徒のLiveKit接続を確認 ===

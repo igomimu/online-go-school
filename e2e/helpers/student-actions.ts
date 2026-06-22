@@ -8,9 +8,9 @@ import { expect, type Page } from '@playwright/test';
  */
 export async function loginAsStudent(
   page: Page,
-  opts: { studentId: string; classroomId: string },
+  opts: { studentCode: string; classroomId: string },
 ): Promise<void> {
-  await page.getByTestId('student-id-input').fill(opts.studentId);
+  await page.getByTestId('student-id-input').fill(opts.studentCode);
   await page.getByTestId('classroom-id-input').fill(opts.classroomId);
   await page.getByTestId('student-login-button').click();
 
@@ -31,7 +31,7 @@ export async function loginAsStudent(
 
   if (result === 'error') {
     const body = await page.evaluate(() => document.body.innerText.substring(0, 500));
-    throw new Error(`生徒ログイン失敗: ${opts.studentId}\n${body}`);
+    throw new Error(`生徒ログイン失敗: ${opts.studentCode}\n${body}`);
   }
 }
 

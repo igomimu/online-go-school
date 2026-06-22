@@ -54,7 +54,7 @@ test.describe('マルチユーザー対局フロー', () => {
 
     // 生徒ログイン
     await loginAsStudent(studentPage, {
-      studentId: TEST_STUDENT_A.id,
+      studentCode: TEST_STUDENT_A.code,
       classroomId,
     });
 

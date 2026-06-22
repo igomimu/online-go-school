@@ -126,7 +126,7 @@ export async function supabaseSignInStudent(
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ studentId, classroomId }),
+      body: JSON.stringify({ studentCode: studentId, classroomId }),
     });
     
     if (!res.ok) {

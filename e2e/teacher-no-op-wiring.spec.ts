@@ -60,7 +60,7 @@ test.describe('TeacherToolbar / StudentTable 配線検証', () => {
     await openClassroomAndConnect(teacherPage);
 
     await loginAsStudent(studentPage, {
-      studentId: TEST_STUDENT_A.id,
+      studentCode: TEST_STUDENT_A.code,
       classroomId,
     });
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
@@ -92,7 +92,7 @@ test.describe('TeacherToolbar / StudentTable 配線検証', () => {
 
     // 生徒も接続させて、reconnect 前後でルームが活きていることを確かめやすくする
     await loginAsStudent(studentPage, {
-      studentId: TEST_STUDENT_A.id,
+      studentCode: TEST_STUDENT_A.code,
       classroomId,
     });
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);

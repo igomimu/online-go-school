@@ -9,8 +9,8 @@ test.describe('セキュリティ・認可バリデーション検証 (Stage 9)'
   // テスト用クライアント (anon)
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
   
-  const uuidA = 'd3c90fa1-b1a2-4c3d-8e4f-5a6b7c8d9e0f';
-  const uuidB = 'e4d01fa2-b2a3-4c4d-9e5f-6a7b8c9d0e1f';
+  const studentA = { uuid: 'd3c90fa1-b1a2-4c3d-8e4f-5a6b7c8d9e0f', code: '1010', email: 'e2e-student-a@test.com' };
+  const studentB = { uuid: 'e4d01fa2-b2a3-4c4d-9e5f-6a7b8c9d0e1f', code: '1011', email: 'e2e-student-b@test.com' };
 
   const classroomA = 'test-class-A-' + Date.now();
   const classroomB = 'test-class-B-' + Date.now();
@@ -20,20 +20,19 @@ test.describe('セキュリティ・認可バリデーション検証 (Stage 9)'
 
   test.beforeAll(async () => {
     // メールログインにてJWTを取得（429レートリミット回避）
-    jwtA = await getStudentJwt(uuidA, classroomA);
-    jwtB = await getStudentJwt(uuidB, classroomB);
+    jwtA = await getStudentJwt(studentA, classroomA);
+    jwtB = await getStudentJwt(studentB, classroomB);
   });
 
   // メールログインして検証済みセッション（JWT）を取得するヘルパー
-  async function getStudentJwt(studentId: string, classroomId: string): Promise<string> {
-    const email = studentId === uuidA ? 'e2e-student-a@test.com' : 'e2e-student-b@test.com';
+  async function getStudentJwt(student: typeof studentA, classroomId: string): Promise<string> {
     const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
-      email,
+      email: student.email,
       password: 'password123',
     });
 
     if (authErr || !authData.session) {
-      throw new Error(`signInWithPassword 失敗 (${email}): ${authErr?.message}`);
+      throw new Error(`signInWithPassword 失敗 (${student.email}): ${authErr?.message}`);
     }
     const jwt = authData.session.access_token;
 
@@ -43,7 +42,7 @@ test.describe('セキュリティ・認可バリデーション検証 (Stage 9)'
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${jwt}`,
       },
-      body: JSON.stringify({ studentId, classroomId }),
+      body: JSON.stringify({ studentCode: student.code, classroomId }),
     });
 
     if (!res.ok) {
@@ -78,7 +77,7 @@ test.describe('セキュリティ・認可バリデーション検証 (Stage 9)'
         action: 'create',
         params: {
           classroom_id: classroomB,
-          black_player: uuidB,
+          black_player: studentB.uuid,
           white_player: 'teacher-id',
           board_size: 9,
         }
@@ -113,7 +112,7 @@ test.describe('セキュリティ・認可バリデーション検証 (Stage 9)'
         action: 'create',
         params: {
           classroom_id: classroomA,
-          black_player: uuidA,
+          black_player: studentA.uuid,
           white_player: 'teacher-id',
           board_size: 9,
         }

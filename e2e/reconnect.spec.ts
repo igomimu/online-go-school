@@ -50,7 +50,7 @@ test.describe('生徒再接続シナリオ', () => {
 
       // === 生徒A ログイン ===
       await loginAsStudent(studentPage, {
-        studentId: TEST_STUDENT_A.id,
+        studentCode: TEST_STUDENT_A.code,
         classroomId,
       });
 
@@ -89,7 +89,7 @@ test.describe('生徒再接続シナリオ', () => {
       await studentPage.reload();
 
       await loginAsStudent(studentPage, {
-        studentId: TEST_STUDENT_A.id,
+        studentCode: TEST_STUDENT_A.code,
         classroomId,
       });
 

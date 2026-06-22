@@ -29,7 +29,7 @@ const corsHeaders = {
 }
 
 interface ValidateRequest {
-  studentId: string
+  studentCode: string
   classroomId: string
 }
 
@@ -63,13 +63,13 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: 'Invalid JSON' }, 400)
   }
-  if (!body.studentId || !body.classroomId) {
-    return json({ error: 'studentId and classroomId are required' }, 400)
+  if (!body.studentCode || !body.classroomId) {
+    return json({ error: 'studentCode and classroomId are required' }, 400)
   }
 
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  if (!uuidRegex.test(body.studentId)) {
-    return json({ error: 'Invalid studentId format (must be UUID)' }, 400)
+  const codeRegex = /^\d{4}$/
+  if (!codeRegex.test(body.studentCode)) {
+    return json({ error: 'Invalid studentCode format (must be 4 digits)' }, 400)
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -87,12 +87,12 @@ Deno.serve(async (req) => {
   }
   const user = userResult.user
 
-  // dojo-app students 照合
+  // dojo-app students 照合（student_code で検索）
   const admin = createClient(supabaseUrl, serviceRoleKey)
   const { data: student, error: lookupErr } = await admin
     .from('students')
     .select('id, name, student_type, status')
-    .eq('id', body.studentId)
+    .eq('student_code', body.studentCode)
     .eq('student_type', 'net')
     .eq('status', 'active')
     .maybeSingle()
