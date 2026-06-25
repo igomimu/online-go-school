@@ -136,13 +136,8 @@ export default function TeacherDashboard({
     ? students.filter(s => selectedClassroom.studentIds.includes(s.id))
     : students;
 
-  const filteredParticipants = selectedClassroom
-    ? participants.filter(p => {
-        const student = findStudentByIdentity(p.identity, students);
-        // マッチングできた生徒は所属をチェック。できなかった場合はオンラインであることを示すため残す
-        return student ? selectedClassroom.studentIds.includes(student.id) : true;
-      })
-    : participants;
+  // 接続してきた参加者は常に表示する（studentIds形式の不一致で誤除外しない）
+  const filteredParticipants = participants;
 
   const filteredGames = selectedClassroom
     ? games.filter(g => {
