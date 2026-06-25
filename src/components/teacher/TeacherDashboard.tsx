@@ -3,6 +3,8 @@ import type { GameSession, AudioPermissions } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
+import { parseIdentity } from '../../utils/identityUtils';
+import { getSupabase } from '../../utils/liveGameApi';
 import { parseSGFTree } from '../../utils/sgfUtils';
 import { createEmptyBoard } from '../../utils/gameLogic';
 import type { Problem } from '../../types/problem';
@@ -85,6 +87,26 @@ export default function TeacherDashboard({
   const [showAutoPairing, setShowAutoPairing] = useState(false);
   const [observingGameId, setObservingGameId] = useState<string | null>(null);
 
+  // 接続中参加者のUUIDをSupabaseで解決してstudentsを補完する
+  const [resolvedStudents, setResolvedStudents] = useState<Student[]>([]);
+  useEffect(() => {
+    const uuids = participants
+      .map(p => parseIdentity(p.identity))
+      .filter((parsed): parsed is { type: 'student'; studentId: string } => parsed.type === 'student')
+      .map(parsed => parsed.studentId)
+      .filter(uuid => !students.find(s => s.id === uuid) && !resolvedStudents.find(s => s.id === uuid));
+    if (uuids.length === 0) return;
+    getSupabase().from('students').select('id,name,rank,grade,address,student_type').in('id', uuids).then(({ data }) => {
+      if (data && data.length > 0) {
+        setResolvedStudents(prev => [
+          ...prev.filter(s => !data.find(d => d.id === s.id)),
+          ...data.map(s => ({ id: s.id, name: s.name, rank: s.rank || '', type: s.student_type || '', grade: s.grade || '', country: s.address || '' })),
+        ]);
+      }
+    });
+  }, [participants, students, resolvedStudents]);
+  const allStudents = [...students, ...resolvedStudents.filter(r => !students.find(s => s.id === r.id))];
+
   // 詰碁SGF読み込み
   const handleLoadProblem = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -132,8 +154,8 @@ export default function TeacherDashboard({
     : null;
 
   const filteredStudents = selectedClassroom
-    ? students.filter(s => selectedClassroom.studentIds.includes(s.id))
-    : students;
+    ? allStudents.filter(s => selectedClassroom.studentIds.includes(s.id) || participants.some(p => p.identity.includes(s.id)))
+    : allStudents;
 
   // 接続してきた参加者は常に表示する（studentIds形式の不一致で誤除外しない）
   const filteredParticipants = participants;
