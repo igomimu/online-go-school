@@ -67,9 +67,8 @@ Deno.serve(async (req) => {
     return json({ error: 'studentCode and classroomId are required' }, 400)
   }
 
-  const codeRegex = /^\d{4}$/
-  if (!codeRegex.test(body.studentCode)) {
-    return json({ error: 'Invalid studentCode format (must be 4 digits)' }, 400)
+  if (body.studentCode.length > 50) {
+    return json({ error: 'Invalid studentCode format' }, 400)
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')

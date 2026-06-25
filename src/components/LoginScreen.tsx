@@ -251,11 +251,10 @@ export default function LoginScreen({
             <label className="block text-sm text-zinc-400 mb-1">生徒コード</label>
             <input
               data-testid="student-id-input"
-              type="tel"
-              inputMode="numeric"
+              type="text"
               value={studentId}
               onChange={e => { setStudentId(e.target.value); setError(''); }}
-              placeholder="4桁の数字"
+              placeholder="先生から受け取ったコード"
               className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
               autoFocus={accounts.length === 0}
             />
