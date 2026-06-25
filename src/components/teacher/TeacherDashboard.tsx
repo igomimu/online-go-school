@@ -3,7 +3,6 @@ import type { GameSession, AudioPermissions } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
-import { findStudentByIdentity } from '../../utils/identityUtils';
 import { parseSGFTree } from '../../utils/sgfUtils';
 import { createEmptyBoard } from '../../utils/gameLogic';
 import type { Problem } from '../../types/problem';
