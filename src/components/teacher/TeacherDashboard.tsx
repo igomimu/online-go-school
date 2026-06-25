@@ -100,7 +100,7 @@ export default function TeacherDashboard({
       if (data && data.length > 0) {
         setResolvedStudents(prev => [
           ...prev.filter(s => !data.find(d => d.id === s.id)),
-          ...data.map(s => ({ id: s.id, name: s.name, rank: s.rank || '', type: s.student_type || '', grade: s.grade || '', country: s.address || '' })),
+          ...data.map(s => ({ id: s.id, name: s.name, rank: s.rank || '', internalRating: '', type: s.student_type || '', grade: s.grade || '', country: s.address || '' })),
         ]);
       }
     });
