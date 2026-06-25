@@ -12,8 +12,7 @@ import { makeStudentIdentity } from './utils/identityUtils';
 import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession } from './utils/liveGameApi';
-import { loadStudents, loadClassrooms, saveStudents } from './utils/classroomStore';
-import { fetchDojoNetStudents } from './utils/dojoSync';
+import { loadStudents, loadClassrooms } from './utils/classroomStore';
 import { saveAccount, supabaseSignOut, loadAccounts } from './utils/authStore';
 
 import Header from './components/Header';
@@ -110,16 +109,6 @@ function App() {
     setClassrooms(loadClassrooms());
   }, []);
 
-  // 先生ログイン時に道場アプリから生徒データを自動同期（UUID形式で上書き）
-  useEffect(() => {
-    if (role !== 'TEACHER') return;
-    fetchDojoNetStudents().then(result => {
-      if (result.students.length > 0) {
-        saveStudents(result.students);
-        setStudents(result.students);
-      }
-    });
-  }, [role]);
 
   const classroomRef = useRef<ClassroomLiveKit | null>(null);
 
