@@ -145,9 +145,9 @@ export default function StudentTable({
                 <td className="px-1 py-0.5 border border-gray-400 text-center">
                 </td>
 
-                {/* 生徒ID */}
+                {/* 生徒ID（4桁コード優先） */}
                 <td className="px-1 py-0.5 border border-gray-400 text-left" style={{ color: row.isConnected ? '#0000cc' : '#666' }}>
-                  {row.student?.id || ''}
+                  {row.student?.studentCode || row.student?.id || ''}
                 </td>
 
                 {/* 姓名 */}

@@ -96,11 +96,11 @@ export default function TeacherDashboard({
       .map(parsed => parsed.studentId)
       .filter(uuid => !students.find(s => s.id === uuid) && !resolvedStudents.find(s => s.id === uuid));
     if (uuids.length === 0) return;
-    getSupabase().from('students').select('id,name,rank,grade,address,student_type').in('id', uuids).then(({ data }) => {
+    getSupabase().from('students').select('id,name,rank,grade,address,student_type,student_code').in('id', uuids).then(({ data }) => {
       if (data && data.length > 0) {
         setResolvedStudents(prev => [
           ...prev.filter(s => !data.find(d => d.id === s.id)),
-          ...data.map(s => ({ id: s.id, name: s.name, rank: s.rank || '', internalRating: '', type: s.student_type || '', grade: s.grade || '', country: s.address || '' })),
+          ...data.map(s => ({ id: s.id, name: s.name, rank: s.rank || '', internalRating: '', type: s.student_type || '', grade: s.grade || '', country: s.address || '', studentCode: s.student_code || '' })),
         ]);
       }
     });

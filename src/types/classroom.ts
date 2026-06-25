@@ -8,6 +8,7 @@ export interface Student {
   grade: string;          // "小4", "中2", "大人" 等（手入力・fallback）
   country: string;        // 所在地
   birthdate?: string;     // 'YYYY-MM-DD'。登録されていれば学年は自動計算される
+  studentCode?: string;   // 4桁ログインコード（表示用）
 }
 
 // === 教室 ===
