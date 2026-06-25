@@ -95,6 +95,7 @@ export default function TeacherToolbar({
       <div style={{
         display: 'flex',
         alignItems: 'center',
+        flexWrap: 'wrap',
         gap: 4,
         padding: '3px 6px',
         background: '#4040a0',
@@ -157,6 +158,7 @@ export default function TeacherToolbar({
       <div style={{
         display: 'flex',
         alignItems: 'center',
+        flexWrap: 'wrap',
         gap: 4,
         padding: '3px 6px',
         background: '#c0c0b8',
