@@ -101,7 +101,9 @@ export default function LoginScreen({
       setError(res.error || 'ログインに失敗しました');
       return;
     }
-    onStudentLogin(sid, cid);
+    // App.tsx の makeStudentIdentity に渡す ID は UUID でなければならない
+    // （api/token.ts が meta.student_id = UUID と比較するため）
+    onStudentLogin(res.studentId ?? sid, cid);
   };
 
   const handleTeacherSubmit = async (e: React.FormEvent) => {

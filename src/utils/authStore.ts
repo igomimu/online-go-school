@@ -100,6 +100,7 @@ export interface SupabaseSessionResult {
   ok: boolean;
   error?: string;
   displayName?: string;
+  studentId?: string; // UUID（validate_student_session が返す student.id）
 }
 
 export async function supabaseSignInStudent(
@@ -153,6 +154,7 @@ export async function supabaseSignInStudent(
     return {
       ok: true,
       displayName: result.display_name || studentId,
+      studentId: result.student_id,
     };
   } catch (err) {
     console.error('[Supabase Auth] Unexpected error in student sign-in:', err);
