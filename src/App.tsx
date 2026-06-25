@@ -869,11 +869,6 @@ function App() {
     return viewMode;
   })();
 
-  // アクティブなゲーム
-  const activeGame: GameSession | undefined = activeGameId
-    ? games.find(g => g.id === activeGameId)
-    : undefined;
-
   return (
     <div className="flex flex-col gap-4 w-full h-screen overflow-hidden">
       {/* ヘッダー */}
