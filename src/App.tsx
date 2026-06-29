@@ -146,8 +146,8 @@ function App() {
   const currentStudentName = useMemo(() => {
     if (role !== 'STUDENT' || !studentId) return undefined;
     const acct = loadAccounts().find(a => a.studentId === studentId);
-    return acct?.studentName || studentId;
-  }, [role, studentId]);
+    return userName || acct?.studentName || studentId;
+  }, [role, studentId, userName]);
 
   // 音声デバッグ更新
   const updateAudioDebug = useCallback(() => {
@@ -338,7 +338,10 @@ function App() {
         roomName: effectiveRoomName,
         identity: connectUserName,
         token: urlToken,
-        username: connectUserName === 'teacher' ? '先生' : connectUserName,
+        username:
+          connectRole === 'STUDENT'
+            ? (userName || connectUserName)
+            : (connectUserName === 'teacher' ? '先生' : connectUserName),
       });
 
       await classroom.connect(livekitUrl, connectToken);
@@ -351,7 +354,7 @@ function App() {
     } catch (err) {
       setConnectionError(err instanceof Error ? err.message : '接続に失敗しました');
     }
-  }, [roomName, livekitUrl, studentId, studentClassroomId, selectedClassroomId]);
+  }, [roomName, livekitUrl, studentId, studentClassroomId, selectedClassroomId, userName]);
 
   // URL params for student auto-join
   useEffect(() => {
