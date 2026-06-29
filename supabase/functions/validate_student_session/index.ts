@@ -86,15 +86,24 @@ Deno.serve(async (req) => {
   }
   const user = userResult.user
 
-  // dojo-app students 照合（student_code で検索）
+  // dojo-app students 照合（入力がUUID形式なら id 列、そうでなければ student_code 列で検索）
   const admin = createClient(supabaseUrl, serviceRoleKey)
-  const { data: student, error: lookupErr } = await admin
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  const isUuid = uuidRegex.test(body.studentCode)
+
+  let query = admin
     .from('students')
     .select('id, name, student_type, status')
-    .eq('student_code', body.studentCode)
     .eq('student_type', 'net')
     .eq('status', 'active')
-    .maybeSingle()
+
+  if (isUuid) {
+    query = query.eq('id', body.studentCode)
+  } else {
+    query = query.eq('student_code', body.studentCode)
+  }
+
+  const { data: student, error: lookupErr } = await query.maybeSingle()
 
   if (lookupErr) {
     return json({ error: 'Student lookup failed', detail: lookupErr.message }, 500)
