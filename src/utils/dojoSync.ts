@@ -32,6 +32,7 @@ interface DojoStudent {
   address: string | null;
   kakuzuke: string | null;
   birthdate: string | null;
+  student_code: string | null;
 }
 
 export async function fetchDojoNetStudents(): Promise<{ students: Student[]; error?: string }> {
@@ -59,7 +60,7 @@ export async function fetchDojoNetStudents(): Promise<{ students: Student[]; err
       if (!DOJO_KEY) {
         return { students: [], error: '道場アプリの接続キーが設定されていません (.env)' };
       }
-      const url = `${DOJO_URL}/rest/v1/students?student_type=eq.net&status=eq.active&select=id,name,rank,student_type,grade,address,kakuzuke,birthdate&order=name`;
+      const url = `${DOJO_URL}/rest/v1/students?student_type=eq.net&status=eq.active&select=id,name,rank,student_type,grade,address,kakuzuke,birthdate,student_code&order=name`;
       res = await fetch(url, {
         headers: {
           'apikey': DOJO_KEY,
@@ -84,6 +85,7 @@ export async function fetchDojoNetStudents(): Promise<{ students: Student[]; err
       grade: d.grade || '',
       country: d.address || '',
       birthdate: d.birthdate || undefined,
+      studentCode: d.student_code || '',
     }));
 
     return { students };

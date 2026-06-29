@@ -425,7 +425,7 @@ export default function ClassroomManager({
                   <tr>
                     <th style={{ ...headerCellStyle, width: 26, textAlign: 'center' }}>×</th>
                     <th style={{ ...headerCellStyle, width: 36, textAlign: 'center' }}>編集</th>
-                    <th style={{ ...headerCellStyle, textAlign: 'left' }}>生徒ID</th>
+                    <th style={{ ...headerCellStyle, textAlign: 'left' }}>ログインコード</th>
                     <th style={{ ...headerCellStyle, textAlign: 'left' }}>姓名</th>
                     <th style={{ ...headerCellStyle, width: 40, textAlign: 'center' }}>棋力</th>
                     <th style={{ ...headerCellStyle, width: 40, textAlign: 'center' }}>R</th>
@@ -448,7 +448,7 @@ export default function ClassroomManager({
                       <td style={{ ...cellStyle, textAlign: 'center' }}>
                         <RowButton label="編集" onClick={() => startEditStudent(s)} />
                       </td>
-                      <td style={{ ...cellStyle, fontSize: 10 }}>{s.id}</td>
+                      <td style={{ ...cellStyle, fontFamily: 'monospace', fontWeight: 'bold' }}>{s.studentCode || s.id}</td>
                       <td style={{
                         ...cellStyle,
                         fontWeight: 'bold',

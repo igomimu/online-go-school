@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
   const admin = createClient(supabaseUrl, serviceRoleKey)
   const { data: students, error: lookupErr } = await admin
     .from('students')
-    .select('id, name, rank, student_type, grade, address, kakuzuke, birthdate')
+    .select('id, name, rank, student_type, grade, address, kakuzuke, birthdate, student_code')
     .eq('student_type', 'net')
     .eq('status', 'active')
     .order('name')
