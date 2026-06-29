@@ -912,7 +912,9 @@ function App() {
       {/* オーディオデバッグ */}
       {audioDebug && (
         <div className="bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 px-4 py-2 rounded-xl text-sm flex items-center gap-3">
-          <span className="flex-1 text-xs">{audioDebug}</span>
+          <span className="flex-1 text-xs">
+            {import.meta.env.DEV ? audioDebug : '音声が聞こえない場合は「音声を開始」を押してください'}
+          </span>
           <button
             onClick={async () => {
               try {
