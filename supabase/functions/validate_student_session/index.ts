@@ -91,19 +91,17 @@ Deno.serve(async (req) => {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   const isUuid = uuidRegex.test(body.studentCode)
 
-  let query = admin
+  const baseQuery = admin
     .from('students')
     .select('id, name, student_type, status')
     .eq('student_type', 'net')
     .eq('status', 'active')
 
-  if (isUuid) {
-    query = query.eq('id', body.studentCode)
-  } else {
-    query = query.eq('student_code', body.studentCode)
-  }
-
-  const { data: student, error: lookupErr } = await query.maybeSingle()
+  const { data: student, error: lookupErr } = await (
+    isUuid
+      ? baseQuery.eq('id', body.studentCode)
+      : baseQuery.eq('student_code', body.studentCode)
+  ).maybeSingle()
 
   if (lookupErr) {
     return json({ error: 'Student lookup failed', detail: lookupErr.message }, 500)
