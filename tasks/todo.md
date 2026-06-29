@@ -352,3 +352,14 @@ Stage 4 で先生（三村さん自身）の認証を localStorage SHA-256 → S
 - [x] `App.tsx` の `onConnectionStateChanged` 内の `saveAccount` で、UUIDではなく生の入力コードを localStorage に保存するよう修正
 - [x] テストを実行し、ログインおよび prefill の動作を確認する
 
+## 参加者欄が「不明(UUID)」と表示される不具合の解決（2026-06-30）
+
+**課題**: 生徒側ブラウザには先生のような「生徒名簿（students）」が無い、あるいは同期されていないため、LiveKit Roomの接続リストで他生徒のUUIDを実名に逆引きできず「不明(d3c90fa1)」と表示されてしまう。
+
+**作業内容**:
+- [x] `validate_student_session` Edge Function で JWT の `user_metadata` に `display_name` も保存し、デプロイ
+- [x] `api/token.ts` で `username` を受け取れるようにし、LiveKit トークン発行時の `name` オプションに実名を設定する
+- [x] フロントの `App.tsx` において、ログイン成功時に実名を `userName` state に格納し、`fetchToken` で `/api/token` に送信する
+- [x] `classroomLiveKit.ts` の `ParticipantInfo` に `name` プロパティを追加し、LiveKit 接続参加者の name を含める
+- [x] 生徒ロビー (`Lobby.tsx`) および先生の生徒テーブル (`StudentTable.tsx`) の表示名解決で、`p.name`（LiveKit の実名）を最優先で表示するよう変更する
+
