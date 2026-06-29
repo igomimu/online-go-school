@@ -347,8 +347,8 @@ Stage 4 で先生（三村さん自身）の認証を localStorage SHA-256 → S
 **課題**: 生徒がログインした際、内部状態（LiveKit等）にはUUIDを使用するが、接続成功時にlocalStorageにUUIDが保存されてしまうため、次回ログイン時に「生徒コード」入力欄にUUIDが自動入力されてユーザーが混乱し、それを消すことでエラーになる問題が発生。
 
 **作業内容**:
-- [ ] `LoginScreen.tsx` の `onStudentLogin` コールバックに第3引数として「入力された生のコード（生徒コード）」を渡すよう拡張
-- [ ] `App.tsx` に `rawStudentCode` 状態を追加し、ログイン完了時に生の入力コードを保持
-- [ ] `App.tsx` の `onConnectionStateChanged` 内の `saveAccount` で、UUIDではなく生の入力コードを localStorage に保存するよう修正
-- [ ] テストを実行し、ログインおよび prefill の動作を確認する
+- [x] `LoginScreen.tsx` の `onStudentLogin` コールバックに第3引数として「入力された生のコード（生徒コード）」を渡すよう拡張
+- [x] `App.tsx` に `rawStudentCode` 状態を追加し、ログイン完了時に生の入力コードを保持
+- [x] `App.tsx` の `onConnectionStateChanged` 内の `saveAccount` で、UUIDではなく生の入力コードを localStorage に保存するよう修正
+- [x] テストを実行し、ログインおよび prefill の動作を確認する
 
