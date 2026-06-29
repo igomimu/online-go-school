@@ -249,13 +249,13 @@ export default function LoginScreen({
         {/* ID入力フォーム */}
         <form onSubmit={handleStudentSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">生徒コード</label>
+            <label className="block text-sm text-zinc-400 mb-1">生徒コード または 生徒ID</label>
             <input
               data-testid="student-id-input"
               type="text"
               value={studentId}
               onChange={e => { setStudentId(e.target.value); setError(''); }}
-              placeholder="先生から受け取ったコード"
+              placeholder="4桁の数字 または 生徒ID"
               className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
               autoFocus={accounts.length === 0}
             />
