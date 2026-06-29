@@ -5,6 +5,11 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
     nvm use 22
 fi
 
+if [ -f "$HOME/.secrets/online-go-school-teacher.env" ]; then
+    echo "[e2e] Sourcing teacher secrets..."
+    export $(cat "$HOME/.secrets/online-go-school-teacher.env" | grep -v '^#' | xargs)
+fi
+
 echo "[e2e] Cleaning up old processes..."
 pkill -f "vite"
 pkill -f "dev-api-server"
@@ -26,18 +31,18 @@ if [ $# -eq 0 ]; then
   echo "[e2e] Running core E2E tests (excluding security)..."
   # e2e/security.spec.ts 以外のすべての spec.ts ファイルを実行
   CORE_TESTS=$(ls e2e/*.spec.ts | grep -v security.spec.ts)
-  CI=true npx playwright test $CORE_TESTS
+  BASE_URL=http://localhost:3000 CI=true npx playwright test --workers=1 $CORE_TESTS
   TEST_RESULT=$?
   
   if [ $TEST_RESULT -eq 0 ]; then
     echo "[e2e] Sleeping 120 seconds to restore Supabase Auth rate limits..."
     sleep 120
     echo "[e2e] Running security E2E tests..."
-    CI=true npx playwright test e2e/security.spec.ts
+    BASE_URL=http://localhost:3000 CI=true npx playwright test --workers=1 e2e/security.spec.ts
     TEST_RESULT=$?
   fi
 else
-  CI=true npm run test:e2e "$@"
+  BASE_URL=http://localhost:3000 CI=true npm run test:e2e -- --workers=1 "$@"
   TEST_RESULT=$?
 fi
 
