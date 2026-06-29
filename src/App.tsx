@@ -96,6 +96,8 @@ function App() {
 
   // 生徒ID認証
   const [studentId, setStudentId] = useState<string | null>(null);
+  // ログイン時に入力された生の生徒コード（UUIDではなく4桁などのコードをlocalStorageに保存するため）
+  const [rawStudentCode, setRawStudentCode] = useState<string>('');
   // 教室ID（ログイン画面 or URLパラメータから）
   const [studentClassroomId, setStudentClassroomId] = useState<string | null>(null);
   // URLから事前設定された教室ID
@@ -306,7 +308,7 @@ function App() {
         setConnectionState(state);
         // 生徒接続成功時にアカウントを保存
         if (state === ConnectionState.Connected && connectRole === 'STUDENT' && studentId && studentClassroomId) {
-          saveAccount(studentId, studentClassroomId);
+          saveAccount(rawStudentCode || studentId, studentClassroomId);
         }
       },
       onActiveSpeakersChanged: (speakers: string[]) => {
@@ -733,9 +735,10 @@ function App() {
       <>
         <LoginScreen
           prefilledClassroomId={prefilledClassroomId}
-          onStudentLogin={(sid, cid) => {
+          onStudentLogin={(sid, cid, rawCode) => {
             // Supabase Session は LoginScreen 側で確立済み（失敗時はここに来ない）
             setStudentId(sid);
+            setRawStudentCode(rawCode || sid);
             setStudentClassroomId(cid);
             setRoomName(`go-${cid}`);
             setUserName(sid); // 先生側で名前解決されるまでIDを表示名に

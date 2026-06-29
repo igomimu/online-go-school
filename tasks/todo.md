@@ -341,3 +341,14 @@ Stage 4 で先生（三村さん自身）の認証を localStorage SHA-256 → S
 - [ ] Windows版の操作録画・スクショ・XML/SGFサンプルを `reference/windows/` に投入（動画本体はOneDrive参照、XML/SGFは未投入）
 - [ ] 対局機能の残り（パス、投了、整地、棋譜保存）を1つずつE2E化
 - [ ] `回線復旧` と `ビデオリセット` から実装に着手
+
+## ログインプリフィル時のUUID混乱防止と生コード保存の改善（2026-06-30）
+
+**課題**: 生徒がログインした際、内部状態（LiveKit等）にはUUIDを使用するが、接続成功時にlocalStorageにUUIDが保存されてしまうため、次回ログイン時に「生徒コード」入力欄にUUIDが自動入力されてユーザーが混乱し、それを消すことでエラーになる問題が発生。
+
+**作業内容**:
+- [ ] `LoginScreen.tsx` の `onStudentLogin` コールバックに第3引数として「入力された生のコード（生徒コード）」を渡すよう拡張
+- [ ] `App.tsx` に `rawStudentCode` 状態を追加し、ログイン完了時に生の入力コードを保持
+- [ ] `App.tsx` の `onConnectionStateChanged` 内の `saveAccount` で、UUIDではなく生の入力コードを localStorage に保存するよう修正
+- [ ] テストを実行し、ログインおよび prefill の動作を確認する
+
