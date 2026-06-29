@@ -116,6 +116,7 @@ Deno.serve(async (req) => {
       student_id: student.id,
       classroom_id: body.classroomId,
       app_role: 'student',
+      display_name: student.name,
     },
   })
   if (updateErr) {

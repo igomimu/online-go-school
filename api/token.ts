@@ -23,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Server configuration error' });
   }
 
-  const { token: rawToken, identity, roomName } = req.body || {};
+  const { token: rawToken, identity, roomName, username } = req.body || {};
 
   if (!identity || !roomName) {
     return res.status(400).json({ error: 'identity and roomName are required' });
@@ -103,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // LiveKit JWT 発行
-  const token = new AccessToken(apiKey, apiSecret, { identity });
+  const token = new AccessToken(apiKey, apiSecret, { identity, name: username });
   token.addGrant({
     room: roomName,
     roomJoin: true,

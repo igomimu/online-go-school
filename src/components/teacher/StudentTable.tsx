@@ -214,7 +214,7 @@ function buildRows(
     );
     rows.push({
       identity: p.identity,
-      displayName: getDisplayName(p.identity, students),
+      displayName: p.name || getDisplayName(p.identity, students),
       isConnected: true,
       student,
       gameStatus: game?.status || null,

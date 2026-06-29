@@ -4,6 +4,7 @@ export interface TokenOptions {
   roomName: string;
   identity: string;
   token?: string; // dojo-app から渡される一時参加トークン
+  username?: string; // 表示用の実名
 }
 
 export async function fetchToken(opts: TokenOptions): Promise<string> {
@@ -26,6 +27,7 @@ export async function fetchToken(opts: TokenOptions): Promise<string> {
       identity: opts.identity, 
       roomName: opts.roomName,
       token: opts.token,
+      username: opts.username,
     }),
   });
 

@@ -11,7 +11,7 @@ import {
 import type { SavedAccount } from '../utils/authStore';
 
 interface LoginScreenProps {
-  onStudentLogin: (studentId: string, classroomId: string, rawCode?: string) => void;
+  onStudentLogin: (studentId: string, classroomId: string, rawCode?: string, displayName?: string) => void;
   onTeacherLogin: () => void;
   /** URL等で事前に設定された教室ID */
   prefilledClassroomId?: string;
@@ -104,7 +104,7 @@ export default function LoginScreen({
     // App.tsx の makeStudentIdentity に渡す ID は UUID でなければならない
     // （api/token.ts が meta.student_id = UUID と比較するため）
     // また、接続成功時に localStorage に保存するため生の入力値 (sid) も第3引数で渡す
-    onStudentLogin(res.studentId ?? sid, cid, sid);
+    onStudentLogin(res.studentId ?? sid, cid, sid, res.displayName);
   };
 
   const handleTeacherSubmit = async (e: React.FormEvent) => {

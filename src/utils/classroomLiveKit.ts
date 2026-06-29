@@ -55,6 +55,7 @@ export interface ParticipantInfo {
   isSpeaking: boolean;
   audioEnabled: boolean;
   videoEnabled: boolean;
+  name?: string;
 }
 
 export type ClassroomEventHandler = {
@@ -254,6 +255,7 @@ export class ClassroomLiveKit {
         isSpeaking: local.isSpeaking,
         audioEnabled: local.isMicrophoneEnabled,
         videoEnabled: local.isCameraEnabled,
+        name: local.name,
       });
     }
 
@@ -263,6 +265,7 @@ export class ClassroomLiveKit {
         isSpeaking: p.isSpeaking,
         audioEnabled: p.isMicrophoneEnabled,
         videoEnabled: p.isCameraEnabled,
+        name: p.name,
       });
     });
 

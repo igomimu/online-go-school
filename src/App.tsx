@@ -338,6 +338,7 @@ function App() {
         roomName: effectiveRoomName,
         identity: connectUserName,
         token: urlToken,
+        username: connectUserName === 'teacher' ? '先生' : connectUserName,
       });
 
       await classroom.connect(livekitUrl, connectToken);
@@ -735,13 +736,13 @@ function App() {
       <>
         <LoginScreen
           prefilledClassroomId={prefilledClassroomId}
-          onStudentLogin={(sid, cid, rawCode) => {
+          onStudentLogin={(sid, cid, rawCode, displayName) => {
             // Supabase Session は LoginScreen 側で確立済み（失敗時はここに来ない）
             setStudentId(sid);
             setRawStudentCode(rawCode || sid);
             setStudentClassroomId(cid);
             setRoomName(`go-${cid}`);
-            setUserName(sid); // 先生側で名前解決されるまでIDを表示名に
+            setUserName(displayName || sid); // 実名を表示名に
             setRole('STUDENT');
           }}
           onTeacherLogin={() => {

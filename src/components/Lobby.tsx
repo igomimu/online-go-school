@@ -269,7 +269,7 @@ export default function Lobby({
               );
               // 登録生徒の棋力をID/名前マッチで検索
               const registered = findStudentByIdentity(p.identity, students);
-              const name = getDisplayName(p.identity, students);
+              const name = p.name || getDisplayName(p.identity, students);
               return (
                 <div
                   key={p.identity}
