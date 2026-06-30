@@ -363,3 +363,11 @@ Stage 4 で先生（三村さん自身）の認証を localStorage SHA-256 → S
 - [x] `classroomLiveKit.ts` の `ParticipantInfo` に `name` プロパティを追加し、LiveKit 接続参加者の name を含める
 - [x] 生徒ロビー (`Lobby.tsx`) および先生の生徒テーブル (`StudentTable.tsx`) の表示名解決で、`p.name`（LiveKit の実名）を最優先で表示するよう変更する
 
+## Deploy Edge Functions CI 失敗対応（2026-06-30）
+
+**課題**: GitHub Actions の `Deploy Edge Functions / deploy` が `Setup Supabase CLI` で失敗。ログ上の直接原因は `version: latest` 解決時の GitHub API rate limit。
+
+**作業内容**:
+- [x] 失敗 run `28425540101` の job log を確認
+- [x] `supabase/setup-cli@v1` の `version: latest` を固定バージョン `2.108.0` に変更
+- [ ] CI workflow を再実行して deploy 成功を確認
