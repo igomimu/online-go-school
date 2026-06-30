@@ -181,7 +181,15 @@ export default function Lobby({
                 <GameThumbnail
                   key={game.id}
                   game={game}
-                  onClick={() => onSelectGame(game.id)}
+                  onClick={() => {
+                    if (role === 'STUDENT') {
+                      // 生徒は対局/観戦とも別窓で開く（教室内は窮屈なため）
+                      const url = `${window.location.origin}${window.location.pathname}?mode=game&gameId=${game.id}&identity=${encodeURIComponent(myIdentity)}&role=STUDENT`;
+                      window.open(url, '_blank', 'width=1000,height=800,menubar=no,toolbar=no,location=no,status=no');
+                    } else {
+                      onSelectGame(game.id);
+                    }
+                  }}
                   isActive={myGame?.id === game.id}
                 />
               ))}
