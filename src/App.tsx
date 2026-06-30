@@ -13,7 +13,7 @@ import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession, finishGame } from './utils/liveGameApi';
 import { loadStudents, loadClassrooms } from './utils/classroomStore';
-import { saveAccount, supabaseSignOut, loadAccounts } from './utils/authStore';
+import { saveAccount, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } from './utils/authStore';
 
 import Header from './components/Header';
 import LoginScreen from './components/LoginScreen';
@@ -360,12 +360,6 @@ function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
-    // 起動時に古い/壊れたセッションをクリア（ゾンビ対策）。
-    // ただし別窓対局(mode=game)は親ウィンドウのログインを引き継ぐため消さない。
-    if (params.get('mode') !== 'game') {
-      void supabaseSignOut();
-    }
-
     const urlClassroomId = params.get('classroomId');
     const urlLkUrl = params.get('url');
     const urlRoom = params.get('room');
@@ -386,6 +380,26 @@ function App() {
       }
       if (urlClassroomId) setStudentClassroomId(urlClassroomId);
       setRole('STUDENT');
+    } else if (params.get('mode') !== 'game') {
+      // 通常ロード: 既存セッションからログイン状態を復元（リロードで再ログイン不要に）。
+      // ゾンビ対策の起動時 signOut は廃止（永続化を妨げていたため）。app_role が無い
+      // セッションはロールを復元しない＝ログイン画面のままで無害。
+      void (async () => {
+        const claims = await getSupabaseSessionClaims();
+        if (claims?.app_role === 'teacher') {
+          setRole('TEACHER');
+          const lastCls = localStorage.getItem('go-school-last-classroom');
+          if (lastCls) {
+            const rn = `go-${lastCls}`;
+            setSelectedClassroomId(lastCls);
+            setRoomName(rn);
+            setTeacherPhase('classroom');
+            void connectLiveKit('TEACHER', userName.trim() || 'teacher', rn, lastCls);
+          } else {
+            setTeacherPhase('manage');
+          }
+        }
+      })();
     }
 
     if (urlClassroomId || urlLkUrl || urlToken) {
@@ -853,6 +867,8 @@ function App() {
               return;
             }
             setSelectedClassroomId(launchClassroomId);
+            // リロード復元用に最後に開いた教室を記憶
+            try { localStorage.setItem('go-school-last-classroom', launchClassroomId); } catch { /* noop */ }
             const newRoomName = `go-${launchClassroomId}`;
             setRoomName(newRoomName);
             setTeacherPhase('classroom');
@@ -861,7 +877,12 @@ function App() {
           onOpenSettings={() => setShowSettings(true)}
           onOpenStudentManager={() => setShowStudentManager(true)}
           onReloadData={reloadClassroomData}
-          onBack={() => setRole(null)}
+          onBack={() => {
+            // 明示ログアウト: セッションを切り、教室復元も解除
+            try { localStorage.removeItem('go-school-last-classroom'); } catch { /* noop */ }
+            void supabaseSignOut();
+            setRole(null);
+          }}
         />
       </>
     );
