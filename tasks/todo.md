@@ -370,4 +370,8 @@ Stage 4 で先生（三村さん自身）の認証を localStorage SHA-256 → S
 **作業内容**:
 - [x] 失敗 run `28425540101` の job log を確認
 - [x] `supabase/setup-cli@v1` の `version: latest` を固定バージョン `2.108.0` に変更
-- [ ] CI workflow を再実行して deploy 成功を確認
+- [x] CI workflow を再実行して deploy 成功を確認
+
+**検証結果**:
+- ローカル: `npx -y deno@2.x test --allow-read --allow-env supabase/functions/` 成功（3 tests / 9 steps）
+- GitHub Actions: run `28429220255` 成功（test 6s、deploy 36s）
