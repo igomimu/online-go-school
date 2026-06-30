@@ -16,7 +16,9 @@ export function parseIdentity(identity: string): { type: 'student'; studentId: s
 export function getDisplayName(identity: string, students: Student[]): string {
   const parsed = parseIdentity(identity);
   if (parsed.type === 'student') {
-    const student = students.find(s => s.id === parsed.studentId) || students.find(s => s.name === parsed.studentId);
+    const student = students.find(s => s.id === parsed.studentId)
+      || students.find(s => s.studentCode === parsed.studentId)
+      || students.find(s => s.name === parsed.studentId);
     return student?.name || `不明(${parsed.studentId.slice(0, 8)})`;
   }
   return parsed.name;
@@ -25,9 +27,10 @@ export function getDisplayName(identity: string, students: Student[]): string {
 export function findStudentByIdentity(identity: string, students: Student[]): Student | undefined {
   const parsed = parseIdentity(identity);
   if (parsed.type === 'student') {
-    const student = students.find(s => s.id === parsed.studentId);
+    const student = students.find(s => s.id === parsed.studentId)
+      || students.find(s => s.studentCode === parsed.studentId);
     if (student) return student;
-    
+
     // 生徒名でログインした場合のフォールバック
     return students.find(s => s.name === parsed.studentId);
   }

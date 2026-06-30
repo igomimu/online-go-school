@@ -74,7 +74,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     boardState,
     boardSize,
     viewRange,
-    showCoordinates = true,
+    showCoordinates = false,
     showNumbers = false,
     isMonochrome = false,
     onCellClick,

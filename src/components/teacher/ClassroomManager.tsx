@@ -105,7 +105,8 @@ export default function ClassroomManager({
     if (editingStudent) {
       updateStudent(form);
     } else {
-      addStudent(form);
+      // 識別子をログインコードに統一（名簿id = 接続identity = 対局の打ち手 を一致させる）
+      addStudent({ ...form, id: loginCode || form.id });
     }
     setIsAddingStudent(false);
     setEditingStudent(null);
