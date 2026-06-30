@@ -19,6 +19,7 @@ export default function ClassroomSettingsDialog({
   const [selectedEnrolled, setSelectedEnrolled] = useState<string | null>(null);
   const [selectedOther, setSelectedOther] = useState<string | null>(null);
   const [seatCount, setSeatCount] = useState(classroom.maxCapacity);
+  const [name, setName] = useState(classroom.name);
 
   const enrolled = enrolledIds
     .map(id => allStudents.find(s => s.id === id))
@@ -63,6 +64,7 @@ export default function ClassroomSettingsDialog({
   const handleSave = () => {
     updateClassroom({
       ...classroom,
+      name: name.trim() || classroom.name,
       studentIds: enrolledIds,
       maxCapacity: seatCount,
     });
@@ -120,15 +122,18 @@ export default function ClassroomSettingsDialog({
           {/* 教室名 + 設定 */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 10, alignItems: 'center' }}>
             <label style={{ fontWeight: 'bold' }}>教室名</label>
-            <div style={{
-              padding: '2px 8px',
-              background: '#fff',
-              border: '1px solid #999',
-              flex: 1,
-              fontSize: 12,
-            }}>
-              {classroom.name}
-            </div>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              style={{
+                padding: '2px 8px',
+                background: '#fff',
+                border: '1px solid #999',
+                flex: 1,
+                fontSize: 12,
+              }}
+            />
           </div>
 
           <div style={{ display: 'flex', gap: 16, marginBottom: 12, alignItems: 'center' }}>
