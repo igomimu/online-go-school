@@ -12,6 +12,7 @@ import {
 } from '../../utils/classroomStore';
 import { parseIgcXml } from '../../utils/igcImport';
 import { fetchDojoNetStudents } from '../../utils/dojoSync';
+import { upsertGoSchoolStudent, deleteGoSchoolStudent } from '../../utils/goSchoolStudents';
 import { resolveGrade } from '../../utils/gradeCalc';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
 
@@ -98,8 +99,9 @@ export default function ClassroomManager({
     setIsAddingStudent(true);
   };
 
-  const handleSaveStudent = () => {
+  const handleSaveStudent = async () => {
     if (!form.name.trim()) return;
+    const loginCode = (form.studentCode || form.id || '').trim();
     if (editingStudent) {
       updateStudent(form);
     } else {
@@ -108,12 +110,19 @@ export default function ClassroomManager({
     setIsAddingStudent(false);
     setEditingStudent(null);
     onReloadData();
+    // オンライン道場 専用名簿(サーバー)に保存 → このコードで生徒がログインできる
+    const res = await upsertGoSchoolStudent(loginCode, form.name);
+    setImportResult(res.ok
+      ? `「${form.name}」を登録しました（ログインコード: ${loginCode}）`
+      : `⚠ ログインコードのサーバー保存に失敗: ${res.error}`);
   };
 
-  const handleDeleteStudent = (id: string) => {
+  const handleDeleteStudent = async (id: string) => {
     if (!confirm('この生徒を削除しますか？')) return;
+    const target = students.find(x => x.id === id);
     deleteStudent(id);
     onReloadData();
+    await deleteGoSchoolStudent(target?.studentCode || id);
   };
 
   const handleAddClassroom = () => {
@@ -368,6 +377,10 @@ export default function ClassroomManager({
                     {editingStudent ? '生徒を編集' : '生徒を追加'}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                    <FormField label="ログインコード *" width={150}>
+                      <input type="text" value={form.studentCode || ''} onChange={e => setForm(f => ({ ...f, studentCode: e.target.value }))}
+                        placeholder="生徒に伝えるコード" style={inputStyle} />
+                    </FormField>
                     <FormField label="名前 *" width={160}>
                       <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                         style={inputStyle} />

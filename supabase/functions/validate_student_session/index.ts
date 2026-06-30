@@ -86,37 +86,56 @@ Deno.serve(async (req) => {
   }
   const user = userResult.user
 
-  // dojo-app students 照合（入力がUUID形式なら id 列、そうでなければ student_code 列で検索）
   const admin = createClient(supabaseUrl, serviceRoleKey)
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  const isUuid = uuidRegex.test(body.studentCode)
+  let resolvedId: string | null = null
+  let resolvedName: string | null = null
 
-  const baseQuery = admin
-    .from('students')
-    .select('id, name, student_type, status')
-    .eq('student_type', 'net')
-    .eq('status', 'active')
-
-  const { data: student, error: lookupErr } = await (
-    isUuid
-      ? baseQuery.eq('id', body.studentCode)
-      : baseQuery.eq('student_code', body.studentCode)
-  ).maybeSingle()
-
-  if (lookupErr) {
-    return json({ error: 'Student lookup failed', detail: lookupErr.message }, 500)
+  // ① オンライン道場 専用名簿(go_school_students)を最優先で照合（道場アプリとは独立）
+  const { data: gsStudent, error: gsErr } = await admin
+    .from('go_school_students')
+    .select('login_id, name')
+    .eq('login_id', body.studentCode)
+    .maybeSingle()
+  if (gsErr) {
+    return json({ error: 'Roster lookup failed', detail: gsErr.message }, 500)
   }
-  if (!student) {
+  if (gsStudent) {
+    resolvedId = gsStudent.login_id
+    resolvedName = gsStudent.name || gsStudent.login_id
+  } else {
+    // ② 移行期フォールバック: 道場DB(student_code / UUID)でも照合
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const isUuid = uuidRegex.test(body.studentCode)
+    const baseQuery = admin
+      .from('students')
+      .select('id, name, student_type, status')
+      .eq('student_type', 'net')
+      .eq('status', 'active')
+    const { data: student, error: lookupErr } = await (
+      isUuid
+        ? baseQuery.eq('id', body.studentCode)
+        : baseQuery.eq('student_code', body.studentCode)
+    ).maybeSingle()
+    if (lookupErr) {
+      return json({ error: 'Student lookup failed', detail: lookupErr.message }, 500)
+    }
+    if (student) {
+      resolvedId = student.id
+      resolvedName = student.name
+    }
+  }
+
+  if (!resolvedId) {
     return json({ error: 'Student not found or inactive' }, 403)
   }
 
   // user_metadata 上書き
   const { error: updateErr } = await admin.auth.admin.updateUserById(user.id, {
     user_metadata: {
-      student_id: student.id,
+      student_id: resolvedId,
       classroom_id: body.classroomId,
       app_role: 'student',
-      display_name: student.name,
+      display_name: resolvedName,
     },
   })
   if (updateErr) {
@@ -125,8 +144,8 @@ Deno.serve(async (req) => {
 
   return json({
     ok: true,
-    display_name: student.name,
-    student_id: student.id,
+    display_name: resolvedName,
+    student_id: resolvedId,
     classroom_id: body.classroomId,
   })
 })
