@@ -160,12 +160,9 @@ export default function TeacherDashboard({
   // 接続してきた参加者は常に表示する（studentIds形式の不一致で誤除外しない）
   const filteredParticipants = participants;
 
-  const filteredGames = selectedClassroom
-    ? games.filter(g => {
-        const identities = filteredParticipants.map(p => p.identity);
-        return identities.includes(g.blackPlayer) || identities.includes(g.whitePlayer);
-      })
-    : games;
+  // 接続状況で絞らない: 教室の進行中対局はすべて表示する
+  // （生徒が一時切断していても先生は対局を見失わない。gamesは既に教室単位で取得済み）
+  const filteredGames = games;
 
   // タイトルバーのクラス名
   const classroomName = selectedClassroom?.name || '三村囲碁オンライン';

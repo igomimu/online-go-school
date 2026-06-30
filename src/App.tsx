@@ -358,10 +358,13 @@ function App() {
 
   // URL params for student auto-join
   useEffect(() => {
-    // 起動時に既存の古い/壊れた認証セッションを強制クリア（ゾンビセッション対策）
-    void supabaseSignOut();
-
     const params = new URLSearchParams(window.location.search);
+
+    // 起動時に古い/壊れたセッションをクリア（ゾンビ対策）。
+    // ただし別窓対局(mode=game)は親ウィンドウのログインを引き継ぐため消さない。
+    if (params.get('mode') !== 'game') {
+      void supabaseSignOut();
+    }
 
     const urlClassroomId = params.get('classroomId');
     const urlLkUrl = params.get('url');

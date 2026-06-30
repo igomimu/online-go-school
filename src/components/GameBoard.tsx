@@ -148,7 +148,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack }: Gam
                 const url = `${window.location.origin}${window.location.pathname}?mode=game&gameId=${gameId}&identity=${encodeURIComponent(myIdentity)}&role=${role}`;
                 window.open(url, '_blank', 'width=1000,height=800,menubar=no,toolbar=no,location=no,status=no');
               }}
-              className="text-xs bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 border border-blue-500/30 rounded px-2 py-0.5 transition-colors duration-150"
+              className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold border border-blue-700 rounded px-3 py-1 transition-colors duration-150"
             >
               別ウィンドウ ↗
             </button>
