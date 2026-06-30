@@ -999,12 +999,24 @@ function App() {
 
         {/* 対局画面 */}
         {effectiveViewMode === 'game' && activeGameId && (
-          <GameBoard
-            gameId={activeGameId}
-            myIdentity={classroomRef.current?.localIdentity ?? userName}
-            isTeacher={role === 'TEACHER'}
-            onBack={handleBackToLobby}
-          />
+          role === 'STUDENT' ? (
+            // 生徒は全画面（教室レイアウトを覆う・同じタブなのでログイン保持）
+            <div className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto p-2 sm:p-4">
+              <GameBoard
+                gameId={activeGameId}
+                myIdentity={classroomRef.current?.localIdentity ?? userName}
+                isTeacher={false}
+                onBack={handleBackToLobby}
+              />
+            </div>
+          ) : (
+            <GameBoard
+              gameId={activeGameId}
+              myIdentity={classroomRef.current?.localIdentity ?? userName}
+              isTeacher={true}
+              onBack={handleBackToLobby}
+            />
+          )
         )}
 
         {/* 授業モード */}
