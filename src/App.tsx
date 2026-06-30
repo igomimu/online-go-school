@@ -11,7 +11,7 @@ import { fetchToken } from './utils/livekitToken';
 import { makeStudentIdentity } from './utils/identityUtils';
 import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
-import { liveRowToSession } from './utils/liveGameApi';
+import { liveRowToSession, finishGame } from './utils/liveGameApi';
 import { loadStudents, loadClassrooms } from './utils/classroomStore';
 import { saveAccount, supabaseSignOut, loadAccounts } from './utils/authStore';
 
@@ -478,7 +478,12 @@ function App() {
     }
   };
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
+    // ログアウト時、自分が打ち手の進行中対局を「中断」にする（playingで放置しない）
+    const myId = classroomRef.current?.localIdentity ?? userName;
+    const myActiveGame = games.find(
+      g => g.status === 'playing' && (g.blackPlayer === myId || g.whitePlayer === myId),
+    );
     classroomRef.current?.destroy();
     classroomRef.current = null;
     setConnectionState(ConnectionState.Disconnected);
@@ -491,6 +496,10 @@ function App() {
     if (role === 'TEACHER') {
       setTeacherPhase('manage');
     } else {
+      // 中断にしてからサインアウト（順序重要: signOut前に認証付きで実行）
+      if (myActiveGame) {
+        await finishGame(myActiveGame.id, '中断').catch(() => {});
+      }
       setRole(null);
       void supabaseSignOut();
     }
