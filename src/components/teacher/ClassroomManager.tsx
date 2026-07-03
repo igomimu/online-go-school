@@ -1,18 +1,16 @@
 import { useState, useRef } from 'react';
 import type { Student, Classroom } from '../../types/classroom';
 import {
-  addStudent,
-  updateStudent,
   deleteStudent,
-  addClassroom,
+  upsertStudent,
+  upsertStudents,
+  upsertClassroom,
   deleteClassroom,
   importAll,
-  loadStudents,
-  saveStudents,
+  migrateCachedRosterToSupabase,
 } from '../../utils/classroomStore';
 import { parseIgcXml } from '../../utils/igcImport';
 import { fetchDojoNetStudents } from '../../utils/dojoSync';
-import { upsertGoSchoolStudent, deleteGoSchoolStudent } from '../../utils/goSchoolStudents';
 import { resolveGrade } from '../../utils/gradeCalc';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
 
@@ -22,7 +20,7 @@ interface ClassroomManagerProps {
   onLaunchClassroom: (classroomId: string) => void;
   onOpenSettings: () => void;
   onOpenStudentManager: () => void;
-  onReloadData: () => void;
+  onReloadData: () => void | Promise<void>;
   onBack: () => void;
 }
 
@@ -63,7 +61,7 @@ export default function ClassroomManager({
       return;
     }
     // 既存の生徒とマージ（IDが同じなら上書き、なければ追加）
-    const existing = loadStudents();
+    const existing = students;
     const merged = [...existing];
     let addedCount = 0;
     let updatedCount = 0;
@@ -77,9 +75,13 @@ export default function ClassroomManager({
         addedCount++;
       }
     }
-    saveStudents(merged);
-    onReloadData();
-    setImportResult(`道場連携完了: ${result.students.length}名のネット生（追加${addedCount}名, 更新${updatedCount}名）`);
+    try {
+      await upsertStudents(merged);
+      await onReloadData();
+      setImportResult(`道場連携完了: ${result.students.length}名のネット生（追加${addedCount}名, 更新${updatedCount}名）`);
+    } catch (err) {
+      setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    }
     setSyncing(false);
   };
 
@@ -102,50 +104,56 @@ export default function ClassroomManager({
   const handleSaveStudent = async () => {
     if (!form.name.trim()) return;
     const loginCode = (form.studentCode || form.id || '').trim();
-    if (editingStudent) {
-      updateStudent(form);
-    } else {
+    try {
       // 識別子をログインコードに統一（名簿id = 接続identity = 対局の打ち手 を一致させる）
-      addStudent({ ...form, id: loginCode || form.id });
+      await upsertStudent({ ...form, id: loginCode || form.id, studentCode: loginCode || form.id }, editingStudent?.id);
+      setIsAddingStudent(false);
+      setEditingStudent(null);
+      await onReloadData();
+      setImportResult(`「${form.name}」を登録しました（ログインコード: ${loginCode || form.id}）`);
+    } catch (err) {
+      setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
     }
-    setIsAddingStudent(false);
-    setEditingStudent(null);
-    onReloadData();
-    // オンライン道場 専用名簿(サーバー)に保存 → このコードで生徒がログインできる
-    const res = await upsertGoSchoolStudent(loginCode, form.name);
-    setImportResult(res.ok
-      ? `「${form.name}」を登録しました（ログインコード: ${loginCode}）`
-      : `⚠ ログインコードのサーバー保存に失敗: ${res.error}`);
   };
 
   const handleDeleteStudent = async (id: string) => {
     if (!confirm('この生徒を削除しますか？')) return;
-    const target = students.find(x => x.id === id);
-    deleteStudent(id);
-    onReloadData();
-    await deleteGoSchoolStudent(target?.studentCode || id);
+    try {
+      await deleteStudent(id);
+      await onReloadData();
+    } catch (err) {
+      setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
-  const handleAddClassroom = () => {
+  const handleAddClassroom = async () => {
     const name = prompt('教室名を入力してください:');
     if (!name) return;
     const capStr = prompt('部屋席数 (デフォルト: 10):', '10');
     const cap = parseInt(capStr || '10') || 10;
-    addClassroom({ id: `CLS${Date.now()}`, name, maxCapacity: cap, studentIds: [] });
-    onReloadData();
+    try {
+      await upsertClassroom({ id: `CLS${Date.now()}`, name, maxCapacity: cap, studentIds: [] });
+      await onReloadData();
+    } catch (err) {
+      setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
-  const handleDeleteClassroom = (id: string) => {
+  const handleDeleteClassroom = async (id: string) => {
     if (!confirm('この教室を削除しますか？')) return;
-    deleteClassroom(id);
-    onReloadData();
+    try {
+      await deleteClassroom(id);
+      await onReloadData();
+    } catch (err) {
+      setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const text = ev.target?.result as string;
       if (!text) return;
       const result = parseIgcXml(text);
@@ -153,12 +161,30 @@ export default function ClassroomManager({
         setImportResult(`エラー: ${result.errors.join(', ')}`);
         return;
       }
-      importAll(result.students, result.classrooms);
-      onReloadData();
-      setImportResult(`${result.students.length}名の生徒、${result.classrooms.length}教室をインポートしました`);
+      try {
+        await importAll(result.students, result.classrooms);
+        await onReloadData();
+        setImportResult(`${result.students.length}名の生徒、${result.classrooms.length}教室をインポートしました`);
+      } catch (err) {
+        setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+      }
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  const handleMigrateLocalRoster = async () => {
+    setSyncing(true);
+    setImportResult(null);
+    try {
+      const roster = await migrateCachedRosterToSupabase();
+      await onReloadData();
+      setImportResult(`ローカル名簿をサーバーへ移行しました: ${roster.students.length}名 / ${roster.classrooms.length}教室`);
+    } catch (err) {
+      setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const cellStyle: React.CSSProperties = {
@@ -269,6 +295,11 @@ export default function ClassroomManager({
                 onClick={syncing ? undefined : handleDojoSync}
               />
               <IgcButton label="XMLインポート" color="#90d060" onClick={() => fileInputRef.current?.click()} />
+              <IgcButton
+                label={syncing ? '処理中...' : 'ローカル名簿をサーバー移行'}
+                color="#f0d060"
+                onClick={syncing ? undefined : handleMigrateLocalRoster}
+              />
               <IgcButton label="教室を追加" color="#60c0f0" onClick={handleAddClassroom} />
               <IgcButton label="生徒を追加" color="#f0c060" onClick={() => { setActiveTab('student'); startAddStudent(); }} />
             </div>
@@ -521,9 +552,9 @@ export default function ClassroomManager({
         <ClassroomSettingsDialog
           classroom={editingClassroom}
           allStudents={students}
-          onSave={() => {
+          onSave={async () => {
             setEditingClassroom(null);
-            onReloadData();
+            await onReloadData();
           }}
           onClose={() => setEditingClassroom(null)}
         />

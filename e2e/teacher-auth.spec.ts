@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { TEST_TEACHER_PASSWORD, TEST_CLASSROOM_NAME, generateClassroomId } from './helpers/test-data';
-import { clearAllData, setupTeacherPassword, setupClassroomData } from './helpers/setup';
+import { TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
+import { clearAllData, setupTeacherPassword, setupClassroomData, testClassroomName } from './helpers/setup';
 
 /**
  * 先生認証はサーバー（validate_teacher_session）が唯一の権威であることの回帰テスト。
@@ -13,6 +13,7 @@ import { clearAllData, setupTeacherPassword, setupClassroomData } from './helper
 test.describe('先生ログイン: サーバー権威', () => {
   test('ローカルに別の旧PWが保存されていても、サーバーの正しいPWでログインできる', async ({ page }) => {
     const classroomId = generateClassroomId('auth');
+    const classroomName = testClassroomName(classroomId);
     await page.goto('/');
     await clearAllData(page);
     // ユーザーのブラウザ状況を再現: ローカルにはサーバーと異なる旧PWが保存済み
@@ -25,7 +26,7 @@ test.describe('先生ログイン: サーバー権威', () => {
     await page.getByTestId('teacher-login-button').click();
 
     // ClassroomManager に到達できる（ローカル照合に弾かれない）
-    await expect(page.getByText(TEST_CLASSROOM_NAME)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(classroomName)).toBeVisible({ timeout: 15_000 });
   });
 
   test('サーバーと一致しないPWではローカル保存と一致してもログインできない', async ({ page }) => {

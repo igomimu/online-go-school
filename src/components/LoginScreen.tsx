@@ -334,10 +334,10 @@ export default function LoginScreen({
 
             // 1.5 既存データの重複生徒を自動排他クリーンアップ
             try {
-              const { loadClassrooms, saveClassrooms } = await import('../utils/classroomStore');
+              const { cleanupDuplicateStudentsInClassrooms, loadClassrooms } = await import('../utils/classroomStore');
               const clses = loadClassrooms();
               if (clses.length > 0) {
-                saveClassrooms(clses); // 保存時に自動で cleanup される
+                localStorage.setItem('go-school-classrooms', JSON.stringify(cleanupDuplicateStudentsInClassrooms(clses)));
               }
             } catch { /* best-effort */ }
 

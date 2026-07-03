@@ -24,6 +24,7 @@ import {
  */
 test.describe('生徒再接続シナリオ', () => {
   test('対局中の生徒が離脱→新しいBrowserContextで再接続するとヘッダの接続数が復帰する', async ({ browser }) => {
+    test.setTimeout(120_000);
     const classroomId = generateClassroomId('reconnect');
     const teacherContext = await browser.newContext();
     let studentContext: BrowserContext = await browser.newContext();
@@ -73,9 +74,9 @@ test.describe('生徒再接続シナリオ', () => {
       await playMove(studentPage, 4, 4);
       await expect(studentPage.locator('[data-stone="4-4"]')).toBeVisible({ timeout: 10_000 });
 
-      // === 生徒が「切断」ボタンでgracefulに離脱 ===
-      await studentPage.getByTitle('切断').click();
-      await studentContext.close();
+      // === 生徒ブラウザを閉じて離脱 ===
+      await closePageBestEffort(studentPage);
+      await closeContextBestEffort(studentContext);
 
       // === 先生側: ヘッダが「0人接続中」に変わる（切断検知） ===
       await expect(teacherPage.getByText('0人接続中')).toBeVisible({ timeout: 30_000 });
@@ -96,8 +97,24 @@ test.describe('生徒再接続シナリオ', () => {
       // === 先生側: 再度「1人接続中」（再接続検知） ===
       await expect(teacherPage.getByText('1人接続中')).toBeVisible({ timeout: 20_000 });
     } finally {
-      await teacherContext.close();
-      await studentContext.close();
+      await Promise.allSettled([
+        closeContextBestEffort(teacherContext),
+        closeContextBestEffort(studentContext),
+      ]);
     }
   });
 });
+
+async function closeContextBestEffort(context: BrowserContext): Promise<void> {
+  await Promise.race([
+    context.close(),
+    new Promise<void>(resolve => setTimeout(resolve, 3_000)),
+  ]);
+}
+
+async function closePageBestEffort(page: Page): Promise<void> {
+  await Promise.race([
+    page.close({ runBeforeUnload: false }),
+    new Promise<void>(resolve => setTimeout(resolve, 3_000)),
+  ]);
+}

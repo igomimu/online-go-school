@@ -8,6 +8,9 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
+  // E2E seeds the shared Supabase roster with fixed test student codes.
+  // Running files in parallel makes tests move the same students between classrooms.
+  workers: 1,
   retries: isProduction ? 0 : 1,
   reporter: 'html',
   use: {

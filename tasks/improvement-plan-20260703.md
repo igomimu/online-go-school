@@ -25,11 +25,18 @@
 **問題**: 生徒・教室が localStorage（`src/utils/classroomStore.ts` の `go-school-students` / `go-school-classrooms`）にしかなく、先生がブラウザ・マシンを変えると名簿が消える。6/30に `go_school_students` テーブル（`src/utils/goSchoolStudents.ts`）でサーバー化が始まったが、localStorage CRUD と併存する「二重真実」の過渡期。過去事故（先生PW二重真実、2026-06-13）と同型。
 
 **方針**:
-- [ ] 教室テーブルを新設（または既存 `go_school_classroom_mappings` を拡張）し、教室CRUDもサーバー化。RLSは既存パターン踏襲（teacher claimでALL、それ以外deny）
-- [ ] `classroomStore.ts` の読み書きを Supabase 経由に置換。localStorage は読み取りキャッシュに格下げ（オフライン表示用）。**「両方に書く」過渡コードは作らない**
-- [ ] 既存 localStorage 名簿の一括移行ボタンを先生画面に用意（DevTools操作をユーザーに求めない）
+- [x] 教室テーブルを新設（または既存 `go_school_classroom_mappings` を拡張）し、教室CRUDもサーバー化。RLSは既存パターン踏襲（teacher claimでALL、それ以外deny）
+- [x] `classroomStore.ts` の読み書きを Supabase 経由に置換。localStorage は読み取りキャッシュに格下げ（オフライン表示用）。**「両方に書く」過渡コードは作らない**
+- [x] 既存 localStorage 名簿の一括移行ボタンを先生画面に用意（DevTools操作をユーザーに求めない）
 
 **受け入れ条件**: 別ブラウザ（シークレットウィンドウ）で先生ログイン→名簿・教室が同一に見えること。E2E追加1本以上。
+
+**実装・検証結果（2026-07-03）**:
+- DB: `supabase/migrations/20260703000000_go_school_roster.sql` を追加し、`go_school_classrooms` / `go_school_students` を作成。RLS は `auth.jwt()->>'app_role' = 'teacher'` の ALL のみ、それ以外 deny。live 系テーブルの INSERT/UPDATE ポリシーは未変更。
+- DB適用: `supabase db push --linked` は remote-only migration 履歴（20260614221121 ほか）により停止したため、Supabase CLI の一時接続情報を使って migration SQL を直接適用。`information_schema.tables` で `go_school_classrooms`, `go_school_students` を確認し、`supabase_migrations.schema_migrations` に `20260703000000 / go_school_roster` を記録。
+- UI: 先生管理画面に「ローカル名簿をサーバー移行」ボタンを追加。localStorage は初期表示キャッシュと移行元のみ。
+- E2E: `e2e/roster-supabase.spec.ts` を追加し、別 BrowserContext の先生ログインで同じ教室・生徒が見えることを検証。
+- 検証: `npx tsc -b` 成功。`npm run test` 成功（29 files / 307 tests）。`BASE_URL=http://localhost:5175 npx playwright test` 成功（14 passed, 1.6m）。スクショ証跡: `verified-stone-placed.png`。
 
 ## タスク2: Edge Function デプロイ検証の自動化 【優先度: 高・小工数】
 

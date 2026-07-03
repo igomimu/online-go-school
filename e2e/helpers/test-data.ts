@@ -12,14 +12,14 @@ export function generateClassroomId(prefix: string = 'e2e'): string {
 // dojo-app students に student_type='net' / status='active' で実在する
 // 専用テスト生徒（validate_student_session の student_code チェックを通すため）。
 export const TEST_STUDENT_A = {
-  id: 'd3c90fa1-b1a2-4c3d-8e4f-5a6b7c8d9e0f',
+  id: '1010',
   code: '1010',
   name: 'テスト生徒A',
   rank: '3K',
 };
 
 export const TEST_STUDENT_B = {
-  id: 'e4d01fa2-b2a3-4c4d-9e5f-6a7b8c9d0e1f',
+  id: '1011',
   code: '1011',
   name: 'テスト生徒B',
   rank: '2K',

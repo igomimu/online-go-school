@@ -4,10 +4,9 @@ import type { Student, Classroom } from '../types/classroom';
 import { parseIgcXml } from '../utils/igcImport';
 import { resolveGrade } from '../utils/gradeCalc';
 import {
-  addStudent,
-  updateStudent,
   deleteStudent,
-  addClassroom,
+  upsertStudent,
+  upsertClassroom,
   deleteClassroom,
   importAll,
 } from '../utils/classroomStore';
@@ -15,7 +14,7 @@ import {
 interface StudentManagerProps {
   students: Student[];
   classrooms: Classroom[];
-  onDataChanged: () => void;
+  onDataChanged: () => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -61,47 +60,60 @@ export default function StudentManager({
     setIsAdding(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim()) return;
-    if (editingStudent) {
-      updateStudent(form);
-    } else {
-      addStudent(form);
+    try {
+      await upsertStudent(form, editingStudent?.id);
+      setIsAdding(false);
+      setEditingStudent(null);
+      await onDataChanged();
+      setImportResult(`${form.name}を保存しました`);
+    } catch (err) {
+      setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
     }
-    setIsAdding(false);
-    setEditingStudent(null);
-    onDataChanged();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('この生徒を削除しますか？')) return;
-    deleteStudent(id);
-    onDataChanged();
+    try {
+      await deleteStudent(id);
+      await onDataChanged();
+    } catch (err) {
+      setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
-  const handleDeleteClassroom = (id: string) => {
+  const handleDeleteClassroom = async (id: string) => {
     if (!confirm('この教室を削除しますか？')) return;
-    deleteClassroom(id);
-    onDataChanged();
+    try {
+      await deleteClassroom(id);
+      await onDataChanged();
+    } catch (err) {
+      setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
-  const handleAddClassroom = () => {
+  const handleAddClassroom = async () => {
     const name = prompt('教室名を入力');
     if (!name) return;
-    addClassroom({
-      id: `CLS${Date.now()}`,
-      name,
-      maxCapacity: 10,
-      studentIds: [],
-    });
-    onDataChanged();
+    try {
+      await upsertClassroom({
+        id: `CLS${Date.now()}`,
+        name,
+        maxCapacity: 10,
+        studentIds: [],
+      });
+      await onDataChanged();
+    } catch (err) {
+      setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       const text = ev.target?.result as string;
       if (!text) return;
       const result = parseIgcXml(text);
@@ -109,9 +121,13 @@ export default function StudentManager({
         setImportResult(`エラー: ${result.errors.join(', ')}`);
         return;
       }
-      importAll(result.students, result.classrooms);
-      onDataChanged();
-      setImportResult(`${result.students.length}名の生徒、${result.classrooms.length}教室をインポートしました`);
+      try {
+        await importAll(result.students, result.classrooms);
+        await onDataChanged();
+        setImportResult(`${result.students.length}名の生徒、${result.classrooms.length}教室をインポートしました`);
+      } catch (err) {
+        setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+      }
     };
     reader.readAsText(file);
     e.target.value = '';

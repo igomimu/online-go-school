@@ -352,6 +352,19 @@ Stage 4 で先生（三村さん自身）の認証を localStorage SHA-256 → S
 - [x] `App.tsx` の `onConnectionStateChanged` 内の `saveAccount` で、UUIDではなく生の入力コードを localStorage に保存するよう修正
 - [x] テストを実行し、ログインおよび prefill の動作を確認する
 
+## タスク1: 生徒・教室名簿の Supabase 一本化（2026-07-03）
+
+- [x] `tasks/improvement-plan-20260703.md` を確認
+- [x] 既存の `classroomStore.ts` / `goSchoolStudents.ts` / 先生管理画面 / RLS migration を確認
+- [x] 名簿・教室 CRUD を Supabase 権威の async store に置換
+- [x] localStorage を初期表示キャッシュと一括移行元に格下げ
+- [x] 先生画面にローカル名簿のサーバー移行ボタンを追加
+- [x] 別ブラウザ先生ログインで同じ名簿が見える E2E を追加
+- [x] Supabase migration 適用
+- [x] `npm run test` / `tsc -b` / E2E 検証
+- [x] 結果を improvement plan に追記
+- [ ] commit & push
+
 ## 参加者欄が「不明(UUID)」と表示される不具合の解決（2026-06-30）
 
 **課題**: 生徒側ブラウザには先生のような「生徒名簿（students）」が無い、あるいは同期されていないため、LiveKit Roomの接続リストで他生徒のUUIDを実名に逆引きできず「不明(d3c90fa1)」と表示されてしまう。

@@ -12,7 +12,7 @@ import { makeStudentIdentity } from './utils/identityUtils';
 import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession, finishGame } from './utils/liveGameApi';
-import { loadStudents, loadClassrooms } from './utils/classroomStore';
+import { fetchRoster, loadStudents, loadClassrooms } from './utils/classroomStore';
 import { saveAccount, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } from './utils/authStore';
 
 import Header from './components/Header';
@@ -106,9 +106,16 @@ function App() {
   // 生徒自動接続の重複防止
   const studentAutoConnectRef = useRef(false);
 
-  const reloadClassroomData = useCallback(() => {
-    setStudents(loadStudents());
-    setClassrooms(loadClassrooms());
+  const reloadClassroomData = useCallback(async () => {
+    try {
+      const roster = await fetchRoster();
+      setStudents(roster.students);
+      setClassrooms(roster.classrooms);
+    } catch (err) {
+      console.error('[Classroom roster] fetch failed, using local cache:', err);
+      setStudents(loadStudents());
+      setClassrooms(loadClassrooms());
+    }
   }, []);
 
 
@@ -406,6 +413,12 @@ function App() {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
+
+  useEffect(() => {
+    if (role === 'TEACHER') {
+      void reloadClassroomData();
+    }
+  }, [role, reloadClassroomData]);
 
   // 生徒自動接続
   useEffect(() => {

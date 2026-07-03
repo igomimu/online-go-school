@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import type { Student, Classroom } from '../../types/classroom';
-import { updateClassroom } from '../../utils/classroomStore';
+import { upsertClassroom } from '../../utils/classroomStore';
 
 interface ClassroomSettingsDialogProps {
   classroom: Classroom;
   allStudents: Student[];
-  onSave: () => void;
+  onSave: () => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -20,6 +20,8 @@ export default function ClassroomSettingsDialog({
   const [selectedOther, setSelectedOther] = useState<string | null>(null);
   const [seatCount, setSeatCount] = useState(classroom.maxCapacity);
   const [name, setName] = useState(classroom.name);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const enrolled = enrolledIds
     .map(id => allStudents.find(s => s.id === id))
@@ -61,14 +63,22 @@ export default function ClassroomSettingsDialog({
     setEnrolledIds(next);
   };
 
-  const handleSave = () => {
-    updateClassroom({
-      ...classroom,
-      name: name.trim() || classroom.name,
-      studentIds: enrolledIds,
-      maxCapacity: seatCount,
-    });
-    onSave();
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await upsertClassroom({
+        ...classroom,
+        name: name.trim() || classroom.name,
+        studentIds: enrolledIds,
+        maxCapacity: seatCount,
+      });
+      await onSave();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const cellStyle: React.CSSProperties = {
@@ -281,16 +291,22 @@ export default function ClassroomSettingsDialog({
           gap: 12,
           background: '#d0d0c8',
         }}>
-          <button onClick={handleSave} style={{
+          {error && (
+            <div style={{ color: '#cc0000', fontWeight: 'bold', alignSelf: 'center' }}>
+              {error}
+            </div>
+          )}
+          <button onClick={handleSave} disabled={saving} style={{
             padding: '6px 32px',
             fontSize: 13,
             fontWeight: 'bold',
             border: '1px solid #333',
             background: '#60a060',
             color: 'white',
-            cursor: 'pointer',
+            cursor: saving ? 'default' : 'pointer',
+            opacity: saving ? 0.6 : 1,
           }}>
-            保存
+            {saving ? '保存中...' : '保存'}
           </button>
           <button onClick={onClose} style={{
             padding: '6px 32px',

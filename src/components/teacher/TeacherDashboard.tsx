@@ -43,7 +43,7 @@ interface TeacherDashboardProps {
   onReconnect: () => void;
   isReconnecting: boolean;
   onOpenStudentManager: () => void;
-  onReloadData: () => void;
+  onReloadData: () => void | Promise<void>;
   onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number }[]) => void;
   onProblemAssign?: (problem: import('../../types/problem').Problem) => void;
   onClearAudioM?: () => void;
@@ -333,7 +333,7 @@ export default function TeacherDashboard({
           allStudents={students}
           onSave={() => {
             setEditingClassroom(null);
-            onReloadData();
+            void onReloadData();
           }}
           onClose={() => setEditingClassroom(null)}
         />

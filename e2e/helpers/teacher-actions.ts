@@ -1,23 +1,41 @@
 import { expect, type Page } from '@playwright/test';
-import { TEST_CLASSROOM_NAME, TEST_TEACHER_PASSWORD } from './test-data';
+import { TEST_CLASSROOM_NAME, TEST_STUDENT_A, TEST_STUDENT_B, TEST_TEACHER_PASSWORD } from './test-data';
 
 /**
  * 先生としてログイン → ClassroomManager画面まで到達
  */
-export async function loginAsTeacher(page: Page, password: string = TEST_TEACHER_PASSWORD): Promise<void> {
+export async function loginAsTeacher(
+  page: Page,
+  password: string = TEST_TEACHER_PASSWORD,
+  classroomName?: string,
+): Promise<void> {
   await page.getByTestId('teacher-mode-link').click();
   await page.getByTestId('teacher-password-input').fill(password);
   await page.getByTestId('teacher-login-button').click();
-  await page.getByText(TEST_CLASSROOM_NAME).waitFor({ timeout: 5_000 });
+  await page.getByText(classroomName || await currentClassroomName(page)).waitFor({ timeout: 10_000 });
 }
 
 /**
  * 教室を開き、ダッシュボード（LiveKit接続完了）まで到達
  */
 export async function openClassroomAndConnect(page: Page): Promise<void> {
-  await page.locator('button', { hasText: '開く' }).first().click();
+  const classroomName = await currentClassroomName(page);
+  await page.locator('tr', { hasText: classroomName }).locator('button', { hasText: '開く' }).first().click();
   // TeacherDashboardヘッダ到達（実装時の表示は「囲」アイコン + 「三村囲碁オンライン 〜 <教室名>」）
   await page.getByText(/三村囲碁オンライン.*〜/).waitFor({ timeout: 20_000 });
+}
+
+async function currentClassroomName(page: Page): Promise<string> {
+  return page.evaluate((fallback) => {
+    try {
+      const e2eName = localStorage.getItem('go-school-e2e-classroom-name');
+      if (e2eName) return e2eName;
+      const classrooms = JSON.parse(localStorage.getItem('go-school-classrooms') || '[]') as Array<{ name?: string }>;
+      return classrooms[0]?.name || fallback;
+    } catch {
+      return fallback;
+    }
+  }, TEST_CLASSROOM_NAME);
 }
 
 /**
@@ -25,10 +43,15 @@ export async function openClassroomAndConnect(page: Page): Promise<void> {
  * StudentTableは未接続の登録生徒もグレー表示するので、data-connected="true"の行を待つ必要がある。
  */
 export async function waitForStudentJoined(page: Page, studentId: string, timeout = 20_000): Promise<void> {
-  await page
-    .locator(`tr[data-connected="true"][data-student-id="${studentId}"]`)
-    .first()
-    .waitFor({ timeout });
+  const byId = page.locator(`tr[data-connected="true"][data-student-id="${studentId}"]`).first();
+  const name = studentNameFromId(studentId);
+  const byName = name ? page.locator('tr[data-connected="true"]').filter({ hasText: name }).first() : null;
+  try {
+    await byId.waitFor({ timeout: Math.min(timeout, 5_000) });
+  } catch {
+    if (!byName) throw new Error(`Connected student row not found: ${studentId}`);
+    await byName.waitFor({ timeout });
+  }
 }
 
 /**
@@ -55,10 +78,17 @@ export async function clickReconnectAndWaitCycle(page: Page, timeout = 30_000): 
  * disabled / enabled の状態確認や click に使う。
  */
 export function getOpenStudentButton(page: Page, studentId: string) {
-  return page
-    .locator(`tr[data-student-id="${studentId}"]`)
-    .first()
-    .locator('button', { hasText: '開く' });
+  const name = studentNameFromId(studentId);
+  const row = name
+    ? page.locator(`tr[data-student-id="${studentId}"], tr`).filter({ hasText: name }).first()
+    : page.locator(`tr[data-student-id="${studentId}"]`).first();
+  return row.locator('button', { hasText: '開く' });
+}
+
+function studentNameFromId(studentId: string): string | undefined {
+  if (studentId === TEST_STUDENT_A.id || studentId === TEST_STUDENT_A.code) return TEST_STUDENT_A.name;
+  if (studentId === TEST_STUDENT_B.id || studentId === TEST_STUDENT_B.code) return TEST_STUDENT_B.name;
+  return undefined;
 }
 
 /**
