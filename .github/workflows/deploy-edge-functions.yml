@@ -6,10 +6,14 @@ on:
       - main
     paths:
       - 'supabase/functions/**'
+      - 'scripts/write-edge-version.js'
+      - 'scripts/smoke-edge-functions.js'
       - '.github/workflows/deploy-edge-functions.yml'
   pull_request:
     paths:
       - 'supabase/functions/**'
+      - 'scripts/write-edge-version.js'
+      - 'scripts/smoke-edge-functions.js'
   workflow_dispatch:
 
 jobs:
@@ -45,7 +49,12 @@ jobs:
         with:
           version: 2.108.0
 
-      - name: Deploy validate_student_session
+      - name: Generate Edge Function version
+        env:
+          EDGE_BUILD_VERSION: ${{ github.sha }}
+        run: node scripts/write-edge-version.js
+
+      - name: Deploy Edge Functions
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: yzsyrtesydpulctjgdog
@@ -58,3 +67,39 @@ jobs:
           supabase functions deploy fetch_students --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF
           supabase functions deploy manage_game_action --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF
           supabase functions deploy submit_move --no-verify-jwt --project-ref $SUPABASE_PROJECT_REF
+
+  smoke:
+    needs: deploy
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Smoke test deployed Edge Functions
+        env:
+          SUPABASE_URL: https://yzsyrtesydpulctjgdog.supabase.co
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || secrets.VITE_DOJO_SUPABASE_KEY }}
+          EXPECTED_EDGE_VERSION: ${{ github.sha }}
+          EDGE_SMOKE_STUDENT_CODE: "1010"
+        run: node scripts/smoke-edge-functions.js
+
+      - name: Write success summary
+        if: success()
+        run: |
+          {
+            echo "## Edge Functions smoke passed"
+            echo ""
+            echo "- Version: $GITHUB_SHA"
+            echo "- Functions: validate_student_session, validate_teacher_session, fetch_students, manage_game_action, submit_move"
+            echo "- validate_student_session student smoke: 200 OK"
+          } >> "$GITHUB_STEP_SUMMARY"

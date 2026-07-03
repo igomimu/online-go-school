@@ -13,11 +13,12 @@
 //   7. custom_access_token_hook が user_metadata を JWT claim に昇格
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { versionResponse } from '../_shared/version.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 }
 
 interface ValidateRequest {
@@ -41,6 +42,9 @@ async function sha256(text: string): Promise<string> {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+  if (req.method === 'GET') {
+    return versionResponse('validate_teacher_session', corsHeaders)
   }
   if (req.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405)

@@ -14,7 +14,9 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:verify-deploy": "node scripts/verify-deploy.js"
+    "test:verify-deploy": "node scripts/verify-deploy.js",
+    "edge:version": "node scripts/write-edge-version.js",
+    "smoke:edge": "node scripts/smoke-edge-functions.js"
   },
   "dependencies": {
     "@livekit/components-react": "^2.9.19",

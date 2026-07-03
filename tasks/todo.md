@@ -8,6 +8,23 @@
 
 ---
 
+## 2026-07-03 Task 2: Edge Functions deploy CI hardening
+
+- [x] 各 Edge Function に GET の version 応答を追加する
+- [x] CI で Edge Function bundle に git SHA を埋め込む
+- [x] deploy 後に本番 Function URL の version と `validate_student_session` smoke を検証する
+- [x] Deno / Node / npm テストで確認し、結果を記録する
+
+### Review
+
+- 追加: `_shared/version.ts` / `_shared/build_version.ts` による Edge Function version 応答。
+- 追加: `scripts/write-edge-version.js` で CI の `github.sha` を Edge bundle に埋め込み。
+- 追加: `scripts/smoke-edge-functions.js` で全 Function の GET version と `validate_student_session` POST を本番 URL で確認。
+- CI: `test -> deploy -> smoke` に分離。PR では deploy/smoke は実行されず、main/workflow_dispatch のみ本番 deploy 後 smoke する。
+- 検証: `npx -y deno@2 test --allow-read --allow-env supabase/functions/`, `node --check scripts/write-edge-version.js && node --check scripts/smoke-edge-functions.js`, `npx tsc -b`, `npm run test`。
+
+---
+
 ## 設計方針（確定済み）
 
 - **Custom JWT via Edge Function** 方式で進める

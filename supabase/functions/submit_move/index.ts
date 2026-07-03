@@ -2,11 +2,12 @@
 // identity / 手番 / move_number 連番のみ検証。合法手判定はクライアント責務。
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { studentMatchesPlayer, toStudentIdentity } from '../_shared/identity.ts'
+import { versionResponse } from '../_shared/version.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 }
 
 type Color = 'BLACK' | 'WHITE'
@@ -33,6 +34,9 @@ function json(body: unknown, status = 200) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+  if (req.method === 'GET') {
+    return versionResponse('submit_move', corsHeaders)
   }
   if (req.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405)
