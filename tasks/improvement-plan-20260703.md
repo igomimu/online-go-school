@@ -38,6 +38,13 @@
 - E2E: `e2e/roster-supabase.spec.ts` を追加し、別 BrowserContext の先生ログインで同じ教室・生徒が見えることを検証。
 - 検証: `npx tsc -b` 成功。`npm run test` 成功（29 files / 307 tests）。`BASE_URL=http://localhost:5175 npx playwright test` 成功（14 passed, 1.6m）。スクショ証跡: `verified-stone-placed.png`。
 
+**✅ 検証役（Claude Code）独立検証 合格（2026-07-03）**:
+- 本番DB実証: 両テーブル存在・`relrowsecurity=true`・teacher ALLポリシーあり・`schema_migrations` に `20260703000000` 記録済み
+- 認可境界プローブ（publishable鍵直叩き）: anon SELECT=空配列 / anon INSERT=**HTTP 401**（42501 RLS拒否、両テーブル）
+- ローカル: tsc緑 / unit 307/307 / E2E **24/24**（chromium、新規 `roster-supabase.spec.ts` 含む）
+- 本番: `online.mimura15.jp/version.json` = `fcb8c32`（push済みHEADと一致、Vercel自動デプロイ確認）/ `proof-prod.spec.ts` **10/10**（実ブラウザ・スクショ `proof-screenshots/`）
+- 軽微な指摘（ブロッカーではない）: ①`go_school_students` に同一述語の重複ポリシー `gss_teacher_rw`（6/30由来）が残存 → 次回migrationでDROP推奨 ②unitテスト数 321→307（classroomStore書換に伴う削減、対象コードのSupabase化に相応） ③本番 `go_school_classrooms` に35行あり（テスト・移行の蓄積か、実運用前に棚卸し推奨）
+
 ## タスク2: Edge Function デプロイ検証の自動化 【優先度: 高・小工数】
 
 **問題**: `.github/workflows/deploy-edge-functions.yml` は直近10runで3回失敗。失敗しても誰も気づかず「フロント直したのにEdge未デプロイ」が再発する構造。
