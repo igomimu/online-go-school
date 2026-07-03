@@ -84,6 +84,13 @@
 - 追加対応: タスク1軽微残の `gss_teacher_rw` 重複ポリシーDROPを `supabase/migrations/20260703060505_drop_duplicate_gss_teacher_rw.sql` に追加。本番適用済み、migration履歴も `20260703060505` applied に修復済み。
 - 最終検証: `npx eslint .` 0 errors / 5 warnings, `npx tsc -b`, `npm run test` 29 files / 307 tests, E2E 14 passed。
 
+**✅ 検証役（Claude Code / Fable 5）独立検証 合格（2026-07-03）**:
+- LEGIONで独立再実行: `npx eslint .` **0 errors / 5 warnings**（既存exhaustive-deps系のみ）/ `tsc -b` 緑 / unit **307/307** / ローカルE2E **14/14**（1.4m、review-ai-highlight含む）
+- 本番: `online.mimura15.jp/version.json` = `3e57ccc`（HEAD一致、Vercel自動デプロイ確認）/ `proof-prod.spec.ts` **10/10**（2.2m、実ブラウザ）
+- コードレビュー（全9ファイルのdiff精読）: **eslint-disable / ts-ignore による抑制ゼロ**。修正は全て正攻法 — ①effect内クリア→「nodeId/gameIdスコープ状態＋派生値マスク」への設計変更（useAiAnalysis / useLiveGame / useLiveGameList / ReviewBoard） ②mount時setState→lazy initializer（SavedGameList / AutoPairingDialog） ③render中のref代入→useEffect同期（useAutoReplay / useGameClock） ④インラインstyle副作用→Tailwind子セレクタ（VideoTiles）
+- 軽微な観察（ブロッカーではない）: useAiAnalysisのキャッシュヒット経路が `queueMicrotask` でsetStateを遅延しているのはやや技巧的だが、300msデバウンスタイマーより先に必ず実行されるため競合しない。useLiveGame系はgameId=null時に古いstateをクリアせずマスクする方式（メモリは次の対局ロードまで保持）— 実害なし
+- タスク1残課題①の `gss_teacher_rw` 重複ポリシーDROPも本番DBで実証: pg_policyに `go_school_students_teacher_all` のみ残存、schema_migrations に `20260703060505` 記録済み
+
 ## タスク4: App.tsx（1,158行・useState 39個）の段階分割 【優先度: 低（試験レッスン安定後）】
 
 **問題**: 画面遷移・LiveKit接続・対局状態・音声映像を1ファイルで管理するゴッドコンポーネント。変更の影響範囲が読めず回帰の温床。
