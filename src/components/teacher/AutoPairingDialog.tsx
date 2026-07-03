@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Student } from '../../types/classroom';
 import { rankToNumber, suggestHandicap } from '../../types/classroom';
 import { findStudentByIdentity, getDisplayName } from '../../utils/identityUtils';
@@ -81,19 +81,12 @@ export default function AutoPairingDialog({
   onCreateGames,
 }: AutoPairingDialogProps) {
   const studentIdentities = connectedIdentities.filter(id => id !== teacherIdentity);
-  const [pairs, setPairs] = useState<PairingPair[]>([]);
-  const [unpairedIdentity, setUnpairedIdentity] = useState<string | null>(null);
-
-  useEffect(() => {
-    const result = autoPair(studentIdentities, students);
-    setPairs(result);
-    // 奇数人なら最後の1人が余り
-    if (studentIdentities.length % 2 === 1) {
-      setUnpairedIdentity(studentIdentities[studentIdentities.length - 1]);
-    } else {
-      setUnpairedIdentity(null);
-    }
-  }, []);
+  const [pairs, setPairs] = useState<PairingPair[]>(() => autoPair(studentIdentities, students));
+  const [unpairedIdentity] = useState<string | null>(() => (
+    studentIdentities.length % 2 === 1
+      ? studentIdentities[studentIdentities.length - 1]
+      : null
+  ));
 
   // 黒白入れ替え
   const swapColors = (index: number) => {

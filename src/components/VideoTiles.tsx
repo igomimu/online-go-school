@@ -19,30 +19,22 @@ function VideoTile({
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !videoElement) return;
+    const video = videoElement;
 
-    // スタイル設定
-    videoElement.style.width = '100%';
-    videoElement.style.height = '100%';
-    videoElement.style.objectFit = 'cover';
-    videoElement.style.borderRadius = '0.5rem';
-    if (isLocal) {
-      videoElement.style.transform = 'scaleX(-1)';
-    }
-
-    container.appendChild(videoElement);
+    container.appendChild(video);
 
     return () => {
-      if (container.contains(videoElement)) {
-        container.removeChild(videoElement);
+      if (container.contains(video)) {
+        container.removeChild(video);
       }
     };
-  }, [videoElement, isLocal]);
+  }, [videoElement]);
 
   return (
     <div className="flex flex-col items-center gap-1 shrink-0">
       <div
         ref={containerRef}
-        className="w-[120px] h-[90px] bg-black/30 rounded-lg overflow-hidden"
+        className={`w-[120px] h-[90px] bg-black/30 rounded-lg overflow-hidden [&>video]:w-full [&>video]:h-full [&>video]:object-cover [&>video]:rounded-lg ${isLocal ? '[&>video]:scale-x-[-1]' : ''}`}
       />
       <span className="text-xs text-zinc-400 truncate max-w-[120px]">
         {identity}{isLocal ? ' (自分)' : ''}

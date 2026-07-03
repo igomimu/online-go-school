@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Trash2, Search } from 'lucide-react';
 import type { SavedGame } from '../types/game';
 import { loadSavedGames, deleteGame } from '../utils/savedGames';
@@ -8,11 +8,7 @@ interface SavedGameListProps {
 }
 
 export default function SavedGameList({ onSelectGame }: SavedGameListProps) {
-  const [games, setGames] = useState<SavedGame[]>([]);
-
-  useEffect(() => {
-    setGames(loadSavedGames());
-  }, []);
+  const [games, setGames] = useState<SavedGame[]>(() => loadSavedGames());
 
   const handleDelete = (id: string) => {
     if (!confirm('この棋譜を削除しますか？')) return;

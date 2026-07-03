@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import GoBoard from './GoBoard';
 import type { Drawing, Marker, StoneColor } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
@@ -102,20 +102,23 @@ export default function ReviewBoard({
   const boardState = currentNode.board;
   const nodeMarkers = currentNode.markers;
 
-  // AI候補手のハイライト座標（1-indexed）。盤面移動時に自動クリア
-  const [aiHighlight, setAiHighlight] = useState<{ x: number; y: number } | null>(null);
-  useEffect(() => { setAiHighlight(null); }, [currentNode]);
+  // AI候補手のハイライト座標（1-indexed）。対象nodeが変わったら表示しない
+  const [aiHighlight, setAiHighlight] = useState<{ nodeId: string; x: number; y: number } | null>(null);
 
   const markers = useMemo<Marker[] | undefined>(() => {
-    if (!aiHighlight) return nodeMarkers;
+    if (!aiHighlight || aiHighlight.nodeId !== currentNode.id) return nodeMarkers;
     const overlay: Marker = { x: aiHighlight.x, y: aiHighlight.y, type: 'SYMBOL', value: 'SQR' };
     return nodeMarkers ? [...nodeMarkers, overlay] : [overlay];
-  }, [nodeMarkers, aiHighlight]);
+  }, [nodeMarkers, aiHighlight, currentNode.id]);
 
   const handleHighlightMove = useCallback((x: number, y: number) => {
     // 同じ手の再クリックでトグル解除（既存パターン: draw mode の re-toggle と同じ感覚）
-    setAiHighlight(prev => (prev && prev.x === x && prev.y === y ? null : { x, y }));
-  }, []);
+    setAiHighlight(prev => (
+      prev && prev.nodeId === currentNode.id && prev.x === x && prev.y === y
+        ? null
+        : { nodeId: currentNode.id, x, y }
+    ));
+  }, [currentNode.id]);
 
   const goToRoot = () => onSetCurrentNode(rootNode);
   const goBack = () => {
