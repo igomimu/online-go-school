@@ -24,6 +24,8 @@ interface DerivedState {
   lastMove: LiveMoveRow | null;
 }
 
+const EMPTY_MOVES: LiveMoveRow[] = [];
+
 function deriveBoardState(game: LiveGameRow, moves: LiveMoveRow[]): DerivedState {
   let board = createEmptyBoard(game.board_size);
 
@@ -108,17 +110,14 @@ export function useLiveGame(
 
   useEffect(() => {
     if (!gameId) {
-      setGame(null);
-      setMoves([]);
-      setLoading(false);
       return;
     }
 
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     (async () => {
+      setLoading(true);
+      setError(null);
       try {
         const [g, m] = await Promise.all([fetchLiveGame(gameId), fetchLiveMoves(gameId)]);
         if (cancelled) return;
@@ -153,8 +152,13 @@ export function useLiveGame(
     };
   }, [gameId]);
 
+  const activeGame = gameId ? game : null;
+  const activeMoves = gameId ? moves : EMPTY_MOVES;
+  const activeLoading = gameId ? loading : false;
+  const activeError = gameId ? error : null;
+
   const derived = useMemo<DerivedState>(() => {
-    if (!game) {
+    if (!activeGame) {
       return {
         boardState: createEmptyBoard(19),
         currentColor: 'BLACK',
@@ -164,123 +168,123 @@ export function useLiveGame(
         lastMove: null,
       };
     }
-    return deriveBoardState(game, moves);
-  }, [game, moves]);
+    return deriveBoardState(activeGame, activeMoves);
+  }, [activeGame, activeMoves]);
 
-  const isBlack = !!game && game.black_player === myIdentity;
-  const isWhite = !!game && game.white_player === myIdentity;
+  const isBlack = !!activeGame && activeGame.black_player === myIdentity;
+  const isWhite = !!activeGame && activeGame.white_player === myIdentity;
   const isParticipant = isBlack || isWhite;
   const myColor: StoneColor | null = isBlack ? 'BLACK' : isWhite ? 'WHITE' : null;
   const isMyTurn = isParticipant && myColor === derived.currentColor;
 
   // 先生が観戦中は myColor が null のまま currentColor 側の生徒の identity を代筆する
   const effectivePlayer = useMemo(() => {
-    if (!game) return null;
+    if (!activeGame) return null;
     if (myColor) return { identity: myIdentity, color: myColor };
     if (isTeacher) {
       return {
-        identity: derived.currentColor === 'BLACK' ? game.black_player : game.white_player,
+        identity: derived.currentColor === 'BLACK' ? activeGame.black_player : activeGame.white_player,
         color: derived.currentColor,
       };
     }
     return null;
-  }, [game, myColor, myIdentity, isTeacher, derived.currentColor]);
+  }, [activeGame, myColor, myIdentity, isTeacher, derived.currentColor]);
 
   const submitMoveFn = useCallback(
     async (x: number, y: number) => {
-      if (!game || !effectivePlayer) return;
-      const res = await apiSubmitMove(game.id, effectivePlayer.identity, x, y, effectivePlayer.color);
+      if (!activeGame || !effectivePlayer) return;
+      const res = await apiSubmitMove(activeGame.id, effectivePlayer.identity, x, y, effectivePlayer.color);
       if (!res.ok) setError(res.error ?? 'submit failed');
     },
-    [game, effectivePlayer],
+    [activeGame, effectivePlayer],
   );
 
   const submitPass = useCallback(async () => {
-    if (!game || !effectivePlayer) return;
+    if (!activeGame || !effectivePlayer) return;
     // 連続パスなら整地へ（ローカルstate基準。Realtimeラグのためピタッと当たらない場合は先生が手動遷移可）
     const lastMove = derived.lastMove;
     const isSecondPass = lastMove && lastMove.x === 0 && lastMove.y === 0;
 
-    const res = await apiSubmitMove(game.id, effectivePlayer.identity, 0, 0, effectivePlayer.color);
+    const res = await apiSubmitMove(activeGame.id, effectivePlayer.identity, 0, 0, effectivePlayer.color);
     if (!res.ok) {
       setError(res.error ?? 'pass failed');
       return;
     }
     if (isSecondPass) {
       try {
-        await apiEnterScoring(game.id);
+        await apiEnterScoring(activeGame.id);
       } catch (e) {
         setError(String(e));
       }
     }
-  }, [game, effectivePlayer, derived.lastMove]);
+  }, [activeGame, effectivePlayer, derived.lastMove]);
 
   const submitResign = useCallback(async () => {
-    if (!game || !effectivePlayer) return;
+    if (!activeGame || !effectivePlayer) return;
     const winner = effectivePlayer.color === 'BLACK' ? 'W' : 'B';
     try {
-      await apiFinishGame(game.id, `${winner}+R`);
+      await apiFinishGame(activeGame.id, `${winner}+R`);
     } catch (e) {
       setError(String(e));
     }
-  }, [game, effectivePlayer]);
+  }, [activeGame, effectivePlayer]);
 
   const enterScoringFn = useCallback(async () => {
-    if (!game) return;
+    if (!activeGame) return;
     try {
-      await apiEnterScoring(game.id);
+      await apiEnterScoring(activeGame.id);
     } catch (e) {
       setError(String(e));
     }
-  }, [game]);
+  }, [activeGame]);
 
   const setDeadStones = useCallback(
     async (deadStones: string[]) => {
-      if (!game) return;
+      if (!activeGame) return;
       try {
-        await apiUpdateDeadStones(game.id, deadStones);
+        await apiUpdateDeadStones(activeGame.id, deadStones);
       } catch (e) {
         setError(String(e));
       }
     },
-    [game],
+    [activeGame],
   );
 
   const finishWithResult = useCallback(
     async (result: string) => {
-      if (!game) return;
+      if (!activeGame) return;
       try {
-        await apiFinishGame(game.id, result);
+        await apiFinishGame(activeGame.id, result);
       } catch (e) {
         setError(String(e));
       }
     },
-    [game],
+    [activeGame],
   );
 
   const resetGame = useCallback(async () => {
-    if (!game) return;
+    if (!activeGame) return;
     try {
-      await apiResetLiveGame(game.id);
+      await apiResetLiveGame(activeGame.id);
     } catch (e) {
       setError(String(e));
     }
-  }, [game]);
+  }, [activeGame]);
 
   return {
-    game,
+    game: activeGame,
     boardState: derived.boardState,
     currentColor: derived.currentColor,
     moveNumber: derived.moveNumber,
     blackCaptures: derived.blackCaptures,
     whiteCaptures: derived.whiteCaptures,
     lastMove: derived.lastMove,
-    moves,
+    moves: activeMoves,
     myColor,
     isParticipant,
     isMyTurn,
-    loading,
-    error,
+    loading: activeLoading,
+    error: activeError,
     submitMove: submitMoveFn,
     submitPass,
     submitResign,

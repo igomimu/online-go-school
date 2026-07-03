@@ -8,6 +8,25 @@
 
 ---
 
+## 2026-07-03 Task 3: lint 9 errors cleanup
+
+- [x] `react-hooks/set-state-in-effect` / `refs` / `immutability` の lint errors 9件を1件ずつ修正
+- [x] 各修正ごとに `BASE_URL=http://localhost:5175 npx playwright test` を実行
+- [x] 最終 `npx eslint .` は 0 errors / 5 warnings
+- [x] タスク1軽微残の `gss_teacher_rw` 重複ポリシー DROP migration を追加し、本番適用
+
+### Review
+
+- 修正: `ReviewBoard.tsx` のAI候補手ハイライトを nodeId 紐づけに変更し、node移動時の同期setStateを廃止。
+- 修正: `SavedGameList.tsx` と `AutoPairingDialog.tsx` の初期値を lazy initializer 化。
+- 修正: `VideoTiles.tsx` はvideo要素のstyle直接変更をやめ、親コンテナCSSで見た目を制御。
+- 修正: `useAiAnalysis.ts`, `useLiveGame.ts`, `useLiveGameList.ts` は無効時の返却値を派生させ、effect内の同期クリアを廃止。
+- 修正: `useAutoReplay.ts`, `useGameClock.ts` のref更新をeffectへ移動。
+- DB: `supabase/migrations/20260703060505_drop_duplicate_gss_teacher_rw.sql` を追加。本番では `gss_teacher_rw` をDROPし、`go_school_students_teacher_all` のみ残存確認。`supabase migration repair --status applied 20260703060505` 済み。
+- 検証: `npx eslint .`（0 errors / 5 warnings）, `npx tsc -b`, `npm run test`（29 files / 307 tests）, `BASE_URL=http://localhost:5175 npx playwright test`（14 passed）。
+
+---
+
 ## 2026-07-03 Task 2: Edge Functions deploy CI hardening
 
 - [x] 各 Edge Function に GET の version 応答を追加する

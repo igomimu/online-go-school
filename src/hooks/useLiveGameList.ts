@@ -15,6 +15,8 @@ export interface UseLiveGameListResult {
   refresh: () => Promise<void>;
 }
 
+const EMPTY_GAMES: LiveGameRow[] = [];
+
 export function useLiveGameList(classroomId: string | null): UseLiveGameListResult {
   const [games, setGames] = useState<LiveGameRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -38,15 +40,13 @@ export function useLiveGameList(classroomId: string | null): UseLiveGameListResu
 
   useEffect(() => {
     if (!classroomId) {
-      setGames([]);
-      setLoading(false);
       return;
     }
 
     let cancelled = false;
-    setLoading(true);
 
     (async () => {
+      setLoading(true);
       try {
         const rows = await fetchLiveGames(classroomId);
         if (cancelled) return;
@@ -106,5 +106,11 @@ export function useLiveGameList(classroomId: string | null): UseLiveGameListResu
     [classroomId],
   );
 
-  return { games, loading, error, createGame, refresh };
+  return {
+    games: classroomId ? games : EMPTY_GAMES,
+    loading: classroomId ? loading : false,
+    error: classroomId ? error : null,
+    createGame,
+    refresh,
+  };
 }

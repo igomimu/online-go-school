@@ -14,9 +14,9 @@ export function useAiAnalysis(
   moveHistory: { x: number; y: number; color: 'BLACK' | 'WHITE' }[],
   options: UseAiAnalysisOptions,
 ) {
-  const [result, setResult] = useState<AiAnalysisResult | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [resultState, setResultState] = useState<{ nodeId: string; result: AiAnalysisResult } | null>(null);
+  const [loadingNodeId, setLoadingNodeId] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<{ nodeId: string; message: string } | null>(null);
   const [settings, setSettings] = useState<AiSettings>(() => loadAiSettings());
 
   // Cache: nodeId -> result
@@ -35,8 +35,6 @@ export function useAiAnalysis(
   // Analyze when node changes (debounced)
   useEffect(() => {
     if (!settings.enabled || !currentNode) {
-      setResult(null);
-      setError(null);
       return;
     }
 
@@ -45,9 +43,11 @@ export function useAiAnalysis(
     // Check cache
     const cached = cacheRef.current.get(nodeId);
     if (cached) {
-      setResult(cached);
-      setError(null);
-      setIsLoading(false);
+      queueMicrotask(() => {
+        setResultState({ nodeId, result: cached });
+        setErrorState(null);
+        setLoadingNodeId(null);
+      });
       return;
     }
 
@@ -61,8 +61,8 @@ export function useAiAnalysis(
       const controller = new AbortController();
       abortRef.current = controller;
 
-      setIsLoading(true);
-      setError(null);
+      setLoadingNodeId(nodeId);
+      setErrorState(null);
 
       const katagoMoves = convertMovesToKatago(moveHistory, options.boardSize);
       const initialStones = options.handicapStones?.map(s => {
@@ -88,14 +88,14 @@ export function useAiAnalysis(
               const firstKey = cacheRef.current.keys().next().value;
               if (firstKey) cacheRef.current.delete(firstKey);
             }
-            setResult(res);
-            setIsLoading(false);
+            setResultState({ nodeId, result: res });
+            setLoadingNodeId(prev => (prev === nodeId ? null : prev));
           }
         })
         .catch(err => {
           if (!controller.signal.aborted) {
-            setError(err.message);
-            setIsLoading(false);
+            setErrorState({ nodeId, message: err.message });
+            setLoadingNodeId(prev => (prev === nodeId ? null : prev));
           }
         });
     }, 300);
@@ -109,10 +109,12 @@ export function useAiAnalysis(
     cacheRef.current.clear();
   }, []);
 
+  const activeNodeId = settings.enabled ? currentNode?.id ?? null : null;
+
   return {
-    result,
-    isLoading,
-    error,
+    result: resultState?.nodeId === activeNodeId ? resultState.result : null,
+    isLoading: loadingNodeId === activeNodeId,
+    error: errorState?.nodeId === activeNodeId ? errorState.message : null,
     settings,
     updateSettings,
     clearCache,

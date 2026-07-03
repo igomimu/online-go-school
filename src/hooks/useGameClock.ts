@@ -47,9 +47,12 @@ export function useGameClockTick(
   onTimeWarning?: (gameId: string, color: 'BLACK' | 'WHITE', secondsLeft: number) => void,
 ) {
   const gamesRef = useRef(games);
-  gamesRef.current = games;
   // Track which warnings have been fired to avoid repeats
   const warnedRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    gamesRef.current = games;
+  }, [games]);
 
   const tick = useCallback(() => {
     const now = Date.now();

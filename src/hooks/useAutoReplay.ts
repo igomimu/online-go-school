@@ -18,7 +18,10 @@ export function useAutoReplay(
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState<ReplaySpeed>(1);
   const nodeRef = useRef(currentNode);
-  nodeRef.current = currentNode;
+
+  useEffect(() => {
+    nodeRef.current = currentNode;
+  }, [currentNode]);
 
   const intervalMs = 1000 / speed;
 

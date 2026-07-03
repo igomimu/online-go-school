@@ -77,6 +77,13 @@
 
 **受け入れ条件**: `npx eslint .` errors 0。E2E全緑。
 
+**完了メモ（2026-07-03）**:
+- lint: 9 errors -> 0 errors（warnings 5件は既存の exhaustive-deps 系として残存）。
+- 修正対象: `ReviewBoard.tsx`, `SavedGameList.tsx`, `VideoTiles.tsx`, `AutoPairingDialog.tsx`, `useAiAnalysis.ts`, `useAutoReplay.ts`, `useGameClock.ts`, `useLiveGame.ts`, `useLiveGameList.ts`。
+- 方針通り各件ごとにE2Eを実行。最終確認も `BASE_URL=http://localhost:5175 npx playwright test` で 14 passed。
+- 追加対応: タスク1軽微残の `gss_teacher_rw` 重複ポリシーDROPを `supabase/migrations/20260703060505_drop_duplicate_gss_teacher_rw.sql` に追加。本番適用済み、migration履歴も `20260703060505` applied に修復済み。
+- 最終検証: `npx eslint .` 0 errors / 5 warnings, `npx tsc -b`, `npm run test` 29 files / 307 tests, E2E 14 passed。
+
 ## タスク4: App.tsx（1,158行・useState 39個）の段階分割 【優先度: 低（試験レッスン安定後）】
 
 **問題**: 画面遷移・LiveKit接続・対局状態・音声映像を1ファイルで管理するゴッドコンポーネント。変更の影響範囲が読めず回帰の温床。
