@@ -363,7 +363,7 @@ Stage 4 で先生（三村さん自身）の認証を localStorage SHA-256 → S
 - [x] Supabase migration 適用
 - [x] `npm run test` / `tsc -b` / E2E 検証
 - [x] 結果を improvement plan に追記
-- [ ] commit & push
+- [x] commit & push (`0dd50f2`)
 
 ## 参加者欄が「不明(UUID)」と表示される不具合の解決（2026-06-30）
 
