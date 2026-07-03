@@ -22,6 +22,8 @@
 - 追加: `scripts/smoke-edge-functions.js` で全 Function の GET version と `validate_student_session` POST を本番 URL で確認。
 - CI: `test -> deploy -> smoke` に分離。PR では deploy/smoke は実行されず、main/workflow_dispatch のみ本番 deploy 後 smoke する。
 - 検証: `npx -y deno@2 test --allow-read --allow-env supabase/functions/`, `node --check scripts/write-edge-version.js && node --check scripts/smoke-edge-functions.js`, `npx tsc -b`, `npm run test`。
+- 本番 CI: https://github.com/igomimu/online-go-school/actions/runs/28638964508 成功。全5 Edge Function が `db5c4b675771daa235ea9b524e2e4056db39c2e7` を返し、`validate_student_session` はテスト生徒コード `1010` で 200 OK。
+- 運用: GitHub Actions secret `SUPABASE_ANON_KEY` が未設定だったため追加済み。今後 smoke は secret 欠落も即失敗として検知する。
 
 ---
 

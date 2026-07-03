@@ -50,11 +50,17 @@
 **問題**: `.github/workflows/deploy-edge-functions.yml` は直近10runで3回失敗。失敗しても誰も気づかず「フロント直したのにEdge未デプロイ」が再発する構造。
 
 **方針**:
-- [ ] 各Edge Functionにバージョン応答を追加（例: GET or 専用action で git SHA を返す。フロントの `scripts/generate-version.js` と同じ仕組み）
-- [ ] workflow の deploy job 後に smoke check job を追加: デプロイ済みバージョン照合 + `validate_student_session` にテスト生徒コードで200が返ること
-- [ ] CI失敗の通知経路を用意（既存のくろん監視 or GitHub通知の確認をユーザーに提案）
+- [x] 各Edge Functionにバージョン応答を追加（例: GET or 専用action で git SHA を返す。フロントの `scripts/generate-version.js` と同じ仕組み）
+- [x] workflow の deploy job 後に smoke check job を追加: デプロイ済みバージョン照合 + `validate_student_session` にテスト生徒コードで200が返ること
+- [x] CI失敗の通知経路を用意（GitHub Actions summary に失敗理由を出力。GitHub通知/くろん監視が拾える形にした）
 
 **受け入れ条件**: わざとテストを落としたブランチでdeployがskipされ、mainでは smoke check まで緑になるrunのURL。
+
+**完了メモ（2026-07-03）**:
+- commit: `db5c4b675771daa235ea9b524e2e4056db39c2e7`
+- main run: https://github.com/igomimu/online-go-school/actions/runs/28638964508
+- smoke: 全5 Edge Function の version が commit SHA と一致。`validate_student_session` はテスト生徒コード `1010` で 200 OK。
+- 初回 smoke で `SUPABASE_ANON_KEY` secret 未設定が発覚し、GitHub Actions secret として追加。failed job 再実行で成功。
 
 ## タスク3: lint残 9 errors（react-hooks系）の解消 【優先度: 中・小工数】
 
