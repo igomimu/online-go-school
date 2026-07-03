@@ -62,6 +62,13 @@
 - smoke: 全5 Edge Function の version が commit SHA と一致。`validate_student_session` はテスト生徒コード `1010` で 200 OK。
 - 初回 smoke で `SUPABASE_ANON_KEY` secret 未設定が発覚し、GitHub Actions secret として追加。failed job 再実行で成功。
 
+**✅ 検証役（Claude Code）独立検証 合格（2026-07-03）**:
+- LEGIONから本番へ `EXPECTED_EDGE_VERSION=db5c4b6... npm run smoke:edge` を独立実行→**全5関数のversion一致 + テスト生徒1010ログイン200 で合格**（CIと同じ結果を第三者環境から再現）
+- 負のパス回帰なし: 不正リクエストは HTTP 400 で拒否。GETバージョン応答の露出はcommit SHAのみ（機密なし）
+- CI run 28638964508 success を確認。Denoテスト実体（`_shared/version.test.ts`）が追加されたため test job が実テストを実行するようになった（従来は「No test files found」で素通しだった）
+- 注記: 受け入れ条件の「わざとテストを落としたブランチでdeploy skip」の実演は未実施。構造保証（`needs: test` + 実テスト存在 + deployはmain pushのみ）で代替受理。厳密に見たい場合は失敗するPRを1本立てれば確認可
+- 運用メモ: workflowのpathsフィルタにより docs のみのcommitではdeployが走らない（正しい挙動）。手動smoke時の `EXPECTED_EDGE_VERSION` は「関数を触った最後のcommit SHA」を使うこと
+
 ## タスク3: lint残 9 errors（react-hooks系）の解消 【優先度: 中・小工数】
 
 **問題**: `npx eslint .` で 9 errors / 6 warnings。`react-hooks/set-state-in-effect` 系はeffect内setStateの再レンダーループ予備軍で、App.tsxの複雑さと掛け算でバグ化しやすい。
