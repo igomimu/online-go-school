@@ -106,12 +106,14 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
   // 対局終了（投了・整地完了）時に自動で閉じる
   useEffect(() => {
     if (game && game.status === 'finished' && onBack) {
+      const isResignOrTimeUp = game.result?.includes('+R') || game.result?.includes('+T') || game.result === '中断';
+      const delay = isResignOrTimeUp ? 500 : 3000;
       const timer = setTimeout(() => {
         onBack();
-      }, 3000);
+      }, delay);
       return () => clearTimeout(timer);
     }
-  }, [game?.status, onBack]);
+  }, [game?.status, game?.result, onBack]);
 
   if (loading || !game) {
     return (

@@ -216,6 +216,14 @@ export function useLiveGame(
           return [...prev, tempMove].sort((a, b) => a.move_number - b.move_number);
         });
       }
+
+      if (msg.type === 'GAME_RESIGN') {
+        const p = msg.payload as { gameId: string; color: StoneColor };
+        if (p.gameId !== gameId) return;
+        
+        const winner = p.color === 'BLACK' ? 'W' : 'B';
+        setGame((prev) => prev ? { ...prev, status: 'finished', result: `${winner}+R` } : null);
+      }
     };
 
     window.addEventListener('live-game-message', handleLiveGameMessage);
@@ -477,12 +485,27 @@ export function useLiveGame(
   const submitResign = useCallback(async () => {
     if (!activeGame || !effectivePlayer) return;
     const winner = effectivePlayer.color === 'BLACK' ? 'W' : 'B';
+
+    // LiveKitデータチャネルでブロードキャスト
+    if (classroom && classroom.isConnected) {
+      classroom.broadcast({
+        type: 'GAME_RESIGN',
+        payload: {
+          gameId: activeGame.id,
+          color: effectivePlayer.color,
+        }
+      }).catch((err) => console.error('[LiveKit resign broadcast error]', err));
+    }
+
+    // ローカルゲーム状態を即座にfinishedに更新（応答性のため）
+    setGame((prev) => prev ? { ...prev, status: 'finished', result: `${winner}+R` } : null);
+
     try {
       await apiFinishGame(activeGame.id, `${winner}+R`);
     } catch (e) {
       setError(String(e));
     }
-  }, [activeGame, effectivePlayer]);
+  }, [activeGame, effectivePlayer, classroom]);
 
   const enterScoringFn = useCallback(async () => {
     if (!activeGame) return;
