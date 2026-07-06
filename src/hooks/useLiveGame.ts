@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { StoneColor, BoardState } from '../components/GoBoard';
 import { createEmptyBoard, checkCapture } from '../utils/gameLogic';
 import { getHandicapStones } from '../utils/handicapStones';
+import { studentMatchesPlayer } from '../utils/identityUtils';
+import { switchClock } from './useGameClock';
+import type { GameClock } from '../types/game';
 import {
   fetchLiveGame,
   fetchLiveMoves,
@@ -86,6 +89,7 @@ export interface UseLiveGameResult {
   myColor: StoneColor | null;
   isParticipant: boolean;
   isMyTurn: boolean;
+  clock: GameClock | null;
 
   loading: boolean;
   error: string | null;
@@ -239,8 +243,8 @@ export function useLiveGame(
     return deriveBoardState(activeGame, activeMoves);
   }, [activeGame, activeMoves]);
 
-  const isBlack = !!activeGame && activeGame.black_player === myIdentity;
-  const isWhite = !!activeGame && activeGame.white_player === myIdentity;
+  const isBlack = !!activeGame && studentMatchesPlayer(myIdentity, activeGame.black_player);
+  const isWhite = !!activeGame && studentMatchesPlayer(myIdentity, activeGame.white_player);
   const isParticipant = isBlack || isWhite;
   const myColor: StoneColor | null = isBlack ? 'BLACK' : isWhite ? 'WHITE' : null;
   const isMyTurn = isParticipant && myColor === derived.currentColor;
@@ -261,8 +265,15 @@ export function useLiveGame(
   const submitMoveFn = useCallback(
     async (x: number, y: number) => {
       if (!activeGame || !effectivePlayer) return;
+      if (!isMyTurn && !isTeacher) return;
       
       const moveNumber = derived.moveNumber + 1;
+
+      // 時計の切り替え
+      let nextClock: GameClock | undefined = undefined;
+      if (activeGame.clock) {
+        nextClock = switchClock(activeGame.clock, effectivePlayer.color);
+      }
 
       // 1. 楽観的更新（仮着手）
       const tempMove: LiveMoveRow = {
@@ -295,21 +306,28 @@ export function useLiveGame(
       }
 
       // 3. Supabase（真実のソース）へ送信
-      const res = await apiSubmitMove(activeGame.id, effectivePlayer.identity, x, y, effectivePlayer.color);
+      const res = await apiSubmitMove(activeGame.id, effectivePlayer.identity, x, y, effectivePlayer.color, nextClock);
       if (!res.ok) {
         setError(res.error ?? 'submit failed');
         // 失敗した場合は仮着手を削除
         setMoves((prev) => prev.filter((m) => m.player_id !== tempMove.player_id));
       }
     },
-    [activeGame, effectivePlayer, derived.moveNumber, classroom],
+    [activeGame, effectivePlayer, derived.moveNumber, classroom, isMyTurn, isTeacher],
   );
 
   const submitPass = useCallback(async () => {
     if (!activeGame || !effectivePlayer) return;
+    if (!isMyTurn && !isTeacher) return;
     const lastMove = derived.lastMove;
     const isSecondPass = lastMove && lastMove.x === 0 && lastMove.y === 0;
     const moveNumber = derived.moveNumber + 1;
+
+    // 時計の切り替え
+    let nextClock: GameClock | undefined = undefined;
+    if (activeGame.clock) {
+      nextClock = switchClock(activeGame.clock, effectivePlayer.color);
+    }
 
     // 1. 楽観的更新
     const tempMove: LiveMoveRow = {
@@ -339,7 +357,7 @@ export function useLiveGame(
       }).catch((err) => console.error('[LiveKit pass broadcast error]', err));
     }
 
-    const res = await apiSubmitMove(activeGame.id, effectivePlayer.identity, 0, 0, effectivePlayer.color);
+    const res = await apiSubmitMove(activeGame.id, effectivePlayer.identity, 0, 0, effectivePlayer.color, nextClock);
     if (!res.ok) {
       setError(res.error ?? 'pass failed');
       // 失敗した場合は仮着手を削除
@@ -353,7 +371,108 @@ export function useLiveGame(
         setError(String(e));
       }
     }
-  }, [activeGame, effectivePlayer, derived.lastMove, derived.moveNumber, classroom]);
+  }, [activeGame, effectivePlayer, derived.lastMove, derived.moveNumber, classroom, isMyTurn, isTeacher]);
+
+  const [localClock, setLocalClock] = useState<GameClock | null>(null);
+
+  // game.clock が更新されたら同期
+  useEffect(() => {
+    if (activeGame?.clock) {
+      setLocalClock(activeGame.clock);
+    } else {
+      setLocalClock(null);
+    }
+  }, [activeGame?.clock]);
+
+  // ローカルの時間切れ処理
+  const handleLocalTimeUp = useCallback(
+    async (color: 'BLACK' | 'WHITE') => {
+      if (!activeGame) return;
+      
+      // 自分がその時間切れになったプレイヤーである場合、または先生である場合のみ終局APIを投げる
+      const isMyTimeUp = myColor === color;
+      if (isMyTimeUp || isTeacher) {
+        const winner = color === 'BLACK' ? 'W' : 'B';
+        try {
+          await apiFinishGame(activeGame.id, `${winner}+T`);
+        } catch (e) {
+          console.error("Failed to finish game on timeup:", e);
+        }
+      }
+    },
+    [activeGame, myColor, isTeacher]
+  );
+
+  // 1秒ごとにローカル残り時間を減少させる
+  useEffect(() => {
+    if (!localClock || activeGame?.status !== 'playing') return;
+    if (localClock.lastTickTime === null) return; // 時計が動いていない（一時停止中）
+
+    const timer = setInterval(() => {
+      setLocalClock((prev) => {
+        if (!prev) return null;
+        
+        const isBlackTurn = derived.currentColor === 'BLACK';
+        const now = Date.now();
+        const elapsed = (now - (prev.lastTickTime || now)) / 1000;
+        
+        if (elapsed < 0.9) return prev; // 1秒未満はスキップ
+
+        const timeLeft = isBlackTurn ? prev.blackTimeLeft : prev.whiteTimeLeft;
+        const byoyomiLeft = isBlackTurn ? prev.blackByoyomiLeft : prev.whiteByoyomiLeft;
+
+        let newTimeLeft = timeLeft - elapsed;
+        let newByoyomiLeft = byoyomiLeft;
+
+        if (newTimeLeft <= 0) {
+          if (prev.byoyomiPeriods > 0 && newByoyomiLeft > 0) {
+            // 秒読みを消費
+            if (timeLeft > 0) {
+              // 持ち時間切れ -> 秒読み開始
+              newTimeLeft = prev.byoyomiSeconds;
+            } else {
+              // 秒読み中 -> 1回消費
+              newByoyomiLeft -= 1;
+              if (newByoyomiLeft <= 0) {
+                // 時間切れ (切れ負け)
+                clearInterval(timer);
+                handleLocalTimeUp(derived.currentColor);
+                return {
+                  ...prev,
+                  lastTickTime: now,
+                  ...(isBlackTurn
+                    ? { blackTimeLeft: 0, blackByoyomiLeft: 0 }
+                    : { whiteTimeLeft: 0, whiteByoyomiLeft: 0 }),
+                };
+              }
+              newTimeLeft = prev.byoyomiSeconds;
+            }
+          } else {
+            // 持ち時間切れ (秒読みなし)
+            clearInterval(timer);
+            handleLocalTimeUp(derived.currentColor);
+            return {
+              ...prev,
+              lastTickTime: now,
+              ...(isBlackTurn
+                ? { blackTimeLeft: 0, blackByoyomiLeft: 0 }
+                : { whiteTimeLeft: 0, whiteByoyomiLeft: 0 }),
+            };
+          }
+        }
+
+        return {
+          ...prev,
+          lastTickTime: now,
+          ...(isBlackTurn
+            ? { blackTimeLeft: newTimeLeft, blackByoyomiLeft: newByoyomiLeft }
+            : { whiteTimeLeft: newTimeLeft, whiteByoyomiLeft: newByoyomiLeft }),
+        };
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [localClock === null, activeGame?.status, derived.currentColor, handleLocalTimeUp]);
 
   const submitResign = useCallback(async () => {
     if (!activeGame || !effectivePlayer) return;
@@ -419,6 +538,7 @@ export function useLiveGame(
     myColor,
     isParticipant,
     isMyTurn,
+    clock: localClock,
     loading: activeLoading,
     error: activeError,
     submitMove: submitMoveFn,

@@ -3,6 +3,7 @@ import GoBoard from './GoBoard';
 import { Flag, SkipForward, Check, RefreshCw } from 'lucide-react';
 import { calculateTerritory, formatScoringResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
+import { formatTime } from '../hooks/useGameClock';
 import { useLiveGame } from '../hooks/useLiveGame';
 import { getSupabase } from '../utils/liveGameApi';
 import { ClassroomLiveKit } from '../utils/classroomLiveKit';
@@ -26,6 +27,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
     whiteCaptures,
     isMyTurn,
     isParticipant,
+    clock,
     loading,
     error,
     submitMove,
@@ -119,6 +121,34 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
     );
   }
 
+  // 黒残り時間表示
+  const renderBlackClock = () => {
+    if (!clock) return null;
+    const isLow = clock.blackTimeLeft <= 10 && clock.blackTimeLeft > 0;
+    const isByoyomi = clock.blackTimeLeft <= 0 && clock.byoyomiPeriods > 0;
+    return (
+      <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
+        isLow || isByoyomi ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-300'
+      }`}>
+        {isByoyomi ? `秒読 ${Math.ceil(clock.blackTimeLeft)}秒 [${clock.blackByoyomiLeft}]` : formatTime(clock.blackTimeLeft)}
+      </span>
+    );
+  };
+
+  // 白残り時間表示
+  const renderWhiteClock = () => {
+    if (!clock) return null;
+    const isLow = clock.whiteTimeLeft <= 10 && clock.whiteTimeLeft > 0;
+    const isByoyomi = clock.whiteTimeLeft <= 0 && clock.byoyomiPeriods > 0;
+    return (
+      <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
+        isLow || isByoyomi ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-300'
+      }`}>
+        {isByoyomi ? `秒読 ${Math.ceil(clock.whiteTimeLeft)}秒 [${clock.whiteByoyomiLeft}]` : formatTime(clock.whiteTimeLeft)}
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-4">
       {/* 対局情報ヘッダー */}
@@ -135,6 +165,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
               {game.black_player}
             </span>
             <span className="text-zinc-600 text-sm">取{blackCaptures}</span>
+            {renderBlackClock()}
           </div>
           <span className="text-zinc-600">vs</span>
           <div className="flex items-center gap-2">
@@ -143,6 +174,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
               {game.white_player}
             </span>
             <span className="text-zinc-600 text-sm">取{whiteCaptures}</span>
+            {renderWhiteClock()}
           </div>
         </div>
         <div data-testid="move-count" className="text-sm text-zinc-500 flex items-center gap-3">

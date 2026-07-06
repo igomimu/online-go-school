@@ -18,6 +18,7 @@ interface SubmitMoveBody {
   x: number
   y: number
   color: Color
+  clock?: any
 }
 
 function opposite(c: Color): Color {
@@ -49,7 +50,7 @@ Deno.serve(async (req) => {
     return json({ error: 'Invalid JSON' }, 400)
   }
 
-  const { game_id, caller_identity, x, y, color } = body
+  const { game_id, caller_identity, x, y, color, clock } = body
   if (!game_id || !caller_identity || typeof x !== 'number' || typeof y !== 'number' || !color) {
     return json({ error: 'Missing required fields' }, 400)
   }
@@ -177,11 +178,15 @@ Deno.serve(async (req) => {
     return json({ error: 'Insert failed', detail: insertErr.message }, 500)
   }
 
-  // 5. updated_at を打刻（Realtime に games 側の変化も知らせる）
+  // 5. updated_at と clock を打刻（Realtime に games 側の変化も知らせる）
+  const updateData: any = { updated_at: new Date().toISOString() }
+  if (clock !== undefined) {
+    updateData.clock = clock
+  }
   await supabase
     .from('go_school_live_games')
-    .update({ updated_at: new Date().toISOString() })
+    .update(updateData)
     .eq('id', game_id)
-
+ 
   return json({ ok: true, move_number: nextMoveNumber })
 })

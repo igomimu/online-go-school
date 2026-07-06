@@ -2,6 +2,18 @@ import type { Student } from '../types/classroom';
 
 const STUDENT_PREFIX = 'sid:';
 
+export function stripSid(value: string): string {
+  return value.startsWith(STUDENT_PREFIX) ? value.slice(STUDENT_PREFIX.length) : value;
+}
+
+export function studentMatchesPlayer(
+  studentId: string | null | undefined,
+  player: string | null | undefined,
+): boolean {
+  if (!studentId || !player) return false;
+  return stripSid(studentId) === stripSid(player);
+}
+
 export function makeStudentIdentity(studentId: string): string {
   return `${STUDENT_PREFIX}${studentId}`;
 }

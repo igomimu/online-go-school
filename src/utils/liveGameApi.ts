@@ -208,6 +208,7 @@ export async function submitMove(
   x: number,
   y: number,
   color: StoneColor,
+  clock?: GameClock,
 ): Promise<SubmitMoveResult> {
   const sb = getSupabase();
   const url = `${functionsBaseUrl()}/submit_move`;
@@ -220,7 +221,7 @@ export async function submitMove(
   const res = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ game_id: gameId, caller_identity: callerIdentity, x, y, color }),
+    body: JSON.stringify({ game_id: gameId, caller_identity: callerIdentity, x, y, color, clock }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
