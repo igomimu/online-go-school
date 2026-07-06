@@ -90,6 +90,7 @@ export interface GameMovePayload {
   x: number;
   y: number;
   color: StoneColor;
+  moveNumber?: number;
 }
 
 export interface GameBoardUpdatePayload {
@@ -105,6 +106,7 @@ export interface GameBoardUpdatePayload {
 export interface GamePassPayload {
   gameId: string;
   color: StoneColor;
+  moveNumber?: number;
 }
 
 export interface GameResignPayload {

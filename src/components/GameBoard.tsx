@@ -5,16 +5,18 @@ import { calculateTerritory, formatScoringResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { useLiveGame } from '../hooks/useLiveGame';
 import { getSupabase } from '../utils/liveGameApi';
+import { ClassroomLiveKit } from '../utils/classroomLiveKit';
 
 interface GameBoardProps {
   gameId: string;
   myIdentity: string;
   isTeacher?: boolean;
   onBack?: () => void;
+  classroom?: ClassroomLiveKit | null;
 }
 
-export default function GameBoard({ gameId, myIdentity, isTeacher, onBack }: GameBoardProps) {
-  const live = useLiveGame(gameId, myIdentity, !!isTeacher);
+export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, classroom }: GameBoardProps) {
+  const live = useLiveGame(gameId, myIdentity, !!isTeacher, classroom);
   const {
     game,
     boardState,

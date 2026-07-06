@@ -190,6 +190,15 @@ function App() {
 
     classroom.setHandlers({
       onMessage: (msg: ClassroomMessage, sender?: string) => {
+        // 対局関連メッセージをカスタムイベントで通知（低遅延同期用）
+        if (msg.type === 'GAME_MOVE' || msg.type === 'GAME_PASS' || msg.type === 'GAME_RESIGN') {
+          window.dispatchEvent(
+            new CustomEvent('live-game-message', {
+              detail: { msg, sender },
+            })
+          );
+        }
+
         // 先生: 対局メッセージ処理
         // 対局関連メッセージはSupabase側で扱うのでここでは不要
         void sender;
@@ -514,6 +523,16 @@ function App() {
     const myActiveGame = games.find(
       g => g.status === 'playing' && (g.blackPlayer === myId || g.whitePlayer === myId),
     );
+
+    // 中断にしてからサインアウト（順序重要: signOut前に認証付きで実行）
+    if (role !== 'TEACHER' && myActiveGame) {
+      try {
+        await finishGame(myActiveGame.id, '中断');
+      } catch (err) {
+        console.error('Failed to suspend game on disconnect:', err);
+      }
+    }
+
     classroomRef.current?.destroy();
     classroomRef.current = null;
     setConnectionState(ConnectionState.Disconnected);
@@ -526,12 +545,8 @@ function App() {
     if (role === 'TEACHER') {
       setTeacherPhase('manage');
     } else {
-      // 中断にしてからサインアウト（順序重要: signOut前に認証付きで実行）
-      if (myActiveGame) {
-        await finishGame(myActiveGame.id, '中断').catch(() => {});
-      }
       setRole(null);
-      void supabaseSignOut();
+      await supabaseSignOut().catch(() => {});
     }
   };
 
@@ -1053,6 +1068,7 @@ function App() {
                 myIdentity={classroomRef.current?.localIdentity ?? userName}
                 isTeacher={false}
                 onBack={handleBackToLobby}
+                classroom={classroomRef.current}
               />
             </div>
           ) : (
@@ -1061,6 +1077,7 @@ function App() {
               myIdentity={classroomRef.current?.localIdentity ?? userName}
               isTeacher={true}
               onBack={handleBackToLobby}
+              classroom={classroomRef.current}
             />
           )
         )}

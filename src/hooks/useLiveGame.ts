@@ -14,6 +14,8 @@ import {
   type LiveGameRow,
   type LiveMoveRow,
 } from '../utils/liveGameApi';
+import type { ClassroomLiveKit, ClassroomMessage } from '../utils/classroomLiveKit';
+import type { GameMovePayload } from '../types/game';
 
 interface DerivedState {
   boardState: BoardState;
@@ -101,6 +103,7 @@ export function useLiveGame(
   gameId: string | null,
   myIdentity: string,
   isTeacher: boolean = false,
+  classroom: ClassroomLiveKit | null = null,
 ): UseLiveGameResult {
   const [game, setGame] = useState<LiveGameRow | null>(null);
   const [moves, setMoves] = useState<LiveMoveRow[]>([]);
@@ -137,8 +140,16 @@ export function useLiveGame(
       },
       onMoveInsert: (row) => {
         setMoves((prev) => {
-          // 重複防止（自分が送信した着手が既に反映されている場合）
-          if (prev.some((m) => m.move_number === row.move_number)) return prev;
+          // 重複防止（仮の着手が既に反映されている場合、本物に差し替える）
+          const idx = prev.findIndex((m) => m.move_number === row.move_number);
+          if (idx >= 0) {
+            if (prev[idx].player_id.startsWith('temp-')) {
+              const next = [...prev];
+              next[idx] = row;
+              return next;
+            }
+            return prev;
+          }
           return [...prev, row].sort((a, b) => a.move_number - b.move_number);
         });
       },
@@ -149,6 +160,63 @@ export function useLiveGame(
       cancelled = true;
       channel.unsubscribe();
       channelRef.current = null;
+    };
+  }, [gameId]);
+
+  // LiveKitデータチャネル経由の低レイテンシ着手メッセージをリッスン
+  useEffect(() => {
+    if (!gameId) return;
+
+    const handleLiveGameMessage = (e: Event) => {
+      const customEvent = e as CustomEvent<{ msg: ClassroomMessage; sender?: string }>;
+      const { msg, sender } = customEvent.detail;
+      
+      if (msg.type === 'GAME_MOVE') {
+        const p = msg.payload as GameMovePayload;
+        if (p.gameId !== gameId) return;
+        
+        setMoves((prev) => {
+          const moveNum = p.moveNumber ?? (prev.length > 0 ? Math.max(...prev.map(m => m.move_number)) + 1 : 1);
+          if (prev.some((m) => m.move_number === moveNum)) return prev;
+          
+          const tempMove: LiveMoveRow = {
+            game_id: gameId,
+            move_number: moveNum,
+            player_id: `temp-lk-${Date.now()}-${sender || ''}`,
+            x: p.x,
+            y: p.y,
+            color: p.color,
+            created_at: new Date().toISOString(),
+          };
+          return [...prev, tempMove].sort((a, b) => a.move_number - b.move_number);
+        });
+      }
+      
+      if (msg.type === 'GAME_PASS') {
+        const p = msg.payload as { gameId: string; color: StoneColor; moveNumber?: number };
+        if (p.gameId !== gameId) return;
+        
+        setMoves((prev) => {
+          const moveNum = p.moveNumber ?? (prev.length > 0 ? Math.max(...prev.map(m => m.move_number)) + 1 : 1);
+          if (prev.some((m) => m.move_number === moveNum)) return prev;
+          
+          const tempMove: LiveMoveRow = {
+            game_id: gameId,
+            move_number: moveNum,
+            player_id: `temp-lk-${Date.now()}-${sender || ''}`,
+            x: 0,
+            y: 0,
+            color: p.color,
+            created_at: new Date().toISOString(),
+          };
+          return [...prev, tempMove].sort((a, b) => a.move_number - b.move_number);
+        });
+      }
+    };
+
+    window.addEventListener('live-game-message', handleLiveGameMessage);
+    return () => {
+      window.removeEventListener('live-game-message', handleLiveGameMessage);
     };
   }, [gameId]);
 
@@ -193,21 +261,89 @@ export function useLiveGame(
   const submitMoveFn = useCallback(
     async (x: number, y: number) => {
       if (!activeGame || !effectivePlayer) return;
+      
+      const moveNumber = derived.moveNumber + 1;
+
+      // 1. 楽観的更新（仮着手）
+      const tempMove: LiveMoveRow = {
+        game_id: activeGame.id,
+        move_number: moveNumber,
+        player_id: `temp-opt-${Date.now()}-${effectivePlayer.identity}`,
+        x,
+        y,
+        color: effectivePlayer.color,
+        created_at: new Date().toISOString(),
+      };
+
+      setMoves((prev) => {
+        if (prev.some((m) => m.move_number === tempMove.move_number)) return prev;
+        return [...prev, tempMove].sort((a, b) => a.move_number - b.move_number);
+      });
+
+      // 2. LiveKitデータチャネルでブロードキャスト（即時性のため）
+      if (classroom && classroom.isConnected) {
+        classroom.broadcast({
+          type: 'GAME_MOVE',
+          payload: {
+            gameId: activeGame.id,
+            x,
+            y,
+            color: effectivePlayer.color,
+            moveNumber,
+          } as GameMovePayload
+        }).catch((err) => console.error('[LiveKit move broadcast error]', err));
+      }
+
+      // 3. Supabase（真実のソース）へ送信
       const res = await apiSubmitMove(activeGame.id, effectivePlayer.identity, x, y, effectivePlayer.color);
-      if (!res.ok) setError(res.error ?? 'submit failed');
+      if (!res.ok) {
+        setError(res.error ?? 'submit failed');
+        // 失敗した場合は仮着手を削除
+        setMoves((prev) => prev.filter((m) => m.player_id !== tempMove.player_id));
+      }
     },
-    [activeGame, effectivePlayer],
+    [activeGame, effectivePlayer, derived.moveNumber, classroom],
   );
 
   const submitPass = useCallback(async () => {
     if (!activeGame || !effectivePlayer) return;
-    // 連続パスなら整地へ（ローカルstate基準。Realtimeラグのためピタッと当たらない場合は先生が手動遷移可）
     const lastMove = derived.lastMove;
     const isSecondPass = lastMove && lastMove.x === 0 && lastMove.y === 0;
+    const moveNumber = derived.moveNumber + 1;
+
+    // 1. 楽観的更新
+    const tempMove: LiveMoveRow = {
+      game_id: activeGame.id,
+      move_number: moveNumber,
+      player_id: `temp-opt-${Date.now()}-${effectivePlayer.identity}`,
+      x: 0,
+      y: 0,
+      color: effectivePlayer.color,
+      created_at: new Date().toISOString(),
+    };
+
+    setMoves((prev) => {
+      if (prev.some((m) => m.move_number === tempMove.move_number)) return prev;
+      return [...prev, tempMove].sort((a, b) => a.move_number - b.move_number);
+    });
+
+    // 2. LiveKitデータチャネルでブロードキャスト
+    if (classroom && classroom.isConnected) {
+      classroom.broadcast({
+        type: 'GAME_PASS',
+        payload: {
+          gameId: activeGame.id,
+          color: effectivePlayer.color,
+          moveNumber,
+        }
+      }).catch((err) => console.error('[LiveKit pass broadcast error]', err));
+    }
 
     const res = await apiSubmitMove(activeGame.id, effectivePlayer.identity, 0, 0, effectivePlayer.color);
     if (!res.ok) {
       setError(res.error ?? 'pass failed');
+      // 失敗した場合は仮着手を削除
+      setMoves((prev) => prev.filter((m) => m.player_id !== tempMove.player_id));
       return;
     }
     if (isSecondPass) {
@@ -217,7 +353,7 @@ export function useLiveGame(
         setError(String(e));
       }
     }
-  }, [activeGame, effectivePlayer, derived.lastMove]);
+  }, [activeGame, effectivePlayer, derived.lastMove, derived.moveNumber, classroom]);
 
   const submitResign = useCallback(async () => {
     if (!activeGame || !effectivePlayer) return;
