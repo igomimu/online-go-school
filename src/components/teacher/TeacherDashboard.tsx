@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import type { GameSession, AudioPermissions } from '../../types/game';
+import type { GameSession, AudioPermissions, SavedGame } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
@@ -9,6 +9,7 @@ import { parseSGFTree } from '../../utils/sgfUtils';
 import { createEmptyBoard } from '../../utils/gameLogic';
 import type { Problem } from '../../types/problem';
 import type { StoneColor } from '../GoBoard';
+import { loadSavedGamesForStudent } from '../../utils/savedGames';
 
 import StudentTable from './StudentTable';
 import BoardThumbnailGrid from './BoardThumbnailGrid';
@@ -50,6 +51,7 @@ interface TeacherDashboardProps {
   onClearAudioS?: () => void;
   onClearSharing?: () => void;
   onResetVideo?: () => void;
+  onSelectSavedGame?: (game: SavedGame) => void;
 }
 
 export default function TeacherDashboard({
@@ -81,11 +83,31 @@ export default function TeacherDashboard({
   onClearAudioS,
   onClearSharing,
   onResetVideo,
+  onSelectSavedGame,
 }: TeacherDashboardProps) {
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [showStudentLinks, setShowStudentLinks] = useState(false);
   const [showAutoPairing, setShowAutoPairing] = useState(false);
   const [observingGameId, setObservingGameId] = useState<string | null>(null);
+
+  // 棋譜履歴表示用のステート
+  const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
+  const [historyGames, setHistoryGames] = useState<SavedGame[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const handleOpenHistory = useCallback(async (student: Student) => {
+    setHistoryStudent(student);
+    setLoadingHistory(true);
+    try {
+      const list = await loadSavedGamesForStudent(student.name, student.id);
+      setHistoryGames(list);
+    } catch (err) {
+      console.error('Failed to load history:', err);
+      setHistoryGames([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
 
   // 接続中参加者のUUIDをSupabaseで解決してstudentsを補完する
   const [resolvedStudents, setResolvedStudents] = useState<Student[]>([]);
@@ -214,6 +236,7 @@ export default function TeacherDashboard({
           localIdentity={localIdentity}
           onToggleHear={onToggleHear}
           onToggleMic={onToggleMic}
+          onOpenHistory={handleOpenHistory}
           onOpenStudent={(identity) => {
             // 対局中(playing)の生徒のみ来る前提（StudentTable 側で gate 済み）
             const game = filteredGames.find(g =>
@@ -357,6 +380,111 @@ export default function TeacherDashboard({
           onClose={() => setShowAutoPairing(false)}
           onCreateGames={onCreateGames}
         />
+      )}
+
+      {/* 棋譜履歴モーダル */}
+      {historyStudent && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div style={{
+            background: '#e8e8e0',
+            border: '2px solid #666',
+            width: 600,
+            maxHeight: '80vh',
+            display: 'flex',
+            flexDirection: 'column',
+            fontFamily: 'MS Gothic, "Noto Sans JP", monospace',
+            fontSize: 12,
+            color: '#333',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          }}>
+            {/* ヘッダー */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '6px 10px',
+              background: '#d0d0c8',
+              borderBottom: '1px solid #999',
+              fontWeight: 'bold',
+              fontSize: 13,
+            }}>
+              <span>棋譜履歴 - {historyStudent.name} さん</span>
+              <button onClick={() => setHistoryStudent(null)} style={{
+                background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#666',
+              }}>&times;</button>
+            </div>
+
+            <div style={{ padding: 12, overflowY: 'auto', flex: 1 }}>
+              {loadingHistory ? (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: '#666' }}>棋譜履歴を読み込み中...</div>
+              ) : historyGames.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: '#666' }}>保存された棋譜履歴はありません。</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {historyGames.map(game => (
+                    <div
+                      key={game.id}
+                      onClick={() => {
+                        onSelectSavedGame?.(game);
+                        setHistoryStudent(null);
+                      }}
+                      style={{
+                        background: '#fff',
+                        border: '1px solid #ccc',
+                        padding: '8px 10px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#f0f0e8'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                        <span>{game.blackPlayer} (黒) vs {game.whitePlayer} (白)</span>
+                        <span style={{ color: '#0066cc', fontSize: 11 }}>検討を開始する</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666', fontSize: 11 }}>
+                        <span>対局日: {game.date}</span>
+                        <span>{game.boardSize}路盤 | コミ: {game.komi} | 結果: {game.result || '不明'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* フッター */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              padding: '6px 10px',
+              background: '#d0d0c8',
+              borderTop: '1px solid #999',
+            }}>
+              <button
+                onClick={() => setHistoryStudent(null)}
+                style={{
+                  padding: '2px 10px',
+                  background: '#fff',
+                  border: '1px solid #999',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                }}
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

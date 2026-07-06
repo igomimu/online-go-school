@@ -14,6 +14,7 @@ interface StudentTableProps {
   onToggleMic: (identity: string) => void;
   onSelectStudent?: (identity: string) => void;
   onOpenStudent?: (studentIdentity: string) => void;
+  onOpenHistory?: (student: Student) => void;
 }
 
 export default function StudentTable({
@@ -26,6 +27,7 @@ export default function StudentTable({
   onToggleMic,
   onSelectStudent,
   onOpenStudent,
+  onOpenHistory,
 }: StudentTableProps) {
   const rows = buildRows(students, participants, games, localIdentity);
 
@@ -41,6 +43,7 @@ export default function StudentTable({
             <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 32 }}>共有</th>
             <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 32 }}>対局</th>
             <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 40 }}>詳細</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 50 }}>棋譜</th>
             <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 32 }}>送信</th>
             <th className="px-1 py-0.5 border border-gray-400 text-left" style={{ width: 130 }}>生徒ＩＤ</th>
             <th className="px-1 py-0.5 border border-gray-400 text-left">姓名</th>
@@ -137,6 +140,22 @@ export default function StudentTable({
                       }}
                     >
                       開く
+                    </button>
+                  )}
+                </td>
+
+                {/* 棋譜履歴 */}
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
+                  {row.student && (
+                    <button
+                      className="px-1 text-xs border border-gray-500 bg-gray-100 hover:bg-gray-200"
+                      style={{ fontSize: 10 }}
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (row.student) onOpenHistory?.(row.student);
+                      }}
+                    >
+                      履歴
                     </button>
                   )}
                 </td>

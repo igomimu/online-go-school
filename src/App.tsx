@@ -5,7 +5,7 @@ import { convertSgfToGameTree } from './utils/treeUtilsV2';
 import { parseSGFTree } from './utils/sgfUtils';
 import { ClassroomLiveKit } from './utils/classroomLiveKit';
 import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './utils/classroomLiveKit';
-import type { ViewMode, AudioPermissions } from './types/game';
+import type { ViewMode, AudioPermissions, SavedGame } from './types/game';
 import type { Student, Classroom } from './types/classroom';
 import { fetchToken } from './utils/livekitToken';
 import { makeStudentIdentity } from './utils/identityUtils';
@@ -414,6 +414,23 @@ function App() {
           } else {
             setTeacherPhase('manage');
           }
+        } else {
+          // 生徒セッションの復元
+          const lastRole = localStorage.getItem('go-school-last-role');
+          if (lastRole === 'STUDENT') {
+            const sid = localStorage.getItem('go-school-last-student-id');
+            const code = localStorage.getItem('go-school-last-student-code');
+            const cid = localStorage.getItem('go-school-last-student-classroom-id');
+            const name = localStorage.getItem('go-school-last-student-name');
+            if (sid && cid && name) {
+              setStudentId(sid);
+              setRawStudentCode(code || sid);
+              setStudentClassroomId(cid);
+              setRoomName(`go-${cid}`);
+              setUserName(name);
+              setRole('STUDENT');
+            }
+          }
         }
       })();
     }
@@ -518,6 +535,13 @@ function App() {
   };
 
   const handleDisconnect = async () => {
+    // 生徒用自動ログイン情報の消去
+    localStorage.removeItem('go-school-last-role');
+    localStorage.removeItem('go-school-last-student-id');
+    localStorage.removeItem('go-school-last-student-code');
+    localStorage.removeItem('go-school-last-student-classroom-id');
+    localStorage.removeItem('go-school-last-student-name');
+
     // ログアウト時、自分が打ち手の進行中対局を「中断」にする（playingで放置しない）
     const myId = classroomRef.current?.localIdentity ?? userName;
     const myActiveGame = games.find(
@@ -639,6 +663,26 @@ function App() {
     };
     reader.readAsText(file);
     event.target.value = '';
+  }, []);
+
+  // 保存された棋譜を検討モードで開く
+  const handleSelectSavedGame = useCallback((game: SavedGame) => {
+    try {
+      const parsed = parseSGFTree(game.sgf);
+      const root = convertSgfToGameTree(parsed.root, null, parsed.size, 1, parsed.board);
+      setReviewRootNode(root);
+      setReviewCurrentNode(root);
+      setReviewBoardSize(parsed.size);
+      setViewMode('review');
+
+      // 生徒にも通知
+      classroomRef.current?.broadcast({
+        type: 'REVIEW_START',
+        payload: { sgf: game.sgf, boardSize: parsed.size },
+      });
+    } catch (err) {
+      alert('棋譜の読み込みに失敗しました');
+    }
   }, []);
 
   // 授業モード開始
@@ -807,6 +851,12 @@ function App() {
           prefilledClassroomId={prefilledClassroomId}
           onStudentLogin={(sid, cid, rawCode, displayName) => {
             // Supabase Session は LoginScreen 側で確立済み（失敗時はここに来ない）
+            localStorage.setItem('go-school-last-role', 'STUDENT');
+            localStorage.setItem('go-school-last-student-id', sid);
+            localStorage.setItem('go-school-last-student-code', rawCode || sid);
+            localStorage.setItem('go-school-last-student-classroom-id', cid);
+            localStorage.setItem('go-school-last-student-name', displayName || sid);
+
             setStudentId(sid);
             setRawStudentCode(rawCode || sid);
             setStudentClassroomId(cid);
@@ -1046,6 +1096,7 @@ function App() {
             onClearAudioS={handleClearAudioS}
             onClearSharing={() => setReviewTargetStudents([])}
             onResetVideo={handleResetVideo}
+            onSelectSavedGame={handleSelectSavedGame}
           />
         )}
 

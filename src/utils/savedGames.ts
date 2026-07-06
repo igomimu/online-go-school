@@ -99,3 +99,40 @@ export async function syncFromSupabase(): Promise<SavedGame[]> {
 
   return games;
 }
+
+export async function loadSavedGamesForStudent(studentName: string, studentIdentity?: string): Promise<SavedGame[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+
+  let query = sb.from('go_school_games').select('*');
+
+  const orConditions = [
+    `black_player.eq."${studentName}"`,
+    `white_player.eq."${studentName}"`
+  ];
+  if (studentIdentity) {
+    orConditions.push(`black_player.eq."${studentIdentity}"`);
+    orConditions.push(`white_player.eq."${studentIdentity}"`);
+  }
+
+  const { data, error } = await query
+    .or(orConditions.join(','))
+    .order('created_at', { ascending: false });
+
+  if (error || !data) {
+    console.error('Supabase load history error:', error?.message);
+    return [];
+  }
+
+  return data.map(row => ({
+    id: row.id,
+    date: row.date,
+    blackPlayer: row.black_player,
+    whitePlayer: row.white_player,
+    boardSize: row.board_size,
+    handicap: row.handicap,
+    komi: row.komi,
+    result: row.result,
+    sgf: row.sgf,
+  }));
+}
