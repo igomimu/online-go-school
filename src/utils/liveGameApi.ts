@@ -121,7 +121,7 @@ async function getRoleAuthToken(sb: SupabaseClient): Promise<string | null> {
 }
 
 async function executeGameAction(
-  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset',
+  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume',
   gameId?: string,
   params?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
@@ -297,7 +297,12 @@ export function subscribeClassroomGames(
   return channel;
 }
 
-/** 对局を初期状態（0手目、石なし）に強制リセットする（先生権限） */
+/** 対局を初期状態（0手目、石なし）に強制リセットする（先生権限） */
 export async function resetLiveGame(gameId: string): Promise<void> {
   await executeGameAction('reset', gameId);
+}
+
+/** 中断または終了した対局を再開する（先生または対局者） */
+export async function resumeLiveGame(gameId: string): Promise<void> {
+  await executeGameAction('resume', gameId);
 }

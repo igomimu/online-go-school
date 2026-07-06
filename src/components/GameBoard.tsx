@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import GoBoard from './GoBoard';
 import { Flag, SkipForward, Check, RefreshCw } from 'lucide-react';
 import { calculateTerritory, formatScoringResult } from '../utils/scoring';
@@ -100,6 +100,16 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
     const resultStr = formatScoringResult(scoringResult);
     finishWithResult(resultStr);
   }, [scoringResult, finishWithResult]);
+
+  // 対局終了（投了・整地完了）時に自動で閉じる
+  useEffect(() => {
+    if (game && game.status === 'finished' && onBack) {
+      const timer = setTimeout(() => {
+        onBack();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [game?.status, onBack]);
 
   if (loading || !game) {
     return (

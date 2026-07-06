@@ -7,9 +7,10 @@ interface GameThumbnailProps {
   onClick: () => void;
   isActive?: boolean;
   students?: Student[];
+  onResume?: (gameId: string) => void;
 }
 
-export default function GameThumbnail({ game, onClick, isActive, students = [] }: GameThumbnailProps) {
+export default function GameThumbnail({ game, onClick, isActive, students = [], onResume }: GameThumbnailProps) {
   const size = game.boardSize;
   const cellSize = 8;
   const totalSize = size * cellSize;
@@ -71,10 +72,23 @@ export default function GameThumbnail({ game, onClick, isActive, students = [] }
           <span className="w-2 h-2 rounded-full bg-white border border-white/20 inline-block" />
           <span className="truncate">{whiteName}</span>
         </div>
-        <div className="text-zinc-500">
-          {game.status === 'playing'
-            ? `${game.moveNumber}手目`
-            : game.result || '終局'}
+        <div className="text-zinc-500 flex justify-between items-center gap-1">
+          <span>
+            {game.status === 'playing'
+              ? `${game.moveNumber}手目`
+              : game.result || '終局'}
+          </span>
+          {game.status === 'finished' && game.result === '中断' && onResume && (
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                onResume(game.id);
+              }}
+              className="px-1.5 py-0.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-[10px] font-bold"
+            >
+              再開
+            </button>
+          )}
         </div>
       </div>
     </button>

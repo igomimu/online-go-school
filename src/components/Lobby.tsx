@@ -42,6 +42,7 @@ interface LobbyProps {
   // チャット（生徒側で表示）
   chatMessages?: ChatMessage[];
   onChatSend?: (text: string, target: 'all' | string) => void;
+  onResumeGame?: (gameId: string) => void;
 }
 
 export default function Lobby({
@@ -66,6 +67,7 @@ export default function Lobby({
   currentStudentName,
   chatMessages,
   onChatSend,
+  onResumeGame,
 }: LobbyProps) {
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -82,6 +84,11 @@ export default function Lobby({
   // 自分が参加中の対局
   const myGame = games.find(g =>
     g.status === 'playing' && (g.blackPlayer === myIdentity || g.whitePlayer === myIdentity)
+  );
+
+  // 自分が参加中の中断対局
+  const mySuspendedGame = games.find(g =>
+    g.status === 'finished' && g.result === '中断' && (g.blackPlayer === myIdentity || g.whitePlayer === myIdentity)
   );
 
   return (
@@ -144,6 +151,28 @@ export default function Lobby({
           </div>
         )}
 
+        {/* 中断された対局があれば再開ボタンを提示 */}
+        {mySuspendedGame && role === 'STUDENT' && !myGame && (
+          <div className="glass-panel p-4 bg-yellow-500/10 border-yellow-500/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-yellow-400">中断された対局があります</h3>
+                <p className="text-sm text-zinc-400">
+                  {mySuspendedGame.blackPlayer} vs {mySuspendedGame.whitePlayer} ({mySuspendedGame.moveNumber}手目)
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onResumeGame?.(mySuspendedGame.id)}
+                  className="premium-button text-sm bg-yellow-600/20 text-yellow-400 border-yellow-500/30 hover:bg-yellow-600/30 flex items-center gap-1.5"
+                >
+                  対局を再開する
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 先生用アクションボタン */}
         {role === 'TEACHER' && (
           <div className="flex gap-3 flex-wrap">
@@ -198,6 +227,7 @@ export default function Lobby({
                   game={game}
                   onClick={() => onSelectGame(game.id)}
                   students={students}
+                  onResume={onResumeGame}
                 />
               ))}
             </div>

@@ -9,6 +9,7 @@ interface BoardThumbnailGridProps {
   students: Student[];
   participants: ParticipantInfo[];
   onSelectGame: (gameId: string) => void;
+  onResumeGame?: (gameId: string) => void;
 }
 
 // IGC風の空碁盤スロット
@@ -45,6 +46,7 @@ export default function BoardThumbnailGrid({
   students,
   participants,
   onSelectGame,
+  onResumeGame,
 }: BoardThumbnailGridProps) {
   const connectedIdentities = new Set(participants.map(p => p.identity));
 
@@ -90,7 +92,7 @@ export default function BoardThumbnailGrid({
             {/* 碁盤 */}
             {game ? (
               <div onClick={() => onSelectGame(game.id)} style={{ cursor: 'pointer' }}>
-                <GameThumbnail game={game} onClick={() => onSelectGame(game.id)} students={students} />
+                <GameThumbnail game={game} onClick={() => onSelectGame(game.id)} students={students} onResume={onResumeGame} />
               </div>
             ) : (
               <EmptyBoardSlot isConnected={isConnected} />

@@ -11,7 +11,7 @@ import { fetchToken } from './utils/livekitToken';
 import { makeStudentIdentity } from './utils/identityUtils';
 import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
-import { liveRowToSession, finishGame } from './utils/liveGameApi';
+import { liveRowToSession, finishGame, resumeLiveGame } from './utils/liveGameApi';
 import { fetchRoster, loadStudents, loadClassrooms } from './utils/classroomStore';
 import { saveAccount, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } from './utils/authStore';
 
@@ -700,6 +700,18 @@ function App() {
     }
   }, [role]);
 
+  // 対局の再開処理
+  const handleResumeGame = useCallback(async (gameId: string) => {
+    try {
+      await resumeLiveGame(gameId);
+      // 再開成功後、即座にその対局画面を開く
+      setActiveGameId(gameId);
+      setViewMode('game');
+    } catch (e) {
+      alert(`対局の再開に失敗しました: ${e}`);
+    }
+  }, []);
+
   // 対局終了時に自動的に閉じる（ロビーに戻る）
   useEffect(() => {
     if (!activeGameId) return;
@@ -1097,6 +1109,7 @@ function App() {
             onClearSharing={() => setReviewTargetStudents([])}
             onResetVideo={handleResetVideo}
             onSelectSavedGame={handleSelectSavedGame}
+            onResumeGame={handleResumeGame}
           />
         )}
 
@@ -1118,31 +1131,21 @@ function App() {
             currentStudentName={currentStudentName}
             chatMessages={chat.messages}
             onChatSend={chat.sendMessage}
+            onResumeGame={handleResumeGame}
           />
         )}
 
         {/* 対局画面 */}
         {effectiveViewMode === 'game' && activeGameId && (
-          role === 'STUDENT' ? (
-            // 生徒は全画面（教室レイアウトを覆う・同じタブなのでログイン保持）
-            <div className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto p-2 sm:p-4">
-              <GameBoard
-                gameId={activeGameId}
-                myIdentity={classroomRef.current?.localIdentity ?? userName}
-                isTeacher={false}
-                onBack={handleBackToLobby}
-                classroom={classroomRef.current}
-              />
-            </div>
-          ) : (
+          <div className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto p-2 sm:p-4">
             <GameBoard
               gameId={activeGameId}
               myIdentity={classroomRef.current?.localIdentity ?? userName}
-              isTeacher={true}
+              isTeacher={role === 'TEACHER'}
               onBack={handleBackToLobby}
               classroom={classroomRef.current}
             />
-          )
+          </div>
         )}
 
         {/* 授業モード */}
@@ -1166,22 +1169,24 @@ function App() {
 
         {/* 検討モード */}
         {effectiveViewMode === 'review' && reviewRootNode && reviewCurrentNode && (
-          <ReviewBoard
-            rootNode={reviewRootNode}
-            currentNode={reviewCurrentNode}
-            boardSize={reviewBoardSize}
-            onSetCurrentNode={setReviewCurrentNode}
-            isTeacher={role === 'TEACHER'}
-            classroomRef={classroomRef}
-            participants={participants}
-            localIdentity={classroomRef.current?.localIdentity ?? ''}
-            targetStudents={reviewTargetStudents}
-            onSetTargetStudents={setReviewTargetStudents}
-            onBack={role === 'TEACHER' ? handleBackToLobby : undefined}
-            registeredStudents={students}
-            chatMessages={chat.messages}
-            onChatSend={chat.sendMessage}
-          />
+          <div className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto p-2 sm:p-4">
+            <ReviewBoard
+              rootNode={reviewRootNode}
+              currentNode={reviewCurrentNode}
+              boardSize={reviewBoardSize}
+              onSetCurrentNode={setReviewCurrentNode}
+              isTeacher={role === 'TEACHER'}
+              classroomRef={classroomRef}
+              participants={participants}
+              localIdentity={classroomRef.current?.localIdentity ?? ''}
+              targetStudents={reviewTargetStudents}
+              onSetTargetStudents={setReviewTargetStudents}
+              onBack={role === 'TEACHER' ? handleBackToLobby : undefined}
+              registeredStudents={students}
+              chatMessages={chat.messages}
+              onChatSend={chat.sendMessage}
+            />
+          </div>
         )}
 
         {/* 詰碁モード */}

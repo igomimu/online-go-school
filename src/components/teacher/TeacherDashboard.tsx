@@ -52,6 +52,7 @@ interface TeacherDashboardProps {
   onClearSharing?: () => void;
   onResetVideo?: () => void;
   onSelectSavedGame?: (game: SavedGame) => void;
+  onResumeGame?: (gameId: string) => void;
 }
 
 export default function TeacherDashboard({
@@ -84,6 +85,7 @@ export default function TeacherDashboard({
   onClearSharing,
   onResetVideo,
   onSelectSavedGame,
+  onResumeGame,
 }: TeacherDashboardProps) {
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [showStudentLinks, setShowStudentLinks] = useState(false);
@@ -264,6 +266,7 @@ export default function TeacherDashboard({
               students={filteredStudents}
               participants={filteredParticipants}
               onSelectGame={(gameId) => setObservingGameId(gameId)}
+              onResumeGame={onResumeGame}
             />
           )}
         </div>

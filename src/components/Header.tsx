@@ -56,7 +56,7 @@ export default function Header({
           <>
             <button
               onClick={onToggleMic}
-              className={`p-2 rounded-lg transition-all ${
+              className={`p-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 isMicEnabled
                   ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
                   : 'bg-white/5 text-zinc-500 hover:bg-white/10'
@@ -64,6 +64,11 @@ export default function Header({
               title={isMicEnabled ? 'マイクOFF' : 'マイクON'}
             >
               {isMicEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+              {role === 'STUDENT' && (
+                <span className="text-xs font-bold whitespace-nowrap">
+                  {isMicEnabled ? 'マイク中（自分の声を送っています）' : '自分の声を送る（マイク）'}
+                </span>
+              )}
             </button>
             <button
               onClick={onToggleMute}
@@ -79,7 +84,7 @@ export default function Header({
             {onToggleCamera && (
               <button
                 onClick={onToggleCamera}
-                className={`p-2 rounded-lg transition-all ${
+                className={`p-2 rounded-lg transition-all flex items-center gap-1.5 ${
                   isCameraEnabled
                     ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
                     : 'bg-white/5 text-zinc-500 hover:bg-white/10'
@@ -87,6 +92,11 @@ export default function Header({
                 title={isCameraEnabled ? 'カメラOFF' : 'カメラON'}
               >
                 {isCameraEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                {role === 'STUDENT' && (
+                  <span className="text-xs font-bold whitespace-nowrap">
+                    {isCameraEnabled ? '映像送信中（自分の顔を送っています）' : '自分の映像を送る（カメラ）'}
+                  </span>
+                )}
               </button>
             )}
           </>

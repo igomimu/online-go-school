@@ -9,7 +9,7 @@ const corsHeaders = {
 }
 
 interface ActionBody {
-  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset'
+  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume'
   game_id?: string
   params?: any
 }
@@ -221,6 +221,20 @@ Deno.serve(async (req) => {
         .eq('id', game_id)
 
       if (resetGameError) throw resetGameError
+      return json({ ok: true })
+    }
+
+    if (action === 'resume') {
+      const { error } = await supabase
+        .from('go_school_live_games')
+        .update({
+          status: 'playing',
+          result: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', game_id)
+
+      if (error) throw error
       return json({ ok: true })
     }
 
