@@ -6,7 +6,7 @@ import { getMainPath, addMove } from '../utils/treeUtilsV2';
 import type { ParticipantInfo, ClassroomLiveKit } from '../utils/classroomLiveKit';
 import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser } from 'lucide-react';
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2 } from 'lucide-react';
 import { checkCapture } from '../utils/gameLogic';
 import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
 import { useAiAnalysis } from '../hooks/useAiAnalysis';
@@ -93,6 +93,7 @@ export default function ReviewBoard({
   chatMessages,
   onChatSend,
 }: ReviewBoardProps) {
+  const [isMaximized, setIsMaximized] = useState(true);
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [drawMode, setDrawMode] = useState<'off' | 'line' | 'arrow'>('off');
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
@@ -326,21 +327,35 @@ export default function ReviewBoard({
         <div className="glass-panel px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {onBack && (
-              <button onClick={onBack} className="text-zinc-500 hover:text-white text-sm">
-                &larr; ロビーに戻る
+              <button
+                onClick={onBack}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold shadow-md transition-all"
+              >
+                <X className="w-4 h-4" /> 検討を閉じる
               </button>
             )}
-            <span className="font-bold">検討モード</span>
-            <span className="text-sm text-zinc-500">
+            <span className="font-bold text-base ml-2">検討モード</span>
+            <span className="text-sm text-zinc-400">
               {currentMoveNumber}手目
             </span>
           </div>
-          {isTeacher && currentNode.children.length > 1 && (
-            <div className="flex items-center gap-2 text-blue-300 text-sm">
-              <GitBranch className="w-4 h-4" />
-              <span>{currentNode.children.length}変化</span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {isTeacher && (
+              <button
+                onClick={() => setIsMaximized(!isMaximized)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white rounded-lg text-xs font-semibold transition-all"
+              >
+                {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                {isMaximized ? '操作パネルを表示' : '碁盤のみ最大化'}
+              </button>
+            )}
+            {isTeacher && currentNode.children.length > 1 && (
+              <div className="flex items-center gap-2 text-blue-300 text-sm">
+                <GitBranch className="w-4 h-4" />
+                <span>{currentNode.children.length}変化</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 碁盤 */}
@@ -567,8 +582,8 @@ export default function ReviewBoard({
       </div>
 
       {/* サイドバー（先生のみ） */}
-      {isTeacher && (
-        <div className="w-full lg:w-64 space-y-4 lg:overflow-y-auto lg:min-h-0">
+      {!isMaximized && isTeacher && (
+        <div className="w-full lg:w-64 space-y-4 lg:overflow-y-auto lg:min-h-0 flex-shrink-0">
           {/* AI分析パネル */}
           <AiAnalysisPanel
             result={aiAnalysis.result}
@@ -589,8 +604,8 @@ export default function ReviewBoard({
           )}
         </div>
       )}
-      {isTeacher && studentParticipants.length > 0 && (
-        <div className="w-full lg:w-64 space-y-4 lg:overflow-y-auto lg:min-h-0">
+      {!isMaximized && isTeacher && studentParticipants.length > 0 && (
+        <div className="w-full lg:w-64 space-y-4 lg:overflow-y-auto lg:min-h-0 flex-shrink-0">
           <div className="glass-panel p-4 space-y-3">
             <h3 className="font-bold text-sm">配信先の生徒</h3>
             <button
@@ -622,8 +637,8 @@ export default function ReviewBoard({
       )}
 
       {/* チャット（先生・生徒共通） */}
-      {chatMessages && onChatSend && (
-        <div className="w-full lg:w-64 lg:overflow-y-auto lg:min-h-0">
+      {!isMaximized && chatMessages && onChatSend && (
+        <div className="w-full lg:w-64 lg:overflow-y-auto lg:min-h-0 flex-shrink-0">
           <div className="glass-panel p-0 overflow-hidden" style={{ height: 320 }}>
             <ChatPanel
               messages={chatMessages}

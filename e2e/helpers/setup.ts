@@ -108,3 +108,36 @@ async function seedSupabaseRoster(classroomId: string, classroomName: string): P
     ], { onConflict: 'login_id' });
   if (studentError) throw new Error(`Failed to seed students: ${studentError.message}`);
 }
+
+export async function teardownSupabaseRoster(classroomId: string): Promise<void> {
+  try {
+    const { url, serviceRoleKey } = getRosterSeedEnv();
+    const supabase = createClient(url, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // 1. この教室での対局を削除
+    await supabase
+      .from('go_school_live_games')
+      .delete()
+      .eq('classroom_id', classroomId);
+
+    // 2. 生徒の紐付けを解除
+    await supabase
+      .from('go_school_students')
+      .update({ classroom_id: null, classroom_position: null })
+      .eq('classroom_id', classroomId);
+
+    // 3. 教室を削除
+    const { error } = await supabase
+      .from('go_school_classrooms')
+      .delete()
+      .eq('id', classroomId);
+
+    if (error) {
+       console.warn(`[E2E Teardown Warning] Failed to delete classroom ${classroomId}: ${error.message}`);
+    }
+  } catch (err) {
+    console.error(`[E2E Teardown Error] Failed to cleanup ${classroomId}:`, err);
+  }
+}

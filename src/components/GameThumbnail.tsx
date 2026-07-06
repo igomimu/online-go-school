@@ -1,15 +1,21 @@
 import type { GameSession } from '../types/game';
+import type { Student } from '../types/classroom';
+import { getDisplayName } from '../utils/identityUtils';
 
 interface GameThumbnailProps {
   game: GameSession;
   onClick: () => void;
   isActive?: boolean;
+  students?: Student[];
 }
 
-export default function GameThumbnail({ game, onClick, isActive }: GameThumbnailProps) {
+export default function GameThumbnail({ game, onClick, isActive, students = [] }: GameThumbnailProps) {
   const size = game.boardSize;
   const cellSize = 8;
   const totalSize = size * cellSize;
+
+  const blackName = getDisplayName(game.blackPlayer, students);
+  const whiteName = getDisplayName(game.whitePlayer, students);
 
   return (
     <button
@@ -59,11 +65,11 @@ export default function GameThumbnail({ game, onClick, isActive }: GameThumbnail
       <div className="mt-2 text-xs text-left space-y-0.5">
         <div className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-black border border-white/20 inline-block" />
-          <span className="truncate">{game.blackPlayer}</span>
+          <span className="truncate">{blackName}</span>
         </div>
         <div className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-white border border-white/20 inline-block" />
-          <span className="truncate">{game.whitePlayer}</span>
+          <span className="truncate">{whiteName}</span>
         </div>
         <div className="text-zinc-500">
           {game.status === 'playing'

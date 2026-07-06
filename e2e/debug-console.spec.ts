@@ -1,6 +1,6 @@
 import { test } from '@playwright/test';
 import { TEST_STUDENT_A, TEST_STUDENT_B, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
-import { setupTeacherPassword, setupClassroomData, clearAllData } from './helpers/setup';
+import { setupTeacherPassword, setupClassroomData, clearAllData, teardownSupabaseRoster } from './helpers/setup';
 import { loginAsTeacher, openClassroomAndConnect, waitForStudentJoined, createGame } from './helpers/teacher-actions';
 import { loginAsStudent, enterAssignedGame } from './helpers/student-actions';
 import fs from 'fs';
@@ -16,6 +16,7 @@ test.afterEach(async () => {
 
 test('本番URLでの対局作成時のコンソールエラーとAPIエラーをキャプチャするデバッグテスト', async ({ browser }) => {
   const classroomId = generateClassroomId('debugfull');
+  try {
   
   const teacherContext = await browser.newContext();
   const studentAContext = await browser.newContext();
@@ -89,7 +90,12 @@ test('本番URLでの対局作成時のコンソールエラーとAPIエラー�
   logs.push(`[DEBUG] Entering assigned game on studentAPage...`);
   await enterAssignedGame(studentAPage);
 
-  await teacherContext.close();
-  await studentAContext.close();
-  await studentBContext.close();
+  } finally {
+    await teacherContext.close();
+    await studentAContext.close();
+    await studentBContext.close();
+    if (classroomId) {
+      await teardownSupabaseRoster(classroomId);
+    }
+  }
 });

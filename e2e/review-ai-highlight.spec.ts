@@ -1,6 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
-import { clearAllData, setupTeacherPassword, setupClassroomData } from './helpers/setup';
+import { clearAllData, setupTeacherPassword, setupClassroomData, teardownSupabaseRoster } from './helpers/setup';
 import {
   loginAsTeacher,
   openClassroomAndConnect,
@@ -80,6 +80,9 @@ test.describe('検討モード AI候補手クリック', () => {
 
   test.afterEach(async () => {
     await teacherContext?.close();
+    if (classroomId) {
+      await teardownSupabaseRoster(classroomId);
+    }
   });
 
   test('SGF読込→検討モード→候補手クリックで盤面にSQRマーカー、再クリックで解除', async () => {

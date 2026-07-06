@@ -1,6 +1,6 @@
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { TEST_STUDENT_A, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
-import { clearAllData, setupTeacherPassword, setupClassroomData } from './helpers/setup';
+import { clearAllData, setupTeacherPassword, setupClassroomData, teardownSupabaseRoster } from './helpers/setup';
 import {
   loginAsTeacher,
   openClassroomAndConnect,
@@ -45,6 +45,9 @@ test.describe('マルチユーザー対局フロー', () => {
   test.afterEach(async () => {
     await teacherContext?.close();
     await studentContext?.close();
+    if (classroomId) {
+      await teardownSupabaseRoster(classroomId);
+    }
   });
 
   test('先生が対局作成 → 生徒が参加 → 着手が同期される', async () => {

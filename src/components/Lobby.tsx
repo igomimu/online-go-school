@@ -180,6 +180,7 @@ export default function Lobby({
                   game={game}
                   onClick={() => onSelectGame(game.id)}
                   isActive={myGame?.id === game.id}
+                  students={students}
                 />
               ))}
             </div>
@@ -196,6 +197,7 @@ export default function Lobby({
                   key={game.id}
                   game={game}
                   onClick={() => onSelectGame(game.id)}
+                  students={students}
                 />
               ))}
             </div>

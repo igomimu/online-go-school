@@ -90,7 +90,7 @@ export default function BoardThumbnailGrid({
             {/* 碁盤 */}
             {game ? (
               <div onClick={() => onSelectGame(game.id)} style={{ cursor: 'pointer' }}>
-                <GameThumbnail game={game} onClick={() => onSelectGame(game.id)} />
+                <GameThumbnail game={game} onClick={() => onSelectGame(game.id)} students={students} />
               </div>
             ) : (
               <EmptyBoardSlot isConnected={isConnected} />

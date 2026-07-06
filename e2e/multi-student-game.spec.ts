@@ -1,6 +1,6 @@
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { TEST_STUDENT_A, TEST_STUDENT_B, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
-import { clearAllData, setupTeacherPassword, setupClassroomData } from './helpers/setup';
+import { clearAllData, setupTeacherPassword, setupClassroomData, teardownSupabaseRoster } from './helpers/setup';
 import {
   loginAsTeacher,
   openClassroomAndConnect,
@@ -58,6 +58,9 @@ test.describe('先生1+生徒2 対局フルシナリオ', () => {
     await teacherContext?.close();
     await studentAContext?.close();
     await studentBContext?.close();
+    if (classroomId) {
+      await teardownSupabaseRoster(classroomId);
+    }
   });
 
   test('先生作成→生徒2人参加→相互着手→両者パス→整地モード突入', async () => {

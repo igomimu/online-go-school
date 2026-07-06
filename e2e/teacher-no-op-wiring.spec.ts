@@ -1,6 +1,6 @@
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { TEST_STUDENT_A, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
-import { clearAllData, setupTeacherPassword, setupClassroomData } from './helpers/setup';
+import { clearAllData, setupTeacherPassword, setupClassroomData, teardownSupabaseRoster } from './helpers/setup';
 import {
   loginAsTeacher,
   openClassroomAndConnect,
@@ -53,6 +53,9 @@ test.describe('TeacherToolbar / StudentTable 配線検証', () => {
   test.afterEach(async () => {
     await teacherContext?.close();
     await studentContext?.close();
+    if (classroomId) {
+      await teardownSupabaseRoster(classroomId);
+    }
   });
 
   test('「開く」ボタン: 対局なしでは disabled、対局作成後にアクティブ化→観戦パネルに遷移', async () => {

@@ -1,6 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { TEST_STUDENT_A, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
-import { clearAllData, setupTeacherPassword, setupClassroomData } from './helpers/setup';
+import { clearAllData, setupTeacherPassword, setupClassroomData, teardownSupabaseRoster } from './helpers/setup';
 import {
   loginAsTeacher,
   openClassroomAndConnect,
@@ -101,6 +101,9 @@ test.describe('生徒再接続シナリオ', () => {
         closeContextBestEffort(teacherContext),
         closeContextBestEffort(studentContext),
       ]);
+      if (classroomId) {
+        await teardownSupabaseRoster(classroomId);
+      }
     }
   });
 });

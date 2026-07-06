@@ -647,14 +647,26 @@ function App() {
   };
 
   // ロビーに戻る
-  const handleBackToLobby = () => {
+  const handleBackToLobby = useCallback(() => {
     setViewMode('lobby');
     setActiveGameId(null);
     // 検討/授業モードなら生徒にも通知
     if (role === 'TEACHER') {
       classroomRef.current?.broadcast({ type: 'REVIEW_END', payload: {} });
     }
-  };
+  }, [role]);
+
+  // 対局終了時に自動的に閉じる（ロビーに戻る）
+  useEffect(() => {
+    if (!activeGameId) return;
+    const currentGame = games.find(g => g.id === activeGameId);
+    if (currentGame && currentGame.status === 'finished') {
+      const timer = setTimeout(() => {
+        handleBackToLobby();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [activeGameId, games, handleBackToLobby]);
 
   // 音声制御（先生用）
   const handleToggleHear = (identity: string) => {

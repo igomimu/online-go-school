@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
-import { clearAllData, setupTeacherPassword, setupClassroomData, testClassroomName } from './helpers/setup';
+import { clearAllData, setupTeacherPassword, setupClassroomData, testClassroomName, teardownSupabaseRoster } from './helpers/setup';
 
 /**
  * 先生認証はサーバー（validate_teacher_session）が唯一の権威であることの回帰テスト。
@@ -14,19 +14,23 @@ test.describe('先生ログイン: サーバー権威', () => {
   test('ローカルに別の旧PWが保存されていても、サーバーの正しいPWでログインできる', async ({ page }) => {
     const classroomId = generateClassroomId('auth');
     const classroomName = testClassroomName(classroomId);
-    await page.goto('/');
-    await clearAllData(page);
-    // ユーザーのブラウザ状況を再現: ローカルにはサーバーと異なる旧PWが保存済み
-    await setupTeacherPassword(page, 'stale-local-password');
-    await setupClassroomData(page, classroomId);
-    await page.reload();
+    try {
+      await page.goto('/');
+      await clearAllData(page);
+      // ユーザーのブラウザ状況を再現: ローカルにはサーバーと異なる旧PWが保存済み
+      await setupTeacherPassword(page, 'stale-local-password');
+      await setupClassroomData(page, classroomId);
+      await page.reload();
 
-    await page.getByTestId('teacher-mode-link').click();
-    await page.getByTestId('teacher-password-input').fill(TEST_TEACHER_PASSWORD);
-    await page.getByTestId('teacher-login-button').click();
+      await page.getByTestId('teacher-mode-link').click();
+      await page.getByTestId('teacher-password-input').fill(TEST_TEACHER_PASSWORD);
+      await page.getByTestId('teacher-login-button').click();
 
-    // ClassroomManager に到達できる（ローカル照合に弾かれない）
-    await expect(page.getByText(classroomName)).toBeVisible({ timeout: 15_000 });
+      // ClassroomManager に到達できる（ローカル照合に弾かれない）
+      await expect(page.getByText(classroomName)).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await teardownSupabaseRoster(classroomId);
+    }
   });
 
   test('サーバーと一致しないPWではローカル保存と一致してもログインできない', async ({ page }) => {
