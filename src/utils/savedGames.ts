@@ -1,5 +1,6 @@
 import type { SavedGame } from '../types/game';
 import { getSupabase } from './liveGameApi';
+import { makeStudentIdentity } from './identityUtils';
 
 const STORAGE_KEY = 'go-school-saved-games';
 
@@ -27,7 +28,7 @@ function saveToLocalStorage(games: SavedGame[]): void {
 
 export function saveGame(game: SavedGame): void {
   // localStorage に即座に保存
-  const games = loadSavedGames();
+  const games = loadSavedGames().filter(g => g.id !== game.id);
   games.unshift(game);
   saveToLocalStorage(games);
 
@@ -113,6 +114,9 @@ export async function loadSavedGamesForStudent(studentName: string, studentIdent
   if (studentIdentity) {
     orConditions.push(`black_player.eq."${studentIdentity}"`);
     orConditions.push(`white_player.eq."${studentIdentity}"`);
+    const sid = makeStudentIdentity(studentIdentity);
+    orConditions.push(`black_player.eq."${sid}"`);
+    orConditions.push(`white_player.eq."${sid}"`);
   }
 
   const { data, error } = await query

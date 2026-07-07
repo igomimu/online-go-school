@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { studentMatchesPlayer } from '../_shared/identity.ts'
+import { exportLiveGameToSgf, formatTokyoSgfDate } from '../_shared/sgf.ts'
 import { versionResponse } from '../_shared/version.ts'
 
 const corsHeaders = {
@@ -167,16 +168,65 @@ Deno.serve(async (req) => {
 
     if (action === 'finish') {
       const { result } = params || {}
+      const normalizedResult = result ?? null
+      const shouldSaveHistory = typeof normalizedResult === 'string' && normalizedResult !== '中断'
+
+      const { data: gameForHistory, error: historyGameErr } = shouldSaveHistory
+        ? await supabase
+          .from('go_school_live_games')
+          .select('id, black_player, white_player, board_size, handicap, komi')
+          .eq('id', game_id)
+          .single()
+        : { data: null, error: null }
+
+      if (historyGameErr) throw historyGameErr
+
+      const { data: movesForHistory, error: historyMovesErr } = shouldSaveHistory
+        ? await supabase
+          .from('go_school_live_moves')
+          .select('x, y, color')
+          .eq('game_id', game_id)
+          .order('move_number', { ascending: true })
+        : { data: [], error: null }
+
+      if (historyMovesErr) throw historyMovesErr
+
       const { error } = await supabase
         .from('go_school_live_games')
         .update({
           status: 'finished',
-          result: result ?? null,
+          result: normalizedResult,
           updated_at: new Date().toISOString(),
         })
         .eq('id', game_id)
 
       if (error) throw error
+
+      if (shouldSaveHistory && gameForHistory) {
+        const date = formatTokyoSgfDate()
+        const sgf = exportLiveGameToSgf(
+          gameForHistory,
+          movesForHistory ?? [],
+          normalizedResult,
+          date,
+        )
+        const { error: saveHistoryErr } = await supabase
+          .from('go_school_games')
+          .upsert({
+            id: gameForHistory.id,
+            date,
+            black_player: gameForHistory.black_player,
+            white_player: gameForHistory.white_player,
+            board_size: gameForHistory.board_size,
+            handicap: gameForHistory.handicap,
+            komi: gameForHistory.komi,
+            result: normalizedResult,
+            sgf,
+          })
+
+        if (saveHistoryErr) throw saveHistoryErr
+      }
+
       return json({ ok: true })
     }
 

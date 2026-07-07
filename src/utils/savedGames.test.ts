@@ -1,6 +1,22 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { loadSavedGames, saveGame, deleteGame, getGame } from './savedGames';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { loadSavedGames, saveGame, deleteGame, getGame, loadSavedGamesForStudent } from './savedGames';
 import type { SavedGame } from '../types/game';
+
+const mockOrder = vi.fn(() => Promise.resolve({ data: [], error: null }));
+const mockOr = vi.fn(() => ({ order: mockOrder }));
+const mockSelect = vi.fn(() => ({ or: mockOr }));
+const mockUpsert = vi.fn(() => Promise.resolve({ error: null }));
+const mockDeleteEq = vi.fn(() => Promise.resolve({ error: null }));
+const mockDelete = vi.fn(() => ({ eq: mockDeleteEq }));
+const mockFrom = vi.fn(() => ({
+  select: mockSelect,
+  upsert: mockUpsert,
+  delete: mockDelete,
+}));
+
+vi.mock('./liveGameApi', () => ({
+  getSupabase: () => ({ from: mockFrom }),
+}));
 
 const mockGame: SavedGame = {
   id: 'test-1',
@@ -17,6 +33,7 @@ const mockGame: SavedGame = {
 describe('savedGames (localStorage)', () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.clearAllMocks();
   });
 
   it('初期状態は空配列', () => {
@@ -29,6 +46,14 @@ describe('savedGames (localStorage)', () => {
     expect(games.length).toBe(1);
     expect(games[0].id).toBe('test-1');
     expect(games[0].blackPlayer).toBe('たろう');
+  });
+
+  it('同じIDの保存は重複せず置き換える', () => {
+    saveGame(mockGame);
+    saveGame({ ...mockGame, result: 'W+R' });
+    const games = loadSavedGames();
+    expect(games).toHaveLength(1);
+    expect(games[0].result).toBe('W+R');
   });
 
   it('最新の棋譜が先頭に来る', () => {
@@ -61,5 +86,14 @@ describe('savedGames (localStorage)', () => {
   it('壊れたJSONでも空配列を返す', () => {
     localStorage.setItem('go-school-saved-games', '{broken');
     expect(loadSavedGames()).toEqual([]);
+  });
+
+  it('生徒別履歴検索では bare UUID と sid: UUID の両方を検索する', async () => {
+    await loadSavedGamesForStudent('たろう', 'student-uuid');
+
+    expect(mockFrom).toHaveBeenCalledWith('go_school_games');
+    expect(mockOr).toHaveBeenCalledWith(
+      'black_player.eq."たろう",white_player.eq."たろう",black_player.eq."student-uuid",white_player.eq."student-uuid",black_player.eq."sid:student-uuid",white_player.eq."sid:student-uuid"',
+    );
   });
 });

@@ -67,7 +67,7 @@ describe('ReviewBoard', () => {
     expect(container.querySelector('[title="線を描く"]')).not.toBeInTheDocument();
   });
 
-  it('「ロビーに戻る」ボタン', () => {
+  it('「検討を閉じる」ボタン', () => {
     const { root } = makeTree();
     const onBack = vi.fn();
     render(
@@ -81,7 +81,7 @@ describe('ReviewBoard', () => {
         onBack={onBack}
       />
     );
-    fireEvent.click(screen.getByText('← ロビーに戻る'));
+    fireEvent.click(screen.getByText('検討を閉じる'));
     expect(onBack).toHaveBeenCalled();
   });
 
@@ -144,6 +144,7 @@ describe('ReviewBoard', () => {
         onSetTargetStudents={vi.fn()}
       />
     );
+    fireEvent.click(screen.getByText('操作パネルを表示'));
     expect(screen.getByText('配信先の生徒')).toBeInTheDocument();
     expect(screen.getByText('全員に配信')).toBeInTheDocument();
     expect(screen.getByText('たろう')).toBeInTheDocument();
