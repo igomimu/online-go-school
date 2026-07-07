@@ -67,7 +67,7 @@ describe('ReviewBoard', () => {
     expect(container.querySelector('[title="線を描く"]')).not.toBeInTheDocument();
   });
 
-  it('「検討を閉じる」ボタン', () => {
+  it('「閉じてホーム」ボタン', () => {
     const { root } = makeTree();
     const onBack = vi.fn();
     render(
@@ -81,7 +81,7 @@ describe('ReviewBoard', () => {
         onBack={onBack}
       />
     );
-    fireEvent.click(screen.getByText('検討を閉じる'));
+    fireEvent.click(screen.getByText('閉じてホーム'));
     expect(onBack).toHaveBeenCalled();
   });
 

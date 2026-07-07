@@ -2,7 +2,7 @@ import GoBoard from './GoBoard';
 import type { Problem } from '../types/problem';
 import { useProblemSession } from '../hooks/useProblemSession';
 import { useEffect } from 'react';
-import { Check, X, RotateCcw, ArrowLeft } from 'lucide-react';
+import { Check, X, RotateCcw } from 'lucide-react';
 
 interface ProblemBoardProps {
   problem: Problem;
@@ -51,12 +51,15 @@ export default function ProblemBoard({
   }[problemState.status];
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-full flex-col gap-3">
       {/* ヘッダー */}
-      <div className="glass-panel px-4 py-3 flex items-center justify-between">
+      <div className="glass-panel shrink-0 px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-zinc-500 hover:text-white text-sm">
-            <ArrowLeft className="w-4 h-4" />
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 rounded-lg text-sm font-semibold transition-colors duration-150 shrink-0"
+          >
+            <X className="w-4 h-4" /> 閉じてホーム
           </button>
           <span className="font-bold">{problem.title || '詰碁'}</span>
           {problem.difficulty && (
@@ -70,17 +73,19 @@ export default function ProblemBoard({
       </div>
 
       {/* 碁盤 */}
-      <div className="glass-panel p-4 flex justify-center">
+      <div className="glass-panel flex flex-1 min-h-0 justify-center items-center p-2 sm:p-3 shadow-2xl">
         <GoBoard
           boardState={problemState.boardState}
           boardSize={problem.boardSize}
+          className="max-w-[min(100%,calc(100dvh-8.5rem))]"
+          maxHeight="calc(100dvh - 8.5rem)"
           onCellClick={problemState.status === 'solving' ? handleCellClick : undefined}
           readOnly={problemState.status !== 'solving'}
         />
       </div>
 
       {/* 操作ボタン */}
-      <div className="flex justify-center gap-3">
+      <div className="shrink-0 flex justify-center gap-3">
         {(problemState.status === 'incorrect' || problemState.status === 'correct') && (
           <button
             onClick={retry}
@@ -92,7 +97,7 @@ export default function ProblemBoard({
       </div>
 
       {/* 手数 */}
-      <div className="text-center text-sm text-zinc-600">
+      <div className="shrink-0 text-center text-sm text-zinc-600">
         {problemState.movesMade.length}手
         {isTeacher && (
           <span className="ml-4 text-zinc-700">

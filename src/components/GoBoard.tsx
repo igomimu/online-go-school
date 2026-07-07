@@ -36,6 +36,8 @@ export interface Drawing {
 export interface GoBoardProps {
     boardState: BoardState;
     boardSize: number;
+    className?: string;
+    maxHeight?: string;
 
     viewRange?: ViewRange;
     showCoordinates?: boolean;
@@ -73,6 +75,8 @@ export interface GoBoardProps {
 const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     boardState,
     boardSize,
+    className = '',
+    maxHeight = 'calc(100vh - 16rem)',
     viewRange,
     showCoordinates = false,
     showNumbers = false,
@@ -362,10 +366,10 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             data-testid="go-board"
             viewBox={viewBoxData.str}
             xmlns="http://www.w3.org/2000/svg"
-            className="select-none mx-auto block w-full max-w-[800px]"
+            className={`select-none mx-auto block w-full max-w-[800px] ${className}`}
             style={{
                 aspectRatio: '1 / 1',
-                maxHeight: 'calc(100vh - 16rem)',
+                maxHeight,
             }}
             shapeRendering="geometricPrecision"
             onMouseUp={onDragEnd}

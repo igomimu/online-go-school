@@ -1011,26 +1011,32 @@ function App() {
     }
     return viewMode;
   })();
+  const isBoardFocusMode =
+    effectiveViewMode === 'game' ||
+    effectiveViewMode === 'review' ||
+    effectiveViewMode === 'problem';
 
   return (
     <div className="flex flex-col gap-4 w-full h-screen overflow-hidden">
       {/* ヘッダー */}
-      <Header
-        role={role}
-        userName={userName}
-        connectionState={connectionState}
-        remoteCount={classroomRef.current?.remoteParticipantCount ?? 0}
-        isMicEnabled={isMicEnabled}
-        onToggleMic={handleToggleMic}
-        isMuted={isMuted}
-        onToggleMute={handleToggleMute}
-        isCameraEnabled={isCameraEnabled}
-        onToggleCamera={handleToggleCamera}
-        onDisconnect={handleDisconnect}
-      />
+      {!isBoardFocusMode && (
+        <Header
+          role={role}
+          userName={userName}
+          connectionState={connectionState}
+          remoteCount={classroomRef.current?.remoteParticipantCount ?? 0}
+          isMicEnabled={isMicEnabled}
+          onToggleMic={handleToggleMic}
+          isMuted={isMuted}
+          onToggleMute={handleToggleMute}
+          isCameraEnabled={isCameraEnabled}
+          onToggleCamera={handleToggleCamera}
+          onDisconnect={handleDisconnect}
+        />
+      )}
 
       {/* ビデオタイル（教師ロビー時はTeacherDashboard内に表示） */}
-      {videoElements.size > 0 && !(role === 'TEACHER' && effectiveViewMode === 'lobby') && (
+      {!isBoardFocusMode && videoElements.size > 0 && !(role === 'TEACHER' && effectiveViewMode === 'lobby') && (
         <VideoTiles
           videoElements={videoElements}
           localIdentity={classroomRef.current?.localIdentity ?? ''}
@@ -1038,14 +1044,14 @@ function App() {
       )}
 
       {/* 接続エラー */}
-      {connectionError && (
+      {!isBoardFocusMode && connectionError && (
         <div className="bg-red-500/20 border border-red-500/30 text-red-300 px-4 py-2 rounded-xl text-sm">
           {connectionError}
         </div>
       )}
 
       {/* オーディオデバッグ */}
-      {audioDebug && (
+      {!isBoardFocusMode && audioDebug && (
         <div className="bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 px-4 py-2 rounded-xl text-sm flex items-center gap-3">
           <span className="flex-1 text-xs">
             {import.meta.env.DEV ? audioDebug : '音声が聞こえない場合は「音声を開始」を押してください'}
@@ -1181,7 +1187,7 @@ function App() {
               localIdentity={classroomRef.current?.localIdentity ?? ''}
               targetStudents={reviewTargetStudents}
               onSetTargetStudents={setReviewTargetStudents}
-              onBack={role === 'TEACHER' ? handleBackToLobby : undefined}
+              onBack={handleBackToLobby}
               registeredStudents={students}
               chatMessages={chat.messages}
               onChatSend={chat.sendMessage}
@@ -1191,32 +1197,34 @@ function App() {
 
         {/* 詰碁モード */}
         {effectiveViewMode === 'problem' && activeProblem && (
-          <ProblemBoard
-            problem={activeProblem}
-            isTeacher={role === 'TEACHER'}
-            onBack={() => {
-              setViewMode('lobby');
-              setActiveProblem(null);
-            }}
-            onResult={(result) => {
-              // 生徒: 結果を先生に送信
-              if (role === 'STUDENT') {
-                classroomRef.current?.broadcast({
-                  type: 'PROBLEM_RESULT',
-                  payload: {
-                    problemId: activeProblem.id,
-                    result,
-                    moveCount: 0,
-                  },
-                });
-              }
-            }}
-          />
+          <div className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto p-2 sm:p-4">
+            <ProblemBoard
+              problem={activeProblem}
+              isTeacher={role === 'TEACHER'}
+              onBack={() => {
+                setViewMode('lobby');
+                setActiveProblem(null);
+              }}
+              onResult={(result) => {
+                // 生徒: 結果を先生に送信
+                if (role === 'STUDENT') {
+                  classroomRef.current?.broadcast({
+                    type: 'PROBLEM_RESULT',
+                    payload: {
+                      problemId: activeProblem.id,
+                      result,
+                      moveCount: 0,
+                    },
+                  });
+                }
+              }}
+            />
+          </div>
         )}
       </div>
 
       {/* 先生用: 音声映像制御パネル（ロビー以外のviewMode時に表示 — ロビーはTeacherDashboardのStudentTableで制御） */}
-      {role === 'TEACHER' && isConnected && effectiveViewMode !== 'lobby' && participants.length > 1 && (
+      {role === 'TEACHER' && isConnected && !isBoardFocusMode && effectiveViewMode !== 'lobby' && participants.length > 1 && (
         <div className="glass-panel p-4 space-y-3">
           <h3 className="font-bold text-sm">音声・映像制御</h3>
           <MediaControlPanel

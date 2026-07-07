@@ -191,7 +191,7 @@ describe('GameBoard', () => {
         onBack={onBack}
       />
     );
-    fireEvent.click(screen.getByText('← 戻る'));
+    fireEvent.click(screen.getByText('閉じてホーム'));
     expect(onBack).toHaveBeenCalled();
   });
 

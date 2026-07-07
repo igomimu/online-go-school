@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import GoBoard from './GoBoard';
-import { Flag, SkipForward, Check, RefreshCw } from 'lucide-react';
+import { Flag, SkipForward, Check, RefreshCw, X } from 'lucide-react';
 import { calculateTerritory, formatScoringResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
@@ -152,13 +152,16 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-full flex-col gap-3">
       {/* 対局情報ヘッダー */}
-      <div className="glass-panel px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="glass-panel shrink-0 px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4 overflow-x-auto">
           {onBack && (
-            <button onClick={onBack} className="text-zinc-500 hover:text-white text-sm">
-              &larr; 戻る
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 rounded-lg text-sm font-semibold transition-colors duration-150 shrink-0"
+            >
+              <X className="w-4 h-4" /> 閉じてホーム
             </button>
           )}
           <div className="flex items-center gap-2">
@@ -252,10 +255,12 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
       )}
 
       {/* 碁盤 */}
-      <div className="glass-panel p-4 flex justify-center">
+      <div className="glass-panel flex flex-1 min-h-0 justify-center items-center p-2 sm:p-3 shadow-2xl">
         <GoBoard
           boardState={boardState}
           boardSize={game.board_size}
+          className="max-w-[min(100%,calc(100dvh-9rem))]"
+          maxHeight="calc(100dvh - 9rem)"
           onCellClick={
             isScoring
               ? isTeacher
@@ -281,7 +286,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
 
       {/* 整地モード */}
       {isScoring && scoringResult && (
-        <div className="space-y-3">
+        <div className="shrink-0 space-y-3">
           <div className="glass-panel px-4 py-3">
             <div className="text-center text-sm font-bold text-yellow-400 mb-2">
               整地モード {isTeacher ? '— 死石をクリックしてマークしてください' : '— 先生が整地中です'}
@@ -319,7 +324,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
 
       {/* 操作ボタン */}
       {game.status === 'playing' && (isParticipant || isTeacher) && (
-        <div className="flex justify-center gap-3">
+        <div className="shrink-0 flex justify-center gap-3">
           {(isMyTurn || isTeacher) && (
             <button
               onClick={handlePassClick}
@@ -339,7 +344,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
 
       {/* ターン表示 */}
       {game.status === 'playing' && (
-        <div data-testid="turn-indicator" className="text-center text-sm text-zinc-500">
+        <div data-testid="turn-indicator" className="shrink-0 text-center text-sm text-zinc-500">
           {isMyTurn ? (
             <span className="text-blue-400 font-bold">あなたの番です</span>
           ) : isParticipant ? (
@@ -352,14 +357,14 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
 
       {/* 終局結果 */}
       {game.status === 'finished' && game.result && (
-        <div className="text-center text-sm text-zinc-400">
+        <div className="shrink-0 text-center text-sm text-zinc-400">
           結果: <span className="text-white font-bold">{game.result}</span>
         </div>
       )}
 
       {/* 先生用管理者機能 */}
       {isTeacher && (
-        <div className="flex flex-col sm:flex-row justify-center gap-3 mt-4 pt-2 border-t border-white/5">
+        <div className="shrink-0 flex flex-col sm:flex-row justify-center gap-3 pt-2 border-t border-white/5">
           {game.status !== 'finished' && (
             <button
               onClick={async () => {

@@ -329,9 +329,9 @@ export default function ReviewBoard({
             {onBack && (
               <button
                 onClick={onBack}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold shadow-md transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 rounded-lg text-sm font-semibold transition-colors duration-150"
               >
-                <X className="w-4 h-4" /> 検討を閉じる
+                <X className="w-4 h-4" /> 閉じてホーム
               </button>
             )}
             <span className="font-bold text-base ml-2">検討モード</span>
@@ -363,6 +363,8 @@ export default function ReviewBoard({
           <GoBoard
             boardState={boardState}
             boardSize={boardSize}
+            className="max-w-[min(100%,calc(100dvh-10rem))]"
+            maxHeight="calc(100dvh - 10rem)"
             markers={markers}
             drawings={drawings}
             readOnly={!isTeacher}
