@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { Student } from '../../types/classroom';
+import type { GameClock } from '../../types/game';
 import { rankToNumber, suggestHandicap } from '../../types/classroom';
+import { CLOCK_PRESETS, createClock } from '../../hooks/useGameClock';
 import { findStudentByIdentity, getDisplayName } from '../../utils/identityUtils';
 
 interface PairingPair {
@@ -26,6 +28,7 @@ interface AutoPairingDialogProps {
     boardSize: number;
     handicap: number;
     komi: number;
+    clock?: GameClock;
   }[]) => void;
 }
 
@@ -87,6 +90,7 @@ export default function AutoPairingDialog({
       ? studentIdentities[studentIdentities.length - 1]
       : null
   ));
+  const [clockPreset, setClockPreset] = useState(0); // index into CLOCK_PRESETS（全対局共通）
 
   // 黒白入れ替え
   const swapColors = (index: number) => {
@@ -128,12 +132,14 @@ export default function AutoPairingDialog({
 
   // 一括開始
   const handleStart = () => {
+    const preset = CLOCK_PRESETS[clockPreset];
     onCreateGames(pairs.map(p => ({
       blackPlayer: p.blackIdentity,
       whitePlayer: p.whiteIdentity,
       boardSize: p.boardSize,
       handicap: p.handicap,
       komi: p.komi,
+      clock: createClock(preset.mainTime, preset.byoyomi, preset.periods),
     })));
     onClose();
   };
@@ -264,8 +270,20 @@ export default function AutoPairingDialog({
         {/* フッター */}
         <div style={{
           padding: '8px 12px', borderTop: '1px solid #999',
-          display: 'flex', justifyContent: 'center', gap: 12, background: '#d0d0c8',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, background: '#d0d0c8',
         }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+            対局時計
+            <select
+              value={clockPreset}
+              onChange={e => setClockPreset(Number(e.target.value))}
+              style={{ fontSize: 11, border: '1px solid #999', padding: '2px 4px' }}
+            >
+              {CLOCK_PRESETS.map((p, i) => (
+                <option key={i} value={i}>{p.label}</option>
+              ))}
+            </select>
+          </label>
           <button
             onClick={handleStart}
             disabled={pairs.length === 0}

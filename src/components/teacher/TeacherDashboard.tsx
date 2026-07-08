@@ -45,7 +45,7 @@ interface TeacherDashboardProps {
   isReconnecting: boolean;
   onOpenStudentManager: () => void;
   onReloadData: () => void | Promise<void>;
-  onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number }[]) => void;
+  onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number; clock?: import('../../types/game').GameClock }[]) => void;
   onProblemAssign?: (problem: import('../../types/problem').Problem) => void;
   onClearAudioM?: () => void;
   onClearAudioS?: () => void;
