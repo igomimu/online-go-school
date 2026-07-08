@@ -680,7 +680,7 @@ function App() {
         type: 'REVIEW_START',
         payload: { sgf: game.sgf, boardSize: parsed.size },
       });
-    } catch (err) {
+    } catch {
       alert('棋譜の読み込みに失敗しました');
     }
   }, []);

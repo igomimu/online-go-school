@@ -113,6 +113,7 @@ export function useLiveGame(
   const [moves, setMoves] = useState<LiveMoveRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [localClock, setLocalClock] = useState<GameClock | null>(null);
   const channelRef = useRef<ReturnType<typeof subscribeLiveGame> | null>(null);
 
   useEffect(() => {
@@ -129,6 +130,7 @@ export function useLiveGame(
         const [g, m] = await Promise.all([fetchLiveGame(gameId), fetchLiveMoves(gameId)]);
         if (cancelled) return;
         setGame(g);
+        setLocalClock(g?.clock ?? null);
         setMoves(m);
         setLoading(false);
       } catch (e) {
@@ -141,6 +143,7 @@ export function useLiveGame(
     const channel = subscribeLiveGame(gameId, {
       onGameChange: (row) => {
         setGame(row);
+        setLocalClock(row.clock ?? null);
       },
       onMoveInsert: (row) => {
         setMoves((prev) => {
@@ -381,17 +384,6 @@ export function useLiveGame(
     }
   }, [activeGame, effectivePlayer, derived.lastMove, derived.moveNumber, classroom, isMyTurn, isTeacher]);
 
-  const [localClock, setLocalClock] = useState<GameClock | null>(null);
-
-  // game.clock が更新されたら同期
-  useEffect(() => {
-    if (activeGame?.clock) {
-      setLocalClock(activeGame.clock);
-    } else {
-      setLocalClock(null);
-    }
-  }, [activeGame?.clock]);
-
   // ローカルの時間切れ処理
   const handleLocalTimeUp = useCallback(
     async (color: 'BLACK' | 'WHITE') => {
@@ -411,9 +403,12 @@ export function useLiveGame(
     [activeGame, myColor, isTeacher]
   );
 
+  const hasLocalClock = localClock !== null;
+  const activeGameStatus = activeGame?.status;
+
   // 1秒ごとにローカル残り時間を減少させる
   useEffect(() => {
-    if (!localClock || activeGame?.status !== 'playing') return;
+    if (!localClock || activeGameStatus !== 'playing') return;
     if (localClock.lastTickTime === null) return; // 時計が動いていない（一時停止中）
 
     const timer = setInterval(() => {
@@ -480,7 +475,7 @@ export function useLiveGame(
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [localClock === null, activeGame?.status, derived.currentColor, handleLocalTimeUp]);
+  }, [hasLocalClock, activeGameStatus, derived.currentColor, handleLocalTimeUp]);
 
   const submitResign = useCallback(async () => {
     if (!activeGame || !effectivePlayer) return;

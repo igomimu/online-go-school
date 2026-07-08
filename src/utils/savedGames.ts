@@ -105,7 +105,7 @@ export async function loadSavedGamesForStudent(studentName: string, studentIdent
   const sb = getSupabase();
   if (!sb) return [];
 
-  let query = sb.from('go_school_games').select('*');
+  const query = sb.from('go_school_games').select('*');
 
   const orConditions = [
     `black_player.eq."${studentName}"`,
