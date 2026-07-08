@@ -1,7 +1,8 @@
-import { LogOut, Volume2, VolumeX, Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { Download, LogOut, Volume2, VolumeX, Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import { ConnectionState } from 'livekit-client';
 import type { Role } from '../utils/classroomLiveKit';
 import RecordingControls from './RecordingControls';
+import { usePwaInstall } from '../hooks/usePwaInstall';
 
 interface HeaderProps {
   role: Role;
@@ -31,6 +32,15 @@ export default function Header({
   onDisconnect,
 }: HeaderProps) {
   const isConnected = connectionState === ConnectionState.Connected;
+  const pwaInstall = usePwaInstall();
+
+  const handleInstallClick = async () => {
+    if (pwaInstall.isIos && !pwaInstall.canInstall) {
+      alert('Safari の共有ボタンから「ホーム画面に追加」を選んでください。');
+      return;
+    }
+    await pwaInstall.install();
+  };
 
   return (
     <header className="flex justify-between items-center glass-panel px-4 py-3">
@@ -102,6 +112,15 @@ export default function Header({
           </>
         )}
         {role === 'TEACHER' && isConnected && <RecordingControls />}
+        {pwaInstall.shouldShowInstall && (
+          <button
+            onClick={handleInstallClick}
+            className="p-2 text-zinc-500 hover:text-blue-400 transition-colors"
+            title={pwaInstall.isIos && !pwaInstall.canInstall ? 'ホーム画面に追加' : 'アプリをインストール'}
+          >
+            <Download className="w-4 h-4" />
+          </button>
+        )}
         <button
           onClick={onDisconnect}
           className="p-2 text-zinc-500 hover:text-red-400 transition-colors"

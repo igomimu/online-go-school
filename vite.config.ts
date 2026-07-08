@@ -23,7 +23,6 @@ export default defineConfig({
     tailwindcss(),
     react(),
     VitePWA({
-      selfDestroying: true,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'favicon.png', 'apple-touch-icon.png'],
       manifest: {
@@ -55,6 +54,10 @@ export default defineConfig({
           // Vercel Functions (LiveKit token等): 常にネットワーク
           {
             urlPattern: /\/api\/.*/i,
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /\/version\.json$/i,
             handler: 'NetworkOnly',
           },
           // LiveKit signaling/data: ws/wss は SW で扱わないが念のため

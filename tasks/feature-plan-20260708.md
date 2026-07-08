@@ -74,13 +74,14 @@ ALTER TABLE public.go_school_live_games
 - 実装証跡: live API/型/明示ログアウト/pagehide/自動resume/ロビー・サムネイル・先生履歴・盤面表示を `interrupted` 対応。`GameThumbnail` は nested button 警告解消のため外側を `role="button"` div化
 - 検証: `npx eslint .` 0 errors（既存warningのみ）・`npx tsc -b`・`npm run test` 314 tests passed。E2E spec はコミット7の本番証跡で追加/実行
 
-### ⬜ コミット6: PWA再有効化＋インストールボタン（単独リリースで監視）
+### ✅ コミット6: PWA再有効化＋インストールボタン（2026-07-08 Codex 完了）
 - `vite.config.ts`: `selfDestroying: true` 削除（これがbeforeinstallpromptを殺している。aaa5e76で過去のSWキャッシュ事故対策として意図適用された経緯あり）
 - `src/main.tsx`: `registerSW({ immediate:true, onRegisteredSW: 60秒毎 r.update() })`（`virtual:pwa-register`）→既存controllerchangeリロードで最新化=**旧キャッシュ配布再発の主対策**
 - workbox runtimeCaching に `/version.json` NetworkOnly保険。`vite-env.d.ts` に pwa/client 型参照
 - **新規 `src/hooks/usePwaInstall.ts`**: モジュールスコープでbeforeinstallprompt/appinstalled捕捉＋`useSyncExternalStore` で `{canInstall, isStandalone, isIos}`。iOSは手動案内（共有→ホーム画面に追加）。standalone起動時は非表示
 - 設置: `LoginScreen.tsx` 補助ボタン群（キャッシュリセットボタンと同型スタイル）＋ `Header.tsx` 右側ボタン群（Downloadアイコン、canInstall時のみ）
 - ロールバック: `selfDestroying: true` を戻す1行revert
+- 検証: `npx eslint .` 0 errors（既存warningのみ）・`npx tsc -b`・`vitest` Header/Lobby/GameThumbnail 緑・`npm run build` 成功（PWA `dist/sw.js` 生成確認）
 
 ### ⬜ コミット7（検証）: 本番検証＋記録
 1. push→Vercel→`version.json` とHEAD照合

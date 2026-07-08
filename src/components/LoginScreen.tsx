@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, Trash2, Plus, Lock, ArrowLeft, RefreshCw } from 'lucide-react';
+import { ChevronDown, Trash2, Plus, Lock, ArrowLeft, RefreshCw, Download } from 'lucide-react';
 import {
   loadAccounts,
   deleteAccount,
@@ -9,6 +9,7 @@ import {
   supabaseSignOut,
 } from '../utils/authStore';
 import type { SavedAccount } from '../utils/authStore';
+import { usePwaInstall } from '../hooks/usePwaInstall';
 
 interface LoginScreenProps {
   onStudentLogin: (studentId: string, classroomId: string, rawCode?: string, displayName?: string) => void;
@@ -30,6 +31,7 @@ export default function LoginScreen({
   const [selectedAccount, setSelectedAccount] = useState<SavedAccount | null>(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const pwaInstall = usePwaInstall();
 
   // 先生
   const [teacherPw, setTeacherPw] = useState('');
@@ -129,6 +131,14 @@ export default function LoginScreen({
     onTeacherLogin();
   };
 
+  const handleInstallClick = async () => {
+    if (pwaInstall.isIos && !pwaInstall.canInstall) {
+      alert('Safari の共有ボタンから「ホーム画面に追加」を選んでください。');
+      return;
+    }
+    await pwaInstall.install();
+  };
+
   if (mode === 'teacher') {
     return (
       <div className="flex flex-col items-center min-h-screen py-12 gap-6">
@@ -167,6 +177,17 @@ export default function LoginScreen({
               {submitting ? '確認中...' : 'ログイン'}
             </button>
           </form>
+
+          {pwaInstall.shouldShowInstall && (
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              className="secondary-button w-full flex items-center justify-center gap-2 text-sm"
+            >
+              <Download className="w-4 h-4" />
+              {pwaInstall.isIos && !pwaInstall.canInstall ? 'ホーム画面に追加' : 'アプリをインストール'}
+            </button>
+          )}
 
           <button
             onClick={() => { setMode('student'); setTeacherError(''); setTeacherPw(''); }}
@@ -368,6 +389,17 @@ export default function LoginScreen({
         >
           <RefreshCw className="w-3.5 h-3.5" /> 接続・キャッシュをリセット
         </button>
+
+        {pwaInstall.shouldShowInstall && (
+          <button
+            type="button"
+            onClick={handleInstallClick}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-white/5 rounded-lg transition-colors duration-150"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {pwaInstall.isIos && !pwaInstall.canInstall ? 'ホーム画面に追加' : 'アプリをインストール'}
+          </button>
+        )}
       </div>
 
       <div className="text-[10px] text-zinc-600 select-none font-mono mt-2">
