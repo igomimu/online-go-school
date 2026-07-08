@@ -112,6 +112,11 @@ ALTER TABLE public.go_school_live_games
 - **⚠️既存E2E失敗3本（今回の変更と無関係、8c6bbef時点で再現確認済み）**: multi-student-game（整地突入）/ review-ai-highlight / teacher-no-op-wiring。d4b86a4〜8c6bbefの先行実装で混入した回帰。**別途修正が必要**
 - 残: 実機PWAインストール確認（LEGIONからは不可、三村さんのChrome/スマホで）・中断→再開の実機確認
 
+#### 追修正（2026-07-08 夕、三村さん実機FB「先生ログインでボタンが出ない」→ e0f40da）
+- 原因: 表示条件が `canInstall`（beforeinstallprompt捕捉後）依存＋リスナー登録が初回レンダー時で早期発火を取りこぼす窓
+- 対応: **ボタン常時表示化**（standalone起動時とインストール直後のみ非表示）。クリック時にネイティブプロンプト、使えなければChrome/Edge/iOSの手動手順をalert案内。リスナー登録をモジュール読込時に前倒し
+- 本番証跡: `f1-login-pwa.png`（生徒）/`f1b-teacher-login-pwa.png`（先生）両画面でボタン表示✅（e0f40da）
+
 ## リスク対策（要点）
 - PWA旧キャッシュ再発: 60秒毎update+autoUpdate+controllerchangeリロード+version.json非precache＋1行revert
 - pagehide不発火（iOS bfcache等）: playing残留→再入室で自動再表示=劣化安全側
