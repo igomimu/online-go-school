@@ -44,7 +44,7 @@ ALTER TABLE public.go_school_live_games
 - 過去の `finished+'中断'` 行は変換しない（古い行の再浮上防止）。適用後 schema_migrations 記録（直接SQL適用時はrepair）。dojo-app側でstatusを読む消費者がいないか `git grep` 確認
 - `rg` 確認: live game status消費者は本アプリの `src/` と `supabase/functions/` に集中。フロント/Edge対応はコミット4-5で実施
 
-### ⬜ コミット4: Edge `manage_game_action/index.ts`
+### ✅ コミット4: Edge `manage_game_action/index.ts`（2026-07-08 Codex 実装完了・未デプロイ）
 - **`interrupt`**（game_id必須。既存認可ゲート=service_role/先生/当事者生徒がそのまま適用）:
   ① status が playing/scoring 以外なら `{ok:true, skipped:true}` で**冪等**（pagehide+ログアウト二重発火対策）
   ② moves取得→`exportLiveGameToSgf(..., '中断', date)`→`go_school_games` upsert（finish内の履歴保存ブロックを関数抽出して共有。キー=live game id なので再開後の正式終局で自然上書き）
@@ -53,6 +53,8 @@ ALTER TABLE public.go_school_live_games
 - **`resume`修正**: `clock.lastTickTime=null` をUPDATEに含める（中断中の経過時間を没収しない。時計は次の着手のswitchClockで再始動=createClock初期挙動と同一）
 - **`finish`のshouldSaveHistory（'中断'除外）撤去**: finishは常に保存
 - デプロイ: `set -a; source ~/.secrets/supabase-dojo.env; set +a; supabase functions deploy manage_game_action --no-verify-jwt --project-ref yzsyrtesydpulctjgdog` → `npm run smoke:edge`
+- 実装証跡: `saveGameHistory` 共通化、`interrupt`/`interrupt_all` 追加、`resume` clock pause対応
+- 検証: `npx eslint .` 0 errors（既存warningのみ）・`npx tsc -b`。`deno check` はローカルに `deno` がなく未実行。Edge deploy/smokeはコミット7で実施
 
 ### ⬜ コミット5: 中断・履歴・再開のフロント配線
 - `liveGameApi.ts`: status unionに `'interrupted'`、`fetchLiveGames` を `['playing','scoring','interrupted']` に、`interruptGame(gameId)`/`interruptAllGames(classroomId)` 追加

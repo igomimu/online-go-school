@@ -10,7 +10,7 @@ const corsHeaders = {
 }
 
 interface ActionBody {
-  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume'
+  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all'
   game_id?: string
   params?: any
 }
@@ -20,6 +20,43 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
+}
+
+function pauseClock(clock: any) {
+  return clock ? { ...clock, lastTickTime: null } : null
+}
+
+async function saveGameHistory(supabase: any, game: any, result: string | null) {
+  const { data: movesForHistory, error: historyMovesErr } = await supabase
+    .from('go_school_live_moves')
+    .select('x, y, color')
+    .eq('game_id', game.id)
+    .order('move_number', { ascending: true })
+
+  if (historyMovesErr) throw historyMovesErr
+
+  const date = formatTokyoSgfDate()
+  const sgf = exportLiveGameToSgf(
+    game,
+    movesForHistory ?? [],
+    result ?? '',
+    date,
+  )
+  const { error: saveHistoryErr } = await supabase
+    .from('go_school_games')
+    .upsert({
+      id: game.id,
+      date,
+      black_player: game.black_player,
+      white_player: game.white_player,
+      board_size: game.board_size,
+      handicap: game.handicap,
+      komi: game.komi,
+      result,
+      sgf,
+    })
+
+  if (saveHistoryErr) throw saveHistoryErr
 }
 
 Deno.serve(async (req) => {
@@ -169,27 +206,14 @@ Deno.serve(async (req) => {
     if (action === 'finish') {
       const { result } = params || {}
       const normalizedResult = result ?? null
-      const shouldSaveHistory = typeof normalizedResult === 'string' && normalizedResult !== '中断'
 
-      const { data: gameForHistory, error: historyGameErr } = shouldSaveHistory
-        ? await supabase
-          .from('go_school_live_games')
-          .select('id, black_player, white_player, board_size, handicap, komi')
-          .eq('id', game_id)
-          .single()
-        : { data: null, error: null }
+      const { data: gameForHistory, error: historyGameErr } = await supabase
+        .from('go_school_live_games')
+        .select('id, black_player, white_player, board_size, handicap, komi')
+        .eq('id', game_id)
+        .single()
 
       if (historyGameErr) throw historyGameErr
-
-      const { data: movesForHistory, error: historyMovesErr } = shouldSaveHistory
-        ? await supabase
-          .from('go_school_live_moves')
-          .select('x, y, color')
-          .eq('game_id', game_id)
-          .order('move_number', { ascending: true })
-        : { data: [], error: null }
-
-      if (historyMovesErr) throw historyMovesErr
 
       const { error } = await supabase
         .from('go_school_live_games')
@@ -202,32 +226,80 @@ Deno.serve(async (req) => {
 
       if (error) throw error
 
-      if (shouldSaveHistory && gameForHistory) {
-        const date = formatTokyoSgfDate()
-        const sgf = exportLiveGameToSgf(
-          gameForHistory,
-          movesForHistory ?? [],
-          normalizedResult,
-          date,
-        )
-        const { error: saveHistoryErr } = await supabase
-          .from('go_school_games')
-          .upsert({
-            id: gameForHistory.id,
-            date,
-            black_player: gameForHistory.black_player,
-            white_player: gameForHistory.white_player,
-            board_size: gameForHistory.board_size,
-            handicap: gameForHistory.handicap,
-            komi: gameForHistory.komi,
-            result: normalizedResult,
-            sgf,
-          })
-
-        if (saveHistoryErr) throw saveHistoryErr
-      }
+      await saveGameHistory(supabase, gameForHistory, normalizedResult)
 
       return json({ ok: true })
+    }
+
+    if (action === 'interrupt') {
+      const { data: gameToInterrupt, error: interruptGameErr } = await supabase
+        .from('go_school_live_games')
+        .select('id, black_player, white_player, board_size, handicap, komi, status, clock')
+        .eq('id', game_id)
+        .single()
+
+      if (interruptGameErr) throw interruptGameErr
+
+      if (!['playing', 'scoring'].includes(gameToInterrupt.status)) {
+        return json({ ok: true, skipped: true })
+      }
+
+      await saveGameHistory(supabase, gameToInterrupt, '中断')
+
+      const { error } = await supabase
+        .from('go_school_live_games')
+        .update({
+          status: 'interrupted',
+          result: '中断',
+          clock: pauseClock(gameToInterrupt.clock),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', game_id)
+        .in('status', ['playing', 'scoring'])
+
+      if (error) throw error
+      return json({ ok: true })
+    }
+
+    if (action === 'interrupt_all') {
+      // 教室単位の一括中断は先生または service_role のみ許可
+      if (!isTeacher && !isServiceRole) {
+        return json({ error: 'Forbidden: Only teachers can interrupt classroom games' }, 403)
+      }
+
+      const { classroom_id } = params || {}
+      if (!classroom_id) {
+        return json({ error: 'Missing params.classroom_id for interrupt_all' }, 400)
+      }
+
+      const { data: gamesToInterrupt, error: listErr } = await supabase
+        .from('go_school_live_games')
+        .select('id, black_player, white_player, board_size, handicap, komi, status, clock')
+        .eq('classroom_id', classroom_id)
+        .in('status', ['playing', 'scoring'])
+
+      if (listErr) throw listErr
+
+      let count = 0
+      for (const gameToInterrupt of gamesToInterrupt ?? []) {
+        await saveGameHistory(supabase, gameToInterrupt, '中断')
+
+        const { error } = await supabase
+          .from('go_school_live_games')
+          .update({
+            status: 'interrupted',
+            result: '中断',
+            clock: pauseClock(gameToInterrupt.clock),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', gameToInterrupt.id)
+          .in('status', ['playing', 'scoring'])
+
+        if (error) throw error
+        count += 1
+      }
+
+      return json({ ok: true, count })
     }
 
     if (action === 'update_clock') {
@@ -275,11 +347,20 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'resume') {
+      const { data: gameToResume, error: resumeGameErr } = await supabase
+        .from('go_school_live_games')
+        .select('clock')
+        .eq('id', game_id)
+        .single()
+
+      if (resumeGameErr) throw resumeGameErr
+
       const { error } = await supabase
         .from('go_school_live_games')
         .update({
           status: 'playing',
           result: null,
+          clock: pauseClock(gameToResume.clock),
           updated_at: new Date().toISOString(),
         })
         .eq('id', game_id)
