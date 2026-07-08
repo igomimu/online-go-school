@@ -33,7 +33,7 @@
 - **E2E注意**: `enterAssignedGame` helperを自動遷移/旧手動ボタン両対応に修正
 - 検証: `npx eslint .` 0 errors（既存warningのみ）・`npx tsc -b`・`vitest` Lobby/GameThumbnail 緑
 
-### ⬜ コミット3: migration `20260708XXXXXX_live_game_interrupted_status.sql`
+### ✅ コミット3: migration `20260708090000_live_game_interrupted_status.sql`（2026-07-08 Codex 完了）
 ```sql
 ALTER TABLE public.go_school_live_games
     DROP CONSTRAINT IF EXISTS go_school_live_games_status_check;
@@ -42,6 +42,7 @@ ALTER TABLE public.go_school_live_games
     CHECK (status IN ('playing', 'scoring', 'finished', 'interrupted'));
 ```
 - 過去の `finished+'中断'` 行は変換しない（古い行の再浮上防止）。適用後 schema_migrations 記録（直接SQL適用時はrepair）。dojo-app側でstatusを読む消費者がいないか `git grep` 確認
+- `rg` 確認: live game status消費者は本アプリの `src/` と `supabase/functions/` に集中。フロント/Edge対応はコミット4-5で実施
 
 ### ⬜ コミット4: Edge `manage_game_action/index.ts`
 - **`interrupt`**（game_id必須。既存認可ゲート=service_role/先生/当事者生徒がそのまま適用）:
