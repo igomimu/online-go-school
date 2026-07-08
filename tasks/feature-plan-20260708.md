@@ -96,7 +96,9 @@ ALTER TABLE public.go_school_live_games
 - DB証跡: `go_school_live_games_status_check: CHECK status IN ('playing','scoring','finished','interrupted')`
 - Edge: `EDGE_BUILD_VERSION=f88bf8db38fbeb9c6fcfbe7686f1ce5b4188e460` で `validate_student_session` / `validate_teacher_session` / `fetch_students` / `manage_game_action` / `submit_move` を再デプロイ
 - Edge smoke: 5 functions version一致 + `validate_student_session` POST OK
-- 未実施: Vercel反映後の実機PWAインストール/自動更新確認、Playwright本番スクショ一式、memory更新
+- Vercel: push後 `https://online.mimura15.jp/version.json` が HEAD `b473779b7a22dcedf9a9059a8a12c9bdcb7d9fff` と一致
+- E2E: `scripts/verify-deploy.js` は version一致後に既存全E2Eを起動したが、既存 `e2e/debug-console.spec.ts` の `teacherContext is not defined` と、本番先生パスワード環境不一致（403）で失敗。未追跡 `e2e/proof-prod.spec.ts` も拾うため途中停止
+- 未実施: 実機PWAインストール/自動更新確認、今回4機能に絞ったPlaywright本番スクショ一式、memory更新
 
 ## リスク対策（要点）
 - PWA旧キャッシュ再発: 60秒毎update+autoUpdate+controllerchangeリロード+version.json非precache＋1行revert
