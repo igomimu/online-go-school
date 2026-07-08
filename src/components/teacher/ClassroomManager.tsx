@@ -209,7 +209,8 @@ export default function ClassroomManager({
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      height: '100vh',
+      // #root の padding: 2rem（上下計4rem）を差し引かないと下部バーが見切れる
+      height: 'calc(100vh - 4rem)',
       background: '#ffff80',
       color: '#333',
       fontFamily: 'MS Gothic, "Noto Sans JP", monospace',
