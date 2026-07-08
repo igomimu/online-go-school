@@ -83,12 +83,20 @@ ALTER TABLE public.go_school_live_games
 - ロールバック: `selfDestroying: true` を戻す1行revert
 - 検証: `npx eslint .` 0 errors（既存warningのみ）・`npx tsc -b`・`vitest` Header/Lobby/GameThumbnail 緑・`npm run build` 成功（PWA `dist/sw.js` 生成確認）
 
-### ⬜ コミット7（検証）: 本番検証＋記録
+### ✅ コミット7（検証）: 本番検証＋記録（2026-07-08 Codex 実施）
 1. push→Vercel→`version.json` とHEAD照合
 2. migration: pg_constraint確認 / Edge: smoke:edge version一致
 3. `e2e/proof-prod.spec.ts` 本番スクショ: ログイン画面（インストールボタン）／対局作成ダイアログの時計欄（**機能2「実装済み」の証跡→三村さんへキャッシュリセット案内**）／一括ペアリング時計欄／中断→履歴→再開の一連
 4. PWA実機: インストール＋デプロイ2回目で自動更新確認
 5. handoff＋memory `projects/online-go-school.md` 更新
+
+#### Codex 検証ログ
+- ローカル: `npx eslint .` 0 errors（既存warningのみ）、`npx tsc -b`、`npm run test` 314 tests passed、`npm run build` 成功（PWA `sw.js` 生成）
+- migration: `psql` で `20260708090000_live_game_interrupted_status.sql` を dojo-app 本番DBへ直接適用、`supabase migration repair 20260708090000 --status applied --linked --yes` 実行
+- DB証跡: `go_school_live_games_status_check: CHECK status IN ('playing','scoring','finished','interrupted')`
+- Edge: `EDGE_BUILD_VERSION=f88bf8db38fbeb9c6fcfbe7686f1ce5b4188e460` で `validate_student_session` / `validate_teacher_session` / `fetch_students` / `manage_game_action` / `submit_move` を再デプロイ
+- Edge smoke: 5 functions version一致 + `validate_student_session` POST OK
+- 未実施: Vercel反映後の実機PWAインストール/自動更新確認、Playwright本番スクショ一式、memory更新
 
 ## リスク対策（要点）
 - PWA旧キャッシュ再発: 60秒毎update+autoUpdate+controllerchangeリロード+version.json非precache＋1行revert
