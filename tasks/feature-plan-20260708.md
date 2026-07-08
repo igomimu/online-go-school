@@ -100,6 +100,18 @@ ALTER TABLE public.go_school_live_games
 - E2E: `scripts/verify-deploy.js` は version一致後に既存全E2Eを起動したが、既存 `e2e/debug-console.spec.ts` の `teacherContext is not defined` と、本番先生パスワード環境不一致（403）で失敗。未追跡 `e2e/proof-prod.spec.ts` も拾うため途中停止
 - 未実施: 実機PWAインストール/自動更新確認、今回4機能に絞ったPlaywright本番スクショ一式、memory更新
 
+#### ✅ 検証役（Claude Code / Fable 5）独立検証（2026-07-08 午後）
+- **全6実装コミットをdiff精読**: 計画との乖離なし。Edge interruptは`.in('status',...)`ガード付きUPDATEで競合安全、認可は既存ゲート適用を確認
+- **独立再実行**: eslint 0 errors / tsc緑 / unit 314/314
+- **DB実証**: pg_constraintにinterrupted、schema_migrationsに`20260708090000`記録済み
+- **本番EdgeのAPIレベル実証**（隔離classroom使用→掃除済み）: create→interrupt(`{ok:true}`)→interrupt再送(`{ok:true,skipped:true}`=冪等)→resume(`{ok:true}`)。DB副作用も正: status/result復帰・blackTimeLeft=555保持・lastTickTime=null・go_school_gamesに中断棋譜(SGF)保存
+- **🚨P1バグ発見→修正（4bf43a9）**: SW初回インストールのclaimで`controllerchange`→**全訪問者の初回アクセスでページが自動リロード**され操作が巻き戻る（本番で実証: 先生ログインがリロードで初期画面に戻されproof specがタイムアウト）。index.htmlに「既存controllerがいた場合のみリロード」ガード追加＋main.tsxの重複ハンドラ削除。**Codexの本番先生PW 403の正体もこれ**（PW不一致ではなくリロードでフォーム巻き戻り）
+- **E2E回帰1件発見→修正（9d53360）**: 自動オープンで再ログイン生徒が碁盤直行→`loginAsStudent`ヘルパーに`go-board`分岐追加（reconnect spec緑復帰）
+- **debug-console.spec.tsのスコープバグ修正（4bf43a9同梱）**: try内宣言のcontextをfinallyで参照→毎回ReferenceError
+- **本番スクショ証跡**（proof-screenshots/）: `f1-login-pwa.png`（SW登録1件・manifest配信確認）/ `f2-game-creation-clock.png`（**対局作成ダイアログに対局時計欄=機能2の実在証跡**）/ `f3-auto-pairing-clock.png`（自動ペアリング「自動対局」ボタン→時計欄表示）
+- **⚠️既存E2E失敗3本（今回の変更と無関係、8c6bbef時点で再現確認済み）**: multi-student-game（整地突入）/ review-ai-highlight / teacher-no-op-wiring。d4b86a4〜8c6bbefの先行実装で混入した回帰。**別途修正が必要**
+- 残: 実機PWAインストール確認（LEGIONからは不可、三村さんのChrome/スマホで）・中断→再開の実機確認
+
 ## リスク対策（要点）
 - PWA旧キャッシュ再発: 60秒毎update+autoUpdate+controllerchangeリロード+version.json非precache＋1行revert
 - pagehide不発火（iOS bfcache等）: playing残留→再入室で自動再表示=劣化安全側
