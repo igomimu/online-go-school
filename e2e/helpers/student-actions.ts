@@ -23,6 +23,11 @@ export async function loginAsStudent(
       .getByRole('heading', { name: '対局中', exact: true })
       .waitFor({ timeout: 25_000 })
       .then(() => 'in-game' as const),
+    // 進行中対局があると自動で碁盤に直行する（2026-07-08 自動オープン機能）
+    page
+      .getByTestId('go-board')
+      .waitFor({ state: 'visible', timeout: 25_000 })
+      .then(() => 'auto-opened-board' as const),
     page
       .getByText('接続に失敗しました')
       .waitFor({ timeout: 25_000 })
