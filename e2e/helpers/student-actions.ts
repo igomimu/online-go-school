@@ -45,13 +45,22 @@ export async function waitForConnectedCount(page: Page, min: number, timeout = 2
 }
 
 /**
- * 対局が配信されたら「碁盤を開く」をクリックして対局画面を表示
+ * 対局が配信されたら対局画面を表示する。
+ * 現行UIは自動で碁盤へ遷移するが、旧挙動の手動ボタンにも対応する。
  */
 export async function enterAssignedGame(page: Page): Promise<void> {
-  // Lobby画面の myGame カードの h3「対局中」をピンポイントで待つ
-  // （他にも生徒テーブル等に「対局中」テキストがあるため）
-  await page.getByRole('heading', { name: '対局中', exact: true }).waitFor({ timeout: 15_000 });
-  await page.getByRole('button', { name: '碁盤を開く', exact: true }).click();
+  const board = page.getByTestId('go-board');
+  const openButton = page.getByRole('button', { name: '碁盤を開く', exact: true });
+
+  const entry = await Promise.race([
+    board.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'board' as const),
+    openButton.waitFor({ state: 'visible', timeout: 15_000 }).then(() => 'button' as const),
+  ]);
+
+  if (entry === 'button') {
+    await openButton.click();
+  }
+  await expect(board).toBeVisible({ timeout: 15_000 });
 }
 
 /**

@@ -25,12 +25,13 @@
 - `AutoPairingDialog.test.tsx` 新規3本（セレクト表示/無制限=clockなし/プリセット選択でclock付与）
 - 検証: vitest 3/3・tsc緑・eslint 0 errors
 
-### ⬜ コミット2: 生徒側で対局開始時に自動で碁盤を開く
+### ✅ コミット2: 生徒側で対局開始時に自動で碁盤を開く（2026-07-08 Codex 完了）
 - `App.tsx` のみ。**guarded setState-during-renderパターン**（effect不使用でlintクリーン）:
   - `autoOpenedGameId` state追加。render中（myGame算出直後、L1005付近）に自分のstatus='playing'対局が現れ、idが前回ガードと異なれば `setAutoOpenedGameId(id)`+`setActiveGameId(id)`+`setViewMode('game')`。myPlayingGameが消えたらガード解除（`setAutoOpenedGameId(null)`）→中断→再開・作り直しで再オープン
   - 手動でロビーに戻る操作は妨げない（同idでは再オープンしない）。L1010の「ロビーに留まる」分岐と手動ボタンは温存
 - lintが `set-state-in-render` を弾いたら: `useLiveGameList` に `onGameUpsert` コールバック追加しイベントハンドラ文脈で通知（初回fetch分も通知）
-- **E2E注意**: multi-user/multi-student specの「生徒が対局を開くボタンを押す」手順が自動遷移で変わる→ `e2e/helpers/` を先に監査・修正
+- **E2E注意**: `enterAssignedGame` helperを自動遷移/旧手動ボタン両対応に修正
+- 検証: `npx eslint .` 0 errors（既存warningのみ）・`npx tsc -b`・`vitest` Lobby/GameThumbnail 緑
 
 ### ⬜ コミット3: migration `20260708XXXXXX_live_game_interrupted_status.sql`
 ```sql

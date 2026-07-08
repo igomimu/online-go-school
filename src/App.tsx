@@ -48,6 +48,7 @@ function App() {
   // 画面状態
   const [viewMode, setViewMode] = useState<ViewMode>('lobby');
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
+  const [autoOpenedGameId, setAutoOpenedGameId] = useState<string | null>(null);
   const [showGameCreation, setShowGameCreation] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -1002,12 +1003,21 @@ function App() {
           (g.blackPlayer === myIdentityForGame || g.whitePlayer === myIdentityForGame),
       )
     : null;
+  const myPlayingGame = myGame?.status === 'playing' ? myGame : null;
+
+  if (myPlayingGame && autoOpenedGameId !== myPlayingGame.id) {
+    setAutoOpenedGameId(myPlayingGame.id);
+    setActiveGameId(myPlayingGame.id);
+    setViewMode('game');
+  } else if (!myPlayingGame && autoOpenedGameId !== null) {
+    setAutoOpenedGameId(null);
+  }
 
   // 生徒の自動ビュー判定
   const effectiveViewMode: ViewMode = (() => {
     if (role === 'STUDENT') {
       if (syncedNode && viewMode !== 'game') return 'lecture';
-      if (myGame && viewMode === 'lobby') return 'lobby'; // ロビーに留まる（ボタンで遷移）
+      if (myGame && viewMode === 'lobby') return 'lobby';
     }
     return viewMode;
   })();
