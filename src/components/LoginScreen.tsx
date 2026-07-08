@@ -132,10 +132,6 @@ export default function LoginScreen({
   };
 
   const handleInstallClick = async () => {
-    if (pwaInstall.isIos && !pwaInstall.canInstall) {
-      alert('Safari の共有ボタンから「ホーム画面に追加」を選んでください。');
-      return;
-    }
     await pwaInstall.install();
   };
 
