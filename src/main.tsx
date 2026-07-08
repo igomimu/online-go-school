@@ -10,6 +10,8 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
+// SW更新時のリロードは index.html の controllerchange ハンドラが一元管理
+// （初回インストールの claim ではリロードしないガード付き）
 const updateSW = registerSW({
   immediate: true,
   onRegisteredSW(_swUrl, registration) {
@@ -18,13 +20,6 @@ const updateSW = registerSW({
       registration.update().catch(() => {})
     }, 60 * 1000)
   },
-})
-
-let refreshing = false
-navigator.serviceWorker?.addEventListener('controllerchange', () => {
-  if (refreshing) return
-  refreshing = true
-  window.location.reload()
 })
 
 void updateSW

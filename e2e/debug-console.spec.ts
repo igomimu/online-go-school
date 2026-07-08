@@ -16,12 +16,11 @@ test.afterEach(async () => {
 
 test('本番URLでの対局作成時のコンソールエラーとAPIエラーをキャプチャするデバッグテスト', async ({ browser }) => {
   const classroomId = generateClassroomId('debugfull');
-  try {
-  
   const teacherContext = await browser.newContext();
   const studentAContext = await browser.newContext();
   const studentBContext = await browser.newContext();
-  
+  try {
+
   const teacherPage = await teacherContext.newPage();
   const studentAPage = await studentAContext.newPage();
   const studentBPage = await studentBContext.newPage();
