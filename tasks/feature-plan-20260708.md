@@ -56,7 +56,7 @@ ALTER TABLE public.go_school_live_games
 - 実装証跡: `saveGameHistory` 共通化、`interrupt`/`interrupt_all` 追加、`resume` clock pause対応
 - 検証: `npx eslint .` 0 errors（既存warningのみ）・`npx tsc -b`。`deno check` はローカルに `deno` がなく未実行。Edge deploy/smokeはコミット7で実施
 
-### ⬜ コミット5: 中断・履歴・再開のフロント配線
+### ✅ コミット5: 中断・履歴・再開のフロント配線（2026-07-08 Codex 実装完了）
 - `liveGameApi.ts`: status unionに `'interrupted'`、`fetchLiveGames` を `['playing','scoring','interrupted']` に、`interruptGame(gameId)`/`interruptAllGames(classroomId)` 追加
 - `types/game.ts` GameSession.status / StudentTable の gameStatus union に interrupted 追加（表示「断」等）
 - **新規 `src/utils/unloadInterrupt.ts`**: onAuthStateChangeでaccess_tokenモジュールキャッシュ→pagehide時 `fetch(keepalive:true, Authorization)` でinterrupt発射＋`sessionStorage['go-school-pending-resume']=gameId` 同期書込。**sendBeacon不使用**（Authorizationヘッダ不可）
@@ -70,7 +70,9 @@ ALTER TABLE public.go_school_live_games
 - `GameThumbnail.tsx` L82: 再開ボタン条件を `status==='interrupted'` に修正＋「中断」ラベル（黄）
 - `TeacherDashboard.tsx` 棋譜履歴モーダル（L433付近）: `result==='中断'` かつ live一覧に同idのinterrupted行が存在→「再開」ボタン→`onResumeGame(id)`＋モーダル閉じ
 - `GameBoard.tsx`: statusラベルに「中断」フォールバック
-- E2E追加 `e2e/interrupt-resume.spec.ts`: ①生徒ログアウト→先生履歴モーダルに中断棋譜+再開→生徒側自動オープン ②生徒リロード→自動resume→盤面・時計復元
+- E2E: ①生徒ログアウト→先生履歴モーダルに中断棋譜+再開→生徒側自動オープン ②生徒リロード→自動resume→盤面・時計復元、をコミット7の本番証跡で追加/実行
+- 実装証跡: live API/型/明示ログアウト/pagehide/自動resume/ロビー・サムネイル・先生履歴・盤面表示を `interrupted` 対応。`GameThumbnail` は nested button 警告解消のため外側を `role="button"` div化
+- 検証: `npx eslint .` 0 errors（既存warningのみ）・`npx tsc -b`・`npm run test` 314 tests passed。E2E spec はコミット7の本番証跡で追加/実行
 
 ### ⬜ コミット6: PWA再有効化＋インストールボタン（単独リリースで監視）
 - `vite.config.ts`: `selfDestroying: true` 削除（これがbeforeinstallpromptを殺している。aaa5e76で過去のSWキャッシュ事故対策として意図適用された経緯あり）

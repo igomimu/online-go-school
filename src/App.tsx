@@ -11,7 +11,13 @@ import { fetchToken } from './utils/livekitToken';
 import { makeStudentIdentity } from './utils/identityUtils';
 import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
-import { liveRowToSession, finishGame, resumeLiveGame } from './utils/liveGameApi';
+import { liveRowToSession, interruptAllGames, interruptGame, resumeLiveGame } from './utils/liveGameApi';
+import {
+  clearPendingResumeGameId,
+  getPendingResumeGameId,
+  initUnloadInterruptAuthCache,
+  interruptGameOnUnload,
+} from './utils/unloadInterrupt';
 import { fetchRoster, loadStudents, loadClassrooms } from './utils/classroomStore';
 import { saveAccount, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } from './utils/authStore';
 
@@ -139,6 +145,10 @@ function App() {
     () => liveGameList.games.map(liveRowToSession),
     [liveGameList.games],
   );
+
+  useEffect(() => {
+    initUnloadInterruptAuthCache();
+  }, []);
 
   // 生徒側の Lobby ヘッダー用（どの教室に入ったか/自分の名前の表示）。
   // 生徒のブラウザには先生が管理する classrooms/students は無いので、
@@ -543,18 +553,27 @@ function App() {
     localStorage.removeItem('go-school-last-student-classroom-id');
     localStorage.removeItem('go-school-last-student-name');
 
-    // ログアウト時、自分が打ち手の進行中対局を「中断」にする（playingで放置しない）
+    // ログアウト時、自分が打ち手の進行中対局を「中断」にする（playing/scoringで放置しない）
     const myId = classroomRef.current?.localIdentity ?? userName;
     const myActiveGame = games.find(
-      g => g.status === 'playing' && (g.blackPlayer === myId || g.whitePlayer === myId),
+      g => (g.status === 'playing' || g.status === 'scoring') && (g.blackPlayer === myId || g.whitePlayer === myId),
     );
 
     // 中断にしてからサインアウト（順序重要: signOut前に認証付きで実行）
     if (role !== 'TEACHER' && myActiveGame) {
       try {
-        await finishGame(myActiveGame.id, '中断');
+        await interruptGame(myActiveGame.id);
       } catch (err) {
         console.error('Failed to suspend game on disconnect:', err);
+      }
+    } else if (role === 'TEACHER') {
+      const classroomId = selectedClassroomId ?? studentClassroomId;
+      if (classroomId) {
+        try {
+          await interruptAllGames(classroomId);
+        } catch (err) {
+          console.error('Failed to interrupt classroom games on disconnect:', err);
+        }
       }
     }
 
@@ -713,17 +732,51 @@ function App() {
     }
   }, []);
 
-  // 対局終了時に自動的に閉じる（ロビーに戻る）
+  // 対局終了/中断時に自動的に閉じる（ロビーに戻る）
   useEffect(() => {
     if (!activeGameId) return;
     const currentGame = games.find(g => g.id === activeGameId);
-    if (currentGame && currentGame.status === 'finished') {
+    if (currentGame && (currentGame.status === 'finished' || currentGame.status === 'interrupted')) {
       const timer = setTimeout(() => {
         handleBackToLobby();
       }, 3000);
       return () => clearTimeout(timer);
     }
   }, [activeGameId, games, handleBackToLobby]);
+
+  // 生徒のブラウザ閉じ/リロードは keepalive fetch で中断を試みる。
+  useEffect(() => {
+    if (role !== 'STUDENT') return;
+    const myId = classroomRef.current?.localIdentity ?? userName;
+    const myActiveGame = games.find(
+      g => (g.status === 'playing' || g.status === 'scoring') && (g.blackPlayer === myId || g.whitePlayer === myId),
+    );
+    if (!myActiveGame) return;
+
+    const handlePageHide = () => interruptGameOnUnload(myActiveGame.id);
+    window.addEventListener('pagehide', handlePageHide);
+    return () => window.removeEventListener('pagehide', handlePageHide);
+  }, [role, games, userName]);
+
+  // pagehide 中断後に戻ってきた場合は、中断中の同一対局を自動再開する。
+  useEffect(() => {
+    if (role !== 'STUDENT') return;
+    const pendingGameId = getPendingResumeGameId();
+    if (!pendingGameId) return;
+
+    const myId = classroomRef.current?.localIdentity ?? userName;
+    const pendingGame = games.find(
+      g => g.id === pendingGameId &&
+        g.status === 'interrupted' &&
+        (g.blackPlayer === myId || g.whitePlayer === myId),
+    );
+    if (!pendingGame) return;
+
+    clearPendingResumeGameId();
+    void resumeLiveGame(pendingGame.id).catch((err) => {
+      console.error('Failed to resume pending interrupted game:', err);
+    });
+  }, [role, games, userName]);
 
   // 音声制御（先生用）
   const handleToggleHear = (identity: string) => {

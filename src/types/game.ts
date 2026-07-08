@@ -19,7 +19,7 @@ export interface GameSession {
   boardSize: number;        // 9, 13, 19
   handicap: number;         // 0-9
   komi: number;             // 6.5等
-  status: 'playing' | 'scoring' | 'finished';
+  status: 'playing' | 'scoring' | 'finished' | 'interrupted';
   boardState: BoardState;
   currentColor: StoneColor;
   moveNumber: number;

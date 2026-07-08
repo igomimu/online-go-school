@@ -88,7 +88,7 @@ export default function Lobby({
 
   // 自分が参加中の中断対局
   const mySuspendedGame = games.find(g =>
-    g.status === 'finished' && g.result === '中断' && (g.blackPlayer === myIdentity || g.whitePlayer === myIdentity)
+    g.status === 'interrupted' && (g.blackPlayer === myIdentity || g.whitePlayer === myIdentity)
   );
 
   return (

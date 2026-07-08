@@ -123,6 +123,7 @@ export default function StudentTable({
                   {row.gameStatus === 'playing' && '●'}
                   {row.gameStatus === 'scoring' && '整'}
                   {row.gameStatus === 'finished' && '済'}
+                  {row.gameStatus === 'interrupted' && '断'}
                 </td>
 
                 {/* 詳細 — 対局中の生徒のみ観戦モードへ */}
@@ -212,7 +213,7 @@ interface StudentRow {
   displayName: string;
   isConnected: boolean;
   student: Student | null;
-  gameStatus: 'playing' | 'scoring' | 'finished' | null;
+  gameStatus: 'playing' | 'scoring' | 'finished' | 'interrupted' | null;
 }
 
 function buildRows(

@@ -152,6 +152,26 @@ describe('Lobby', () => {
     expect(screen.getByText('碁盤を開く')).toBeInTheDocument();
   });
 
+  it('自分が参加中の中断対局に再開ボタンを表示する（生徒）', () => {
+    const onResumeGame = vi.fn();
+    render(
+      <Lobby
+        role="STUDENT"
+        participants={mockParticipants}
+        localIdentity="たろう"
+        activeSpeakers={[]}
+        games={[{ ...mockGame, status: 'interrupted', result: '中断' }]}
+        studentJoinInfo=""
+        onSelectGame={vi.fn()}
+        onResumeGame={onResumeGame}
+        myIdentity="たろう"
+      />
+    );
+
+    fireEvent.click(screen.getByText('対局を再開する'));
+    expect(onResumeGame).toHaveBeenCalledWith('game-1');
+  });
+
   it('「対局を作成」ボタンのクリック', () => {
     const onCreateGame = vi.fn();
     render(

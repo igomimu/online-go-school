@@ -103,10 +103,10 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
     finishWithResult(resultStr);
   }, [scoringResult, finishWithResult]);
 
-  // 対局終了（投了・整地完了）時に自動で閉じる
+  // 対局終了/中断時に自動で閉じる
   useEffect(() => {
-    if (game && game.status === 'finished' && onBack) {
-      const isResignOrTimeUp = game.result?.includes('+R') || game.result?.includes('+T') || game.result === '中断';
+    if (game && (game.status === 'finished' || game.status === 'interrupted') && onBack) {
+      const isResignOrTimeUp = game.result?.includes('+R') || game.result?.includes('+T') || game.status === 'interrupted';
       const delay = isResignOrTimeUp ? 500 : 3000;
       const timer = setTimeout(() => {
         onBack();
@@ -188,7 +188,9 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
               ? `${moveNumber}手目`
               : game.status === 'scoring'
                 ? '整地中'
-                : `終局: ${game.result ?? ''}`}
+                : game.status === 'interrupted'
+                  ? '中断'
+                  : `終局: ${game.result ?? ''}`}
           </span>
           {!(new URLSearchParams(window.location.search).get('mode') === 'game') && (
             <button
@@ -356,7 +358,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
       )}
 
       {/* 終局結果 */}
-      {game.status === 'finished' && game.result && (
+      {(game.status === 'finished' || game.status === 'interrupted') && game.result && (
         <div className="shrink-0 text-center text-sm text-zinc-400">
           結果: <span className="text-white font-bold">{game.result}</span>
         </div>
@@ -365,7 +367,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
       {/* 先生用管理者機能 */}
       {isTeacher && (
         <div className="shrink-0 flex flex-col sm:flex-row justify-center gap-3 pt-2 border-t border-white/5">
-          {game.status !== 'finished' && (
+          {game.status !== 'finished' && game.status !== 'interrupted' && (
             <button
               onClick={async () => {
                 if (confirm('この対局を強制終了し、生徒の「対局中」状態を解除します（打った石は残ります）。よろしいですか？')) {

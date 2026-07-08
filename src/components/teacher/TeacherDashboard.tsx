@@ -432,35 +432,59 @@ export default function TeacherDashboard({
                 <div style={{ textAlign: 'center', padding: '20px 0', color: '#666' }}>保存された棋譜履歴はありません。</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {historyGames.map(game => (
-                    <div
-                      key={game.id}
-                      onClick={() => {
-                        onSelectSavedGame?.(game);
-                        setHistoryStudent(null);
-                      }}
-                      style={{
-                        background: '#fff',
-                        border: '1px solid #ccc',
-                        padding: '8px 10px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 4,
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = '#f0f0e8'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                        <span>{game.blackPlayer} (黒) vs {game.whitePlayer} (白)</span>
-                        <span style={{ color: '#0066cc', fontSize: 11 }}>検討を開始する</span>
+                  {historyGames.map(game => {
+                    const interruptedLiveGame = games.find(g => g.id === game.id && g.status === 'interrupted');
+                    return (
+                      <div
+                        key={game.id}
+                        onClick={() => {
+                          onSelectSavedGame?.(game);
+                          setHistoryStudent(null);
+                        }}
+                        style={{
+                          background: '#fff',
+                          border: '1px solid #ccc',
+                          padding: '8px 10px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 4,
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#f0f0e8'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', gap: 8 }}>
+                          <span>{game.blackPlayer} (黒) vs {game.whitePlayer} (白)</span>
+                          {interruptedLiveGame && onResumeGame ? (
+                            <button
+                              onClick={e => {
+                                e.stopPropagation();
+                                onResumeGame(interruptedLiveGame.id);
+                                setHistoryStudent(null);
+                              }}
+                              style={{
+                                background: '#f59e0b',
+                                border: '1px solid #b45309',
+                                color: '#fff',
+                                fontSize: 11,
+                                fontWeight: 'bold',
+                                padding: '1px 8px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              再開
+                            </button>
+                          ) : (
+                            <span style={{ color: '#0066cc', fontSize: 11 }}>検討を開始する</span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666', fontSize: 11 }}>
+                          <span>対局日: {game.date}</span>
+                          <span>{game.boardSize}路盤 | コミ: {game.komi} | 結果: {game.result || '不明'}</span>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666', fontSize: 11 }}>
-                        <span>対局日: {game.date}</span>
-                        <span>{game.boardSize}路盤 | コミ: {game.komi} | 結果: {game.result || '不明'}</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

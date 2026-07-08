@@ -41,6 +41,16 @@ describe('GameThumbnail', () => {
     expect(screen.getByText('W+2.5')).toBeInTheDocument();
   });
 
+  it('中断対局は再開ボタンを表示する', () => {
+    const onResume = vi.fn();
+    const game = createMockGame({ status: 'interrupted', result: '中断' });
+    render(<GameThumbnail game={game} onClick={vi.fn()} onResume={onResume} />);
+
+    fireEvent.click(screen.getByText('再開'));
+    expect(screen.getByText('中断')).toBeInTheDocument();
+    expect(onResume).toHaveBeenCalledWith('game-1');
+  });
+
   it('クリックでonClickが呼ばれる', () => {
     const onClick = vi.fn();
     render(<GameThumbnail game={createMockGame()} onClick={onClick} />);

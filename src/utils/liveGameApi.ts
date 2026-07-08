@@ -29,7 +29,7 @@ export interface LiveGameRow {
   board_size: number;
   handicap: number;
   komi: number;
-  status: 'playing' | 'scoring' | 'finished';
+  status: 'playing' | 'scoring' | 'finished' | 'interrupted';
   result: string | null;
   scoring_dead_stones: string[];
   clock: GameClock | null;
@@ -121,7 +121,7 @@ async function getRoleAuthToken(sb: SupabaseClient): Promise<string | null> {
 }
 
 async function executeGameAction(
-  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume',
+  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all',
   gameId?: string,
   params?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
@@ -169,7 +169,7 @@ export async function fetchLiveGames(classroomId: string): Promise<LiveGameRow[]
     .from('go_school_live_games')
     .select('*')
     .eq('classroom_id', classroomId)
-    .in('status', ['playing', 'scoring'])
+    .in('status', ['playing', 'scoring', 'interrupted'])
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as LiveGameRow[];
@@ -242,6 +242,14 @@ export async function updateDeadStones(gameId: string, deadStones: string[]): Pr
 
 export async function finishGame(gameId: string, result: string): Promise<void> {
   await executeGameAction('finish', gameId, { result });
+}
+
+export async function interruptGame(gameId: string): Promise<void> {
+  await executeGameAction('interrupt', gameId);
+}
+
+export async function interruptAllGames(classroomId: string): Promise<void> {
+  await executeGameAction('interrupt_all', undefined, { classroom_id: classroomId });
 }
 
 export async function updateClock(gameId: string, clock: GameClock): Promise<void> {

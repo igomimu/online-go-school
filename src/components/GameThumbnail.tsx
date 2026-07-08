@@ -19,11 +19,19 @@ export default function GameThumbnail({ game, onClick, isActive, students = [], 
   const whiteName = getDisplayName(game.whitePlayer, students);
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       className={`glass-panel p-2 hover:bg-white/5 transition-all ${
         isActive ? 'ring-2 ring-blue-500' : ''
-      } ${game.status === 'finished' ? 'opacity-60' : ''}`}
+      } ${game.status === 'finished' || game.status === 'interrupted' ? 'opacity-60' : ''}`}
     >
       {/* ミニ碁盤 */}
       <svg width={totalSize} height={totalSize} viewBox={`0 0 ${totalSize} ${totalSize}`}>
@@ -76,9 +84,11 @@ export default function GameThumbnail({ game, onClick, isActive, students = [], 
           <span>
             {game.status === 'playing'
               ? `${game.moveNumber}手目`
-              : game.result || '終局'}
+              : game.status === 'interrupted'
+                ? '中断'
+                : game.result || '終局'}
           </span>
-          {game.status === 'finished' && game.result === '中断' && onResume && (
+          {game.status === 'interrupted' && onResume && (
             <button
               onClick={e => {
                 e.stopPropagation();
@@ -91,6 +101,6 @@ export default function GameThumbnail({ game, onClick, isActive, students = [], 
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 }
