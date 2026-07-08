@@ -12,6 +12,7 @@ import {
 import { parseIgcXml } from '../../utils/igcImport';
 import { fetchDojoNetStudents } from '../../utils/dojoSync';
 import { resolveGrade } from '../../utils/gradeCalc';
+import { usePwaInstall } from '../../hooks/usePwaInstall';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
 
 interface ClassroomManagerProps {
@@ -42,6 +43,7 @@ export default function ClassroomManager({
   onReloadData,
   onBack,
 }: ClassroomManagerProps) {
+  const pwaInstall = usePwaInstall();
   const [activeTab, setActiveTab] = useState<TabId>('classroom');
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
@@ -540,6 +542,9 @@ export default function ClassroomManager({
       }}>
         <IgcButton label="閉じる" onClick={onBack} />
         <div style={{ flex: 1 }} />
+        {pwaInstall.shouldShowInstall && (
+          <IgcButton label="⬇ アプリをインストール" color="#6090f0" onClick={() => { void pwaInstall.install(); }} />
+        )}
         <IgcButton label="教室追加" color="#60c0f0" onClick={handleAddClassroom} />
         <IgcButton label="生徒追加" color="#f0c060" onClick={() => { setActiveTab('student'); startAddStudent(); }} />
         <IgcButton label="XMLインポート" color="#90d060" onClick={() => fileInputRef.current?.click()} />

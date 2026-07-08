@@ -111,10 +111,11 @@ export default function Header({
         {pwaInstall.shouldShowInstall && (
           <button
             onClick={handleInstallClick}
-            className="p-2 text-zinc-500 hover:text-blue-400 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-600/15 text-blue-300 border border-blue-500/30 rounded-lg hover:bg-blue-600/25 transition-colors duration-150"
             title={pwaInstall.isIos && !pwaInstall.canInstall ? 'ホーム画面に追加' : 'アプリをインストール'}
           >
             <Download className="w-4 h-4" />
+            インストール
           </button>
         )}
         <button
