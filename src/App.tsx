@@ -721,13 +721,15 @@ function App() {
 
   // ロビーに戻る
   const handleBackToLobby = useCallback(() => {
-    setViewMode('lobby');
-    setActiveGameId(null);
-    // 検討/授業モードなら生徒にも通知
-    if (role === 'TEACHER') {
+    // 検討/授業モードから戻るときだけ生徒にセッション終了を通知する。
+    // 対局盤から戻るときに送ると、REVIEW_ENDを受けた対局中の生徒の碁盤まで閉じてしまう
+    // （先生が対局者として盤を自動オープン→閉じる経路が d976887 で常用になった）。
+    if (role === 'TEACHER' && (viewMode === 'review' || viewMode === 'lecture')) {
       classroomRef.current?.broadcast({ type: 'REVIEW_END', payload: {} });
     }
-  }, [role]);
+    setViewMode('lobby');
+    setActiveGameId(null);
+  }, [role, viewMode]);
 
   // 対局の再開処理
   const handleResumeGame = useCallback(async (gameId: string) => {
