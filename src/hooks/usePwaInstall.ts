@@ -115,7 +115,8 @@ export function usePwaInstall() {
   return {
     ...state,
     install: promptOrExplainInstall,
-    // アプリ内(standalone)起動時とインストール直後以外は常に表示する
-    shouldShowInstall: !state.isStandalone && !state.appInstalled,
+    // iOSの場合は手順案内ができるので standalone でなければ表示。
+    // それ以外（Android/PC等）の場合は、ネイティブプロンプトが実行可能な場合（canInstallがtrue）のみ表示する。
+    shouldShowInstall: !state.isStandalone && !state.appInstalled && (state.isIos || state.canInstall),
   };
 }
