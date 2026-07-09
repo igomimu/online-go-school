@@ -104,7 +104,18 @@ function toStudent(row: GoSchoolStudentRow): Student {
   };
 }
 
+// E2E/テスト実行が本番DBに残す教室を教師UIから除外する。
+// （名前が先頭ソートされ自動選択→0名教室で生徒リスト・対局同期が出ない事故を防ぐ）
+export function isTestClassroom(id: string | null | undefined, name: string | null | undefined): boolean {
+  const idStr = (id || '').toLowerCase();
+  if (/^(debugfull|verify|wiring|test-class|e2e|debug|smoke)[-_]/.test(idStr)) return true;
+  const nameStr = name || '';
+  if (nameStr.startsWith('E2Eテスト教室') || /(^|\s)(E2E|test|debug)/i.test(nameStr)) return true;
+  return false;
+}
+
 function buildRoster(studentRows: GoSchoolStudentRow[], classroomRows: GoSchoolClassroomRow[]): ClassroomRoster {
+  classroomRows = classroomRows.filter(row => !isTestClassroom(row.id, row.name));
   const students = studentRows
     .map(toStudent)
     .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
