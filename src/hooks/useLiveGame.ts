@@ -349,10 +349,11 @@ export function useLiveGame(
 
       const moveNumber = derived.moveNumber + 1;
 
-      // 時計の切り替え
+      // 時計の切り替え。activeGame.clock はDBに最後に保存した時点（前回着手時）の値なので、
+      // ここで使うと消費した持ち時間が巻き戻る。tick済みのローカル時計を正として書き込む。
       let nextClock: GameClock | undefined = undefined;
       if (activeGame.clock) {
-        nextClock = switchClock(activeGame.clock, effectivePlayer.color);
+        nextClock = switchClock(localClock ?? activeGame.clock, effectivePlayer.color);
       }
 
       // 1. 楽観的更新（仮着手）
@@ -396,7 +397,7 @@ export function useLiveGame(
         setMoves((prev) => prev.filter((m) => m.player_id !== tempMove.player_id));
       }
     },
-    [activeGame, effectivePlayer, derived.moveNumber, derived.currentColor, classroom, isMyTurn, retrySubmitAfterResync],
+    [activeGame, effectivePlayer, derived.moveNumber, derived.currentColor, classroom, isMyTurn, retrySubmitAfterResync, localClock],
   );
 
   const submitPass = useCallback(async () => {
@@ -407,10 +408,11 @@ export function useLiveGame(
     const isSecondPass = lastMove && lastMove.x === 0 && lastMove.y === 0;
     const moveNumber = derived.moveNumber + 1;
 
-    // 時計の切り替え
+    // 時計の切り替え。activeGame.clock はDBに最後に保存した時点（前回着手時）の値なので、
+    // ここで使うと消費した持ち時間が巻き戻る。tick済みのローカル時計を正として書き込む。
     let nextClock: GameClock | undefined = undefined;
     if (activeGame.clock) {
-      nextClock = switchClock(activeGame.clock, effectivePlayer.color);
+      nextClock = switchClock(localClock ?? activeGame.clock, effectivePlayer.color);
     }
 
     // 1. 楽観的更新
@@ -458,7 +460,7 @@ export function useLiveGame(
         setError(String(e));
       }
     }
-  }, [activeGame, effectivePlayer, derived.lastMove, derived.moveNumber, derived.currentColor, classroom, isMyTurn, retrySubmitAfterResync]);
+  }, [activeGame, effectivePlayer, derived.lastMove, derived.moveNumber, derived.currentColor, classroom, isMyTurn, retrySubmitAfterResync, localClock]);
 
   // ローカルの時間切れ処理
   const handleLocalTimeUp = useCallback(
@@ -541,7 +543,7 @@ export function useLiveGame(
                   : { whiteTimeLeft: 0, whiteByoyomiLeft: 0 }),
               };
             }
-            // 回を消費した瞬間の告知（残りN回です／最後の考慮時間に入りました）
+            // 回を消費した瞬間の告知（残りN回です／最後の考慮時間です）
             const transition = getByoyomiAnnouncement(prev.byoyomiSeconds, prev.byoyomiSeconds, byoyomiLeft);
             if (transition) speakByoyomi(transition);
             newTimeLeft = prev.byoyomiSeconds;

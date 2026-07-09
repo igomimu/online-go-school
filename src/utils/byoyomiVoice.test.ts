@@ -38,8 +38,8 @@ describe('getByoyomiAnnouncement', () => {
   });
 
   describe('30秒・最後の考慮時間に入る（periodsLeft=2）', () => {
-    it('30秒で「最後の考慮時間に入りました」', () => {
-      expect(getByoyomiAnnouncement(30, 30, 2)).toBe('最後の考慮時間に入りました');
+    it('30秒で「最後の考慮時間です」（「入りました」はTTSが誤読するため不使用）', () => {
+      expect(getByoyomiAnnouncement(30, 30, 2)).toBe('最後の考慮時間です');
     });
   });
 

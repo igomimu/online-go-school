@@ -133,7 +133,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
     const isLow = clock.blackTimeLeft <= 10 && clock.blackTimeLeft > 0;
     const isByoyomi = !!clock.blackInByoyomi;
     return (
-      <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
+      <span data-testid="clock-black" className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
         isLow || isByoyomi ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-300'
       }`}>
         {isByoyomi ? `秒読 ${Math.ceil(clock.blackTimeLeft)}秒 [${clock.blackByoyomiLeft}]` : formatTime(clock.blackTimeLeft)}
@@ -147,7 +147,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
     const isLow = clock.whiteTimeLeft <= 10 && clock.whiteTimeLeft > 0;
     const isByoyomi = !!clock.whiteInByoyomi;
     return (
-      <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
+      <span data-testid="clock-white" className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
         isLow || isByoyomi ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-300'
       }`}>
         {isByoyomi ? `秒読 ${Math.ceil(clock.whiteTimeLeft)}秒 [${clock.whiteByoyomiLeft}]` : formatTime(clock.whiteTimeLeft)}
