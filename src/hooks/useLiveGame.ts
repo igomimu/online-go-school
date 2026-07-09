@@ -475,10 +475,19 @@ export function useLiveGame(
   }, [hasLocalClock, activeGameStatus, derived.currentColor, handleLocalTimeUp]);
 
   const submitResign = useCallback(async () => {
-    if (!activeGame || !effectivePlayer) return;
+    // 投了は手番の対局者本人のみ。観戦者・非対局者・相手番では何もしない。
+    if (!activeGame || !effectivePlayer || !isMyTurn) return;
     const winner = effectivePlayer.color === 'BLACK' ? 'W' : 'B';
 
-    // LiveKitデータチャネルでブロードキャスト
+    // 先にサーバー（真実のソース）へ確定させる。失敗したら対局中のままにしない。
+    try {
+      await apiFinishGame(activeGame.id, `${winner}+R`);
+    } catch (e) {
+      setError(String(e));
+      return;
+    }
+
+    // LiveKitデータチャネルでブロードキャスト（相手・観戦者へ即時反映）
     if (classroom && classroom.isConnected) {
       classroom.broadcast({
         type: 'GAME_RESIGN',
@@ -489,15 +498,9 @@ export function useLiveGame(
       }).catch((err) => console.error('[LiveKit resign broadcast error]', err));
     }
 
-    // ローカルゲーム状態を即座にfinishedに更新（応答性のため）
+    // ローカルゲーム状態を finished に更新（Realtime 反映前の応答性のため）
     setGame((prev) => prev ? { ...prev, status: 'finished', result: `${winner}+R` } : null);
-
-    try {
-      await apiFinishGame(activeGame.id, `${winner}+R`);
-    } catch (e) {
-      setError(String(e));
-    }
-  }, [activeGame, effectivePlayer, classroom]);
+  }, [activeGame, effectivePlayer, isMyTurn, classroom]);
 
   const enterScoringFn = useCallback(async () => {
     if (!activeGame) return;

@@ -166,6 +166,16 @@ describe('GameBoard', () => {
     vi.restoreAllMocks();
   });
 
+  it('相手の番のときは投了ボタンを表示しない（投了は手番側のみ）', () => {
+    const game = createMockGame({ currentColor: 'WHITE' }); // たろう=黒 → 手番でない
+    setupMock({ game });
+    render(
+      <GameBoard gameId="game-1" myIdentity="たろう" />
+    );
+    expect(screen.queryByText('投了')).not.toBeInTheDocument();
+    expect(screen.queryByText('パス')).not.toBeInTheDocument();
+  });
+
   it('終局時は結果を表示しボタンは非表示', () => {
     const game = createMockGame({ status: 'finished', result: 'B+R' });
     setupMock({ game });

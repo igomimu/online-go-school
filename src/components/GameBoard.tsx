@@ -96,9 +96,10 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
   }, [isMyTurn, submitPass]);
 
   const handleResignClick = useCallback(() => {
-    if (!isParticipant && !isTeacher) return;
+    // 投了は手番の対局者本人のみ
+    if (!isMyTurn) return;
     if (confirm('投了しますか？')) submitResign();
-  }, [isParticipant, isTeacher, submitResign]);
+  }, [isMyTurn, submitResign]);
 
   const handleScoringConfirm = useCallback(() => {
     if (!scoringResult) return;
@@ -327,17 +328,15 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
         </div>
       )}
 
-      {/* 操作ボタン */}
-      {game.status === 'playing' && (isParticipant || isTeacher) && (
+      {/* 操作ボタン（パス・投了とも手番の対局者本人のみ） */}
+      {game.status === 'playing' && isMyTurn && (
         <div className="shrink-0 flex justify-center gap-3">
-          {isMyTurn && (
-            <button
-              onClick={handlePassClick}
-              className="secondary-button flex items-center gap-2 text-sm"
-            >
-              <SkipForward className="w-4 h-4" /> パス
-            </button>
-          )}
+          <button
+            onClick={handlePassClick}
+            className="secondary-button flex items-center gap-2 text-sm"
+          >
+            <SkipForward className="w-4 h-4" /> パス
+          </button>
           <button
             onClick={handleResignClick}
             className="secondary-button flex items-center gap-2 text-sm border-red-500/20 hover:bg-red-500/10 hover:text-red-400"
