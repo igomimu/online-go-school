@@ -152,6 +152,12 @@ export function useLiveGame(
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [localClock, setLocalClock] = useState<GameClock | null>(null);
+  // interval コールバックが setState updater を介さず現在値を読むためのミラー
+  // （読み上げ副作用を updater の外に出すため。updater は React が2回呼び直すことがある）
+  const localClockRef = useRef<GameClock | null>(null);
+  useEffect(() => {
+    localClockRef.current = localClock;
+  }, [localClock]);
   const channelRef = useRef<ReturnType<typeof subscribeLiveGame> | null>(null);
   const lastByoyomiSpeakRef = useRef<string | null>(null); // 秒読み読み上げの重複防止
 
@@ -484,90 +490,102 @@ export function useLiveGame(
   const hasLocalClock = localClock !== null;
   const activeGameStatus = activeGame?.status;
 
-  // 1秒ごとにローカル残り時間を減少させる
+  // 1秒ごとにローカル残り時間を減少させる。
+  // ⚠️ 計算と読み上げは setState の updater に入れないこと。updater は純粋関数の前提で
+  // React が2回呼び直すことがあり、読み上げ副作用が入っていると音声がダブる
+  // （「残り2回残り2回です」事故 2026-07-10）。interval コールバック内で ref から
+  // 現在値を読んで計算し、結果を setLocalClock に「値」で渡す。
   useEffect(() => {
     if (!localClock || activeGameStatus !== 'playing') return;
     if (localClock.lastTickTime === null) return; // 時計が動いていない（一時停止中）
 
     const timer = setInterval(() => {
-      setLocalClock((prev) => {
-        if (!prev) return null;
-        
-        const isBlackTurn = derived.currentColor === 'BLACK';
-        const now = Date.now();
-        const elapsed = (now - (prev.lastTickTime || now)) / 1000;
-        
-        if (elapsed < 0.9) return prev; // 1秒未満はスキップ
+      const prev = localClockRef.current;
+      if (!prev || prev.lastTickTime === null) return;
 
-        const timeLeft = isBlackTurn ? prev.blackTimeLeft : prev.whiteTimeLeft;
-        const byoyomiLeft = isBlackTurn ? prev.blackByoyomiLeft : prev.whiteByoyomiLeft;
-        const inByoyomi = isBlackTurn ? prev.blackInByoyomi : prev.whiteInByoyomi;
+      const isBlackTurn = derived.currentColor === 'BLACK';
+      const now = Date.now();
+      const elapsed = (now - (prev.lastTickTime || now)) / 1000;
 
-        let newTimeLeft = timeLeft - elapsed;
-        let newByoyomiLeft = byoyomiLeft;
-        let newInByoyomi = inByoyomi ?? false;
+      if (elapsed < 0.9) return; // 1秒未満はスキップ
 
-        if (newTimeLeft <= 0) {
-          if (!newInByoyomi) {
-            // 持ち時間切れ
-            if (prev.byoyomiPeriods > 0) {
-              // 秒読み開始（回数はまだ消費しない）
-              newInByoyomi = true;
-              newTimeLeft = prev.byoyomiSeconds;
-            } else {
-              // 秒読みなし → 切れ負け
-              speakByoyomi('時間切れ負けです');
-              clearInterval(timer);
-              handleLocalTimeUp(derived.currentColor);
-              return {
-                ...prev,
-                lastTickTime: now,
-                ...(isBlackTurn
-                  ? { blackTimeLeft: 0 }
-                  : { whiteTimeLeft: 0 }),
-              };
-            }
-          } else {
-            // 秒読みを1回使い切った → 回数を消費
-            newByoyomiLeft -= 1;
-            if (newByoyomiLeft <= 0) {
-              // 最後の秒読みを使い切り → 「10」まで数えて時間切れ負け
-              speakByoyomi('10、時間切れ負けです');
-              clearInterval(timer);
-              handleLocalTimeUp(derived.currentColor);
-              return {
-                ...prev,
-                lastTickTime: now,
-                ...(isBlackTurn
-                  ? { blackTimeLeft: 0, blackByoyomiLeft: 0 }
-                  : { whiteTimeLeft: 0, whiteByoyomiLeft: 0 }),
-              };
-            }
-            // 回を消費した瞬間の告知（残りN回です／最後の考慮時間です）
-            const transition = getByoyomiAnnouncement(prev.byoyomiSeconds, prev.byoyomiSeconds, byoyomiLeft);
-            if (transition) speakByoyomi(transition);
+      const timeLeft = isBlackTurn ? prev.blackTimeLeft : prev.whiteTimeLeft;
+      const byoyomiLeft = isBlackTurn ? prev.blackByoyomiLeft : prev.whiteByoyomiLeft;
+      const inByoyomi = isBlackTurn ? prev.blackInByoyomi : prev.whiteInByoyomi;
+
+      const commit = (next: GameClock) => {
+        localClockRef.current = next; // 稀な再入でも二重計算しないよう即時反映
+        setLocalClock(next);
+      };
+
+      let newTimeLeft = timeLeft - elapsed;
+      let newByoyomiLeft = byoyomiLeft;
+      let newInByoyomi = inByoyomi ?? false;
+
+      if (newTimeLeft <= 0) {
+        if (!newInByoyomi) {
+          // 持ち時間切れ
+          if (prev.byoyomiPeriods > 0) {
+            // 秒読み開始（回数はまだ消費しない）
+            newInByoyomi = true;
             newTimeLeft = prev.byoyomiSeconds;
+          } else {
+            // 秒読みなし → 切れ負け
+            speakByoyomi('時間切れ負けです');
+            clearInterval(timer);
+            handleLocalTimeUp(derived.currentColor);
+            commit({
+              ...prev,
+              lastTickTime: now,
+              ...(isBlackTurn
+                ? { blackTimeLeft: 0 }
+                : { whiteTimeLeft: 0 }),
+            });
+            return;
           }
-        }
-
-        // 秒読み中の各秒の読み上げ（10秒・20秒・25秒・1〜9 等）
-        if (newInByoyomi && newTimeLeft > 0) {
-          const elapsedSec = Math.round(prev.byoyomiSeconds - newTimeLeft);
-          const phrase = getByoyomiAnnouncement(prev.byoyomiSeconds, elapsedSec, newByoyomiLeft);
-          const key = `${derived.currentColor}:${newByoyomiLeft}:${elapsedSec}`;
-          if (phrase && lastByoyomiSpeakRef.current !== key) {
-            lastByoyomiSpeakRef.current = key;
-            speakByoyomi(phrase);
+        } else {
+          // 秒読みを1回使い切った → 回数を消費
+          newByoyomiLeft -= 1;
+          if (newByoyomiLeft <= 0) {
+            // 最後の秒読みを使い切り → 時間切れ負け。
+            // 直前の秒読みで「10」を読み上げ済みなら重ねて「10」と言わない（10,10のダブり防止）
+            const said10 = lastByoyomiSpeakRef.current === `${derived.currentColor}:1:${Math.floor(prev.byoyomiSeconds)}`;
+            speakByoyomi(said10 ? '時間切れ負けです' : '10、時間切れ負けです');
+            clearInterval(timer);
+            handleLocalTimeUp(derived.currentColor);
+            commit({
+              ...prev,
+              lastTickTime: now,
+              ...(isBlackTurn
+                ? { blackTimeLeft: 0, blackByoyomiLeft: 0 }
+                : { whiteTimeLeft: 0, whiteByoyomiLeft: 0 }),
+            });
+            return;
           }
+          // 回を消費した瞬間の告知（残りN回です／最後の考慮時間です）
+          const transition = getByoyomiAnnouncement(prev.byoyomiSeconds, prev.byoyomiSeconds, byoyomiLeft);
+          if (transition) speakByoyomi(transition);
+          newTimeLeft = prev.byoyomiSeconds;
         }
+      }
 
-        return {
-          ...prev,
-          lastTickTime: now,
-          ...(isBlackTurn
-            ? { blackTimeLeft: newTimeLeft, blackByoyomiLeft: newByoyomiLeft, blackInByoyomi: newInByoyomi }
-            : { whiteTimeLeft: newTimeLeft, whiteByoyomiLeft: newByoyomiLeft, whiteInByoyomi: newInByoyomi }),
-        };
+      // 秒読み中の各秒の読み上げ（10秒・20秒・25秒・1〜9 等）
+      if (newInByoyomi && newTimeLeft > 0) {
+        const elapsedSec = Math.round(prev.byoyomiSeconds - newTimeLeft);
+        const phrase = getByoyomiAnnouncement(prev.byoyomiSeconds, elapsedSec, newByoyomiLeft);
+        const key = `${derived.currentColor}:${newByoyomiLeft}:${elapsedSec}`;
+        if (phrase && lastByoyomiSpeakRef.current !== key) {
+          lastByoyomiSpeakRef.current = key;
+          speakByoyomi(phrase);
+        }
+      }
+
+      commit({
+        ...prev,
+        lastTickTime: now,
+        ...(isBlackTurn
+          ? { blackTimeLeft: newTimeLeft, blackByoyomiLeft: newByoyomiLeft, blackInByoyomi: newInByoyomi }
+          : { whiteTimeLeft: newTimeLeft, whiteByoyomiLeft: newByoyomiLeft, whiteInByoyomi: newInByoyomi }),
       });
     }, 1000);
 
