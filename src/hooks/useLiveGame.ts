@@ -3,6 +3,7 @@ import type { StoneColor, BoardState } from '../components/GoBoard';
 import { createEmptyBoard, checkCapture } from '../utils/gameLogic';
 import { getHandicapStones } from '../utils/handicapStones';
 import { studentMatchesPlayer } from '../utils/identityUtils';
+import { getByoyomiAnnouncement, speakByoyomi } from '../utils/byoyomiVoice';
 import { switchClock } from './useGameClock';
 import type { GameClock } from '../types/game';
 import {
@@ -115,6 +116,7 @@ export function useLiveGame(
   const [error, setError] = useState<string | null>(null);
   const [localClock, setLocalClock] = useState<GameClock | null>(null);
   const channelRef = useRef<ReturnType<typeof subscribeLiveGame> | null>(null);
+  const lastByoyomiSpeakRef = useRef<string | null>(null); // 秒読み読み上げの重複防止
 
   useEffect(() => {
     if (!gameId) {
@@ -420,44 +422,62 @@ export function useLiveGame(
 
         const timeLeft = isBlackTurn ? prev.blackTimeLeft : prev.whiteTimeLeft;
         const byoyomiLeft = isBlackTurn ? prev.blackByoyomiLeft : prev.whiteByoyomiLeft;
+        const inByoyomi = isBlackTurn ? prev.blackInByoyomi : prev.whiteInByoyomi;
 
         let newTimeLeft = timeLeft - elapsed;
         let newByoyomiLeft = byoyomiLeft;
+        let newInByoyomi = inByoyomi ?? false;
 
         if (newTimeLeft <= 0) {
-          if (prev.byoyomiPeriods > 0 && newByoyomiLeft > 0) {
-            // 秒読みを消費
-            if (timeLeft > 0) {
-              // 持ち時間切れ -> 秒読み開始
+          if (!newInByoyomi) {
+            // 持ち時間切れ
+            if (prev.byoyomiPeriods > 0) {
+              // 秒読み開始（回数はまだ消費しない）
+              newInByoyomi = true;
               newTimeLeft = prev.byoyomiSeconds;
             } else {
-              // 秒読み中 -> 1回消費
-              newByoyomiLeft -= 1;
-              if (newByoyomiLeft <= 0) {
-                // 時間切れ (切れ負け)
-                clearInterval(timer);
-                handleLocalTimeUp(derived.currentColor);
-                return {
-                  ...prev,
-                  lastTickTime: now,
-                  ...(isBlackTurn
-                    ? { blackTimeLeft: 0, blackByoyomiLeft: 0 }
-                    : { whiteTimeLeft: 0, whiteByoyomiLeft: 0 }),
-                };
-              }
-              newTimeLeft = prev.byoyomiSeconds;
+              // 秒読みなし → 切れ負け
+              clearInterval(timer);
+              handleLocalTimeUp(derived.currentColor);
+              return {
+                ...prev,
+                lastTickTime: now,
+                ...(isBlackTurn
+                  ? { blackTimeLeft: 0 }
+                  : { whiteTimeLeft: 0 }),
+              };
             }
           } else {
-            // 持ち時間切れ (秒読みなし)
-            clearInterval(timer);
-            handleLocalTimeUp(derived.currentColor);
-            return {
-              ...prev,
-              lastTickTime: now,
-              ...(isBlackTurn
-                ? { blackTimeLeft: 0, blackByoyomiLeft: 0 }
-                : { whiteTimeLeft: 0, whiteByoyomiLeft: 0 }),
-            };
+            // 秒読みを1回使い切った → 回数を消費
+            newByoyomiLeft -= 1;
+            if (newByoyomiLeft <= 0) {
+              // 時間切れ (切れ負け)
+              speakByoyomi('時間切れです');
+              clearInterval(timer);
+              handleLocalTimeUp(derived.currentColor);
+              return {
+                ...prev,
+                lastTickTime: now,
+                ...(isBlackTurn
+                  ? { blackTimeLeft: 0, blackByoyomiLeft: 0 }
+                  : { whiteTimeLeft: 0, whiteByoyomiLeft: 0 }),
+              };
+            }
+            // 回を消費した瞬間の告知（残りN回です／最後の考慮時間に入りました）
+            const transition = getByoyomiAnnouncement(prev.byoyomiSeconds, prev.byoyomiSeconds, byoyomiLeft);
+            if (transition) speakByoyomi(transition);
+            newTimeLeft = prev.byoyomiSeconds;
+          }
+        }
+
+        // 秒読み中の各秒の読み上げ（10秒・20秒・25秒・1〜9 等）
+        if (newInByoyomi && newTimeLeft > 0) {
+          const elapsedSec = Math.round(prev.byoyomiSeconds - newTimeLeft);
+          const phrase = getByoyomiAnnouncement(prev.byoyomiSeconds, elapsedSec, newByoyomiLeft);
+          const key = `${derived.currentColor}:${newByoyomiLeft}:${elapsedSec}`;
+          if (phrase && lastByoyomiSpeakRef.current !== key) {
+            lastByoyomiSpeakRef.current = key;
+            speakByoyomi(phrase);
           }
         }
 
@@ -465,8 +485,8 @@ export function useLiveGame(
           ...prev,
           lastTickTime: now,
           ...(isBlackTurn
-            ? { blackTimeLeft: newTimeLeft, blackByoyomiLeft: newByoyomiLeft }
-            : { whiteTimeLeft: newTimeLeft, whiteByoyomiLeft: newByoyomiLeft }),
+            ? { blackTimeLeft: newTimeLeft, blackByoyomiLeft: newByoyomiLeft, blackInByoyomi: newInByoyomi }
+            : { whiteTimeLeft: newTimeLeft, whiteByoyomiLeft: newByoyomiLeft, whiteInByoyomi: newInByoyomi }),
         };
       });
     }, 1000);

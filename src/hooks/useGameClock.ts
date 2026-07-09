@@ -14,14 +14,19 @@ export const CLOCK_PRESETS = [
 
 export function createClock(mainTime: number, byoyomi: number, periods: number): GameClock | undefined {
   if (mainTime === 0 && byoyomi === 0) return undefined;
+  // 持ち時間0＝いきなり秒読みから開始
+  const startInByoyomi = mainTime === 0 && byoyomi > 0;
+  const startTime = startInByoyomi ? byoyomi : mainTime;
   return {
     mainTimeSeconds: mainTime,
     byoyomiSeconds: byoyomi,
     byoyomiPeriods: periods,
-    blackTimeLeft: mainTime,
-    whiteTimeLeft: mainTime,
+    blackTimeLeft: startTime,
+    whiteTimeLeft: startTime,
     blackByoyomiLeft: periods,
     whiteByoyomiLeft: periods,
+    blackInByoyomi: startInByoyomi,
+    whiteInByoyomi: startInByoyomi,
     lastTickTime: null,
   };
 }
@@ -92,30 +97,31 @@ export function useGameClockTick(
       const isBlack = game.currentColor === 'BLACK';
       const timeLeft = isBlack ? game.clock.blackTimeLeft : game.clock.whiteTimeLeft;
       const byoyomiLeft = isBlack ? game.clock.blackByoyomiLeft : game.clock.whiteByoyomiLeft;
+      const inByoyomi = isBlack ? game.clock.blackInByoyomi : game.clock.whiteInByoyomi;
 
       let newTimeLeft = timeLeft - elapsed;
       let newByoyomiLeft = byoyomiLeft;
+      let newInByoyomi = inByoyomi ?? false;
 
       if (newTimeLeft <= 0) {
-        if (game.clock.byoyomiPeriods > 0 && newByoyomiLeft > 0) {
-          // 秒読みに入る or 秒読みカウント消費
-          if (timeLeft > 0) {
-            // 持ち時間切れ → 秒読み開始
+        if (!newInByoyomi) {
+          // 持ち時間切れ
+          if (game.clock.byoyomiPeriods > 0) {
+            // 秒読み開始（回数はまだ消費しない）
+            newInByoyomi = true;
             newTimeLeft = game.clock.byoyomiSeconds;
           } else {
-            // 秒読み中 → 1回消費
-            newByoyomiLeft -= 1;
-            if (newByoyomiLeft <= 0) {
-              // 時間切れ
-              onTimeUp(game.id, game.currentColor);
-              continue;
-            }
-            newTimeLeft = game.clock.byoyomiSeconds;
+            onTimeUp(game.id, game.currentColor);
+            continue;
           }
         } else {
-          // 持ち時間切れ（秒読みなし）
-          onTimeUp(game.id, game.currentColor);
-          continue;
+          // 秒読みを1回使い切った → 回数を消費
+          newByoyomiLeft -= 1;
+          if (newByoyomiLeft <= 0) {
+            onTimeUp(game.id, game.currentColor);
+            continue;
+          }
+          newTimeLeft = game.clock.byoyomiSeconds;
         }
       }
 
@@ -136,8 +142,8 @@ export function useGameClockTick(
         ...game.clock,
         lastTickTime: now,
         ...(isBlack
-          ? { blackTimeLeft: newTimeLeft, blackByoyomiLeft: newByoyomiLeft }
-          : { whiteTimeLeft: newTimeLeft, whiteByoyomiLeft: newByoyomiLeft }),
+          ? { blackTimeLeft: newTimeLeft, blackByoyomiLeft: newByoyomiLeft, blackInByoyomi: newInByoyomi }
+          : { whiteTimeLeft: newTimeLeft, whiteByoyomiLeft: newByoyomiLeft, whiteInByoyomi: newInByoyomi }),
       };
 
       updateGameClock(game.id, newClock);
@@ -154,25 +160,21 @@ export function useGameClockTick(
 export function switchClock(clock: GameClock, color: 'BLACK' | 'WHITE'): GameClock {
   const now = Date.now();
   const isBlack = color === 'BLACK';
+  const moverInByoyomi = isBlack ? clock.blackInByoyomi : clock.whiteInByoyomi;
 
-  // 着手した側: 秒読み中なら時間をリセット
+  // 着手した側: 秒読み中は各手ごとに満タン（B秒）へ戻す。
   let timeLeft = isBlack ? clock.blackTimeLeft : clock.whiteTimeLeft;
-  if (timeLeft <= 0 && clock.byoyomiPeriods > 0) {
+  if (moverInByoyomi) {
+    timeLeft = clock.byoyomiSeconds;
+  } else if (timeLeft <= 0 && clock.byoyomiPeriods > 0) {
+    // 旧データ救済（inByoyomi 未設定で持ち時間切れ）
     timeLeft = clock.byoyomiSeconds;
   }
 
-  // 相手側: mainTime=0で未初期化の場合、秒読み時間を設定
-  const opponentTimeLeft = isBlack ? clock.whiteTimeLeft : clock.blackTimeLeft;
-  let opponentTime = opponentTimeLeft;
-  if (opponentTime <= 0 && clock.mainTimeSeconds === 0 && clock.byoyomiPeriods > 0) {
-    opponentTime = clock.byoyomiSeconds;
-  }
-
+  // 相手側は自分の手番開始時点の値のまま（秒読みなら前手で満タンに戻っている）。
   return {
     ...clock,
     lastTickTime: now,
-    ...(isBlack
-      ? { blackTimeLeft: timeLeft, whiteTimeLeft: opponentTime }
-      : { whiteTimeLeft: timeLeft, blackTimeLeft: opponentTime }),
+    ...(isBlack ? { blackTimeLeft: timeLeft } : { whiteTimeLeft: timeLeft }),
   };
 }

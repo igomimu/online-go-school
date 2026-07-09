@@ -9,6 +9,8 @@ export interface GameClock {
   whiteTimeLeft: number;       // 白残り時間（秒）
   blackByoyomiLeft: number;    // 黒秒読み残り回数
   whiteByoyomiLeft: number;    // 白秒読み残り回数
+  blackInByoyomi?: boolean;    // 黒が秒読みに入っているか（持ち時間切れ）
+  whiteInByoyomi?: boolean;    // 白が秒読みに入っているか
   lastTickTime: number | null; // 最後のtick時刻（ms）
 }
 

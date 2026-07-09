@@ -131,7 +131,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
   const renderBlackClock = () => {
     if (!clock) return null;
     const isLow = clock.blackTimeLeft <= 10 && clock.blackTimeLeft > 0;
-    const isByoyomi = clock.blackTimeLeft <= 0 && clock.byoyomiPeriods > 0;
+    const isByoyomi = !!clock.blackInByoyomi;
     return (
       <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
         isLow || isByoyomi ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-300'
@@ -145,7 +145,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
   const renderWhiteClock = () => {
     if (!clock) return null;
     const isLow = clock.whiteTimeLeft <= 10 && clock.whiteTimeLeft > 0;
-    const isByoyomi = clock.whiteTimeLeft <= 0 && clock.byoyomiPeriods > 0;
+    const isByoyomi = !!clock.whiteInByoyomi;
     return (
       <span className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
         isLow || isByoyomi ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-300'
