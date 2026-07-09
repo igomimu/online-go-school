@@ -646,8 +646,16 @@ function App() {
     komi: number;
     clock?: import('./types/game').GameClock;
   }) => {
-    await liveGameList.createGame(opts);
+    const row = await liveGameList.createGame(opts);
     setShowGameCreation(false);
+    setGameCreationBlack(null);
+    // 先生自身が対局者（黒/白）なら対局盤を自動で開く。
+    // ダッシュボードのサムネイルは静的（着手を反映しない）ため、盤を開かないと相手の着手が見えない。
+    const me = classroomRef.current?.localIdentity ?? userName;
+    if (row && (row.black_player === me || row.white_player === me)) {
+      setActiveGameId(row.id);
+      setViewMode('game');
+    }
   };
 
   // 詰碁: 配信

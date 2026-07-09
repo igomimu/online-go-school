@@ -192,12 +192,19 @@ export async function fetchRoster(): Promise<ClassroomRoster> {
     (classroomRows ?? []) as GoSchoolClassroomRow[],
   );
 
-  // Preserve a pre-migration local roster when the server is still empty.
-  // The migration button uses these keys as its source.
-  if (hasRosterData(roster) || !hasRosterData(loadCachedRoster())) {
+  // サーバーが空でローカルに名簿がある場合は、ローカルを正として返す。
+  // （サーバー未保存/一時的な空応答で「教室が見つからない」状態にしない）
+  if (!hasRosterData(roster)) {
+    const cached = loadCachedRoster();
+    if (hasRosterData(cached)) {
+      return cached;
+    }
     cacheRoster(roster);
+    return roster;
   }
 
+  // サーバーに名簿がある場合はそれを正とし、ローカルキャッシュも更新
+  cacheRoster(roster);
   return roster;
 }
 
