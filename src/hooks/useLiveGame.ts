@@ -17,6 +17,7 @@ import {
   resetLiveGame as apiResetLiveGame,
   type LiveGameRow,
   type LiveMoveRow,
+  type SubmitMoveResult,
 } from '../utils/liveGameApi';
 import type { ClassroomLiveKit, ClassroomMessage } from '../utils/classroomLiveKit';
 import type { GameMovePayload } from '../types/game';
@@ -75,6 +76,42 @@ function deriveBoardState(game: LiveGameRow, moves: LiveMoveRow[]): DerivedState
       : 'BLACK';
 
   return { boardState: board, currentColor, moveNumber, blackCaptures, whiteCaptures, lastMove };
+}
+
+// ---- 409（手番不一致/連番衝突）後の再送判定 ----
+// 早指しでは、相手の直前の手がサーバー確定する前に自分の手を送ってしまうことがある
+// （ローカルの手番はLiveKitブロードキャスト由来でサーバーより先行するため）。
+// その場合サーバーは409で拒否するので、movesを取り直して手番を確認してから再送する。
+
+export function isRetryableSubmitError(error?: string): boolean {
+  return !!error && (error.includes('Not your turn') || error.includes('Move number already taken'));
+}
+
+export type SubmitRetryDecision =
+  | { kind: 'already-applied'; moveNumber: number } // この手が既にサーバーに入っていた（送信の二重化）
+  | { kind: 'retry' } // 手番が来ている → 再送してよい
+  | { kind: 'wait' }; // 相手の手がまだサーバー未確定 → もう少し待つ
+
+export function decideSubmitRetry(
+  serverMoves: Pick<LiveMoveRow, 'move_number' | 'x' | 'y' | 'color'>[],
+  color: StoneColor,
+  x: number,
+  y: number,
+  handicap: number,
+): SubmitRetryDecision {
+  const last = serverMoves[serverMoves.length - 1];
+  // 手番は交互なので、最後の手が自分の色かつ同座標なら、それはこの手自身（成功済み）
+  if (last && last.color === color && last.x === x && last.y === y) {
+    return { kind: 'already-applied', moveNumber: last.move_number };
+  }
+  const expectedColor: StoneColor = last
+    ? last.color === 'BLACK'
+      ? 'WHITE'
+      : 'BLACK'
+    : handicap >= 2
+      ? 'WHITE'
+      : 'BLACK';
+  return expectedColor === color ? { kind: 'retry' } : { kind: 'wait' };
 }
 
 export interface UseLiveGameResult {
@@ -269,6 +306,40 @@ export function useLiveGame(
     return null;
   }, [activeGame, myColor, myIdentity]);
 
+  // 409（手番不一致/連番衝突）で拒否された手を、サーバーmoves再取得→手番確認のうえ
+  // 限定回数だけ再送する。相手の手の永続化を追い越して送信した場合の取りこぼしを防ぐ。
+  const retrySubmitAfterResync = useCallback(
+    async (
+      game: LiveGameRow,
+      player: { identity: string; color: StoneColor },
+      x: number,
+      y: number,
+      clock: GameClock | undefined,
+      firstError: string | undefined,
+    ): Promise<SubmitMoveResult> => {
+      let lastResult: SubmitMoveResult = { ok: false, error: firstError };
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+        let serverMoves: LiveMoveRow[];
+        try {
+          serverMoves = await fetchLiveMoves(game.id);
+        } catch {
+          continue;
+        }
+        const decision = decideSubmitRetry(serverMoves, player.color, x, y, game.handicap);
+        if (decision.kind === 'already-applied') {
+          return { ok: true, move_number: decision.moveNumber };
+        }
+        if (decision.kind === 'wait') continue;
+        console.warn(`[useLiveGame] 手番同期の遅れを検知、着手を再送します (attempt ${attempt})`);
+        lastResult = await apiSubmitMove(game.id, player.identity, x, y, player.color, clock);
+        if (lastResult.ok || !isRetryableSubmitError(lastResult.error)) return lastResult;
+      }
+      return lastResult;
+    },
+    [],
+  );
+
   const submitMoveFn = useCallback(
     async (x: number, y: number) => {
       if (!activeGame || !effectivePlayer) return;
@@ -315,14 +386,17 @@ export function useLiveGame(
       }
 
       // 3. Supabase（真実のソース）へ送信
-      const res = await apiSubmitMove(activeGame.id, effectivePlayer.identity, x, y, effectivePlayer.color, nextClock);
+      let res = await apiSubmitMove(activeGame.id, effectivePlayer.identity, x, y, effectivePlayer.color, nextClock);
+      if (!res.ok && isRetryableSubmitError(res.error)) {
+        res = await retrySubmitAfterResync(activeGame, effectivePlayer, x, y, nextClock, res.error);
+      }
       if (!res.ok) {
         setError(res.error ?? 'submit failed');
         // 失敗した場合は仮着手を削除
         setMoves((prev) => prev.filter((m) => m.player_id !== tempMove.player_id));
       }
     },
-    [activeGame, effectivePlayer, derived.moveNumber, derived.currentColor, classroom, isMyTurn],
+    [activeGame, effectivePlayer, derived.moveNumber, derived.currentColor, classroom, isMyTurn, retrySubmitAfterResync],
   );
 
   const submitPass = useCallback(async () => {
@@ -367,7 +441,10 @@ export function useLiveGame(
       }).catch((err) => console.error('[LiveKit pass broadcast error]', err));
     }
 
-    const res = await apiSubmitMove(activeGame.id, effectivePlayer.identity, 0, 0, effectivePlayer.color, nextClock);
+    let res = await apiSubmitMove(activeGame.id, effectivePlayer.identity, 0, 0, effectivePlayer.color, nextClock);
+    if (!res.ok && isRetryableSubmitError(res.error)) {
+      res = await retrySubmitAfterResync(activeGame, effectivePlayer, 0, 0, nextClock, res.error);
+    }
     if (!res.ok) {
       setError(res.error ?? 'pass failed');
       // 失敗した場合は仮着手を削除
@@ -381,7 +458,7 @@ export function useLiveGame(
         setError(String(e));
       }
     }
-  }, [activeGame, effectivePlayer, derived.lastMove, derived.moveNumber, derived.currentColor, classroom, isMyTurn]);
+  }, [activeGame, effectivePlayer, derived.lastMove, derived.moveNumber, derived.currentColor, classroom, isMyTurn, retrySubmitAfterResync]);
 
   // ローカルの時間切れ処理
   const handleLocalTimeUp = useCallback(
