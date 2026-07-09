@@ -8,13 +8,11 @@ describe('getByoyomiAnnouncement', () => {
       expect(f(10)).toBe('10秒');
       expect(f(20)).toBe('20秒');
     });
-    it('最後の10秒を1〜9で数える', () => {
+    it('最後の10秒を1〜10で数える（30秒で「10」）', () => {
       expect(f(21)).toBe('1');
       expect(f(22)).toBe('2');
       expect(f(29)).toBe('9');
-    });
-    it('30秒で時間切れ', () => {
-      expect(f(30)).toBe('時間切れです');
+      expect(f(30)).toBe('10');
     });
     it('マーク以外は無音', () => {
       expect(f(5)).toBeNull();
@@ -54,10 +52,10 @@ describe('getByoyomiAnnouncement', () => {
       expect(f(40)).toBe('40秒');
       expect(f(50)).toBe('50秒');
     });
-    it('最後の10秒を1〜9、60秒で時間切れ', () => {
+    it('最後の10秒を1〜10（60秒で「10」）', () => {
       expect(f(51)).toBe('1');
       expect(f(59)).toBe('9');
-      expect(f(60)).toBe('時間切れです');
+      expect(f(60)).toBe('10');
     });
   });
 

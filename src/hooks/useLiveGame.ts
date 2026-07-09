@@ -437,6 +437,7 @@ export function useLiveGame(
               newTimeLeft = prev.byoyomiSeconds;
             } else {
               // 秒読みなし → 切れ負け
+              speakByoyomi('時間切れ負けです');
               clearInterval(timer);
               handleLocalTimeUp(derived.currentColor);
               return {
@@ -451,8 +452,8 @@ export function useLiveGame(
             // 秒読みを1回使い切った → 回数を消費
             newByoyomiLeft -= 1;
             if (newByoyomiLeft <= 0) {
-              // 時間切れ (切れ負け)
-              speakByoyomi('時間切れです');
+              // 最後の秒読みを使い切り → 「10」まで数えて時間切れ負け
+              speakByoyomi('10、時間切れ負けです');
               clearInterval(timer);
               handleLocalTimeUp(derived.currentColor);
               return {

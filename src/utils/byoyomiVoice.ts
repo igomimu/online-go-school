@@ -32,10 +32,10 @@ export function getByoyomiAnnouncement(
   }
 
   if (isFinal) {
-    // 最後の回: 最後の10秒を 1〜9 とカウントし、B秒で「時間切れです」
-    if (e === B) return '時間切れです';
-    if (e >= B - 9 && e <= B - 1) {
-      return String(e - (B - 10)); // B-9→1, ..., B-1→9
+    // 最後の回: 最後の10秒を 1〜10 とカウントする（B秒で「10」）。
+    // 「時間切れ負けです」は時間切れ処理側で読み上げる。
+    if (e >= B - 9 && e <= B) {
+      return String(e - (B - 10)); // B-9→1, ..., B→10
     }
     return null;
   }
@@ -47,7 +47,7 @@ export function getByoyomiAnnouncement(
     const remaining = periodsLeft - 1; // この回を消費した後の残り
     if (remaining >= 2) return `残り${remaining}回です`;
     if (remaining === 1) return '最後の考慮時間に入りました';
-    return '時間切れです'; // 念のため（本来 isFinal 側で処理）
+    return '時間切れ負けです'; // 念のため（本来 isFinal 側で処理）
   }
   return null;
 }
