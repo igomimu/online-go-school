@@ -221,4 +221,40 @@ describe('GameBoard', () => {
     expect(screen.queryByText('パス')).not.toBeInTheDocument();
     expect(screen.queryByText('投了')).not.toBeInTheDocument();
   });
+
+  it('プレイヤーを兼ねる先生は相手の手番では盤がロックされ着手できない', () => {
+    // 先生=白番、いまは黒（生徒）の手番。isProxyTeacher=false（プレイヤー兼任のため）
+    const game = createMockGame({ blackPlayer: '生徒', whitePlayer: '先生', currentColor: 'BLACK' });
+    setupMock({
+      game,
+      myColor: 'WHITE',
+      isParticipant: true,
+      isMyTurn: false,
+      isProxyTeacher: false,
+    });
+    const { container } = render(
+      <GameBoard gameId="game-1" myIdentity="先生" isTeacher />
+    );
+    // 相手の手番なのでクリック可能なセルが一つも描画されない（readOnly）
+    expect(container.querySelector('[data-cell]')).toBeNull();
+  });
+
+  it('観戦中の先生（どちらの色でもない）は手番側を代打ちできる', () => {
+    // 先生は黒白どちらのプレイヤーでもない → isProxyTeacher=true
+    const game = createMockGame({ blackPlayer: '生徒A', whitePlayer: '生徒B', currentColor: 'BLACK' });
+    setupMock({
+      game,
+      myColor: null,
+      isParticipant: false,
+      isMyTurn: false,
+      isProxyTeacher: true,
+    });
+    const { container } = render(
+      <GameBoard gameId="game-1" myIdentity="先生" isTeacher />
+    );
+    const cell = container.querySelector('[data-cell]');
+    expect(cell).not.toBeNull();
+    fireEvent.click(cell as Element);
+    expect(mockSubmitMove).toHaveBeenCalled();
+  });
 });

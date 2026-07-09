@@ -89,6 +89,7 @@ export interface UseLiveGameResult {
   myColor: StoneColor | null;
   isParticipant: boolean;
   isMyTurn: boolean;
+  isProxyTeacher: boolean;
   clock: GameClock | null;
 
   loading: boolean;
@@ -259,6 +260,9 @@ export function useLiveGame(
   const isParticipant = isBlack || isWhite;
   const myColor: StoneColor | null = isBlack ? 'BLACK' : isWhite ? 'WHITE' : null;
   const isMyTurn = isParticipant && myColor === derived.currentColor;
+  // 先生が対局のプレイヤーを兼ねている（黒/白のどちらか）場合は手番に従う。
+  // どちらの色でもない純粋な観戦時のみ、手番側の代打ちを許可する。
+  const isProxyTeacher = isTeacher && !isParticipant;
 
   // 先生が観戦中は myColor が null のまま currentColor 側の生徒の identity を代筆する
   const effectivePlayer = useMemo(() => {
@@ -276,8 +280,10 @@ export function useLiveGame(
   const submitMoveFn = useCallback(
     async (x: number, y: number) => {
       if (!activeGame || !effectivePlayer) return;
-      if (!isMyTurn && !isTeacher) return;
-      
+      if (!isMyTurn && !isProxyTeacher) return;
+      // 手番でない色の着手は絶対に発生させない（楽観的更新・LiveKit配信の前に弾く）
+      if (effectivePlayer.color !== derived.currentColor) return;
+
       const moveNumber = derived.moveNumber + 1;
 
       // 時計の切り替え
@@ -324,12 +330,13 @@ export function useLiveGame(
         setMoves((prev) => prev.filter((m) => m.player_id !== tempMove.player_id));
       }
     },
-    [activeGame, effectivePlayer, derived.moveNumber, classroom, isMyTurn, isTeacher],
+    [activeGame, effectivePlayer, derived.moveNumber, derived.currentColor, classroom, isMyTurn, isProxyTeacher],
   );
 
   const submitPass = useCallback(async () => {
     if (!activeGame || !effectivePlayer) return;
-    if (!isMyTurn && !isTeacher) return;
+    if (!isMyTurn && !isProxyTeacher) return;
+    if (effectivePlayer.color !== derived.currentColor) return;
     const lastMove = derived.lastMove;
     const isSecondPass = lastMove && lastMove.x === 0 && lastMove.y === 0;
     const moveNumber = derived.moveNumber + 1;
@@ -382,7 +389,7 @@ export function useLiveGame(
         setError(String(e));
       }
     }
-  }, [activeGame, effectivePlayer, derived.lastMove, derived.moveNumber, classroom, isMyTurn, isTeacher]);
+  }, [activeGame, effectivePlayer, derived.lastMove, derived.moveNumber, derived.currentColor, classroom, isMyTurn, isProxyTeacher]);
 
   // ローカルの時間切れ処理
   const handleLocalTimeUp = useCallback(
@@ -556,6 +563,7 @@ export function useLiveGame(
     myColor,
     isParticipant,
     isMyTurn,
+    isProxyTeacher,
     clock: localClock,
     loading: activeLoading,
     error: activeError,

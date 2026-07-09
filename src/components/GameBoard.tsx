@@ -27,6 +27,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
     whiteCaptures,
     isMyTurn,
     isParticipant,
+    isProxyTeacher,
     clock,
     loading,
     error,
@@ -41,7 +42,9 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
 
   const isScoring = game?.status === 'scoring';
-  const canPlay = game?.status === 'playing' && (isMyTurn || isTeacher);
+  // 着手できるのは自分の手番のとき、または先生が観戦（どちらの色でもない）で手番側を代打ちするとき。
+  // 先生でもプレイヤーを兼ねている場合は自分の手番のみ（isProxyTeacher=false）。
+  const canPlay = game?.status === 'playing' && (isMyTurn || isProxyTeacher);
 
   const deadStonesSet = useMemo(
     () => new Set(game?.scoring_dead_stones ?? []),
@@ -79,18 +82,18 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
         setDeadStones(Array.from(currentDead));
         return;
       }
-      if (!isMyTurn && !isTeacher) return;
-      // 先生は常に currentColor で打つ（指導対局で代打ちできる）
-      // 生徒は myColor === currentColor のときのみ到達
+      if (!isMyTurn && !isProxyTeacher) return;
+      // 手番側だけが着手できる。プレイヤーを兼ねる先生も自分の手番のみ。
+      // 観戦中の先生（isProxyTeacher）は手番側の色で代打ちする。
       submitMove(x, y);
     },
-    [game, isScoring, isTeacher, boardState, isMyTurn, submitMove, setDeadStones],
+    [game, isScoring, isTeacher, boardState, isMyTurn, isProxyTeacher, submitMove, setDeadStones],
   );
 
   const handlePassClick = useCallback(() => {
-    if (!isMyTurn && !isTeacher) return;
+    if (!isMyTurn && !isProxyTeacher) return;
     submitPass();
-  }, [isMyTurn, isTeacher, submitPass]);
+  }, [isMyTurn, isProxyTeacher, submitPass]);
 
   const handleResignClick = useCallback(() => {
     if (!isParticipant && !isTeacher) return;
@@ -275,7 +278,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
           readOnly={
             isScoring
               ? !isTeacher
-              : game.status !== 'playing' || (!isMyTurn && !isTeacher)
+              : game.status !== 'playing' || (!isMyTurn && !isProxyTeacher)
           }
           onCellMouseEnter={canPlay ? (x, y) => setGhostPos({ x, y }) : undefined}
           onCellMouseLeave={canPlay ? () => setGhostPos(null) : undefined}
@@ -327,7 +330,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
       {/* 操作ボタン */}
       {game.status === 'playing' && (isParticipant || isTeacher) && (
         <div className="shrink-0 flex justify-center gap-3">
-          {(isMyTurn || isTeacher) && (
+          {(isMyTurn || isProxyTeacher) && (
             <button
               onClick={handlePassClick}
               className="secondary-button flex items-center gap-2 text-sm"
