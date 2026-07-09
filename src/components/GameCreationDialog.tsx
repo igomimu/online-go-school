@@ -4,7 +4,9 @@ import type { Student } from '../types/classroom';
 import { suggestHandicap } from '../types/classroom';
 import { findStudentByIdentity, getDisplayName } from '../utils/identityUtils';
 import type { GameClock } from '../types/game';
-import { CLOCK_PRESETS, createClock } from '../hooks/useGameClock';
+import type { TimeSettings } from '../hooks/useGameClock';
+import { DEFAULT_TIME_SETTINGS, timeSettingsToClock } from '../hooks/useGameClock';
+import TimeControlPicker from './TimeControlPicker';
 
 interface GameCreationDialogProps {
   students: string[];  // 利用可能な生徒名一覧（LiveKit identity）
@@ -19,6 +21,7 @@ interface GameCreationDialogProps {
     clock?: GameClock;
   }) => void;
   registeredStudents?: Student[];  // 登録済み生徒データ（棋力表示用）
+  initialBlackPlayer?: string;     // 生徒一覧から「対局」を押した生徒を黒番に初期選択
 }
 
 const BOARD_SIZES = [19, 13, 9];
@@ -29,16 +32,21 @@ export default function GameCreationDialog({
   onClose,
   onCreate,
   registeredStudents = [],
+  initialBlackPlayer,
 }: GameCreationDialogProps) {
   // 「先生」も含めたプレイヤー候補
   const allPlayers = [teacherName, ...students];
 
-  const [blackPlayer, setBlackPlayer] = useState(students[0] || teacherName);
-  const [whitePlayer, setWhitePlayer] = useState(students.length > 1 ? students[1] : teacherName);
+  const [blackPlayer, setBlackPlayer] = useState(initialBlackPlayer || students[0] || teacherName);
+  const [whitePlayer, setWhitePlayer] = useState(
+    initialBlackPlayer
+      ? teacherName
+      : students.length > 1 ? students[1] : teacherName,
+  );
   const [boardSize, setBoardSize] = useState(19);
   const [handicap, setHandicap] = useState(0);
   const [komi, setKomi] = useState(6.5);
-  const [clockPreset, setClockPreset] = useState(0); // index into CLOCK_PRESETS
+  const [timeSettings, setTimeSettings] = useState<TimeSettings>(DEFAULT_TIME_SETTINGS);
 
   // ダイアログ開口後に生徒が参加したケースへの保険:
   // 初期値が teacherName 固定のままで students propが埋まった瞬間、自動で生徒を選択し直す。
@@ -75,8 +83,7 @@ export default function GameCreationDialog({
 
   const handleSubmit = () => {
     if (blackPlayer === whitePlayer) return;
-    const preset = CLOCK_PRESETS[clockPreset];
-    const clock = createClock(preset.mainTime, preset.byoyomi, preset.periods);
+    const clock = timeSettingsToClock(timeSettings);
     onCreate({ blackPlayer, whitePlayer, boardSize, handicap, komi, clock });
   };
 
@@ -198,18 +205,10 @@ export default function GameCreationDialog({
           />
         </div>
 
-        {/* 対局時計 */}
+        {/* 対局時計（持ち時間を項目ごとに自由設定） */}
         <div>
-          <label className="block text-sm text-zinc-400 mb-1">対局時計</label>
-          <select
-            value={clockPreset}
-            onChange={e => setClockPreset(Number(e.target.value))}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
-          >
-            {CLOCK_PRESETS.map((p, i) => (
-              <option key={i} value={i}>{p.label}</option>
-            ))}
-          </select>
+          <label className="block text-sm text-zinc-400 mb-2">対局時計</label>
+          <TimeControlPicker variant="dark" value={timeSettings} onChange={setTimeSettings} />
         </div>
 
         <button

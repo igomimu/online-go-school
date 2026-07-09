@@ -26,6 +26,32 @@ export function createClock(mainTime: number, byoyomi: number, periods: number):
   };
 }
 
+// --- 講師が項目ごとに自由入力する持ち時間設定（ネット囲碁学園 NHK杯方式に準拠） ---
+// 考慮時間（分）＝持ち時間 / 秒読み（秒/手）＝10・20・30・60 / 秒読みの回数＝考慮時間
+export interface TimeSettings {
+  mainMinutes: number;      // 持ち時間（分）。0で持ち時間なし
+  byoyomiEnabled: boolean;  // 秒読み あり/なし
+  byoyomiSeconds: number;   // 秒読み秒数（10/20/30/60）
+  byoyomiPeriods: number;   // 秒読みの回数（考慮時間）
+}
+
+export const BYOYOMI_SECONDS_OPTIONS = [10, 20, 30, 60] as const;
+
+export const DEFAULT_TIME_SETTINGS: TimeSettings = {
+  mainMinutes: 10,
+  byoyomiEnabled: true,
+  byoyomiSeconds: 30,
+  byoyomiPeriods: 3,
+};
+
+/** TimeSettings → GameClock。持ち時間0＆秒読みなしなら undefined（時間無制限）。 */
+export function timeSettingsToClock(s: TimeSettings): GameClock | undefined {
+  const main = Math.max(0, Math.floor(s.mainMinutes || 0)) * 60;
+  const byoSec = s.byoyomiEnabled ? s.byoyomiSeconds : 0;
+  const byoPer = s.byoyomiEnabled ? Math.max(1, Math.floor(s.byoyomiPeriods || 0)) : 0;
+  return createClock(main, byoSec, byoPer);
+}
+
 // 時間表示フォーマット
 export function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
