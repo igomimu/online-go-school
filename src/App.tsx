@@ -1105,6 +1105,8 @@ function App() {
         <VideoTiles
           videoElements={videoElements}
           localIdentity={classroomRef.current?.localIdentity ?? ''}
+          participants={participants}
+          students={students}
         />
       )}
 

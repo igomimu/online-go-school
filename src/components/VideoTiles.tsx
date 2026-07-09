@@ -1,16 +1,21 @@
 import { useEffect, useRef } from 'react';
+import type { ParticipantInfo } from '../utils/classroomLiveKit';
+import type { Student } from '../types/classroom';
+import { resolvePlayerName } from '../utils/identityUtils';
 
 interface VideoTilesProps {
   videoElements: Map<string, HTMLVideoElement>;
   localIdentity: string;
+  participants?: ParticipantInfo[];
+  students?: Student[];
 }
 
 function VideoTile({
-  identity,
+  label,
   videoElement,
   isLocal,
 }: {
-  identity: string;
+  label: string;
   videoElement: HTMLVideoElement;
   isLocal: boolean;
 }) {
@@ -37,13 +42,13 @@ function VideoTile({
         className={`w-[120px] h-[90px] bg-black/30 rounded-lg overflow-hidden [&>video]:w-full [&>video]:h-full [&>video]:object-cover [&>video]:rounded-lg ${isLocal ? '[&>video]:scale-x-[-1]' : ''}`}
       />
       <span className="text-xs text-zinc-400 truncate max-w-[120px]">
-        {identity}{isLocal ? ' (自分)' : ''}
+        {label}{isLocal ? ' (自分)' : ''}
       </span>
     </div>
   );
 }
 
-export default function VideoTiles({ videoElements, localIdentity }: VideoTilesProps) {
+export default function VideoTiles({ videoElements, localIdentity, participants = [], students = [] }: VideoTilesProps) {
   if (videoElements.size === 0) return null;
 
   // ローカルを先頭に表示
@@ -53,12 +58,19 @@ export default function VideoTiles({ videoElements, localIdentity }: VideoTilesP
     return a.localeCompare(b);
   });
 
+  // identity ではなく必ず実名を表示（ログイン・講師管理機能以外は実名）
+  const labelFor = (identity: string): string => {
+    if (identity === localIdentity) return '';
+    const p = participants.find(pp => pp.identity === identity);
+    return p?.name || resolvePlayerName(identity, students);
+  };
+
   return (
     <div className="flex flex-row gap-2 overflow-x-auto justify-center py-2 px-4">
       {sortedEntries.map(([identity, element]) => (
         <VideoTile
           key={identity}
-          identity={identity}
+          label={labelFor(identity)}
           videoElement={element}
           isLocal={identity === localIdentity}
         />

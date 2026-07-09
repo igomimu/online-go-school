@@ -8,6 +8,7 @@ import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2 } from 'lucide-react';
 import { checkCapture } from '../utils/gameLogic';
+import { getDisplayName } from '../utils/identityUtils';
 import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
 import { useAiAnalysis } from '../hooks/useAiAnalysis';
 import AiAnalysisPanel from './AiAnalysisPanel';
@@ -629,7 +630,7 @@ export default function ReviewBoard({
                       isSelected ? 'bg-blue-500/10 text-blue-300' : 'bg-white/5 text-zinc-500'
                     }`}
                   >
-                    {s.identity}
+                    {s.name || getDisplayName(s.identity, registeredStudents ?? [])}
                   </button>
                 );
               })}

@@ -298,6 +298,8 @@ export default function TeacherDashboard({
                 <VideoTiles
                   videoElements={videoElements}
                   localIdentity={localIdentity}
+                  participants={participants}
+                  students={allStudents}
                 />
               </div>
             ) : (

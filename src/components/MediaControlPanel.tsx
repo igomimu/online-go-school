@@ -1,6 +1,7 @@
 import { Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import type { ParticipantInfo } from '../utils/classroomLiveKit';
 import type { AudioPermissions } from '../types/game';
+import { resolvePlayerName } from '../utils/identityUtils';
 
 interface MediaControlPanelProps {
   participants: ParticipantInfo[];
@@ -30,7 +31,7 @@ export default function MediaControlPanel({
         const perms = audioPermissions[p.identity] || { canHear: true, micAllowed: true, cameraAllowed: true };
         return (
           <div key={p.identity} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2 text-sm">
-            <span className="truncate flex-1">{p.identity}</span>
+            <span className="truncate flex-1">{p.name || resolvePlayerName(p.identity, [])}</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => onToggleHear(p.identity)}

@@ -27,7 +27,7 @@ export default function ParticipantList({
             }`}
           >
             <span className={isLocal ? 'font-semibold' : ''}>
-              {p.identity}
+              {p.name || '参加者'}
               {isLocal && <span className="text-zinc-500 ml-1">(you)</span>}
             </span>
             <span className={p.audioEnabled ? 'text-green-400' : 'text-zinc-600'}>
