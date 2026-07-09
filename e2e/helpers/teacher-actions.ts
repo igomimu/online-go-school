@@ -92,11 +92,22 @@ function studentNameFromId(studentId: string): string | undefined {
 }
 
 /**
- * 観戦パネル（GameObserverPanel + GameBoard onBack有り）に遷移したことを確認する。
- * GameObserverPanel 経由でしか出現しない「← 戻る」ボタンを目印に使う。
+ * 対局盤ビュー（GameObserverPanel / 自動オープンされた対局盤、GameBoard onBack有り）に
+ * 遷移したことを確認する。onBack時のみ出現する「閉じてホーム」ボタンを目印に使う
+ * （8c6bbef で「← 戻る」から改名）。
  */
 export async function waitForObserverPanel(page: Page, timeout = 10_000): Promise<void> {
-  await expect(page.getByRole('button', { name: /戻る/ })).toBeVisible({ timeout });
+  await expect(page.getByRole('button', { name: '閉じてホーム' })).toBeVisible({ timeout });
+}
+
+/**
+ * 対局盤ビューを「閉じてホーム」で閉じ、TeacherDashboardに戻るまで待つ。
+ * d976887以降、先生自身が対局者の場合は対局作成直後に盤が自動で開くため、
+ * ダッシュボード側のUI（StudentTable等）を検証する前にこれで戻る必要がある。
+ */
+export async function closeGameBoardToHome(page: Page, timeout = 10_000): Promise<void> {
+  await page.getByRole('button', { name: '閉じてホーム' }).click();
+  await page.getByText(/三村囲碁オンライン.*〜/).waitFor({ timeout });
 }
 
 /**

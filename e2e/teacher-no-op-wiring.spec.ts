@@ -9,6 +9,7 @@ import {
   clickReconnectAndWaitCycle,
   getOpenStudentButton,
   waitForObserverPanel,
+  closeGameBoardToHome,
 } from './helpers/teacher-actions';
 import { loginAsStudent } from './helpers/student-actions';
 
@@ -80,6 +81,10 @@ test.describe('TeacherToolbar / StudentTable 配線検証', () => {
       boardSize: 9,
       expectedPlayersCount: 2,
     });
+
+    // d976887: 先生自身が対局者なので対局盤が自動で開く → 閉じてダッシュボードに戻る
+    await waitForObserverPanel(teacherPage);
+    await closeGameBoardToHome(teacherPage);
 
     // 対局作成後、行の gameStatus が playing になり「開く」がアクティブ化
     await expect(openButton).toBeEnabled({ timeout: 15_000 });

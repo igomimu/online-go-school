@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clearAllData, setupClassroomData, setupTeacherPassword, testClassroomName, teardownSupabaseRoster } from './helpers/setup';
+import { allowTestClassroom, clearAllData, setupClassroomData, setupTeacherPassword, testClassroomName, teardownSupabaseRoster } from './helpers/setup';
 import { loginAsTeacher } from './helpers/teacher-actions';
 import {
   generateClassroomId,
@@ -29,6 +29,8 @@ test.describe('生徒・教室名簿: Supabase 権威', () => {
         await secondPage.goto('/');
         await clearAllData(secondPage);
         await setupTeacherPassword(secondPage, TEST_TEACHER_PASSWORD);
+        // 27ec7bd のテスト教室除外フィルタをこの教室だけ opt-out（サーバー名簿から見えるように）
+        await allowTestClassroom(secondPage, classroomId);
         await secondPage.reload();
 
         await loginAsTeacher(secondPage, TEST_TEACHER_PASSWORD, classroomName);

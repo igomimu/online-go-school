@@ -114,8 +114,20 @@ export function isTestClassroom(id: string | null | undefined, name: string | nu
   return false;
 }
 
+// E2E実行中のブラウザだけは、自分がシードしたテスト教室を見える必要がある。
+// setupClassroomData が書き込む go-school-e2e-classroom-id をopt-inの許可IDとして扱う。
+// 実運用ブラウザにはこのキーが存在しないため、除外フィルタの挙動は変わらない。
+function e2eAllowedClassroomId(): string | null {
+  try {
+    return localStorage.getItem('go-school-e2e-classroom-id');
+  } catch {
+    return null;
+  }
+}
+
 function buildRoster(studentRows: GoSchoolStudentRow[], classroomRows: GoSchoolClassroomRow[]): ClassroomRoster {
-  classroomRows = classroomRows.filter(row => !isTestClassroom(row.id, row.name));
+  const allowedId = e2eAllowedClassroomId();
+  classroomRows = classroomRows.filter(row => (allowedId !== null && row.id === allowedId) || !isTestClassroom(row.id, row.name));
   const students = studentRows
     .map(toStudent)
     .sort((a, b) => a.name.localeCompare(b.name, 'ja'));

@@ -92,8 +92,11 @@ test.describe('検討モード AI候補手クリック', () => {
     // SGF を流し込んで検討モードに遷移（9路、黒1手）
     await loadSgfForReview(teacherPage, '(;FF[4]GM[1]SZ[9];B[ee])');
 
-    // 検討モードのヘッダ／盤面が出るまで待つ
-    // AiAnalysisPanel に「AI分析」ヘッダがあるのでこれを目印にする
+    // 検討モードのヘッダが出るまで待つ
+    // 8a387f6以降は「碁盤のみ最大化」がデフォルトで操作パネル（AI分析含む）が非表示
+    // → 「操作パネルを表示」で開いてから AiAnalysisPanel を検証する
+    await expect(teacherPage.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
+    await teacherPage.getByRole('button', { name: '操作パネルを表示' }).click();
     await expect(teacherPage.getByRole('heading', { name: 'AI分析' })).toBeVisible({ timeout: 15_000 });
 
     // モック応答後、候補手リストに 'D4' / 'G5' が出る

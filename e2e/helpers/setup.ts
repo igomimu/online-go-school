@@ -12,6 +12,17 @@ export async function clearAllData(page: Page): Promise<void> {
   await page.evaluate(() => localStorage.clear());
 }
 
+/**
+ * 指定した教室IDだけ isTestClassroom 除外フィルタ（classroomStore）の対象外にする。
+ * setupClassroomData を通らないブラウザ（別ブラウザの先生ログイン検証など）で、
+ * サーバー名簿由来のテスト教室を見えるようにするために使う。
+ */
+export async function allowTestClassroom(page: Page, classroomId: string): Promise<void> {
+  await page.evaluate((id) => {
+    localStorage.setItem('go-school-e2e-classroom-id', id);
+  }, classroomId);
+}
+
 export async function setupTeacherPassword(page: Page, password: string): Promise<void> {
   await page.evaluate(async (pw) => {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
