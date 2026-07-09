@@ -6,7 +6,9 @@ import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
 import { useLiveGame } from '../hooks/useLiveGame';
 import { getSupabase } from '../utils/liveGameApi';
+import { resolvePlayerName } from '../utils/identityUtils';
 import { ClassroomLiveKit } from '../utils/classroomLiveKit';
+import type { Student } from '../types/classroom';
 
 interface GameBoardProps {
   gameId: string;
@@ -14,9 +16,10 @@ interface GameBoardProps {
   isTeacher?: boolean;
   onBack?: () => void;
   classroom?: ClassroomLiveKit | null;
+  students?: Student[];  // 対局者名を解決するための名簿（IDは一切表示しない）
 }
 
-export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, classroom }: GameBoardProps) {
+export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, classroom, students = [] }: GameBoardProps) {
   const live = useLiveGame(gameId, myIdentity, !!isTeacher, classroom);
   const {
     game,
@@ -167,7 +170,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-black border border-white/20" />
             <span className={currentColor === 'BLACK' ? 'font-bold text-white' : 'text-zinc-400'}>
-              {game.black_player}
+              {resolvePlayerName(game.black_player, students)}
             </span>
             <span className="text-zinc-600 text-sm">取{blackCaptures}</span>
             {renderBlackClock()}
@@ -176,7 +179,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-white border border-white/20" />
             <span className={currentColor === 'WHITE' ? 'font-bold text-white' : 'text-zinc-400'}>
-              {game.white_player}
+              {resolvePlayerName(game.white_player, students)}
             </span>
             <span className="text-zinc-600 text-sm">取{whiteCaptures}</span>
             {renderWhiteClock()}
@@ -352,7 +355,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
           ) : isParticipant ? (
             '相手の番です'
           ) : (
-            `${currentColor === 'BLACK' ? game.black_player : game.white_player}の番`
+            `${resolvePlayerName(currentColor === 'BLACK' ? game.black_player : game.white_player, students)}の番`
           )}
         </div>
       )}

@@ -3,7 +3,7 @@ import type { GameSession, AudioPermissions, SavedGame } from '../../types/game'
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
-import { parseIdentity } from '../../utils/identityUtils';
+import { parseIdentity, resolvePlayerName, stripSid } from '../../utils/identityUtils';
 import { getSupabase } from '../../utils/liveGameApi';
 import { parseSGFTree } from '../../utils/sgfUtils';
 import { createEmptyBoard } from '../../utils/gameLogic';
@@ -21,6 +21,7 @@ import ClassroomSettingsDialog from './ClassroomSettingsDialog';
 import StudentLinkGenerator from './StudentLinkGenerator';
 import AutoPairingDialog from './AutoPairingDialog';
 import GameObserverPanel from './GameObserverPanel';
+import StudentEditDialog from './StudentEditDialog';
 
 interface TeacherDashboardProps {
   participants: ParticipantInfo[];
@@ -38,6 +39,7 @@ interface TeacherDashboardProps {
   videoElements: Map<string, HTMLVideoElement>;
   studentJoinInfo: string;
   onCreateGame: () => void;
+  onStartGameWithStudent?: (identity: string) => void;
   onStartLecture: () => void;
   onLoadSgf: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onDisconnect: () => void;
@@ -71,6 +73,7 @@ export default function TeacherDashboard({
   videoElements,
   studentJoinInfo,
   onCreateGame,
+  onStartGameWithStudent,
   onStartLecture,
   onLoadSgf,
   onDisconnect,
@@ -91,6 +94,7 @@ export default function TeacherDashboard({
   const [showStudentLinks, setShowStudentLinks] = useState(false);
   const [showAutoPairing, setShowAutoPairing] = useState(false);
   const [observingGameId, setObservingGameId] = useState<string | null>(null);
+  const [editingStudentInfo, setEditingStudentInfo] = useState<Student | null>(null);
 
   // 棋譜履歴表示用のステート
   const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
@@ -239,6 +243,8 @@ export default function TeacherDashboard({
           onToggleHear={onToggleHear}
           onToggleMic={onToggleMic}
           onOpenHistory={handleOpenHistory}
+          onStartGame={onStartGameWithStudent}
+          onEditStudent={setEditingStudentInfo}
           onOpenStudent={(identity) => {
             // 対局中(playing)の生徒のみ来る前提（StudentTable 側で gate 済み）
             const game = filteredGames.find(g =>
@@ -374,6 +380,15 @@ export default function TeacherDashboard({
         />
       )}
 
+      {/* 生徒情報の編集（段級位変更） */}
+      {editingStudentInfo && (
+        <StudentEditDialog
+          student={editingStudentInfo}
+          onClose={() => setEditingStudentInfo(null)}
+          onSaved={onReloadData}
+        />
+      )}
+
       {/* 自動ペアリング */}
       {showAutoPairing && (
         <AutoPairingDialog
@@ -434,6 +449,27 @@ export default function TeacherDashboard({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {historyGames.map(game => {
                     const interruptedLiveGame = games.find(g => g.id === game.id && g.status === 'interrupted');
+                    // この生徒がその対局で黒か白か（保存値は sid:/uuid/コード/名前 いずれか）
+                    const matchesHistoryStudent = (raw: string) => {
+                      const v = stripSid(raw || '');
+                      return v === historyStudent.id || v === historyStudent.studentCode || v === historyStudent.name;
+                    };
+                    const studentColor = matchesHistoryStudent(game.blackPlayer)
+                      ? 'BLACK'
+                      : matchesHistoryStudent(game.whitePlayer)
+                        ? 'WHITE'
+                        : null;
+                    // 結果表記 "B+..." / "W+..." から勝者を判定（強制終局・中断・ジゴは判定なし）
+                    const winner = game.result?.startsWith('B')
+                      ? 'BLACK'
+                      : game.result?.startsWith('W')
+                        ? 'WHITE'
+                        : null;
+                    const outcome = studentColor && winner
+                      ? (studentColor === winner ? 'win' : 'loss')
+                      : null;
+                    // 勝ちは青字、負けは赤字
+                    const playerColor = outcome === 'win' ? '#0055cc' : outcome === 'loss' ? '#cc0000' : '#333';
                     return (
                       <div
                         key={game.id}
@@ -454,7 +490,11 @@ export default function TeacherDashboard({
                         onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', gap: 8 }}>
-                          <span>{game.blackPlayer} (黒) vs {game.whitePlayer} (白)</span>
+                          <span style={{ color: playerColor }}>
+                            {resolvePlayerName(game.blackPlayer, allStudents)} (黒) vs {resolvePlayerName(game.whitePlayer, allStudents)} (白)
+                            {outcome === 'win' && <span style={{ marginLeft: 6, fontSize: 11 }}>◯勝ち</span>}
+                            {outcome === 'loss' && <span style={{ marginLeft: 6, fontSize: 11 }}>●負け</span>}
+                          </span>
                           {interruptedLiveGame && onResumeGame ? (
                             <button
                               onClick={e => {

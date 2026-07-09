@@ -10,6 +10,7 @@ interface GameObserverPanelProps {
 
 export default function GameObserverPanel({
   gameId,
+  students = [],
   localIdentity,
   onBack,
 }: GameObserverPanelProps) {
@@ -20,6 +21,7 @@ export default function GameObserverPanel({
         myIdentity={localIdentity}
         isTeacher
         onBack={onBack}
+        students={students}
       />
     </div>
   );

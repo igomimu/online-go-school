@@ -15,6 +15,8 @@ interface StudentTableProps {
   onSelectStudent?: (identity: string) => void;
   onOpenStudent?: (studentIdentity: string) => void;
   onOpenHistory?: (student: Student) => void;
+  onStartGame?: (identity: string) => void;
+  onEditStudent?: (student: Student) => void;
 }
 
 export default function StudentTable({
@@ -28,6 +30,8 @@ export default function StudentTable({
   onSelectStudent,
   onOpenStudent,
   onOpenHistory,
+  onStartGame,
+  onEditStudent,
 }: StudentTableProps) {
   const rows = buildRows(students, participants, games, localIdentity);
 
@@ -44,7 +48,7 @@ export default function StudentTable({
             <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 32 }}>対局</th>
             <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 40 }}>詳細</th>
             <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 50 }}>棋譜</th>
-            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 32 }}>送信</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 40 }}>編集</th>
             <th className="px-1 py-0.5 border border-gray-400 text-left" style={{ width: 130 }}>生徒ＩＤ</th>
             <th className="px-1 py-0.5 border border-gray-400 text-left">姓名</th>
             <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 36 }}>棋力</th>
@@ -118,12 +122,25 @@ export default function StudentTable({
                   )}
                 </td>
 
-                {/* 対局 */}
+                {/* 対局（進行中は状態表示、対局していない接続中の生徒は新規対局開始ボタン） */}
                 <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.gameStatus === 'playing' && '●'}
                   {row.gameStatus === 'scoring' && '整'}
                   {row.gameStatus === 'finished' && '済'}
                   {row.gameStatus === 'interrupted' && '断'}
+                  {!row.gameStatus && row.isConnected && row.identity && onStartGame && (
+                    <button
+                      className="px-1 border border-blue-700 bg-blue-600 text-white hover:bg-blue-700"
+                      style={{ fontSize: 10 }}
+                      title="この生徒と新規対局を開始"
+                      onClick={e => {
+                        e.stopPropagation();
+                        onStartGame(row.identity);
+                      }}
+                    >
+                      対局
+                    </button>
+                  )}
                 </td>
 
                 {/* 詳細 — 対局中の生徒のみ観戦モードへ */}
@@ -161,8 +178,20 @@ export default function StudentTable({
                   )}
                 </td>
 
-                {/* 送信 */}
+                {/* 編集（段級位などの生徒情報を講師が変更） */}
                 <td className="px-1 py-0.5 border border-gray-400 text-center">
+                  {row.student && onEditStudent && (
+                    <button
+                      className="px-1 text-xs border border-gray-500 bg-gray-100 hover:bg-gray-200"
+                      style={{ fontSize: 10 }}
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (row.student) onEditStudent(row.student);
+                      }}
+                    >
+                      編集
+                    </button>
+                  )}
                 </td>
 
                 {/* 生徒ID（4桁コード優先） */}

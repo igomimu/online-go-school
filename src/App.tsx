@@ -56,6 +56,7 @@ function App() {
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
   const [autoOpenedGameId, setAutoOpenedGameId] = useState<string | null>(null);
   const [showGameCreation, setShowGameCreation] = useState(false);
+  const [gameCreationBlack, setGameCreationBlack] = useState<string | null>(null); // 生徒一覧から開始した時の黒番プリセット
   const [showSettings, setShowSettings] = useState(false);
 
   // 教師フェーズ: manage=教室管理, classroom=授業中
@@ -869,6 +870,7 @@ function App() {
           gameId={paramGameId}
           myIdentity={decodeURIComponent(paramIdentity)}
           isTeacher={isTeacherRole}
+          students={students}
         />
       </div>
     );
@@ -1159,7 +1161,8 @@ function App() {
             onChatSend={chat.sendMessage}
             videoElements={videoElements}
             studentJoinInfo={studentJoinInfo}
-            onCreateGame={() => setShowGameCreation(true)}
+            onCreateGame={() => { setGameCreationBlack(null); setShowGameCreation(true); }}
+            onStartGameWithStudent={(identity) => { setGameCreationBlack(identity); setShowGameCreation(true); }}
             onStartLecture={handleStartLecture}
             onLoadSgf={handleSgfLoadFromLobby}
             onDisconnect={handleDisconnect}
@@ -1213,6 +1216,7 @@ function App() {
               isTeacher={role === 'TEACHER'}
               onBack={handleBackToLobby}
               classroom={classroomRef.current}
+              students={students}
             />
           </div>
         )}
@@ -1305,9 +1309,10 @@ function App() {
         <GameCreationDialog
           students={participants.filter(p => p.identity !== (classroomRef.current?.localIdentity ?? '')).map(p => p.identity)}
           teacherName={classroomRef.current?.localIdentity || userName || '先生'}
-          onClose={() => setShowGameCreation(false)}
+          onClose={() => { setShowGameCreation(false); setGameCreationBlack(null); }}
           onCreate={handleCreateGame}
           registeredStudents={students}
+          initialBlackPlayer={gameCreationBlack ?? undefined}
         />
       )}
 

@@ -36,6 +36,24 @@ export function getDisplayName(identity: string, students: Student[]): string {
   return parsed.name;
 }
 
+/**
+ * 対局者の保存値（sid:uuid / uuid / ログインコード / 名前）を必ず「人が読める名前」に解決する。
+ * IDは一切表示しない: 名簿で解決できないUUID/生徒IDは「対局者」にフォールバックする。
+ */
+export function resolvePlayerName(raw: string | null | undefined, students: Student[]): string {
+  if (!raw) return '';
+  const stripped = stripSid(raw);
+  const found = students.find(
+    s => s.id === stripped || s.studentCode === stripped || s.name === stripped,
+  );
+  if (found) return found.name;
+  // 生徒ID（sid: 付き）やUUID素の値は絶対に表示しない
+  if (raw.startsWith(STUDENT_PREFIX)) return '対局者';
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stripped)) return '対局者';
+  // 先生名など人が読める文字列はそのまま
+  return stripped;
+}
+
 export function findStudentByIdentity(identity: string, students: Student[]): Student | undefined {
   const parsed = parseIdentity(identity);
   if (parsed.type === 'student') {

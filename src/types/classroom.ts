@@ -43,6 +43,14 @@ export function gradeToDisplay(gradeNum: number): string {
   return '';
 }
 
+// === 段級位の選択肢（強い順）。講師が生徒一覧から棋力を変更する時に使う ===
+export const RANK_OPTIONS = [
+  '8D', '7D', '6D', '5D', '4D', '3D', '2D', '1D',
+  '1K', '2K', '3K', '4K', '5K', '6K', '7K', '8K', '9K', '10K',
+  '11K', '12K', '13K', '14K', '15K', '16K', '17K', '18K', '19K', '20K',
+  '25K', '30K',
+] as const;
+
 // === 棋力を数値に変換（ペアリング用） ===
 // 高いほど強い: 9D=9, 1D=1, 1K=0, 2K=-1, ..., 30K=-29
 export function rankToNumber(rank: string): number {
