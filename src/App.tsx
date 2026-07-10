@@ -512,13 +512,32 @@ function App() {
   }, [reviewCurrentNode, role, viewMode, reviewBoardSize]);
 
   // 音声操作
+  // getUserMedia系の失敗をユーザーに分かる日本語にする（本番はaudioDebugが非表示のため、無言で失敗させない）
+  const mediaErrorMessage = (err: unknown, device: 'マイク' | 'カメラ'): string => {
+    const name = err instanceof DOMException ? err.name : '';
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+      return `${device}の使用がブラウザでブロックされています。アドレスバーの鍵マーク（🔒）から${device}を「許可」に変更してください。`;
+    }
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+      return `${device}が見つかりません。端末に${device}が接続されているか確認してください。`;
+    }
+    if (name === 'NotReadableError' || name === 'TrackStartError') {
+      return `${device}を他のアプリが使用中の可能性があります。他のアプリを閉じてからお試しください。`;
+    }
+    return `${device}を開始できませんでした: ${err instanceof Error ? err.message : String(err)}`;
+  };
+
   const handleToggleMic = async () => {
-    if (!classroomRef.current?.isConnected) return;
+    if (!classroomRef.current?.isConnected) {
+      alert('教室との接続が切れています。ページを再読み込みしてから、もう一度お試しください。');
+      return;
+    }
     try {
       const enabled = await classroomRef.current.toggleMicrophone();
       setIsMicEnabled(enabled);
     } catch (err) {
       setAudioDebug(`マイクエラー: ${err instanceof Error ? err.message : String(err)}`);
+      alert(mediaErrorMessage(err, 'マイク'));
     }
   };
 
@@ -537,12 +556,16 @@ function App() {
   };
 
   const handleToggleCamera = async () => {
-    if (!classroomRef.current?.isConnected) return;
+    if (!classroomRef.current?.isConnected) {
+      alert('教室との接続が切れています。ページを再読み込みしてから、もう一度お試しください。');
+      return;
+    }
     try {
       const enabled = await classroomRef.current.toggleCamera();
       setIsCameraEnabled(enabled);
     } catch (err) {
       setAudioDebug(`カメラエラー: ${err instanceof Error ? err.message : String(err)}`);
+      alert(mediaErrorMessage(err, 'カメラ'));
     }
   };
 
