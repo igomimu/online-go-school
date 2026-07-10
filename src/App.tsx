@@ -38,7 +38,7 @@ import { useChat } from './hooks/useChat';
 import { useNotificationSound } from './hooks/useNotificationSound';
 import type { ChatMessagePayload } from './types/chat';
 
-import { Settings, Mic, MicOff, Video, VideoOff, Volume2, VolumeX } from 'lucide-react';
+import { Settings } from 'lucide-react';
 
 function App() {
   const [role, setRole] = useState<Role | null>(null);
@@ -1359,75 +1359,6 @@ function App() {
           onDataChanged={reloadClassroomData}
           onClose={() => setShowStudentManager(false)}
         />
-      )}
-
-      {/* 盤面フォーカスモード時の音声・映像フローティング制御 */}
-      {isBoardFocusMode && isConnected && (
-        <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 items-end">
-          {audioDebug && (
-            <div className="bg-yellow-600 border border-yellow-500 text-white px-3 py-2 rounded-lg text-xs flex items-center gap-2 shadow-lg animate-pulse max-w-xs">
-              <span className="font-semibold">音声未開始</span>
-              <button
-                onClick={async () => {
-                  try {
-                    await classroomRef.current?.room.startAudio();
-                    document.querySelectorAll('audio').forEach(el => {
-                      (el as HTMLAudioElement).muted = false;
-                      (el as HTMLAudioElement).volume = 1;
-                      (el as HTMLAudioElement).play().catch(() => {});
-                    });
-                    setAudioDebug(prev => prev + ' [音声開始]');
-                  } catch (e) {
-                    setAudioDebug(prev => prev + ` [エラー: ${e}]`);
-                  }
-                }}
-                className="px-2 py-0.5 bg-white text-zinc-900 rounded font-bold text-xs hover:bg-zinc-100 transition-colors"
-              >
-                開始する
-              </button>
-            </div>
-          )}
-          <div className="flex items-center gap-1.5 bg-zinc-900/95 border border-zinc-800 p-1.5 rounded-xl shadow-2xl">
-            {/* マイクボタン */}
-            <button
-              onClick={handleToggleMic}
-              className={`p-2 rounded-lg transition-colors ${
-                isMicEnabled
-                  ? 'bg-blue-600/30 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30'
-                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700'
-              }`}
-              title={isMicEnabled ? 'マイクをミュート' : 'マイクをミュート解除'}
-            >
-              {isMicEnabled ? <Mic className="w-[18px] h-[18px]" /> : <MicOff className="w-[18px] h-[18px]" />}
-            </button>
-
-            {/* スピーカー（受話ミュート）ボタン */}
-            <button
-              onClick={handleToggleMute}
-              className={`p-2 rounded-lg transition-colors ${
-                !isMuted
-                  ? 'bg-blue-600/30 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30'
-                  : 'bg-red-600/30 hover:bg-red-600/40 text-red-400 border border-red-500/30'
-              }`}
-              title={!isMuted ? '相手の音声をミュート' : '相手の音声をミュート解除'}
-            >
-              {!isMuted ? <Volume2 className="w-[18px] h-[18px]" /> : <VolumeX className="w-[18px] h-[18px]" />}
-            </button>
-
-            {/* カメラボタン */}
-            <button
-              onClick={handleToggleCamera}
-              className={`p-2 rounded-lg transition-colors ${
-                isCameraEnabled
-                  ? 'bg-blue-600/30 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30'
-                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700'
-              }`}
-              title={isCameraEnabled ? 'カメラをOFF' : 'カメラをON'}
-            >
-              {isCameraEnabled ? <Video className="w-[18px] h-[18px]" /> : <VideoOff className="w-[18px] h-[18px]" />}
-            </button>
-          </div>
-        </div>
       )}
     </div>
   );
