@@ -15,11 +15,12 @@ interface GameBoardProps {
   myIdentity: string;
   isTeacher?: boolean;
   onBack?: () => void;
+  onMoveSubmitted?: () => void;
   classroom?: ClassroomLiveKit | null;
   students?: Student[];  // 対局者名を解決するための名簿（IDは一切表示しない）
 }
 
-export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, classroom, students = [] }: GameBoardProps) {
+export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitted, classroom, students = [] }: GameBoardProps) {
   const live = useLiveGame(gameId, myIdentity, !!isTeacher, classroom);
   const {
     game,
@@ -65,7 +66,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
   }, [isScoring, game, boardState, deadStonesSet, blackCaptures, whiteCaptures]);
 
   const handleCellClick = useCallback(
-    (x: number, y: number) => {
+    async (x: number, y: number) => {
       if (!game) return;
       if (isScoring) {
         if (!isTeacher) return;
@@ -85,15 +86,17 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, class
       }
       if (!isMyTurn) return;
       // 手番の対局者本人のみ着手できる（代打ち不可）。
-      submitMove(x, y);
+      await submitMove(x, y);
+      onMoveSubmitted?.();
     },
-    [game, isScoring, isTeacher, boardState, isMyTurn, submitMove, setDeadStones],
+    [game, isScoring, isTeacher, boardState, isMyTurn, submitMove, setDeadStones, onMoveSubmitted],
   );
 
-  const handlePassClick = useCallback(() => {
+  const handlePassClick = useCallback(async () => {
     if (!isMyTurn) return;
-    submitPass();
-  }, [isMyTurn, submitPass]);
+    await submitPass();
+    onMoveSubmitted?.();
+  }, [isMyTurn, submitPass, onMoveSubmitted]);
 
   const handleResignClick = useCallback(() => {
     // 投了は手番の対局者本人のみ

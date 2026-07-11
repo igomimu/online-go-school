@@ -22,6 +22,8 @@ import StudentLinkGenerator from './StudentLinkGenerator';
 import AutoPairingDialog from './AutoPairingDialog';
 import GameObserverPanel from './GameObserverPanel';
 import StudentEditDialog from './StudentEditDialog';
+import SimulGrid from './SimulGrid';
+import type { LiveGameRow } from '../../utils/liveGameApi';
 
 interface TeacherDashboardProps {
   participants: ParticipantInfo[];
@@ -55,6 +57,21 @@ interface TeacherDashboardProps {
   onResetVideo?: () => void;
   onSelectSavedGame?: (game: SavedGame) => void;
   onResumeGame?: (gameId: string) => void;
+  liveGames: LiveGameRow[];
+  showSimulGrid: boolean;
+  onShowSimulGrid: () => void;
+  onHideSimulGrid: () => void;
+  onOpenSimulGame: (gameId: string) => void;
+  onCreateSimulGame: (opts: {
+    blackPlayer: string;
+    whitePlayer: string;
+    boardSize: number;
+    handicap: number;
+    komi: number;
+    clock: null;
+  }) => Promise<void>;
+  autoReturnAfterSimulMove: boolean;
+  onToggleAutoReturnAfterSimulMove: () => void;
 }
 
 export default function TeacherDashboard({
@@ -89,6 +106,14 @@ export default function TeacherDashboard({
   onResetVideo,
   onSelectSavedGame,
   onResumeGame,
+  liveGames,
+  showSimulGrid,
+  onShowSimulGrid,
+  onHideSimulGrid,
+  onOpenSimulGame,
+  onCreateSimulGame,
+  autoReturnAfterSimulMove,
+  onToggleAutoReturnAfterSimulMove,
 }: TeacherDashboardProps) {
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [showStudentLinks, setShowStudentLinks] = useState(false);
@@ -230,6 +255,24 @@ export default function TeacherDashboard({
           fontWeight: 'bold',
         }}>囲</span>
         三村囲碁オンライン 〜 {classroomName}
+        <button
+          onClick={() => {
+            setObservingGameId(null);
+            onShowSimulGrid();
+          }}
+          style={{
+            marginLeft: 'auto',
+            border: '1px solid rgba(255,255,255,0.7)',
+            background: showSimulGrid ? '#f59e0b' : 'rgba(255,255,255,0.15)',
+            color: showSimulGrid ? '#111' : '#fff',
+            padding: '2px 10px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: 12,
+          }}
+        >
+          多面打ち
+        </button>
       </div>
 
       {/* 生徒一覧テーブル */}
@@ -259,7 +302,19 @@ export default function TeacherDashboard({
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {/* 碁盤エリア: サムネイルグリッド or 観戦パネル */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {observingGameId && filteredGames.find(g => g.id === observingGameId) ? (
+          {showSimulGrid ? (
+            <SimulGrid
+              games={liveGames}
+              students={filteredStudents}
+              participants={filteredParticipants}
+              teacherIdentity={localIdentity}
+              onOpenGame={onOpenSimulGame}
+              onCreateGame={onCreateSimulGame}
+              autoReturnAfterMove={autoReturnAfterSimulMove}
+              onToggleAutoReturnAfterMove={onToggleAutoReturnAfterSimulMove}
+              onBack={onHideSimulGrid}
+            />
+          ) : observingGameId && filteredGames.find(g => g.id === observingGameId) ? (
             <GameObserverPanel
               gameId={observingGameId}
               students={filteredStudents}

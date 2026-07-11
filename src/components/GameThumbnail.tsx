@@ -6,11 +6,13 @@ interface GameThumbnailProps {
   game: GameSession;
   onClick: () => void;
   isActive?: boolean;
+  isMyTurn?: boolean;
+  turnLabel?: string;
   students?: Student[];
   onResume?: (gameId: string) => void;
 }
 
-export default function GameThumbnail({ game, onClick, isActive, students = [], onResume }: GameThumbnailProps) {
+export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnLabel, students = [], onResume }: GameThumbnailProps) {
   const size = game.boardSize;
   const cellSize = 8;
   const totalSize = size * cellSize;
@@ -30,7 +32,7 @@ export default function GameThumbnail({ game, onClick, isActive, students = [], 
         }
       }}
       className={`glass-panel p-2 hover:bg-white/5 transition-all ${
-        isActive ? 'ring-2 ring-blue-500' : ''
+        isMyTurn ? 'ring-2 ring-amber-400' : isActive ? 'ring-2 ring-blue-500' : ''
       } ${game.status === 'finished' || game.status === 'interrupted' ? 'opacity-60' : ''}`}
     >
       {/* ミニ碁盤 */}
@@ -58,6 +60,7 @@ export default function GameThumbnail({ game, onClick, isActive, students = [], 
             return (
               <circle
                 key={`${x}-${y}`}
+                data-stone={`${x + 1}-${y + 1}`}
                 cx={x * cellSize + cellSize / 2}
                 cy={y * cellSize + cellSize / 2}
                 r={cellSize * 0.4}
@@ -100,6 +103,13 @@ export default function GameThumbnail({ game, onClick, isActive, students = [], 
             </button>
           )}
         </div>
+        {turnLabel && (
+          <div className={`inline-flex px-1.5 py-0.5 text-[10px] font-bold ${
+            isMyTurn ? 'bg-amber-400 text-zinc-950' : 'bg-zinc-700 text-zinc-300'
+          }`}>
+            {turnLabel}
+          </div>
+        )}
       </div>
     </div>
   );
