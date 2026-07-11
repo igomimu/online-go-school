@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import type { GameSession, AudioPermissions, SavedGame } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom } from '../../types/classroom';
@@ -24,6 +24,7 @@ import GameObserverPanel from './GameObserverPanel';
 import StudentEditDialog from './StudentEditDialog';
 import SimulGrid from './SimulGrid';
 import type { LiveGameRow } from '../../utils/liveGameApi';
+import { upsertClassroom } from '../../utils/classroomStore';
 
 interface TeacherDashboardProps {
   participants: ParticipantInfo[];
@@ -206,9 +207,47 @@ export default function TeacherDashboard({
     ? classrooms.find(c => c.id === selectedClassroomId)
     : null;
 
-  const filteredStudents = selectedClassroom
-    ? allStudents.filter(s => selectedClassroom.studentIds.includes(s.id) || participants.some(p => p.identity.includes(s.id)))
-    : allStudents;
+  // 生徒の上下位置の並べ替え
+  const handleMoveStudent = useCallback(async (studentId: string, direction: 'up' | 'down') => {
+    if (!selectedClassroom) return;
+    const ids = [...selectedClassroom.studentIds];
+    const idx = ids.indexOf(studentId);
+    if (idx < 0) return;
+    if (direction === 'up' && idx > 0) {
+      [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
+    } else if (direction === 'down' && idx < ids.length - 1) {
+      [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
+    } else {
+      return;
+    }
+
+    try {
+      await upsertClassroom({
+        ...selectedClassroom,
+        studentIds: ids,
+      });
+      if (onReloadData) {
+        await onReloadData();
+      }
+    } catch (err) {
+      console.error('Failed to move student:', err);
+    }
+  }, [selectedClassroom, onReloadData]);
+
+  const filteredStudents = useMemo(() => {
+    if (!selectedClassroom) return allStudents;
+    const enrolled = allStudents.filter(s => selectedClassroom.studentIds.includes(s.id));
+    enrolled.sort((a, b) => {
+      const idxA = selectedClassroom.studentIds.indexOf(a.id);
+      const idxB = selectedClassroom.studentIds.indexOf(b.id);
+      return idxA - idxB;
+    });
+    const extra = allStudents.filter(s =>
+      !selectedClassroom.studentIds.includes(s.id) &&
+      participants.some(p => p.identity.includes(s.id))
+    );
+    return [...enrolled, ...extra];
+  }, [allStudents, selectedClassroom, participants]);
 
   // 接続してきた参加者は常に表示する（studentIds形式の不一致で誤除外しない）
   const filteredParticipants = participants;
@@ -288,6 +327,7 @@ export default function TeacherDashboard({
           onOpenHistory={handleOpenHistory}
           onStartGame={onStartGameWithStudent}
           onEditStudent={setEditingStudentInfo}
+          onMoveStudent={handleMoveStudent}
           onOpenStudent={(identity) => {
             // 対局中(playing)の生徒のみ来る前提（StudentTable 側で gate 済み）
             const game = filteredGames.find(g =>

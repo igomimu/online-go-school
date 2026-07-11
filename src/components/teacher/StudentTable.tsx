@@ -1,7 +1,6 @@
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student } from '../../types/classroom';
 import type { GameSession, AudioPermissions } from '../../types/game';
-import { findStudentByIdentity, getDisplayName } from '../../utils/identityUtils';
 import { resolveGrade } from '../../utils/gradeCalc';
 
 interface StudentTableProps {
@@ -17,6 +16,7 @@ interface StudentTableProps {
   onOpenHistory?: (student: Student) => void;
   onStartGame?: (identity: string) => void;
   onEditStudent?: (student: Student) => void;
+  onMoveStudent?: (studentId: string, direction: 'up' | 'down') => void;
 }
 
 export default function StudentTable({
@@ -32,6 +32,7 @@ export default function StudentTable({
   onOpenHistory,
   onStartGame,
   onEditStudent,
+  onMoveStudent,
 }: StudentTableProps) {
   const rows = buildRows(students, participants, games, localIdentity);
 
@@ -49,6 +50,7 @@ export default function StudentTable({
             <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 40 }}>詳細</th>
             <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 50 }}>棋譜</th>
             <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 40 }}>編集</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 44 }}>順序</th>
             <th className="px-1 py-0.5 border border-gray-400 text-left" style={{ width: 130 }}>生徒ＩＤ</th>
             <th className="px-1 py-0.5 border border-gray-400 text-left">姓名</th>
             <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 36 }}>棋力</th>
@@ -194,6 +196,36 @@ export default function StudentTable({
                   )}
                 </td>
 
+                {/* 順序 */}
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
+                  {row.student && onMoveStudent && (
+                    <div className="flex justify-center gap-1">
+                      <button
+                        className="px-1 border border-gray-500 bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-gray-100"
+                        style={{ fontSize: 9, lineHeight: 1 }}
+                        disabled={!row.canMoveUp}
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (row.student) onMoveStudent(row.student.id, 'up');
+                        }}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        className="px-1 border border-gray-500 bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-gray-100"
+                        style={{ fontSize: 9, lineHeight: 1 }}
+                        disabled={!row.canMoveDown}
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (row.student) onMoveStudent(row.student.id, 'down');
+                        }}
+                      >
+                        ▼
+                      </button>
+                    </div>
+                  )}
+                </td>
+
                 {/* 生徒ID（4桁コード優先） */}
                 <td className="px-1 py-0.5 border border-gray-400 text-left" style={{ color: row.isConnected ? '#0000cc' : '#666' }}>
                   {row.student?.studentCode || row.student?.id || ''}
@@ -243,6 +275,8 @@ interface StudentRow {
   isConnected: boolean;
   student: Student | null;
   gameStatus: 'playing' | 'scoring' | 'finished' | 'interrupted' | null;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
 }
 
 function buildRows(
@@ -254,32 +288,41 @@ function buildRows(
   const rows: StudentRow[] = [];
   const matched = new Set<string>();
 
-  // 接続中の参加者を先に（先生以外）
-  for (const p of participants) {
-    if (p.identity === localIdentity) continue;
-    const student = findStudentByIdentity(p.identity, students) || null;
-    const game = games.find(g =>
-      (g.blackPlayer === p.identity || g.whitePlayer === p.identity)
-    );
+  // 登録されている生徒の順序で rows を作る（クラスで決められた表示順を維持）
+  for (let i = 0; i < students.length; i++) {
+    const s = students[i];
+    const p = participants.find(part => part.identity === s.id || part.identity.includes(s.id));
+    const isConnected = !!p && p.identity !== localIdentity;
+    const identity = p?.identity || s.id;
+    const game = games.find(g => g.blackPlayer === identity || g.whitePlayer === identity);
+
     rows.push({
-      identity: p.identity,
-      displayName: p.name || getDisplayName(p.identity, students),
-      isConnected: true,
-      student,
+      identity,
+      displayName: p?.name || s.name,
+      isConnected,
+      student: s,
       gameStatus: game?.status || null,
+      canMoveUp: i > 0,
+      canMoveDown: i < students.length - 1,
     });
-    if (student) matched.add(student.id);
+    matched.add(s.id);
   }
 
-  // 未接続の登録済み生徒
-  for (const s of students) {
-    if (matched.has(s.id)) continue;
+  // 登録されていないが接続中の参加者（先生を除く）を末尾に追加
+  for (const p of participants) {
+    if (p.identity === localIdentity) continue;
+    const sId = students.find(s => p.identity === s.id || p.identity.includes(s.id))?.id;
+    if (sId && matched.has(sId)) continue;
+
+    const game = games.find(g => g.blackPlayer === p.identity || g.whitePlayer === p.identity);
     rows.push({
-      identity: s.name,
-      displayName: s.name,
-      isConnected: false,
-      student: s,
-      gameStatus: null,
+      identity: p.identity,
+      displayName: p.name || p.identity,
+      isConnected: true,
+      student: null,
+      gameStatus: game?.status || null,
+      canMoveUp: false,
+      canMoveDown: false,
     });
   }
 
