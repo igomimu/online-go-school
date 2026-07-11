@@ -87,6 +87,8 @@ test.describe('合法手判定', () => {
   });
 
   test('コウの即取り返しは禁止され、コウ立て後は取り返せる', async () => {
+    studentAPage.on('console', (msg) => console.log('[A]', msg.text()));
+    studentBPage.on('console', (msg) => console.log('[B]', msg.text()));
     const sequence: Array<[Page, number, number]> = [
       [studentAPage, 3, 3],
       [studentBPage, 5, 2],
