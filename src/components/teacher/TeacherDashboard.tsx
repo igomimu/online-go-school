@@ -62,7 +62,6 @@ interface TeacherDashboardProps {
   showSimulGrid: boolean;
   onShowSimulGrid: () => void;
   onHideSimulGrid: () => void;
-  onOpenSimulGame: (gameId: string) => void;
   onCreateSimulGame: (opts: {
     blackPlayer: string;
     whitePlayer: string;
@@ -71,8 +70,7 @@ interface TeacherDashboardProps {
     komi: number;
     clock?: import('../../types/game').GameClock | null;
   }) => Promise<void>;
-  autoReturnAfterSimulMove: boolean;
-  onToggleAutoReturnAfterSimulMove: () => void;
+  classroom?: import('../../utils/classroomLiveKit').ClassroomLiveKit | null;
 }
 
 export default function TeacherDashboard({
@@ -111,10 +109,8 @@ export default function TeacherDashboard({
   showSimulGrid,
   onShowSimulGrid,
   onHideSimulGrid,
-  onOpenSimulGame,
   onCreateSimulGame,
-  autoReturnAfterSimulMove,
-  onToggleAutoReturnAfterSimulMove,
+  classroom,
 }: TeacherDashboardProps) {
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [showStudentLinks, setShowStudentLinks] = useState(false);
@@ -348,11 +344,9 @@ export default function TeacherDashboard({
               students={filteredStudents}
               participants={filteredParticipants}
               teacherIdentity={localIdentity}
-              onOpenGame={onOpenSimulGame}
               onCreateGame={onCreateSimulGame}
-              autoReturnAfterMove={autoReturnAfterSimulMove}
-              onToggleAutoReturnAfterMove={onToggleAutoReturnAfterSimulMove}
               onBack={onHideSimulGrid}
+              classroom={classroom}
             />
           ) : observingGameId && filteredGames.find(g => g.id === observingGameId) ? (
             <GameObserverPanel

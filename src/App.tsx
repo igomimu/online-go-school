@@ -54,9 +54,7 @@ function App() {
   // 画面状態
   const [viewMode, setViewMode] = useState<ViewMode>('lobby');
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
-  const [activeGameSource, setActiveGameSource] = useState<'dashboard' | 'simul' | null>(null);
   const [teacherDashboardView, setTeacherDashboardView] = useState<'main' | 'simul'>('main');
-  const [autoReturnAfterSimulMove, setAutoReturnAfterSimulMove] = useState(true);
   const [autoOpenedGameId, setAutoOpenedGameId] = useState<string | null>(null);
   const [showGameCreation, setShowGameCreation] = useState(false);
   const [gameCreationBlack, setGameCreationBlack] = useState<string | null>(null); // 生徒一覧から開始した時の黒番プリセット
@@ -612,7 +610,6 @@ function App() {
     setStudentJoinInfo('');
     setViewMode('lobby');
     setActiveGameId(null);
-    setActiveGameSource(null);
     setTeacherDashboardView('main');
     // 教師は教室管理ページに戻る、生徒はロール選択に戻る
     if (role === 'TEACHER') {
@@ -662,16 +659,8 @@ function App() {
   // 対局選択
   const handleSelectGame = (gameId: string) => {
     setActiveGameId(gameId);
-    setActiveGameSource('dashboard');
     setViewMode('game');
   };
-
-  const handleOpenSimulGame = useCallback((gameId: string) => {
-    setActiveGameId(gameId);
-    setActiveGameSource('simul');
-    setTeacherDashboardView('simul');
-    setViewMode('game');
-  }, []);
 
   // 対局作成（Supabase insert、Realtime経由で全員に配信）
   const handleCreateGame = async (opts: {
@@ -690,7 +679,6 @@ function App() {
     const me = classroomRef.current?.localIdentity ?? userName;
     if (row && (row.black_player === me || row.white_player === me)) {
       setActiveGameId(row.id);
-      setActiveGameSource('dashboard');
       setViewMode('game');
     }
   };
@@ -778,7 +766,6 @@ function App() {
     }
     setViewMode('lobby');
     setActiveGameId(null);
-    setActiveGameSource(null);
   }, [role, viewMode]);
 
   // 対局の再開処理
@@ -787,7 +774,6 @@ function App() {
       await resumeLiveGame(gameId);
       // 再開成功後、即座にその対局画面を開く
       setActiveGameId(gameId);
-      setActiveGameSource('dashboard');
       setViewMode('game');
     } catch (e) {
       alert(`対局の再開に失敗しました: ${e}`);
@@ -1124,7 +1110,6 @@ function App() {
   if (myPlayingGame && autoOpenedGameId !== myPlayingGame.id) {
     setAutoOpenedGameId(myPlayingGame.id);
     setActiveGameId(myPlayingGame.id);
-    setActiveGameSource('dashboard');
     setViewMode('game');
   } else if (!myPlayingGame && autoOpenedGameId !== null) {
     setAutoOpenedGameId(null);
@@ -1250,10 +1235,8 @@ function App() {
             showSimulGrid={teacherDashboardView === 'simul'}
             onShowSimulGrid={() => setTeacherDashboardView('simul')}
             onHideSimulGrid={() => setTeacherDashboardView('main')}
-            onOpenSimulGame={handleOpenSimulGame}
             onCreateSimulGame={handleCreateSimulGame}
-            autoReturnAfterSimulMove={autoReturnAfterSimulMove}
-            onToggleAutoReturnAfterSimulMove={() => setAutoReturnAfterSimulMove((value) => !value)}
+            classroom={classroomRef.current}
           />
         )}
 
@@ -1287,11 +1270,7 @@ function App() {
               myIdentity={classroomRef.current?.localIdentity ?? userName}
               isTeacher={role === 'TEACHER'}
               onBack={handleBackToLobby}
-              onMoveSubmitted={
-                role === 'TEACHER' && activeGameSource === 'simul' && autoReturnAfterSimulMove
-                  ? handleBackToLobby
-                  : undefined
-              }
+              onMoveSubmitted={undefined}
               classroom={classroomRef.current}
               students={students}
             />
