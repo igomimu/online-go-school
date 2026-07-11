@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { StoneColor, BoardState } from '../components/GoBoard';
-import { createEmptyBoard, checkCapture } from '../utils/gameLogic';
+import { createEmptyBoard, checkCapture, boardHash, isLegalMove } from '../utils/gameLogic';
 import { getHandicapStones } from '../utils/handicapStones';
 import { studentMatchesPlayer } from '../utils/identityUtils';
 import { getByoyomiAnnouncement, speakByoyomi } from '../utils/byoyomiVoice';
@@ -76,6 +76,14 @@ export function deriveBoardState(game: LiveGameRow, moves: LiveMoveRow[]): Deriv
       : 'BLACK';
 
   return { boardState: board, currentColor, moveNumber, blackCaptures, whiteCaptures, lastMove };
+}
+
+// コウ判定の参照位置 = 相手の直前の着手が打たれる前の盤面（2手前の局面）。
+// 着手後の盤面がこれと一致する手は簡易コウ（即取り返し）として禁止。
+// 直前手がパスならこの比較は自然に成立しない（自分の着手で必ず石が増えるため）＝パスでコウが解除される。
+export function koReferenceHash(game: LiveGameRow, moves: LiveMoveRow[]): string | undefined {
+  if (moves.length === 0) return undefined;
+  return boardHash(deriveBoardState(game, moves.slice(0, -1)).boardState);
 }
 
 // ---- 409（手番不一致/連番衝突）後の再送判定 ----
@@ -352,10 +360,19 @@ export function useLiveGame(
       // 手番の対局者本人のみ着手可能（代打ち不可）。楽観的更新・LiveKit配信の前に弾く。
       if (!isMyTurn) return;
       if (effectivePlayer.color !== derived.currentColor) return;
-      // 合法手チェック: 既に石がある交点には打てない
-      // （submit_move は合法手判定をクライアントに委ねているため、ここが唯一の関門）
+      // 合法手チェック: 空点・自殺手・コウ（submit_move は合法手判定をクライアントに
+      // 委ねているため、ここが唯一の関門）
       if (x < 1 || y < 1 || x > activeGame.board_size || y > activeGame.board_size) return;
-      if (derived.boardState[y - 1]?.[x - 1]) return;
+      if (!isLegalMove(
+        derived.boardState,
+        x,
+        y,
+        effectivePlayer.color,
+        activeGame.board_size,
+        koReferenceHash(activeGame, moves),
+      )) {
+        return;
+      }
 
       const moveNumber = derived.moveNumber + 1;
 
@@ -407,7 +424,7 @@ export function useLiveGame(
         setMoves((prev) => prev.filter((m) => m.player_id !== tempMove.player_id));
       }
     },
-    [activeGame, effectivePlayer, derived.moveNumber, derived.currentColor, derived.boardState, classroom, isMyTurn, retrySubmitAfterResync, localClock],
+    [activeGame, effectivePlayer, derived.moveNumber, derived.currentColor, derived.boardState, moves, classroom, isMyTurn, retrySubmitAfterResync, localClock],
   );
 
   const submitPass = useCallback(async () => {
