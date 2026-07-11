@@ -168,7 +168,15 @@ export default function SimulGrid({
                 students={students}
                 onClick={() => onOpenGame(game.id)}
                 isMyTurn={myTurn}
-                turnLabel={myTurn ? 'あなたの番' : game.status === 'playing' ? '相手考慮中' : '整地中'}
+                turnLabel={
+                  myTurn
+                    ? 'あなたの番'
+                    : game.status === 'playing'
+                      ? '相手考慮中'
+                      : game.status === 'scoring'
+                        ? '整地中'
+                        : '中断'
+                }
               />
             );
           })}
