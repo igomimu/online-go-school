@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ensureRealtimeAuth,
   fetchLiveGames,
   createLiveGame as apiCreateLiveGame,
   subscribeClassroomGames,
@@ -59,35 +60,41 @@ export function useLiveGameList(classroomId: string | null): UseLiveGameListResu
       }
     })();
 
-    const channel = subscribeClassroomGames(classroomId, {
-      onInsert: (row) => {
-        setGames((prev) => {
-          if (prev.some((g) => g.id === row.id)) return prev;
-          return [row, ...prev];
-        });
-      },
-      onUpdate: (row) => {
-        setGames((prev) => {
-          // finishedになったら一覧から除外
-          if (row.status === 'finished') {
-            return prev.filter((g) => g.id !== row.id);
-          }
-          const idx = prev.findIndex((g) => g.id === row.id);
-          if (idx === -1) return [row, ...prev];
-          const next = [...prev];
-          next[idx] = row;
-          return next;
-        });
-      },
-      onDelete: (row) => {
-        setGames((prev) => prev.filter((g) => g.id !== row.id));
-      },
-    });
-    channelRef.current = channel;
+    // 購読はセッション復元後に行う（購読時トークンでRLSが評価されるため。ensureRealtimeAuth参照）
+    let channel: ReturnType<typeof subscribeClassroomGames> | null = null;
+    (async () => {
+      await ensureRealtimeAuth();
+      if (cancelled) return;
+      channel = subscribeClassroomGames(classroomId, {
+        onInsert: (row) => {
+          setGames((prev) => {
+            if (prev.some((g) => g.id === row.id)) return prev;
+            return [row, ...prev];
+          });
+        },
+        onUpdate: (row) => {
+          setGames((prev) => {
+            // finishedになったら一覧から除外
+            if (row.status === 'finished') {
+              return prev.filter((g) => g.id !== row.id);
+            }
+            const idx = prev.findIndex((g) => g.id === row.id);
+            if (idx === -1) return [row, ...prev];
+            const next = [...prev];
+            next[idx] = row;
+            return next;
+          });
+        },
+        onDelete: (row) => {
+          setGames((prev) => prev.filter((g) => g.id !== row.id));
+        },
+      });
+      channelRef.current = channel;
+    })();
 
     return () => {
       cancelled = true;
-      channel.unsubscribe();
+      channel?.unsubscribe();
       channelRef.current = null;
     };
   }, [classroomId]);

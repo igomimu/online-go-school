@@ -7,6 +7,7 @@ import { getByoyomiAnnouncement, speakByoyomi } from '../utils/byoyomiVoice';
 import { switchClock } from './useGameClock';
 import type { GameClock } from '../types/game';
 import {
+  ensureRealtimeAuth,
   fetchLiveGame,
   fetchLiveMoves,
   submitMove as apiSubmitMove,
@@ -209,32 +210,38 @@ export function useLiveGame(
       }
     })();
 
-    const channel = subscribeLiveGame(gameId, {
-      onGameChange: (row) => {
-        setGame(row);
-        setLocalClock(row.clock ?? null);
-      },
-      onMoveInsert: (row) => {
-        setMoves((prev) => {
-          // 重複防止（仮の着手が既に反映されている場合、本物に差し替える）
-          const idx = prev.findIndex((m) => m.move_number === row.move_number);
-          if (idx >= 0) {
-            if (prev[idx].player_id.startsWith('temp-')) {
-              const next = [...prev];
-              next[idx] = row;
-              return next;
+    // 購読はセッション復元後に行う（購読時トークンでRLSが評価されるため。ensureRealtimeAuth参照）
+    let channel: ReturnType<typeof subscribeLiveGame> | null = null;
+    (async () => {
+      await ensureRealtimeAuth();
+      if (cancelled) return;
+      channel = subscribeLiveGame(gameId, {
+        onGameChange: (row) => {
+          setGame(row);
+          setLocalClock(row.clock ?? null);
+        },
+        onMoveInsert: (row) => {
+          setMoves((prev) => {
+            // 重複防止（仮の着手が既に反映されている場合、本物に差し替える）
+            const idx = prev.findIndex((m) => m.move_number === row.move_number);
+            if (idx >= 0) {
+              if (prev[idx].player_id.startsWith('temp-')) {
+                const next = [...prev];
+                next[idx] = row;
+                return next;
+              }
+              return prev;
             }
-            return prev;
-          }
-          return [...prev, row].sort((a, b) => a.move_number - b.move_number);
-        });
-      },
-    });
-    channelRef.current = channel;
+            return [...prev, row].sort((a, b) => a.move_number - b.move_number);
+          });
+        },
+      });
+      channelRef.current = channel;
+    })();
 
     return () => {
       cancelled = true;
-      channel.unsubscribe();
+      channel?.unsubscribe();
       channelRef.current = null;
     };
   }, [gameId]);

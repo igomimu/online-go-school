@@ -21,6 +21,28 @@ export function getSupabase(): SupabaseClient {
   return supabase;
 }
 
+// Realtime購読の前に必ず待つ認証関門。
+// postgres_changes のRLS認可は「購読時のトークン」で評価されるため、
+// ページ読み込み直後（セッション復元前＝匿名状態）に購読すると、
+// その後セッションが復元されてもイベントが一切届かない。
+// （2026-07-11 別ウィンドウ碁盤に相手の着手が反映されないバグの真因）
+let realtimeAuthReady: Promise<void> | null = null;
+export function ensureRealtimeAuth(): Promise<void> {
+  if (!realtimeAuthReady) {
+    const sb = getSupabase();
+    realtimeAuthReady = sb.auth
+      .getSession() // セッション復元（storage読み込み）を待つ
+      .then(({ data }) => {
+        const token = data.session?.access_token;
+        if (token) sb.realtime.setAuth(token);
+      })
+      .catch(() => {
+        // 認証なし（匿名）でも購読自体は行う（RLSが許す範囲で受信）
+      });
+  }
+  return realtimeAuthReady;
+}
+
 export interface LiveGameRow {
   id: string;
   classroom_id: string;

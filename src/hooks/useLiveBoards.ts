@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { BoardState, StoneColor } from '../components/GoBoard';
 import { createEmptyBoard } from '../utils/gameLogic';
 import {
+  ensureRealtimeAuth,
   fetchLiveMovesForGames,
   subscribeLiveMovesForGames,
   type LiveGameRow,
@@ -91,19 +92,25 @@ export function useLiveBoards(games: LiveGameRow[]): UseLiveBoardsResult {
         setLoading(false);
       });
 
-    const channel = subscribeLiveMovesForGames(gameIds, (row) => {
-      setMovesByGame((prev) => {
-        const next = new Map(prev);
-        const list = next.get(row.game_id) ?? [];
-        if (list.some((m) => m.move_number === row.move_number)) return prev;
-        next.set(row.game_id, [...list, row].sort((a, b) => a.move_number - b.move_number));
-        return next;
+    // 購読はセッション復元後に行う（購読時トークンでRLSが評価されるため。ensureRealtimeAuth参照）
+    let channel: ReturnType<typeof subscribeLiveMovesForGames> | null = null;
+    (async () => {
+      await ensureRealtimeAuth();
+      if (cancelled) return;
+      channel = subscribeLiveMovesForGames(gameIds, (row) => {
+        setMovesByGame((prev) => {
+          const next = new Map(prev);
+          const list = next.get(row.game_id) ?? [];
+          if (list.some((m) => m.move_number === row.move_number)) return prev;
+          next.set(row.game_id, [...list, row].sort((a, b) => a.move_number - b.move_number));
+          return next;
+        });
       });
-    });
+    })();
 
     return () => {
       cancelled = true;
-      channel.unsubscribe();
+      channel?.unsubscribe();
     };
     // gameIdsKey is the stable subscription boundary; gameIds is derived from it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
