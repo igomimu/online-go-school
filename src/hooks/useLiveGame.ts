@@ -352,6 +352,10 @@ export function useLiveGame(
       // 手番の対局者本人のみ着手可能（代打ち不可）。楽観的更新・LiveKit配信の前に弾く。
       if (!isMyTurn) return;
       if (effectivePlayer.color !== derived.currentColor) return;
+      // 合法手チェック: 既に石がある交点には打てない
+      // （submit_move は合法手判定をクライアントに委ねているため、ここが唯一の関門）
+      if (x < 1 || y < 1 || x > activeGame.board_size || y > activeGame.board_size) return;
+      if (derived.boardState[y - 1]?.[x - 1]) return;
 
       const moveNumber = derived.moveNumber + 1;
 
@@ -403,7 +407,7 @@ export function useLiveGame(
         setMoves((prev) => prev.filter((m) => m.player_id !== tempMove.player_id));
       }
     },
-    [activeGame, effectivePlayer, derived.moveNumber, derived.currentColor, classroom, isMyTurn, retrySubmitAfterResync, localClock],
+    [activeGame, effectivePlayer, derived.moveNumber, derived.currentColor, derived.boardState, classroom, isMyTurn, retrySubmitAfterResync, localClock],
   );
 
   const submitPass = useCallback(async () => {

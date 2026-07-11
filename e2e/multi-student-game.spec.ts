@@ -112,8 +112,13 @@ test.describe('先生1+生徒2 対局フルシナリオ', () => {
     await expect(studentAPage.locator('[data-stone="4-4"]')).toBeVisible({ timeout: 10_000 });
     await expect(studentBPage.locator('[data-stone="4-4"]')).toBeVisible({ timeout: 10_000 });
 
-    // === 生徒B(白)が (5,5) に着手 ===
+    // === 生徒B(白)が黒石のある(4,4)をクリック → 拒否される（上書きバグの回帰、2026-07-11修正）===
     await waitForMyTurn(studentBPage);
+    await playMove(studentBPage, 4, 4);
+    // 石は黒のまま・手数も進まない（クリックが無視される）
+    await expect(studentBPage.getByTestId('move-count')).toContainText('1手目');
+
+    // === 生徒B(白)が (5,5) に着手 ===
     await playMove(studentBPage, 5, 5);
 
     await expect(studentAPage.locator('[data-stone="5-5"]')).toBeVisible({ timeout: 10_000 });
