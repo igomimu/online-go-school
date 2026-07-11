@@ -701,7 +701,7 @@ function App() {
     boardSize: number;
     handicap: number;
     komi: number;
-    clock: null;
+    clock?: import('./types/game').GameClock | null;
   }) => {
     await liveGameList.createGame(opts);
     setTeacherDashboardView('simul');

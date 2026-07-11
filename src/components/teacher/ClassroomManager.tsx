@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import type { Student, Classroom } from '../../types/classroom';
 import {
   deleteStudent,
+  deleteStudents,
   upsertStudent,
   upsertStudents,
   upsertClassroom,
@@ -51,6 +52,44 @@ export default function ClassroomManager({
   const [importResult, setImportResult] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+
+  const toggleSelectStudent = (id: string) => {
+    setSelectedStudentIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllStudents = () => {
+    setSelectedStudentIds(prev => {
+      if (prev.size === students.length) {
+        return new Set();
+      } else {
+        return new Set(students.map(s => s.id));
+      }
+    });
+  };
+
+  const handleBulkDeleteStudents = async () => {
+    const count = selectedStudentIds.size;
+    if (count === 0) return;
+    if (!confirm(`選択した ${count} 名の生徒を一括削除しますか？`)) return;
+    try {
+      setSyncing(true);
+      setImportResult(null);
+      await deleteStudents(Array.from(selectedStudentIds));
+      setSelectedStudentIds(new Set());
+      await onReloadData();
+      setImportResult(`${count} 名の生徒を一括削除しました。`);
+    } catch (err) {
+      setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // 道場アプリからネット生を同期
   const handleDojoSync = async () => {
@@ -319,6 +358,23 @@ export default function ClassroomManager({
             )}
           </div>
 
+          {activeTab === 'student' && selectedStudentIds.size > 0 && (
+            <div style={{
+              background: '#ffe0e0',
+              border: '2px solid #cc6060',
+              padding: 10,
+              marginTop: 8,
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: 6, color: '#cc0000', fontSize: 11 }}>一括操作</div>
+              <div style={{ fontSize: 11, marginBottom: 6 }}>{selectedStudentIds.size} 名を選択中</div>
+              <IgcButton
+                label="選択した生徒を削除"
+                color="#ff6060"
+                onClick={handleBulkDeleteStudents}
+              />
+            </div>
+          )}
+
           <div style={{ marginTop: 'auto' }}>
             <div style={{ color: '#cc0000', fontWeight: 'bold', marginBottom: 8, fontSize: 11 }}>
               定期的に教室情報のバックアップをお願いします。
@@ -471,6 +527,14 @@ export default function ClassroomManager({
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
+                    <th style={{ ...headerCellStyle, width: 26, textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={students.length > 0 && selectedStudentIds.size === students.length}
+                        onChange={toggleSelectAllStudents}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </th>
                     <th style={{ ...headerCellStyle, width: 26, textAlign: 'center' }}>×</th>
                     <th style={{ ...headerCellStyle, width: 36, textAlign: 'center' }}>編集</th>
                     <th style={{ ...headerCellStyle, textAlign: 'left' }}>ログインコード</th>
@@ -487,6 +551,14 @@ export default function ClassroomManager({
                     <tr key={s.id} style={{
                       background: i % 2 === 0 ? '#f0f0e8' : '#e8e8e0',
                     }}>
+                      <td style={{ ...cellStyle, textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedStudentIds.has(s.id)}
+                          onChange={() => toggleSelectStudent(s.id)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
                       <td style={{ ...cellStyle, textAlign: 'center' }}>
                         <button
                           onClick={() => handleDeleteStudent(s.id)}
@@ -514,7 +586,7 @@ export default function ClassroomManager({
 
                   {students.length === 0 && (
                     <tr>
-                      <td colSpan={9} style={{ padding: 30, textAlign: 'center' }}>
+                      <td colSpan={10} style={{ padding: 30, textAlign: 'center' }}>
                         <div style={{ color: '#999', marginBottom: 12 }}>
                           生徒がいません
                         </div>

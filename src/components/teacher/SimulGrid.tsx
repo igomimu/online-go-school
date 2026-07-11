@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { Student } from '../../types/classroom';
-import type { GameSession } from '../../types/game';
+import type { GameSession, GameClock } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import { liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
 import { deriveLiveBoardSnapshots, useLiveBoards } from '../../hooks/useLiveBoards';
@@ -19,7 +19,7 @@ interface SimulGridProps {
     boardSize: number;
     handicap: number;
     komi: number;
-    clock: null;
+    clock?: GameClock | null;
   }) => Promise<void>;
   autoReturnAfterMove: boolean;
   onToggleAutoReturnAfterMove: () => void;

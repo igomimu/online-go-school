@@ -68,7 +68,7 @@ interface TeacherDashboardProps {
     boardSize: number;
     handicap: number;
     komi: number;
-    clock: null;
+    clock?: import('../../types/game').GameClock | null;
   }) => Promise<void>;
   autoReturnAfterSimulMove: boolean;
   onToggleAutoReturnAfterSimulMove: () => void;

@@ -260,6 +260,16 @@ export async function deleteStudent(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+export async function deleteStudents(ids: string[]): Promise<void> {
+  const targetIds = ids.map(id => (id || '').trim()).filter(Boolean);
+  if (targetIds.length === 0) return;
+  const { error } = await getSupabase()
+    .from('go_school_students')
+    .delete()
+    .in('login_id', targetIds);
+  if (error) throw new Error(error.message);
+}
+
 export async function upsertStudents(students: Student[]): Promise<void> {
   const rows = students.map(s => toStudentProfileRow(s));
   if (rows.length === 0) return;
