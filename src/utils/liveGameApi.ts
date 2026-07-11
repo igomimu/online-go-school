@@ -81,7 +81,7 @@ export interface CreateLiveGameOpts {
   boardSize: number;
   handicap: number;
   komi: number;
-  clock?: GameClock;
+  clock?: GameClock | null;
 }
 
 /**
@@ -195,6 +195,18 @@ export async function fetchLiveMoves(gameId: string): Promise<LiveMoveRow[]> {
   return (data ?? []) as LiveMoveRow[];
 }
 
+export async function fetchLiveMovesForGames(gameIds: string[]): Promise<LiveMoveRow[]> {
+  if (gameIds.length === 0) return [];
+  const { data, error } = await getSupabase()
+    .from('go_school_live_moves')
+    .select('*')
+    .in('game_id', gameIds)
+    .order('game_id', { ascending: true })
+    .order('move_number', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as LiveMoveRow[];
+}
+
 export interface SubmitMoveResult {
   ok: boolean;
   move_number?: number;
@@ -276,6 +288,27 @@ export function subscribeLiveGame(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'go_school_live_moves', filter: `game_id=eq.${gameId}` },
       (payload) => handlers.onMoveInsert?.(payload.new as LiveMoveRow),
+    )
+    .subscribe();
+  return channel;
+}
+
+export function subscribeLiveMovesForGames(
+  gameIds: string[],
+  onMoveInsert: (row: LiveMoveRow) => void,
+): RealtimeChannel {
+  const sb = getSupabase();
+  const ids = new Set(gameIds);
+  const channelKey = gameIds.slice().sort().join(',');
+  const channel = sb
+    .channel(`live-moves:${channelKey || 'empty'}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'go_school_live_moves' },
+      (payload) => {
+        const row = payload.new as LiveMoveRow;
+        if (ids.has(row.game_id)) onMoveInsert(row);
+      },
     )
     .subscribe();
   return channel;

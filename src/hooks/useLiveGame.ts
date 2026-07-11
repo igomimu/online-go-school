@@ -22,7 +22,7 @@ import {
 import type { ClassroomLiveKit, ClassroomMessage } from '../utils/classroomLiveKit';
 import type { GameMovePayload } from '../types/game';
 
-interface DerivedState {
+export interface DerivedState {
   boardState: BoardState;
   currentColor: StoneColor;
   moveNumber: number;
@@ -33,7 +33,7 @@ interface DerivedState {
 
 const EMPTY_MOVES: LiveMoveRow[] = [];
 
-function deriveBoardState(game: LiveGameRow, moves: LiveMoveRow[]): DerivedState {
+export function deriveBoardState(game: LiveGameRow, moves: LiveMoveRow[]): DerivedState {
   let board = createEmptyBoard(game.board_size);
 
   // 置石を適用
