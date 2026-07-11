@@ -25,33 +25,37 @@ igocampus（ネット囲碁学園）の指導碁と同じ運用イメージ: 先
 | 対局1面のフル機能フック | `src/hooks/useLiveGame.ts` | 開いた盤にのみ使う。**グリッドにN個マウントしない**（Realtimeチャネル・時計・秒読み音声がN重になる） |
 | 盤面導出ロジック | `useLiveGame.ts` 内 `deriveBoardState(game, moves)` | **exportして再利用**（コピー禁止）。純関数なのでそのまま使える |
 | ミニ碁盤表示 | `src/components/GameThumbnail.tsx` | `game.boardState` を描画できる。propsを少し拡張して使う |
-| 対局作成API | `useLiveGameList.createGame()` | ループでN回呼ぶだけで多面作成になる |
+| 対局作成API | `useLiveGameList.createGame()` | 多面打ちでは1局ずつ呼ぶ（グリッドの「対局を追加」から） |
 | 対局盤（1面） | `src/components/GameBoard.tsx` | タイルクリックで開く先。変更不要のはず |
 | 名前解決 | `src/utils/identityUtils.ts` `getDisplayName` | sid:xxxx → 生徒名 |
 
 ## 2. UX仕様
 
-### 2-1. 多面打ちの開始（TeacherDashboard に「多面打ち」ボタン追加）
-- クリックで `SimulCreationDialog`（新規コンポーネント）を開く。
-- ダイアログ内容:
-  - **接続中の生徒一覧**（チェックボックス、既に対局中の生徒は「対局中」表示で選択不可）
-  - **碁盤サイズ**: 9/13/19路（全面共通、既存の路数ボタンUIを踏襲）
-  - **置石**: 生徒ごとに 0〜9 を個別指定（デフォルト0）。行レイアウト=「☑ 生徒名（棋力） 置石[select]」
+### 2-1. 多面打ちの開始・追加（**1局ずつ追加する。一括作成は作らない**）
+**教室の進行上、生徒は同時に対局準備ができるとは限らない**（前の課題を終えた子から順に
+指導碁に入る等）。したがって「N人選んで一斉スタート」方式は不採用。
+多面打ちは「先生が対局者の対局が増えていくと自然に多面になる」モデルにする。
+
+- TeacherDashboard に「**多面打ち**」ボタン → SimulGrid（2-2）を開く。
+  先生対局が0面でも開ける（空状態＝「対局を追加」ボタンのみ表示）。
+- SimulGrid 内に「**対局を追加**」ボタン → `SimulAddGameDialog`（新規、1生徒分だけの軽量ダイアログ）:
+  - **生徒**: 接続中で「先生と対局中でない」生徒から1人選択（既に先生と対局中の生徒は
+    「対局中」表示で選択不可。生徒同士の対局は妨げない）
+  - **碁盤サイズ**: 9/13/19路（前回追加時の選択を記憶し次回デフォルトに）
+  - **置石**: 0〜9（デフォルト0。置石>=2でコミ0.5、それ以外6.5 — 既存ダイアログと同じ連動）
   - **先生の石**: 白固定（置石>=2の面は自動的に白先。既存 deriveBoardState が対応済み）
   - **時計: なし（固定）**。多面打ちv1では clock を渡さない（`clock: null`）。
     UI に時計設定を出さないこと（N面の時計同時進行は未設計のため）
-- 「開始」で選択された生徒それぞれと対局を作成:
-  `createGame({ blackPlayer: sid:<生徒>, whitePlayer: <teacherIdentity>, boardSize, handicap, komi: handicap>=2 ? 0.5 : 6.5, clock: null })` をループ実行。
-  1件でも失敗したら失敗した生徒名を列挙してalert（成功分はそのまま）。
-- **重要**: `App.tsx` `handleCreateGame` の「先生が対局者なら盤を自動オープン」(d976887) は
-  多面打ち一括作成では**発動させない**（最後の1面だけ開く事故になる）。
-  一括作成は handleCreateGame を経由せず liveGameList.createGame を直接ループし、
-  作成完了後に多面打ちビューへ遷移する実装にする。
+  - 「追加」で `createGame({ blackPlayer: sid:<生徒>, whitePlayer: <teacherIdentity>, boardSize, handicap, komi, clock: null })` を1回実行
+- **重要**: SimulGrid からの追加では `App.tsx` `handleCreateGame` の
+  「先生が対局者なら盤を自動オープン」(d976887) を**発動させない**。
+  追加後は SimulGrid に留まり、新しいタイルが増えるだけ（先生は自分のリズムで打ちに行く）。
+  通常のダッシュボードからの単発対局作成では従来どおり自動オープンを維持すること。
+- 途中参加OK: 何面か打っている最中でも「対局を追加」でいつでも面を増やせる。
 
 ### 2-2. 多面打ちビュー（SimulGrid、新規）
-- 発動条件: 「先生が対局者（black/white いずれか）である playing/scoring の対局」が2面以上
-  → TeacherDashboard に「多面打ちビュー」タブ/ボタンを表示（1面以下では出さない）。
-  多面打ち開始ダイアログからの遷移でも開く。
+- 表示対象: 「先生が対局者（black/white いずれか）である playing/scoring/interrupted の対局」全部。
+  TeacherDashboard の「多面打ち」ボタンからいつでも開ける（0面でも空状態表示）。
 - 表示: レスポンシブなグリッド（2〜3列、`grid-cols-2 xl:grid-cols-3`）。各タイル:
   - ライブ更新されるミニ碁盤（後述 `useLiveBoards` で石まで反映）
   - 黒/白の生徒名・先生、手数
@@ -60,8 +64,9 @@ igocampus（ネット囲碁学園）の指導碁と同じ運用イメージ: 先
   - クリックで既存の GameBoard（1面フル画面）を開く
 - ヘッダに「**次の手番の盤へ**」ボタン: 先生手番の盤のうち最も長く待たせている順
   （最終着手 created_at が古い順）で次の盤の GameBoard を開く。
-- GameBoard から「閉じてホーム」した時、多面打ち中（上記発動条件が真）なら
-  ダッシュボードではなく SimulGrid に戻る。
+- **SimulGrid から開いた盤**を「閉じてホーム」した時は、ダッシュボードではなく
+  SimulGrid に戻る（どこから開いたかを App の state で覚えておく）。
+  通常経路（ダッシュボードの「開く」等）から開いた盤は従来どおりダッシュボードへ。
 - **着手後の自動巡回**: GameBoard で先生が着手したら、多面打ち中なら自動で SimulGrid に戻る
   （トグルでOFF可、デフォルトON。「打つ→次の盤が光っている→クリック」のリズムを作る）。
 
@@ -72,7 +77,8 @@ igocampus（ネット囲碁学園）の指導碁と同じ運用イメージ: 先
 ### 2-4. 終局・整地
 - 各面の整地・終局は既存 GameBoard の機能をそのまま使う（タイルから開いて操作）。
 - finished になった面は SimulGrid から自動で消える（useLiveGameList が既に除外する）。
-- 全面終局したら SimulGrid は「多面打ち終了」表示→ダッシュボードに戻るボタン。
+- 全面終局したら空状態（「対局を追加」ボタンのみ）に戻る。追加も終了も1局単位なので
+  「多面打ちの終了」という特別な状態は作らない。ダッシュボードへは戻るボタンでいつでも。
 
 ## 3. 新規実装の核: `useLiveBoards(gameIds: string[])`
 
@@ -101,7 +107,7 @@ igocampus（ネット囲碁学園）の指導碁と同じ運用イメージ: 先
 | `src/hooks/useLiveGame.ts` | `deriveBoardState` を export（移動はしない、exportのみ） |
 | `src/utils/liveGameApi.ts` | `fetchLiveMovesForGames` / `subscribeLiveMovesForGames` 追加 |
 | `src/hooks/useLiveBoards.ts` | **新規**（上記仕様） |
-| `src/components/teacher/SimulCreationDialog.tsx` | **新規** |
+| `src/components/teacher/SimulAddGameDialog.tsx` | **新規**（1生徒分の追加ダイアログ） |
 | `src/components/teacher/SimulGrid.tsx` | **新規**（GameThumbnail を拡張利用 or 専用タイル） |
 | `src/components/GameThumbnail.tsx` | 手番バッジ・ライブ盤面を受けるprops拡張（後方互換維持、既存テストを壊さない） |
 | `src/components/teacher/TeacherDashboard.tsx` | 「多面打ち」開始ボタン＋ビュー切替 |
@@ -111,12 +117,12 @@ igocampus（ネット囲碁学園）の指導碁と同じ運用イメージ: 先
 
 ### ユニット（vitest）
 1. `useLiveBoards` の導出ロジック: moves配列→盤面/手番/手数（deriveBoardState経由、3面分）
-2. SimulCreationDialog: 選択生徒数分の createGame 呼び出し・置石/コミ連動（handicap>=2→komi 0.5）・対局中生徒の選択不可
+2. SimulAddGameDialog: createGame が正しい引数で1回呼ばれる・置石/コミ連動（handicap>=2→komi 0.5）・先生と対局中の生徒は選択不可・盤サイズの前回値記憶
 3. 既存 GameThumbnail テストが全部緑のまま（後方互換）
 
 ### E2E（Playwright、`e2e/simul-game.spec.ts` 新規）
 シナリオ: 先生1＋生徒2（テスト生徒A/B、既存ヘルパー使用）
-1. 先生が多面打ちダイアログで A・B を選択して開始 → **対局が2面作成され、盤は自動で開かず** SimulGrid が表示される
+1. 先生が「多面打ち」→ SimulGrid（空状態）→「対局を追加」で A と開始 → **盤は自動で開かず**タイルが1面増える → 続けて「対局を追加」で B と開始 → タイルが2面になる（**1局ずつの追加**の検証）
 2. 生徒A・Bはそれぞれ自分の対局盤に自動遷移する（既存挙動）
 3. Aが初手を打つ → **SimulGridのAのタイルに石が現れ、「あなたの番」バッジが点く**（ライブ反映の検証）
 4. 先生が「次の手番の盤へ」→ Aの盤が開く → 着手 → 自動でSimulGridに戻る
@@ -139,7 +145,7 @@ igocampus（ネット囲碁学園）の指導碁と同じ運用イメージ: 先
   （Headerあり）に置くこと
 - `getByRole('button', { name: '閉じてホーム' })` が盤ビューの目印（waitForObserverPanel）
 - 対局作成ダイアログの number input 順は「コミ→持ち時間→回数」（既存テスト参照）。
-  SimulCreationDialog では時計UIを出さないので関係ないが、既存ダイアログを流用する場合は注意
+  SimulAddGameDialog では時計UIを出さないので関係ないが、既存ダイアログを流用する場合は注意
 
 ## 7. スコープ外（v1でやらない）
 
@@ -150,5 +156,5 @@ igocampus（ネット囲碁学園）の指導碁と同じ運用イメージ: 先
 
 ## 8. 完了時
 
-- 意味単位でcommit（例: ①liveGameApi+useLiveBoards ②SimulCreationDialog ③SimulGrid+App配線 ④E2E）→ push
+- 意味単位でcommit（例: ①liveGameApi+useLiveBoards ②SimulAddGameDialog ③SimulGrid+App配線 ④E2E）→ push
 - `handoff -t "多面打ちv1実装" ...` を記録し、検証役（Claude）に E2E独立実行を依頼
