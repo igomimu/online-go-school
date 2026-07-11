@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState } from 'react';
 import type { Student } from '../../types/classroom';
 import type { GameClock } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
@@ -8,6 +8,7 @@ import { deriveLiveBoardSnapshots, useLiveBoards } from '../../hooks/useLiveBoar
 import GameThumbnail from '../GameThumbnail';
 import GameBoard from '../GameBoard';
 import SimulAddGameDialog from './SimulAddGameDialog';
+import { getNextTeacherTurnGameId, isTeacherParticipant, isTeacherTurn } from './simulRotation';
 
 interface SimulGridProps {
   games: LiveGameRow[];
@@ -24,46 +25,6 @@ interface SimulGridProps {
   }) => Promise<void>;
   onBack: () => void;
   classroom?: ClassroomLiveKit | null;
-}
-
-export interface GameSessionInfo {
-  game: {
-    id: string;
-    status: string;
-    black_player: string;
-    white_player: string;
-  };
-  snapshot: {
-    currentColor: 'BLACK' | 'WHITE';
-    lastMoveAt?: string | null;
-  };
-}
-
-export function isTeacherParticipant(game: { black_player: string; white_player: string; }, teacherIdentity: string): boolean {
-  return game.black_player === teacherIdentity || game.white_player === teacherIdentity;
-}
-
-export function isTeacherTurn(game: { black_player: string; white_player: string; }, currentColor: 'BLACK' | 'WHITE', teacherIdentity: string): boolean {
-  if (game.black_player === teacherIdentity) return currentColor === 'BLACK';
-  if (game.white_player === teacherIdentity) return currentColor === 'WHITE';
-  return false;
-}
-
-export function getNextTeacherTurnGameId(
-  sessions: GameSessionInfo[],
-  teacherIdentity: string
-): string | null {
-  const waiting = sessions
-    .filter(({ game, snapshot }) =>
-      game.status === 'playing' &&
-      isTeacherTurn(game, snapshot.currentColor, teacherIdentity)
-    )
-    .sort((a, b) => {
-      const aTime = a.snapshot.lastMoveAt ? Date.parse(a.snapshot.lastMoveAt) : 0;
-      const bTime = b.snapshot.lastMoveAt ? Date.parse(b.snapshot.lastMoveAt) : 0;
-      return aTime - bTime;
-    });
-  return waiting[0]?.game.id ?? null;
 }
 
 export default function SimulGrid({
@@ -103,57 +64,47 @@ export default function SimulGrid({
     return getNextTeacherTurnGameId(sessions, teacherIdentity);
   }, [sessions, teacherIdentity]);
 
-  // 対局の進行状態を監視するためのハッシュ
+  // 表示する盤のID。選択中の盤が対局リストから消えた（終局等）/未選択の場合は
+  // 手番の盤→先頭の盤へフォールバックする。
+  const selectionValid = activeSimulGameId !== null && sessions.some(s => s.game.id === activeSimulGameId);
+  const resolvedActiveId = selectionValid
+    ? activeSimulGameId
+    : (nextGameId ?? sessions[0]?.game.id ?? null);
+
+  // フォールバックした選択はレンダー中に確定させてスティッキーにする
+  // （対局追加などで games の並びが変わっても表示中の盤が入れ替わらないように）。
+  // レンダー中のstate調整はReact公式パターン（effect内のsetStateは使わない）。
+  if (!selectionValid && activeSimulGameId !== resolvedActiveId) {
+    setActiveSimulGameId(resolvedActiveId);
+  }
+
+  // 対局の進行状態を監視するためのハッシュ（手動選択とローテーションの競合防止:
+  // 実際の対局進行があったときだけ自動切替を走らせる）
   const sessionsStateHash = useMemo(() => {
     return sessions
       .map(s => `${s.game.id}:${s.game.status}:${s.snapshot.currentColor}:${s.snapshot.moveNumber}`)
       .join('|');
   }, [sessions]);
 
-  // 前回のハッシュを保持する ref
-  const lastStateHashRef = useRef(sessionsStateHash);
-
-  // 自動切替 useEffect (v2 切替ロジックの核心)
-  useEffect(() => {
-    if (loading) return;
-
-    const activeSession = sessions.find(s => s.game.id === activeSimulGameId);
-
-    // 1. 表示中の盤が対局リストにない、または未設定の場合の初期・フォールバック選択 (ハッシュ関係なく処理)
-    if (!activeSession) {
-      const nextId = getNextTeacherTurnGameId(sessions, teacherIdentity);
-      if (nextId) {
-        setActiveSimulGameId(nextId);
-      } else if (sessions.length > 0) {
-        setActiveSimulGameId(sessions[0].game.id);
-      } else {
-        setActiveSimulGameId(null);
-      }
-      lastStateHashRef.current = sessionsStateHash;
-      return;
-    }
-
-    // 2. 整地中 (scoring) の盤を表示している間は自動切替をスキップ (誤動作防止)
-    if (activeSession.game.status === 'scoring') {
-      lastStateHashRef.current = sessionsStateHash;
-      return;
-    }
-
-    // 実際の対局進行（手番、手数など）に変化があった場合のみ自動切替を走らせる
-    const hasStateChanged = lastStateHashRef.current !== sessionsStateHash;
-    lastStateHashRef.current = sessionsStateHash;
-
-    if (hasStateChanged) {
-      // 3. 自分の手番でない && 他に自分の手番の盤がある場合に自動で切り替える
-      const myTurn = activeSession.game.status === 'playing' && isTeacherTurn(activeSession.game, activeSession.snapshot.currentColor, teacherIdentity);
-      if (!myTurn) {
-        const nextId = getNextTeacherTurnGameId(sessions, teacherIdentity);
-        if (nextId && nextId !== activeSimulGameId) {
-          setActiveSimulGameId(nextId);
+  // 自動切替（v2 切替ロジックの核心）: 対局が実際に進行した時のみ、
+  // 表示中の盤が自分の手番でなければ「最も待たせている手番の盤」へ切り替える。
+  const [prevStateHash, setPrevStateHash] = useState(sessionsStateHash);
+  if (sessionsStateHash !== prevStateHash) {
+    setPrevStateHash(sessionsStateHash);
+    if (!loading) {
+      const activeSession = sessions.find(s => s.game.id === resolvedActiveId);
+      // 整地中 (scoring) の盤を表示している間は自動切替をスキップ (死石指定の操作中に飛ぶ事故防止)
+      if (activeSession && activeSession.game.status !== 'scoring') {
+        const myTurn = activeSession.game.status === 'playing' && isTeacherTurn(activeSession.game, activeSession.snapshot.currentColor, teacherIdentity);
+        if (!myTurn) {
+          const nextId = getNextTeacherTurnGameId(sessions, teacherIdentity);
+          if (nextId && nextId !== resolvedActiveId) {
+            setActiveSimulGameId(nextId);
+          }
         }
       }
     }
-  }, [sessions, sessionsStateHash, activeSimulGameId, teacherIdentity, loading]);
+  }
 
   const waitingCount = useMemo(() => {
     return sessions.filter(s => s.game.status === 'playing' && isTeacherTurn(s.game, s.snapshot.currentColor, teacherIdentity)).length;
@@ -273,11 +224,11 @@ export default function SimulGrid({
             );
           })}
         </div>
-      ) : activeSimulGameId ? (
+      ) : resolvedActiveId ? (
         <div data-testid="simul-active-board" className="flex-1 bg-zinc-950 p-2 sm:p-4 text-white overflow-y-auto">
           <GameBoard
-            key={activeSimulGameId}
-            gameId={activeSimulGameId}
+            key={resolvedActiveId}
+            gameId={resolvedActiveId}
             myIdentity={teacherIdentity}
             isTeacher={true}
             classroom={classroom}

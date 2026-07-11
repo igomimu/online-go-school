@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getNextTeacherTurnGameId, type GameSessionInfo } from './SimulGrid';
+import { getNextTeacherTurnGameId, type GameSessionInfo } from './simulRotation';
 
 describe('getNextTeacherTurnGameId (次盤選定ロジック)', () => {
   const teacherId = 'teacher';
