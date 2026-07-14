@@ -8,8 +8,7 @@ import {
   createGame,
   clickReconnectAndWaitCycle,
   getOpenStudentButton,
-  waitForSimulBoard,
-  closeSimulToHome,
+  waitForTeacherGameWindow,
 } from './helpers/teacher-actions';
 import { loginAsStudent } from './helpers/student-actions';
 
@@ -74,24 +73,24 @@ test.describe('TeacherToolbar / StudentTable 配線検証', () => {
     await expect(openButton).toBeVisible();
     await expect(openButton).toBeDisabled();
 
-    // 対局作成
-    await createGame(teacherPage, {
-      blackName: TEST_STUDENT_A.name,
-      whiteName: '先生',
-      boardSize: 9,
-      expectedPlayersCount: 2,
-    });
-
-    // 先生自身が対局者なので多面打ちビューで盤が自動で開く → 戻るでダッシュボードに戻る
-    await waitForSimulBoard(teacherPage);
-    await closeSimulToHome(teacherPage);
+    // 対局作成 → 先生自身が対局者なので講師専用の別ウィンドウが自動で開く
+    const gameWindow = await waitForTeacherGameWindow(teacherPage, () =>
+      createGame(teacherPage, {
+        blackName: TEST_STUDENT_A.name,
+        whiteName: '先生',
+        boardSize: 9,
+        expectedPlayersCount: 2,
+      }),
+    );
+    await gameWindow.close();
 
     // 対局作成後、行の gameStatus が playing になり「開く」がアクティブ化
+    // （教室ホーム画面=teacherPageは終始ダッシュボードのまま操作可能）
     await expect(openButton).toBeEnabled({ timeout: 15_000 });
 
-    // クリック → 先生自身の対局なので多面打ちビューに遷移
-    await openButton.click();
-    await waitForSimulBoard(teacherPage);
+    // クリック → 先生自身の対局なので講師専用の別ウィンドウが再度開く
+    const reopenedWindow = await waitForTeacherGameWindow(teacherPage, () => openButton.click());
+    await reopenedWindow.close();
   });
 
   test('「回線復旧」ボタン: クリック→復旧中ラベル+disabled→数秒で復旧', async () => {

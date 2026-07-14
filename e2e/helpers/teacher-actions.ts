@@ -111,20 +111,32 @@ export async function closeGameBoardToHome(page: Page, timeout = 10_000): Promis
 }
 
 /**
- * 多面打ちビュー（1盤表示）に遷移したことを確認する。
- * 2026-07-14以降、先生自身が対局者の対局は全画面盤ではなく多面打ちビューで開く
- * （対局作成を重ねるだけで盤が増える動線に一本化）。
+ * 講師専用の対局別ウィンドウ（popup）を捕捉する。
+ * 2026-07-15以降、先生自身が対局者の対局は教室ホーム画面に埋め込まず、
+ * 常に別ウィンドウ1枚（手番になるたびに自動切替）で開く。
+ * `action` は対局作成/再開など、別ウィンドウを誘発するクリック操作。
+ * popupイベントはクリックより前にリスナーを張っておく必要があるため、
+ * Promise.allでactionと同時に待ち受ける。
  */
-export async function waitForSimulBoard(page: Page, timeout = 10_000): Promise<void> {
-  await expect(page.getByTestId('simul-active-board')).toBeVisible({ timeout });
+export async function waitForTeacherGameWindow(
+  page: Page,
+  action: () => Promise<void>,
+  timeout = 10_000,
+): Promise<Page> {
+  const [popup] = await Promise.all([
+    page.waitForEvent('popup', { timeout }),
+    action(),
+  ]);
+  await expect(popup.getByTestId('simul-active-board')).toBeVisible({ timeout });
+  return popup;
 }
 
 /**
- * 多面打ちビューを「戻る」で閉じ、ダッシュボード本体（サムネイルグリッド）に戻る。
+ * 既に取得済みの講師専用対局別ウィンドウ(popup)で、1盤表示(simul-active-board)が
+ * 見えていることを確認する。
  */
-export async function closeSimulToHome(page: Page, timeout = 10_000): Promise<void> {
-  await page.getByTestId('simul-back').click();
-  await expect(page.getByTestId('simul-active-board')).toBeHidden({ timeout });
+export async function waitForSimulBoard(page: Page, timeout = 10_000): Promise<void> {
+  await expect(page.getByTestId('simul-active-board')).toBeVisible({ timeout });
 }
 
 /**

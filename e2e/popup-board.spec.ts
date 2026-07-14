@@ -1,11 +1,14 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { TEST_STUDENT_A, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
 import { clearAllData, setupClassroomData, setupTeacherPassword, teardownSupabaseRoster } from './helpers/setup';
-import { createGame, loginAsTeacher, openClassroomAndConnect, waitForSimulBoard, waitForStudentJoined } from './helpers/teacher-actions';
+import { createGame, loginAsTeacher, openClassroomAndConnect, waitForTeacherGameWindow, waitForStudentJoined } from './helpers/teacher-actions';
 import { enterAssignedGame, loginAsStudent, playMove, waitForMyTurn } from './helpers/student-actions';
 
-// 回帰テスト: 講師が碁盤を「別ウィンドウ」にすると相手の着手が反映されない（2026-07-11修正）。
+// 回帰テスト: 講師の対局別ウィンドウに生徒の着手が反映されない（2026-07-11修正）。
 // 真因=セッション復元前のRealtime購読はRLSで弾かれ、以後イベントが届かない（ensureRealtimeAuth参照）。
+// 2026-07-15以降、講師の対局は常に別ウィンドウで自動オープンする設計になったため、
+// 「多面打ちビュー→手動で別ウィンドウボタン」という旧手順は発生しなくなり、
+// 対局作成が直接この別ウィンドウを誘発する形になった。
 
 test('講師の別ウィンドウ碁盤に生徒の着手が反映される', async ({ browser }) => {
   test.setTimeout(120_000);
@@ -37,20 +40,16 @@ test('講師の別ウィンドウ碁盤に生徒の着手が反映される', as
     await loginAsStudent(studentAPage, { studentCode: TEST_STUDENT_A.code, classroomId });
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
 
-    await createGame(teacherPage, {
-      blackName: TEST_STUDENT_A.name,
-      whiteName: '先生',
-      boardSize: 9,
-      expectedPlayersCount: 2,
-    });
-    await waitForSimulBoard(teacherPage); // 先生は対局者なので多面打ちビューで盤が自動で開く
-
-    // 「別ウィンドウ ↗」で popup を開く
-    const popupPromise = teacherPage.context().waitForEvent('page');
-    await teacherPage.getByRole('button', { name: /別ウィンドウ/ }).click();
-    const popup = await popupPromise;
+    // 対局作成 → 先生は対局者なので講師専用の別ウィンドウが自動で開く
+    const popup = await waitForTeacherGameWindow(teacherPage, () =>
+      createGame(teacherPage, {
+        blackName: TEST_STUDENT_A.name,
+        whiteName: '先生',
+        boardSize: 9,
+        expectedPlayersCount: 2,
+      }),
+    );
     popup.on('console', (msg) => console.log('[POPUP]', msg.type(), msg.text().slice(0, 200)));
-    await popup.waitForLoadState('domcontentloaded');
     await expect(popup.getByTestId('go-board')).toBeVisible({ timeout: 15_000 });
 
     // 生徒Aが初手を打つ

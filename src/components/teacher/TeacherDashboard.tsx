@@ -22,8 +22,6 @@ import StudentLinkGenerator from './StudentLinkGenerator';
 import AutoPairingDialog from './AutoPairingDialog';
 import GameObserverPanel from './GameObserverPanel';
 import StudentEditDialog from './StudentEditDialog';
-import SimulGrid from './SimulGrid';
-import type { LiveGameRow } from '../../utils/liveGameApi';
 import { upsertClassroom } from '../../utils/classroomStore';
 
 interface TeacherDashboardProps {
@@ -58,11 +56,8 @@ interface TeacherDashboardProps {
   onResetVideo?: () => void;
   onSelectSavedGame?: (game: SavedGame) => void;
   onResumeGame?: (gameId: string) => void;
-  liveGames: LiveGameRow[];
-  showSimulGrid: boolean;
-  onShowSimulGrid: () => void;
-  onHideSimulGrid: () => void;
-  classroom?: import('../../utils/classroomLiveKit').ClassroomLiveKit | null;
+  /** 講師専用の対局別ウィンドウを開く/前面化する（対局は常にこの別ウィンドウで行う） */
+  onOpenTeacherGameWindow: () => void;
 }
 
 export default function TeacherDashboard({
@@ -97,11 +92,7 @@ export default function TeacherDashboard({
   onResetVideo,
   onSelectSavedGame,
   onResumeGame,
-  liveGames,
-  showSimulGrid,
-  onShowSimulGrid,
-  onHideSimulGrid,
-  classroom,
+  onOpenTeacherGameWindow,
 }: TeacherDashboardProps) {
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [showStudentLinks, setShowStudentLinks] = useState(false);
@@ -303,10 +294,10 @@ export default function TeacherDashboard({
               (g.blackPlayer === identity || g.whitePlayer === identity) && g.status === 'playing'
             );
             if (!game) return;
-            // 先生自身の対局なら多面打ちビュー（1盤表示+ローテーション）で開く
+            // 先生自身の対局なら講師専用の別ウィンドウ（1盤表示+ローテーション）で開く
             if (game.blackPlayer === localIdentity || game.whitePlayer === localIdentity) {
               setObservingGameId(null);
-              onShowSimulGrid();
+              onOpenTeacherGameWindow();
             } else {
               setObservingGameId(game.id);
             }
@@ -316,18 +307,9 @@ export default function TeacherDashboard({
 
       {/* 中央: 碁盤グリッド/観戦 + 右サイドバー（ビデオ+チャット） */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        {/* 碁盤エリア: サムネイルグリッド or 観戦パネル */}
+        {/* 碁盤エリア: サムネイルグリッド or 観戦パネル（対局は常に講師専用の別ウィンドウで行うため、教室ホーム画面には対局盤を埋め込まない） */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {showSimulGrid ? (
-            <SimulGrid
-              games={liveGames}
-              students={filteredStudents}
-              teacherIdentity={localIdentity}
-              onOpenGameCreation={onCreateGame}
-              onBack={onHideSimulGrid}
-              classroom={classroom}
-            />
-          ) : observingGameId && filteredGames.find(g => g.id === observingGameId) ? (
+          {observingGameId && filteredGames.find(g => g.id === observingGameId) ? (
             <GameObserverPanel
               gameId={observingGameId}
               students={filteredStudents}
@@ -340,10 +322,10 @@ export default function TeacherDashboard({
               students={filteredStudents}
               participants={filteredParticipants}
               onSelectGame={(gameId) => {
-                // 先生自身の対局なら多面打ちビュー（1盤表示+ローテーション）で開く
+                // 先生自身の対局なら講師専用の別ウィンドウ（1盤表示+ローテーション）で開く
                 const game = filteredGames.find(g => g.id === gameId);
                 if (game && (game.blackPlayer === localIdentity || game.whitePlayer === localIdentity)) {
-                  onShowSimulGrid();
+                  onOpenTeacherGameWindow();
                 } else {
                   setObservingGameId(gameId);
                 }
@@ -417,6 +399,7 @@ export default function TeacherDashboard({
         onReconnect={onReconnect}
         isReconnecting={isReconnecting}
         onOpenStudentManager={onOpenStudentManager}
+        onOpenTeacherGameWindow={onOpenTeacherGameWindow}
         onLoadProblem={handleLoadProblem}
         onEditClassroom={() => {
           if (selectedClassroom) setEditingClassroom(selectedClassroom);

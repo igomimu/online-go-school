@@ -25,6 +25,7 @@ import Header from './components/Header';
 import LoginScreen from './components/LoginScreen';
 import Lobby from './components/Lobby';
 import GameBoard from './components/GameBoard';
+import TeacherGameWindow from './components/teacher/TeacherGameWindow';
 import GameCreationDialog from './components/GameCreationDialog';
 import LectureBoard from './components/LectureBoard';
 import ReviewBoard from './components/ReviewBoard';
@@ -40,6 +41,9 @@ import type { ChatMessagePayload } from './types/chat';
 
 import { Settings } from 'lucide-react';
 
+// 講師専用の対局別ウィンドウの固定名。同名指定によりwindow.openが既存ウィンドウを再利用・前面化する。
+const TEACHER_GAME_WINDOW_NAME = 'teacher-game-window';
+
 function App() {
   const [role, setRole] = useState<Role | null>(null);
   const [userName, setUserName] = useState('');
@@ -54,7 +58,6 @@ function App() {
   // 画面状態
   const [viewMode, setViewMode] = useState<ViewMode>('lobby');
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
-  const [teacherDashboardView, setTeacherDashboardView] = useState<'main' | 'simul'>('main');
   const [autoOpenedGameId, setAutoOpenedGameId] = useState<string | null>(null);
   const [showGameCreation, setShowGameCreation] = useState(false);
   const [gameCreationBlack, setGameCreationBlack] = useState<string | null>(null); // 生徒一覧から開始した時の黒番プリセット
@@ -662,6 +665,14 @@ function App() {
     setViewMode('game');
   };
 
+  // 講師専用の対局別ウィンドウを開く/前面化する（固定ウィンドウ名により、既存ウィンドウがあれば再利用される）。
+  const openTeacherGameWindow = useCallback((classroomId: string) => {
+    const identity = classroomRef.current?.localIdentity ?? userName;
+    const url = `${window.location.origin}${window.location.pathname}?mode=game&role=TEACHER&teacherClassroomId=${encodeURIComponent(classroomId)}&identity=${encodeURIComponent(identity)}`;
+    const win = window.open(url, TEACHER_GAME_WINDOW_NAME, 'width=1000,height=800,menubar=no,toolbar=no,location=no,status=no');
+    win?.focus();
+  }, [userName]);
+
   // 対局作成（Supabase insert、Realtime経由で全員に配信）
   const handleCreateGame = async (opts: {
     blackPlayer: string;
@@ -671,16 +682,17 @@ function App() {
     komi: number;
     clock?: import('./types/game').GameClock;
   }) => {
-    const row = await liveGameList.createGame(opts);
+    // 先生自身が対局者（黒/白）なら講師専用の別ウィンドウ（常に1盤表示・手番ローテーション）で開く。
+    // ポップアップブロッカー対策のため、await createGame() より前・クリックの同期区間内で呼ぶ。
+    // 全画面の対局盤に埋め込むと対局追加など他の操作ができなくなるため、
+    // 講師の対局は面数に関わらず別ウィンドウに一本化する（2026-07-14 三村さん指示、07-15 別ウィンドウ方式へ再設計）。
+    const me = classroomRef.current?.localIdentity ?? userName;
+    if (selectedClassroomId && (opts.blackPlayer === me || opts.whitePlayer === me)) {
+      openTeacherGameWindow(selectedClassroomId);
+    }
+    await liveGameList.createGame(opts);
     setShowGameCreation(false);
     setGameCreationBlack(null);
-    // 先生自身が対局者（黒/白）なら多面打ちビュー（常に1盤表示・手番ローテーション）で開く。
-    // 全画面の対局盤に入れると対局追加など他の操作ができなくなるため、
-    // 講師の対局は面数に関わらず多面打ちビューに一本化する（2026-07-14 三村さん指示）。
-    const me = classroomRef.current?.localIdentity ?? userName;
-    if (row && (row.black_player === me || row.white_player === me)) {
-      setTeacherDashboardView('simul');
-    }
   };
 
   // 詰碁: 配信
@@ -758,22 +770,24 @@ function App() {
 
   // 対局の再開処理
   const handleResumeGame = useCallback(async (gameId: string) => {
+    // 先生自身が対局者なら講師専用の別ウィンドウ（対局作成と同じ動線）、それ以外は全画面盤。
+    // ポップアップブロッカー対策のため、await resumeLiveGame() より前・クリックの同期区間内で呼ぶ。
+    const row = liveGameList.games.find(g => g.id === gameId);
+    const me = classroomRef.current?.localIdentity ?? userName;
+    const teacherIsParticipant = role === 'TEACHER' && !!row && (row.black_player === me || row.white_player === me);
+    if (teacherIsParticipant && selectedClassroomId) {
+      openTeacherGameWindow(selectedClassroomId);
+    }
     try {
       await resumeLiveGame(gameId);
-      // 再開成功後、即座にその対局画面を開く。
-      // 先生自身が対局者なら多面打ちビュー（対局作成と同じ動線）、それ以外は全画面盤。
-      const row = liveGameList.games.find(g => g.id === gameId);
-      const me = classroomRef.current?.localIdentity ?? userName;
-      if (role === 'TEACHER' && row && (row.black_player === me || row.white_player === me)) {
-        setTeacherDashboardView('simul');
-      } else {
+      if (!teacherIsParticipant) {
         setActiveGameId(gameId);
         setViewMode('game');
       }
     } catch (e) {
       alert(`対局の再開に失敗しました: ${e}`);
     }
-  }, [liveGameList.games, role, userName]);
+  }, [liveGameList.games, role, userName, selectedClassroomId, openTeacherGameWindow]);
 
   // 対局終了/中断時に自動的に閉じる（ロビーに戻る）
   useEffect(() => {
@@ -901,9 +915,26 @@ function App() {
   const params = new URLSearchParams(window.location.search);
   const isDedicatedGameMode = params.get('mode') === 'game';
   const paramGameId = params.get('gameId');
+  // 生徒招待リンクの `classroomId` パラメータと衝突しないよう別名にする
+  // （既存の初期化useEffectが `classroomId` を見て生徒セッション扱いし、URLをreplaceStateで消してしまうため）。
+  const paramClassroomId = params.get('teacherClassroomId');
   const paramIdentity = params.get('identity');
   const paramRole = params.get('role');
 
+  // 講師用: 教師が持つ全対局をこのウィンドウ単体で購読し、常に1盤だけ表示（手番になるたびに自動切替）。
+  if (isDedicatedGameMode && paramRole === 'TEACHER' && paramClassroomId && paramIdentity) {
+    return (
+      <div className="w-full h-screen overflow-y-auto">
+        <TeacherGameWindow
+          classroomId={paramClassroomId}
+          teacherIdentity={decodeURIComponent(paramIdentity)}
+          students={students}
+        />
+      </div>
+    );
+  }
+
+  // 生徒用: 単一対局のみ表示（変更なし）。
   if (isDedicatedGameMode && paramGameId && paramIdentity) {
     const isTeacherRole = paramRole === 'TEACHER';
     return (
@@ -1226,11 +1257,7 @@ function App() {
             onResetVideo={handleResetVideo}
             onSelectSavedGame={handleSelectSavedGame}
             onResumeGame={handleResumeGame}
-            liveGames={liveGameList.games}
-            showSimulGrid={teacherDashboardView === 'simul'}
-            onShowSimulGrid={() => setTeacherDashboardView('simul')}
-            onHideSimulGrid={() => setTeacherDashboardView('main')}
-            classroom={classroomRef.current}
+            onOpenTeacherGameWindow={() => selectedClassroomId && openTeacherGameWindow(selectedClassroomId)}
           />
         )}
 

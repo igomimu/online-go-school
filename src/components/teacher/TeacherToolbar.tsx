@@ -11,6 +11,8 @@ interface TeacherToolbarProps {
   onReconnect: () => void;
   isReconnecting: boolean;
   onOpenStudentManager: () => void;
+  /** 講師専用の対局別ウィンドウを開く/前面化する */
+  onOpenTeacherGameWindow?: () => void;
   onEditClassroom?: () => void;
   onShowStudentLinks?: () => void;
   onAutoPairing?: () => void;
@@ -56,6 +58,7 @@ export default function TeacherToolbar({
   onReconnect,
   isReconnecting,
   onOpenStudentManager,
+  onOpenTeacherGameWindow,
   onEditClassroom,
   onShowStudentLinks,
   onAutoPairing,
@@ -172,6 +175,9 @@ export default function TeacherToolbar({
         <div style={{ flex: 1 }} />
 
         <IgcButton label="対局作成" color="#90d060" onClick={onCreateGame} data-testid="create-game-toolbar-button" />
+        {onOpenTeacherGameWindow && (
+          <IgcButton label="対局ウィンドウ" color="#f59e0b" onClick={onOpenTeacherGameWindow} data-testid="open-teacher-game-window-button" />
+        )}
         <IgcButton label="自動対局" color="#60c090" onClick={onAutoPairing} />
 
         <input ref={fileInputRef} type="file" accept=".sgf" onChange={onLoadSgf} className="hidden" />

@@ -1,30 +1,30 @@
 import { useMemo, useState } from 'react';
 import type { Student } from '../../types/classroom';
-import { ClassroomLiveKit } from '../../utils/classroomLiveKit';
-import { liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
+import { liveRowToSession } from '../../utils/liveGameApi';
 import { deriveLiveBoardSnapshots, useLiveBoards } from '../../hooks/useLiveBoards';
+import { useLiveGameList } from '../../hooks/useLiveGameList';
 import GameThumbnail from '../GameThumbnail';
 import GameBoard from '../GameBoard';
 import { getNextTeacherTurnGameId, isTeacherParticipant, isTeacherTurn } from './simulRotation';
 
-interface SimulGridProps {
-  games: LiveGameRow[];
-  students: Student[];
+interface TeacherGameWindowProps {
+  classroomId: string;
   teacherIdentity: string;
-  /** 通常の対局作成ダイアログを開く（多面打ち専用ダイアログは廃止、対局作成を重ねるだけで盤が増える） */
-  onOpenGameCreation: () => void;
-  onBack: () => void;
-  classroom?: ClassroomLiveKit | null;
+  students: Student[];
 }
 
-export default function SimulGrid({
-  games,
-  students,
+/**
+ * 講師専用の対局別ウィンドウ（`?mode=game&role=TEACHER&classroomId=...`）の中身。
+ * 講師が持つ全対局をこのウィンドウ単体で購読し、常に1盤だけ表示する。
+ * 表示中の対局が自分の手番でなくなったら、最も待たせている手番の盤へ自動切替する。
+ * 対局作成・生徒一覧はメインウィンドウ（教室ホーム画面）側の責務なのでここには持たない。
+ */
+export default function TeacherGameWindow({
+  classroomId,
   teacherIdentity,
-  onOpenGameCreation,
-  onBack,
-  classroom,
-}: SimulGridProps) {
+  students,
+}: TeacherGameWindowProps) {
+  const { games } = useLiveGameList(classroomId);
   const [activeSimulGameId, setActiveSimulGameId] = useState<string | null>(null);
   const [showList, setShowList] = useState(false);
 
@@ -118,13 +118,6 @@ export default function SimulGrid({
         background: '#e8e8e0',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            data-testid="simul-back"
-            onClick={onBack}
-            style={{ border: '1px solid #999', background: '#fff', padding: '3px 10px', cursor: 'pointer', fontSize: 12 }}
-          >
-            戻る
-          </button>
           <strong style={{ fontSize: 14 }}>多面打ち</strong>
           <span style={{ color: '#666', fontSize: 12 }}>
             {sessions.length}面（あなたの番 {waitingCount}面）
@@ -159,32 +152,13 @@ export default function SimulGrid({
           >
             次の手番の盤へ
           </button>
-          <button
-            onClick={onOpenGameCreation}
-            style={{ border: '1px solid #1e3a8a', background: '#3030a0', color: 'white', padding: '3px 12px', cursor: 'pointer', fontWeight: 'bold', fontSize: 12 }}
-          >
-            対局を追加
-          </button>
         </div>
       </div>
 
       {/* 本体コンテンツ */}
       {sessions.length === 0 ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <button
-            onClick={onOpenGameCreation}
-            style={{
-              border: '2px solid #3030a0',
-              background: '#fff',
-              color: '#3030a0',
-              padding: '10px 22px',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              fontSize: 14,
-            }}
-          >
-            対局を追加
-          </button>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, color: '#666' }}>
+          対局がありません。教室ホーム画面から対局を作成してください。
         </div>
       ) : showList ? (
         <div className="grid grid-cols-2 xl:grid-cols-3 gap-3 p-3">
@@ -220,7 +194,6 @@ export default function SimulGrid({
             gameId={resolvedActiveId}
             myIdentity={teacherIdentity}
             isTeacher={true}
-            classroom={classroom}
             students={students}
           />
         </div>

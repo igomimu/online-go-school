@@ -1,5 +1,5 @@
 // 多面打ちの手番判定・次盤選定ロジック（純関数）。
-// SimulGrid から分離しているのは react-refresh/only-export-components 対応
+// TeacherGameWindow から分離しているのは react-refresh/only-export-components 対応
 // （コンポーネントファイルから関数を export しない）。
 
 export interface GameSessionInfo {

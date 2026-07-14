@@ -6,8 +6,7 @@ import {
   openClassroomAndConnect,
   waitForStudentJoined,
   createGame,
-  waitForSimulBoard,
-  closeSimulToHome,
+  waitForTeacherGameWindow,
 } from './helpers/teacher-actions';
 import {
   loginAsStudent,
@@ -63,17 +62,17 @@ test.describe('生徒再接続シナリオ', () => {
       await expect(teacherPage.getByText('1人接続中')).toBeVisible({ timeout: 10_000 });
 
       // === 対局作成: 生徒A(黒) vs 先生(白) ===
-      await createGame(teacherPage, {
-        blackName: TEST_STUDENT_A.name,
-        whiteName: '先生', // option表示は "teacher（先生）" なので「先生」でマッチ
-        boardSize: 9,
-        expectedPlayersCount: 2,
-      });
-
-      // 先生自身が対局者なので多面打ちビューで盤が自動で開く。
-      // サムネイルグリッド等ダッシュボード本体を検証するため、戻るで閉じる
-      await waitForSimulBoard(teacherPage);
-      await closeSimulToHome(teacherPage);
+      // 先生自身が対局者なので講師専用の別ウィンドウが自動で開く。
+      // 教室ホーム画面(teacherPage)は終始ダッシュボードのままなので、以降の検証に影響しない。
+      const gameWindow = await waitForTeacherGameWindow(teacherPage, () =>
+        createGame(teacherPage, {
+          blackName: TEST_STUDENT_A.name,
+          whiteName: '先生', // option表示は "teacher（先生）" なので「先生」でマッチ
+          boardSize: 9,
+          expectedPlayersCount: 2,
+        }),
+      );
+      await gameWindow.close();
 
       // === 生徒が対局画面に入り、1手打つ ===
       await enterAssignedGame(studentPage);
