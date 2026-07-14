@@ -42,3 +42,6 @@ public/version.json
 
 # Vercel (machine-local project link; deploy uses VERCEL_ORG_ID/PROJECT_ID env)
 .vercel
+
+# 検証役(Claude)のローカル検証道具はgit管理しない
+e2e/proof-*.spec.ts
