@@ -1,0 +1,33 @@
+name: Build Check
+
+# Vercelの本番デプロイと同じ `npm run build`(tsc -b && vite build)をCIで実行し、
+# ビルド失敗を push/PR の時点でGitHub上に検知する。
+# `npx tsc --noEmit` はルートの tsconfig.json が files:[] のプロジェクト参照専用構成のため
+# 実質何もチェックしない(2026-07-15判明)。ビルド健全性の確認は必ずこのワークフローと
+# 同じ `npm run build` を使うこと。
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (same command as Vercel production build)
+        run: npm run build
