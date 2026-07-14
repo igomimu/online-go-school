@@ -613,7 +613,6 @@ function App() {
     setStudentJoinInfo('');
     setViewMode('lobby');
     setActiveGameId(null);
-    setTeacherDashboardView('main');
     // 教師は教室管理ページに戻る、生徒はロール選択に戻る
     if (role === 'TEACHER') {
       setTeacherPhase('manage');
