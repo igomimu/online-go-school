@@ -242,10 +242,10 @@ export default function StudentManager({
                   <select
                     value={form.rank}
                     onChange={e => setForm(f => ({ ...f, rank: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
                   >
-                    <option value="">未設定</option>
-                    {RANKS.map(r => <option key={r} value={r}>{r}</option>)}
+                    <option value="" className="bg-zinc-800 text-white">未設定</option>
+                    {RANKS.map(r => <option key={r} value={r} className="bg-zinc-800 text-white">{r}</option>)}
                   </select>
                 </div>
                 <div>
@@ -266,9 +266,9 @@ export default function StudentManager({
                   <select
                     value={form.type}
                     onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
                   >
-                    {TYPES.map(t => <option key={t} value={t}>{t || '未設定'}</option>)}
+                    {TYPES.map(t => <option key={t} value={t} className="bg-zinc-800 text-white">{t || '未設定'}</option>)}
                   </select>
                 </div>
                 <div>
@@ -296,9 +296,9 @@ export default function StudentManager({
                     value={form.grade}
                     onChange={e => setForm(f => ({ ...f, grade: e.target.value }))}
                     disabled={!!form.birthdate}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 disabled:opacity-40"
+                    className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 disabled:opacity-40"
                   >
-                    {GRADES.map(g => <option key={g} value={g}>{g || '未設定'}</option>)}
+                    {GRADES.map(g => <option key={g} value={g} className="bg-zinc-800 text-white">{g || '未設定'}</option>)}
                   </select>
                 </div>
                 <div>

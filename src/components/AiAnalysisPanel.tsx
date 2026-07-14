@@ -137,13 +137,13 @@ export default function AiAnalysisPanel({
               <select
                 value={settings.maxVisits}
                 onChange={e => onUpdateSettings({ maxVisits: Number(e.target.value) })}
-                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs"
+                className="w-full bg-white/5 text-white border border-white/10 rounded px-2 py-1 text-xs"
               >
-                <option value={100}>100 (速い)</option>
-                <option value={500}>500</option>
-                <option value={1000}>1000 (標準)</option>
-                <option value={2000}>2000 (精密)</option>
-                <option value={5000}>5000 (高精度)</option>
+                <option value={100} className="bg-zinc-800 text-white">100 (速い)</option>
+                <option value={500} className="bg-zinc-800 text-white">500</option>
+                <option value={1000} className="bg-zinc-800 text-white">1000 (標準)</option>
+                <option value={2000} className="bg-zinc-800 text-white">2000 (精密)</option>
+                <option value={5000} className="bg-zinc-800 text-white">5000 (高精度)</option>
               </select>
             </div>
           </div>

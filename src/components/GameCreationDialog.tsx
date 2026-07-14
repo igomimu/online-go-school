@@ -111,12 +111,12 @@ export default function GameCreationDialog({
             data-testid="black-player-select"
             value={blackPlayer}
             onChange={e => setBlackPlayer(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+            className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
           >
             {allPlayers.map(p => {
               const rank = getRank(p);
               return (
-                <option key={p} value={p}>
+                <option key={p} value={p} className="bg-zinc-800 text-white">
                   {displayName(p)}{p === teacherName ? '（先生）' : ''}{rank ? ` [${rank}]` : ''}
                 </option>
               );
@@ -138,12 +138,12 @@ export default function GameCreationDialog({
             data-testid="white-player-select"
             value={whitePlayer}
             onChange={e => setWhitePlayer(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+            className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
           >
             {allPlayers.map(p => {
               const rank = getRank(p);
               return (
-                <option key={p} value={p}>
+                <option key={p} value={p} className="bg-zinc-800 text-white">
                   {displayName(p)}{p === teacherName ? '（先生）' : ''}{rank ? ` [${rank}]` : ''}
                 </option>
               );

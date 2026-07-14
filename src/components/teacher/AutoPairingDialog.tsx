@@ -7,6 +7,9 @@ import { DEFAULT_TIME_SETTINGS, timeSettingsToClock } from '../../hooks/useGameC
 import { findStudentByIdentity, getDisplayName } from '../../utils/identityUtils';
 import TimeControlPicker from '../TimeControlPicker';
 
+// 置石は0(互先)+2〜9子。1子は意味をなさないため選択肢から除く。
+const HANDICAP_OPTIONS = [0, 2, 3, 4, 5, 6, 7, 8, 9];
+
 interface PairingPair {
   blackIdentity: string;
   whiteIdentity: string;
@@ -224,7 +227,7 @@ export default function AutoPairingDialog({
                         onChange={e => changeHandicap(i, Number(e.target.value))}
                         style={{ width: 32, fontSize: 11, border: '1px solid #999' }}
                       >
-                        {Array.from({ length: 10 }, (_, n) => (
+                        {HANDICAP_OPTIONS.map(n => (
                           <option key={n} value={n}>{n}</option>
                         ))}
                       </select>
