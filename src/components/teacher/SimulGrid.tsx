@@ -1,28 +1,18 @@
 import { useMemo, useState } from 'react';
 import type { Student } from '../../types/classroom';
-import type { GameClock } from '../../types/game';
-import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import { ClassroomLiveKit } from '../../utils/classroomLiveKit';
 import { liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
 import { deriveLiveBoardSnapshots, useLiveBoards } from '../../hooks/useLiveBoards';
 import GameThumbnail from '../GameThumbnail';
 import GameBoard from '../GameBoard';
-import SimulAddGameDialog from './SimulAddGameDialog';
 import { getNextTeacherTurnGameId, isTeacherParticipant, isTeacherTurn } from './simulRotation';
 
 interface SimulGridProps {
   games: LiveGameRow[];
   students: Student[];
-  participants: ParticipantInfo[];
   teacherIdentity: string;
-  onCreateGame: (opts: {
-    blackPlayer: string;
-    whitePlayer: string;
-    boardSize: number;
-    handicap: number;
-    komi: number;
-    clock?: GameClock | null;
-  }) => Promise<void>;
+  /** 通常の対局作成ダイアログを開く（多面打ち専用ダイアログは廃止、対局作成を重ねるだけで盤が増える） */
+  onOpenGameCreation: () => void;
   onBack: () => void;
   classroom?: ClassroomLiveKit | null;
 }
@@ -30,13 +20,11 @@ interface SimulGridProps {
 export default function SimulGrid({
   games,
   students,
-  participants,
   teacherIdentity,
-  onCreateGame,
+  onOpenGameCreation,
   onBack,
   classroom,
 }: SimulGridProps) {
-  const [showAddDialog, setShowAddDialog] = useState(false);
   const [activeSimulGameId, setActiveSimulGameId] = useState<string | null>(null);
   const [showList, setShowList] = useState(false);
 
@@ -131,6 +119,7 @@ export default function SimulGrid({
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
+            data-testid="simul-back"
             onClick={onBack}
             style={{ border: '1px solid #999', background: '#fff', padding: '3px 10px', cursor: 'pointer', fontSize: 12 }}
           >
@@ -171,7 +160,7 @@ export default function SimulGrid({
             次の手番の盤へ
           </button>
           <button
-            onClick={() => setShowAddDialog(true)}
+            onClick={onOpenGameCreation}
             style={{ border: '1px solid #1e3a8a', background: '#3030a0', color: 'white', padding: '3px 12px', cursor: 'pointer', fontWeight: 'bold', fontSize: 12 }}
           >
             対局を追加
@@ -183,7 +172,7 @@ export default function SimulGrid({
       {sessions.length === 0 ? (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <button
-            onClick={() => setShowAddDialog(true)}
+            onClick={onOpenGameCreation}
             style={{
               border: '2px solid #3030a0',
               background: '#fff',
@@ -241,16 +230,6 @@ export default function SimulGrid({
         </div>
       )}
 
-      {showAddDialog && (
-        <SimulAddGameDialog
-          connectedIdentities={participants.map((p) => p.identity)}
-          students={students}
-          teacherIdentity={teacherIdentity}
-          games={games}
-          onClose={() => setShowAddDialog(false)}
-          onCreate={onCreateGame}
-        />
-      )}
     </div>
   );
 }

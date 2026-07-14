@@ -1,26 +1,8 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { TEST_STUDENT_A, TEST_STUDENT_B, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
 import { clearAllData, setupClassroomData, setupTeacherPassword, teardownSupabaseRoster } from './helpers/setup';
-import { loginAsTeacher, openClassroomAndConnect, waitForStudentJoined } from './helpers/teacher-actions';
+import { createGame, loginAsTeacher, openClassroomAndConnect, waitForStudentJoined } from './helpers/teacher-actions';
 import { enterAssignedGame, loginAsStudent, playMove, waitForMyTurn } from './helpers/student-actions';
-
-async function openSimulGrid(page: Page): Promise<void> {
-  await page.getByRole('button', { name: '多面打ち', exact: true }).click();
-  await expect(page.getByText('多面打ち').first()).toBeVisible({ timeout: 10_000 });
-}
-
-async function addSimulGame(page: Page, studentName: string): Promise<void> {
-  await page.getByRole('button', { name: '対局を追加', exact: true }).first().click();
-  await page.getByText('多面打ち - 対局を追加').waitFor({ timeout: 5_000 });
-  const select = page.getByTestId('simul-student-select');
-  const options = await select.locator('option').allTextContents();
-  const index = options.findIndex((text) => text.includes(studentName));
-  if (index < 0) throw new Error(`多面追加候補に ${studentName} が見つからない: ${JSON.stringify(options)}`);
-  await select.selectOption({ index });
-  await page.getByRole('button', { name: '9路', exact: true }).click();
-  await page.getByRole('button', { name: '追加', exact: true }).click();
-  await expect(page.getByText('多面打ち - 対局を追加')).toBeHidden({ timeout: 10_000 });
-}
 
 function simulTile(page: Page, studentName: string) {
   return page.getByRole('button', { name: new RegExp(`${studentName}.*\\d+手目`) });
@@ -68,7 +50,7 @@ test.describe('多面打ちv2: 単一盤ローテーション', () => {
     if (classroomId) await teardownSupabaseRoster(classroomId);
   });
 
-  test('先生が対局を追加するとグリッドではなく1面表示され、講師着手後に自動切り替えが行われる', async () => {
+  test('通常の対局作成を重ねるだけで多面打ちビュー（1盤表示）になり、講師着手後に自動切り替えが行われる', async () => {
     await loginAsTeacher(teacherPage);
     await openClassroomAndConnect(teacherPage);
 
@@ -79,19 +61,28 @@ test.describe('多面打ちv2: 単一盤ローテーション', () => {
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
     await waitForStudentJoined(teacherPage, TEST_STUDENT_B.id);
 
-    // 1. 先生が「多面打ち」を開く -> 空状態 -> Aと対局追加
-    await openSimulGrid(teacherPage);
-    await addSimulGame(teacherPage, TEST_STUDENT_A.name);
+    // 1. 通常の「対局作成」で A(黒) vs 先生(白) -> 多面打ちビュー（1盤表示）が自動で開く
+    await createGame(teacherPage, {
+      blackName: TEST_STUDENT_A.name,
+      whiteName: '先生',
+      boardSize: 9,
+      expectedPlayersCount: 3, // 先生 + 生徒2
+    });
 
-    // -> グリッドではなく盤が1面表示される（Aの盤。まだ黒番=A考慮中）
+    // -> 全画面盤ではなく多面打ちビューの盤が1面表示される（Aの盤。まだ黒番=A考慮中）
     const activeBoard = teacherPage.getByTestId('simul-active-board');
     await expect(activeBoard).toBeVisible({ timeout: 10_000 });
     await expect(activeBoard.getByText(TEST_STUDENT_A.name)).toBeVisible();
     await expect(activeBoard.getByText('相手の番です')).toBeVisible(); // 黒考慮中
-    await expect(teacherPage.getByRole('button', { name: '閉じてホーム' })).toHaveCount(0); // 戻る動線は上部バー
+    await expect(teacherPage.getByRole('button', { name: '閉じてホーム' })).toHaveCount(0); // 全画面盤に閉じ込めない
 
-    // 2. B と対局追加
-    await addSimulGame(teacherPage, TEST_STUDENT_B.name);
+    // 2. さらに「対局作成」で B(黒) vs 先生(白) -> 対局作成ボタンは多面打ちビュー中も操作できる
+    await createGame(teacherPage, {
+      blackName: TEST_STUDENT_B.name,
+      whiteName: '先生',
+      boardSize: 9,
+      expectedPlayersCount: 3,
+    });
 
     // -> 表示は1盤のまま（Aの盤）、上部バーが「2面（あなたの番 0面）」になる
     await expect(activeBoard).toBeVisible();

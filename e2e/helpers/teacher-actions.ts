@@ -111,6 +111,23 @@ export async function closeGameBoardToHome(page: Page, timeout = 10_000): Promis
 }
 
 /**
+ * 多面打ちビュー（1盤表示）に遷移したことを確認する。
+ * 2026-07-14以降、先生自身が対局者の対局は全画面盤ではなく多面打ちビューで開く
+ * （対局作成を重ねるだけで盤が増える動線に一本化）。
+ */
+export async function waitForSimulBoard(page: Page, timeout = 10_000): Promise<void> {
+  await expect(page.getByTestId('simul-active-board')).toBeVisible({ timeout });
+}
+
+/**
+ * 多面打ちビューを「戻る」で閉じ、ダッシュボード本体（サムネイルグリッド）に戻る。
+ */
+export async function closeSimulToHome(page: Page, timeout = 10_000): Promise<void> {
+  await page.getByTestId('simul-back').click();
+  await expect(page.getByTestId('simul-active-board')).toBeHidden({ timeout });
+}
+
+/**
  * 検討モードに突入するため、SGF読込ボタン経由で隠しfile inputにSGF文字列を流し込む。
  * 9路 + 1手だけの最小SGFをデフォルトで使う。
  */

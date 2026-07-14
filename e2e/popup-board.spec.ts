@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { TEST_STUDENT_A, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
 import { clearAllData, setupClassroomData, setupTeacherPassword, teardownSupabaseRoster } from './helpers/setup';
-import { createGame, loginAsTeacher, openClassroomAndConnect, waitForObserverPanel, waitForStudentJoined } from './helpers/teacher-actions';
+import { createGame, loginAsTeacher, openClassroomAndConnect, waitForSimulBoard, waitForStudentJoined } from './helpers/teacher-actions';
 import { enterAssignedGame, loginAsStudent, playMove, waitForMyTurn } from './helpers/student-actions';
 
 // 回帰テスト: 講師が碁盤を「別ウィンドウ」にすると相手の着手が反映されない（2026-07-11修正）。
@@ -43,7 +43,7 @@ test('講師の別ウィンドウ碁盤に生徒の着手が反映される', as
       boardSize: 9,
       expectedPlayersCount: 2,
     });
-    await waitForObserverPanel(teacherPage); // 先生は対局者なので盤が自動で開く
+    await waitForSimulBoard(teacherPage); // 先生は対局者なので多面打ちビューで盤が自動で開く
 
     // 「別ウィンドウ ↗」で popup を開く
     const popupPromise = teacherPage.context().waitForEvent('page');

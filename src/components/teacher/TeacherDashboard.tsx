@@ -62,14 +62,6 @@ interface TeacherDashboardProps {
   showSimulGrid: boolean;
   onShowSimulGrid: () => void;
   onHideSimulGrid: () => void;
-  onCreateSimulGame: (opts: {
-    blackPlayer: string;
-    whitePlayer: string;
-    boardSize: number;
-    handicap: number;
-    komi: number;
-    clock?: import('../../types/game').GameClock | null;
-  }) => Promise<void>;
   classroom?: import('../../utils/classroomLiveKit').ClassroomLiveKit | null;
 }
 
@@ -109,7 +101,6 @@ export default function TeacherDashboard({
   showSimulGrid,
   onShowSimulGrid,
   onHideSimulGrid,
-  onCreateSimulGame,
   classroom,
 }: TeacherDashboardProps) {
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
@@ -290,24 +281,6 @@ export default function TeacherDashboard({
           fontWeight: 'bold',
         }}>囲</span>
         三村囲碁オンライン 〜 {classroomName}
-        <button
-          onClick={() => {
-            setObservingGameId(null);
-            onShowSimulGrid();
-          }}
-          style={{
-            marginLeft: 'auto',
-            border: '1px solid rgba(255,255,255,0.7)',
-            background: showSimulGrid ? '#f59e0b' : 'rgba(255,255,255,0.15)',
-            color: showSimulGrid ? '#111' : '#fff',
-            padding: '2px 10px',
-            cursor: 'pointer',
-            fontWeight: 'bold',
-            fontSize: 12,
-          }}
-        >
-          多面打ち
-        </button>
       </div>
 
       {/* 生徒一覧テーブル */}
@@ -329,7 +302,14 @@ export default function TeacherDashboard({
             const game = filteredGames.find(g =>
               (g.blackPlayer === identity || g.whitePlayer === identity) && g.status === 'playing'
             );
-            if (game) setObservingGameId(game.id);
+            if (!game) return;
+            // 先生自身の対局なら多面打ちビュー（1盤表示+ローテーション）で開く
+            if (game.blackPlayer === localIdentity || game.whitePlayer === localIdentity) {
+              setObservingGameId(null);
+              onShowSimulGrid();
+            } else {
+              setObservingGameId(game.id);
+            }
           }}
         />
       </div>
@@ -342,9 +322,8 @@ export default function TeacherDashboard({
             <SimulGrid
               games={liveGames}
               students={filteredStudents}
-              participants={filteredParticipants}
               teacherIdentity={localIdentity}
-              onCreateGame={onCreateSimulGame}
+              onOpenGameCreation={onCreateGame}
               onBack={onHideSimulGrid}
               classroom={classroom}
             />
@@ -360,7 +339,15 @@ export default function TeacherDashboard({
               games={filteredGames}
               students={filteredStudents}
               participants={filteredParticipants}
-              onSelectGame={(gameId) => setObservingGameId(gameId)}
+              onSelectGame={(gameId) => {
+                // 先生自身の対局なら多面打ちビュー（1盤表示+ローテーション）で開く
+                const game = filteredGames.find(g => g.id === gameId);
+                if (game && (game.blackPlayer === localIdentity || game.whitePlayer === localIdentity)) {
+                  onShowSimulGrid();
+                } else {
+                  setObservingGameId(gameId);
+                }
+              }}
               onResumeGame={onResumeGame}
             />
           )}

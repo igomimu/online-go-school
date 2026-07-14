@@ -8,8 +8,8 @@ import {
   createGame,
   clickReconnectAndWaitCycle,
   getOpenStudentButton,
-  waitForObserverPanel,
-  closeGameBoardToHome,
+  waitForSimulBoard,
+  closeSimulToHome,
 } from './helpers/teacher-actions';
 import { loginAsStudent } from './helpers/student-actions';
 
@@ -82,16 +82,16 @@ test.describe('TeacherToolbar / StudentTable 配線検証', () => {
       expectedPlayersCount: 2,
     });
 
-    // d976887: 先生自身が対局者なので対局盤が自動で開く → 閉じてダッシュボードに戻る
-    await waitForObserverPanel(teacherPage);
-    await closeGameBoardToHome(teacherPage);
+    // 先生自身が対局者なので多面打ちビューで盤が自動で開く → 戻るでダッシュボードに戻る
+    await waitForSimulBoard(teacherPage);
+    await closeSimulToHome(teacherPage);
 
     // 対局作成後、行の gameStatus が playing になり「開く」がアクティブ化
     await expect(openButton).toBeEnabled({ timeout: 15_000 });
 
-    // クリック → 観戦パネル（GameObserverPanel）に遷移
+    // クリック → 先生自身の対局なので多面打ちビューに遷移
     await openButton.click();
-    await waitForObserverPanel(teacherPage);
+    await waitForSimulBoard(teacherPage);
   });
 
   test('「回線復旧」ボタン: クリック→復旧中ラベル+disabled→数秒で復旧', async () => {

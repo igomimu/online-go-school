@@ -674,26 +674,14 @@ function App() {
     const row = await liveGameList.createGame(opts);
     setShowGameCreation(false);
     setGameCreationBlack(null);
-    // 先生自身が対局者（黒/白）なら対局盤を自動で開く。
-    // ダッシュボードのサムネイルは静的（着手を反映しない）ため、盤を開かないと相手の着手が見えない。
+    // 先生自身が対局者（黒/白）なら多面打ちビュー（常に1盤表示・手番ローテーション）で開く。
+    // 全画面の対局盤に入れると対局追加など他の操作ができなくなるため、
+    // 講師の対局は面数に関わらず多面打ちビューに一本化する（2026-07-14 三村さん指示）。
     const me = classroomRef.current?.localIdentity ?? userName;
     if (row && (row.black_player === me || row.white_player === me)) {
-      setActiveGameId(row.id);
-      setViewMode('game');
+      setTeacherDashboardView('simul');
     }
   };
-
-  const handleCreateSimulGame = useCallback(async (opts: {
-    blackPlayer: string;
-    whitePlayer: string;
-    boardSize: number;
-    handicap: number;
-    komi: number;
-    clock?: import('./types/game').GameClock | null;
-  }) => {
-    await liveGameList.createGame(opts);
-    setTeacherDashboardView('simul');
-  }, [liveGameList]);
 
   // 詰碁: 配信
   const handleProblemAssign = (problem: import('./types/problem').Problem) => {
@@ -772,13 +760,20 @@ function App() {
   const handleResumeGame = useCallback(async (gameId: string) => {
     try {
       await resumeLiveGame(gameId);
-      // 再開成功後、即座にその対局画面を開く
-      setActiveGameId(gameId);
-      setViewMode('game');
+      // 再開成功後、即座にその対局画面を開く。
+      // 先生自身が対局者なら多面打ちビュー（対局作成と同じ動線）、それ以外は全画面盤。
+      const row = liveGameList.games.find(g => g.id === gameId);
+      const me = classroomRef.current?.localIdentity ?? userName;
+      if (role === 'TEACHER' && row && (row.black_player === me || row.white_player === me)) {
+        setTeacherDashboardView('simul');
+      } else {
+        setActiveGameId(gameId);
+        setViewMode('game');
+      }
     } catch (e) {
       alert(`対局の再開に失敗しました: ${e}`);
     }
-  }, []);
+  }, [liveGameList.games, role, userName]);
 
   // 対局終了/中断時に自動的に閉じる（ロビーに戻る）
   useEffect(() => {
@@ -1235,7 +1230,6 @@ function App() {
             showSimulGrid={teacherDashboardView === 'simul'}
             onShowSimulGrid={() => setTeacherDashboardView('simul')}
             onHideSimulGrid={() => setTeacherDashboardView('main')}
-            onCreateSimulGame={handleCreateSimulGame}
             classroom={classroomRef.current}
           />
         )}

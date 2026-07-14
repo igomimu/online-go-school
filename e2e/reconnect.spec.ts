@@ -6,8 +6,8 @@ import {
   openClassroomAndConnect,
   waitForStudentJoined,
   createGame,
-  waitForObserverPanel,
-  closeGameBoardToHome,
+  waitForSimulBoard,
+  closeSimulToHome,
 } from './helpers/teacher-actions';
 import {
   loginAsStudent,
@@ -70,10 +70,10 @@ test.describe('生徒再接続シナリオ', () => {
         expectedPlayersCount: 2,
       });
 
-      // d976887: 先生自身が対局者なので対局盤が自動で開く。
-      // 盤フォーカスモードでは Header（N人接続中）が描画されないため、閉じて戻る
-      await waitForObserverPanel(teacherPage);
-      await closeGameBoardToHome(teacherPage);
+      // 先生自身が対局者なので多面打ちビューで盤が自動で開く。
+      // サムネイルグリッド等ダッシュボード本体を検証するため、戻るで閉じる
+      await waitForSimulBoard(teacherPage);
+      await closeSimulToHome(teacherPage);
 
       // === 生徒が対局画面に入り、1手打つ ===
       await enterAssignedGame(studentPage);
