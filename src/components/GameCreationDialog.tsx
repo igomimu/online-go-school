@@ -70,8 +70,18 @@ export default function GameCreationDialog({
     return getDisplayName(identity, registeredStudents);
   };
 
-  // 棋力差から置き石を自動提案
+  // 棋力差から置き石を自動提案。黒番/白番を選び直した時のみ発動し、
+  // ユーザーが置石・コミを手動変更した後は上書きしない
+  // （registeredStudentsの参照が再レンダリングごとに変わり、無関係な更新で
+  //   手動設定を勝手に上書きしてしまうバグがあった）。
+  const [handicapTouched, setHandicapTouched] = useState(false);
+
   useEffect(() => {
+    setHandicapTouched(false);
+  }, [blackPlayer, whitePlayer]);
+
+  useEffect(() => {
+    if (handicapTouched) return;
     const bRank = getRank(blackPlayer);
     const wRank = getRank(whitePlayer);
     if (bRank && wRank) {
@@ -79,7 +89,8 @@ export default function GameCreationDialog({
       setHandicap(suggestion.handicap);
       setKomi(suggestion.komi);
     }
-  }, [blackPlayer, whitePlayer, registeredStudents]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blackPlayer, whitePlayer, registeredStudents, handicapTouched]);
 
   const handleSubmit = () => {
     if (blackPlayer === whitePlayer) return;
@@ -186,6 +197,7 @@ export default function GameCreationDialog({
             onChange={e => {
               const h = parseInt(e.target.value);
               setHandicap(h);
+              setHandicapTouched(true);
               if (h >= 2) setKomi(0.5);
               else setKomi(6.5);
             }}
@@ -200,7 +212,7 @@ export default function GameCreationDialog({
             type="number"
             value={komi}
             step={0.5}
-            onChange={e => setKomi(parseFloat(e.target.value) || 0)}
+            onChange={e => { setKomi(parseFloat(e.target.value) || 0); setHandicapTouched(true); }}
             className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
           />
         </div>
