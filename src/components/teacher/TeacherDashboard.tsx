@@ -14,7 +14,6 @@ import { loadSavedGamesForStudent } from '../../utils/savedGames';
 import StudentTable from './StudentTable';
 import BoardThumbnailGrid from './BoardThumbnailGrid';
 import ChatPanel from './ChatPanel';
-import RoomTabs from './RoomTabs';
 import TeacherToolbar from './TeacherToolbar';
 import VideoTiles from '../VideoTiles';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
@@ -224,7 +223,11 @@ export default function TeacherDashboard({
       !selectedClassroom.studentIds.includes(s.id) &&
       participants.some(p => p.identity.includes(s.id))
     );
-    return [...enrolled, ...extra];
+    const combined = [...enrolled, ...extra];
+    // ログイン中(接続中)の生徒を先頭に。Array.sortは安定ソートなので、
+    // 接続中グループ内・未接続グループ内それぞれの相対順序(studentIdsの並び)は維持される。
+    const isConnected = (s: Student) => participants.some(p => p.identity === s.id || p.identity.includes(s.id));
+    return combined.sort((a, b) => Number(isConnected(b)) - Number(isConnected(a)));
   }, [allStudents, selectedClassroom, participants]);
 
   // 接続してきた参加者は常に表示する（studentIds形式の不一致で誤除外しない）
@@ -410,13 +413,6 @@ export default function TeacherDashboard({
         onClearAudioS={onClearAudioS}
         onClearSharing={onClearSharing}
         onResetVideo={onResetVideo}
-      />
-
-      {/* 部屋タブ（IGC最下部） */}
-      <RoomTabs
-        classrooms={classrooms}
-        selectedClassroomId={selectedClassroomId}
-        onSelectClassroom={onSelectClassroom}
       />
 
       {/* 教室設定ダイアログ（生徒入替） */}
