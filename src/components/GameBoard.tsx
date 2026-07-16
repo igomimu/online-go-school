@@ -110,14 +110,12 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
     finishWithResult(resultStr);
   }, [scoringResult, finishWithResult]);
 
-  // 対局終了/中断時に自動で閉じる
+  // 対局終了/中断時に自動で閉じる（結果を確認できるよう一律で猶予を置く）
   useEffect(() => {
     if (game && (game.status === 'finished' || game.status === 'interrupted') && onBack) {
-      const isResignOrTimeUp = game.result?.includes('+R') || game.result?.includes('+T') || game.status === 'interrupted';
-      const delay = isResignOrTimeUp ? 500 : 3000;
       const timer = setTimeout(() => {
         onBack();
-      }, delay);
+      }, 3000);
       return () => clearTimeout(timer);
     }
   }, [game?.status, game?.result, onBack]);
