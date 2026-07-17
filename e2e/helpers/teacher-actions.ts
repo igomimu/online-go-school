@@ -168,9 +168,10 @@ export async function createGame(
     whiteName: string;
     boardSize?: 9 | 13 | 19;
     expectedPlayersCount?: number;
+    mainMinutes?: number; // 未指定ならDEFAULT_TIME_SETTINGS(持ち時間0分・秒読み30秒×1)のまま
   },
 ): Promise<void> {
-  const { blackName, whiteName, boardSize = 9, expectedPlayersCount = 2 } = opts;
+  const { blackName, whiteName, boardSize = 9, expectedPlayersCount = 2, mainMinutes } = opts;
 
   await page.getByTestId('create-game-toolbar-button').click();
   await page.getByTestId('create-game-button').waitFor({ timeout: 5_000 });
@@ -190,6 +191,11 @@ export async function createGame(
 
   await blackSelect.selectOption({ index: blackIdx });
   await page.getByTestId('white-player-select').selectOption({ index: whiteIdx });
+
+  if (mainMinutes !== undefined) {
+    // number input はダイアログ内で コミ → 持ち時間（分） → 秒読みの回数 の順
+    await page.locator('input[type="number"]').nth(1).fill(String(mainMinutes));
+  }
 
   // 対局開始
   await page.getByTestId('create-game-button').click();

@@ -45,12 +45,14 @@ test('着手後に消費した持ち時間が巻き戻らない', async ({ brows
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
     await waitForStudentJoined(teacherPage, TEST_STUDENT_B.id);
 
-    // デフォルト時計 = 持10分 + 秒読み30秒×3（GameCreationDialogのDEFAULT_TIME_SETTINGS）
+    // 持ち時間消費の永続化を検証したいので明示的に10分を指定
+    // （DEFAULT_TIME_SETTINGSは持ち時間0分・秒読み30秒×1のため、指定しないと本テストの意図が成立しない）
     await createGame(teacherPage, {
       blackName: TEST_STUDENT_A.name,
       whiteName: TEST_STUDENT_B.name,
       boardSize: 9,
       expectedPlayersCount: 3,
+      mainMinutes: 10,
     });
 
     await Promise.all([enterAssignedGame(studentAPage), enterAssignedGame(studentBPage)]);

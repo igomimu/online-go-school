@@ -43,10 +43,10 @@ export interface TimeSettings {
 export const BYOYOMI_SECONDS_OPTIONS = [10, 20, 30, 60] as const;
 
 export const DEFAULT_TIME_SETTINGS: TimeSettings = {
-  mainMinutes: 10,
+  mainMinutes: 0,
   byoyomiEnabled: true,
   byoyomiSeconds: 30,
-  byoyomiPeriods: 3,
+  byoyomiPeriods: 1,
 };
 
 /** TimeSettings → GameClock。持ち時間0＆秒読みなしなら undefined（時間無制限）。 */

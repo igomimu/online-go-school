@@ -25,6 +25,8 @@ interface GameCreationDialogProps {
 }
 
 const BOARD_SIZES = [19, 13, 9];
+// 置石は0(互先)+2〜9子。1子は意味をなさないため選択肢から除く。
+const HANDICAP_OPTIONS = [0, 2, 3, 4, 5, 6, 7, 8, 9];
 
 export default function GameCreationDialog({
   students,
@@ -188,21 +190,26 @@ export default function GameCreationDialog({
 
         {/* 置石 */}
         <div>
-          <label className="block text-sm text-zinc-400 mb-1">置石: {handicap}</label>
-          <input
-            type="range"
-            min={0}
-            max={9}
-            value={handicap}
-            onChange={e => {
-              const h = parseInt(e.target.value);
-              setHandicap(h);
-              setHandicapTouched(true);
-              if (h >= 2) setKomi(0.5);
-              else setKomi(6.5);
-            }}
-            className="w-full"
-          />
+          <label className="block text-sm text-zinc-400 mb-1">置石</label>
+          <div className="flex flex-wrap gap-2">
+            {HANDICAP_OPTIONS.map(h => (
+              <button
+                key={h}
+                onClick={() => {
+                  setHandicap(h);
+                  setHandicapTouched(true);
+                  setKomi(h >= 2 ? 0.5 : 6.5);
+                }}
+                className={`flex-1 min-w-[3rem] py-2 rounded-lg text-sm font-medium transition-all ${
+                  handicap === h
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white/5 hover:bg-white/10'
+                }`}
+              >
+                {h === 0 ? '互先' : `${h}子`}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* コミ */}

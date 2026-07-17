@@ -35,7 +35,7 @@ describe('AutoPairingDialog', () => {
     expect(screen.getByRole('button', { name: '30秒' })).toBeInTheDocument();
   });
 
-  it('デフォルト設定（持10分・秒読30秒×3）で clock が付与される', () => {
+  it('デフォルト設定（持0分・秒読30秒×1）で clock が付与される', () => {
     const onCreateGames = vi.fn();
     render(<AutoPairingDialog {...defaultProps} onCreateGames={onCreateGames} />);
     fireEvent.click(screen.getByText('1局を一括開始'));
@@ -44,25 +44,21 @@ describe('AutoPairingDialog', () => {
     expect(pairs).toHaveLength(1);
     expect(pairs[0].clock).toEqual(
       expect.objectContaining({
-        mainTimeSeconds: 600,
+        mainTimeSeconds: 0,
         byoyomiSeconds: 30,
-        byoyomiPeriods: 3,
-        blackTimeLeft: 600,
-        whiteTimeLeft: 600,
+        byoyomiPeriods: 1,
         lastTickTime: null,
       })
     );
   });
 
-  it('秒読み「なし」にすると秒読み0で clock が作られる', () => {
+  it('秒読み「なし」にすると持ち時間0＆秒読み0で時間無制限(clock未定義)になる', () => {
     const onCreateGames = vi.fn();
     render(<AutoPairingDialog {...defaultProps} onCreateGames={onCreateGames} />);
     fireEvent.click(screen.getByRole('button', { name: 'なし' }));
     fireEvent.click(screen.getByText('1局を一括開始'));
     const pairs = onCreateGames.mock.calls[0][0];
-    expect(pairs[0].clock).toEqual(
-      expect.objectContaining({ mainTimeSeconds: 600, byoyomiSeconds: 0, byoyomiPeriods: 0 })
-    );
+    expect(pairs[0].clock).toBeUndefined();
   });
 
   it('秒読み秒数を60秒に変更すると clock に反映される', () => {
@@ -72,7 +68,7 @@ describe('AutoPairingDialog', () => {
     fireEvent.click(screen.getByText('1局を一括開始'));
     const pairs = onCreateGames.mock.calls[0][0];
     expect(pairs[0].clock).toEqual(
-      expect.objectContaining({ byoyomiSeconds: 60, byoyomiPeriods: 3 })
+      expect.objectContaining({ byoyomiSeconds: 60, byoyomiPeriods: 1 })
     );
   });
 });
