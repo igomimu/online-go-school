@@ -647,7 +647,11 @@ export function useLiveGame(
           }
           // 回を消費した瞬間の告知（残りN回です／最後の考慮時間です）
           const transition = getByoyomiAnnouncement(prev.byoyomiSeconds, prev.byoyomiSeconds, byoyomiLeft);
-          if (transition) speakByoyomi(transition);
+          const transitionKey = `${derived.currentColor}:transition:${byoyomiLeft}`;
+          if (transition && lastByoyomiSpeakRef.current !== transitionKey) {
+            lastByoyomiSpeakRef.current = transitionKey;
+            speakByoyomi(transition);
+          }
           newTimeLeft = prev.byoyomiSeconds;
         }
       }
