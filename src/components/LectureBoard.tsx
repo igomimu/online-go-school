@@ -356,7 +356,7 @@ export default function LectureBoard({
         </div>
 
         {/* 碁盤 */}
-        <div className="glass-panel p-4 flex justify-center items-center shadow-2xl relative lg:flex-1 lg:min-h-0">
+        <div className="glass-panel p-4 flex justify-center items-center shadow-2xl relative lg:flex-1 lg:min-h-0 overflow-hidden">
           {isTeacher && currentNode.children.length > 1 && (
             <div className="absolute top-4 right-4 flex items-center gap-2 bg-blue-500/20 px-3 py-1 rounded-full text-blue-300 text-sm">
               <GitBranch className="w-4 h-4" />
@@ -375,6 +375,8 @@ export default function LectureBoard({
             onDragStart={drawMode !== 'off' ? handleDrawDragStart : undefined}
             onDragMove={drawMode !== 'off' ? handleDrawDragMove : undefined}
             onDragEnd={drawMode !== 'off' ? handleDrawDragEnd : undefined}
+            className="!w-auto h-full max-w-full"
+            maxHeight="100%"
           />
         </div>
 
