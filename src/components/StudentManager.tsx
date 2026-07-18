@@ -61,9 +61,10 @@ export default function StudentManager({
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) return;
+    const nextId = (form.studentCode || form.id || '').trim();
+    if (!nextId || !form.name.trim()) return;
     try {
-      await upsertStudent(form, editingStudent?.id);
+      await upsertStudent({ ...form, id: nextId, studentCode: nextId }, editingStudent?.id);
       setIsAdding(false);
       setEditingStudent(null);
       await onDataChanged();
@@ -192,6 +193,7 @@ export default function StudentManager({
                   <div key={s.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 text-sm">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-medium truncate">{s.name}</span>
+                      <span className="text-xs text-zinc-500 font-mono shrink-0">{s.studentCode || s.id}</span>
                       {s.rank && (
                         <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-xs font-mono shrink-0">
                           {s.rank}
@@ -225,6 +227,16 @@ export default function StudentManager({
           {tab === 'students' && isAdding && (
             <div className="space-y-4">
               <h3 className="font-bold">{editingStudent ? '生徒を編集' : '生徒を追加'}</h3>
+
+              <div>
+                <label className="block text-sm text-zinc-400 mb-1">生徒ID / ログインコード *</label>
+                <input
+                  type="text"
+                  value={form.studentCode || form.id}
+                  onChange={e => setForm(f => ({ ...f, id: e.target.value, studentCode: e.target.value }))}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
 
               <div>
                 <label className="block text-sm text-zinc-400 mb-1">名前 *</label>
@@ -313,7 +325,7 @@ export default function StudentManager({
               </div>
 
               <div className="flex gap-2">
-                <button onClick={handleSave} disabled={!form.name.trim()} className="premium-button disabled:opacity-30">
+                <button onClick={handleSave} disabled={!(form.studentCode || form.id).trim() || !form.name.trim()} className="premium-button disabled:opacity-30">
                   {editingStudent ? '更新' : '追加'}
                 </button>
                 <button onClick={() => setIsAdding(false)} className="secondary-button">

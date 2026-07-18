@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import GameCreationDialog from './GameCreationDialog';
 
 describe('GameCreationDialog', () => {
@@ -12,7 +12,7 @@ describe('GameCreationDialog', () => {
 
   it('ダイアログのタイトルを表示', () => {
     render(<GameCreationDialog {...defaultProps} />);
-    expect(screen.getByText('対局作成')).toBeInTheDocument();
+    expect(screen.getByText('対局作成')).toBeTruthy();
   });
 
   it('生徒と先生がプレイヤー候補に表示される', () => {
@@ -26,9 +26,9 @@ describe('GameCreationDialog', () => {
 
   it('碁盤サイズ選択ボタン', () => {
     render(<GameCreationDialog {...defaultProps} />);
-    expect(screen.getByText('19路')).toBeInTheDocument();
-    expect(screen.getByText('13路')).toBeInTheDocument();
-    expect(screen.getByText('9路')).toBeInTheDocument();
+    expect(screen.getByText('19路')).toBeTruthy();
+    expect(screen.getByText('13路')).toBeTruthy();
+    expect(screen.getByText('9路')).toBeTruthy();
   });
 
   it('閉じるボタン', () => {
@@ -41,12 +41,13 @@ describe('GameCreationDialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('対局開始ボタンでonCreateが呼ばれる', () => {
+  it('対局開始ボタンでonCreateが呼ばれ、作成後に閉じる', async () => {
     const onCreate = vi.fn();
-    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
+    const onClose = vi.fn();
+    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} onClose={onClose} />);
     // デフォルト: black=たろう, white=はなこ（異なるので有効）
     fireEvent.click(screen.getByText('対局開始'));
-    expect(onCreate).toHaveBeenCalledWith(
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         blackPlayer: 'たろう',
         whitePlayer: 'はなこ',
@@ -54,7 +55,22 @@ describe('GameCreationDialog', () => {
         handicap: 0,
         komi: 6.5,
       })
+    ));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('initialBlackPlayerが変わったら選択中の生徒を更新する', () => {
+    const { rerender } = render(
+      <GameCreationDialog {...defaultProps} students={['sid:1001', 'sid:1002']} teacherName="teacher" initialBlackPlayer="sid:1001" />,
     );
+    expect((screen.getByTestId('black-player-select') as HTMLSelectElement).value).toBe('sid:1001');
+
+    rerender(
+      <GameCreationDialog {...defaultProps} students={['sid:1001', 'sid:1002']} teacherName="teacher" initialBlackPlayer="sid:1002" />,
+    );
+
+    expect((screen.getByTestId('black-player-select') as HTMLSelectElement).value).toBe('sid:1002');
+    expect((screen.getByTestId('white-player-select') as HTMLSelectElement).value).toBe('teacher');
   });
 
   it('同じプレイヤーを選ぶとエラーメッセージ', () => {
@@ -63,7 +79,7 @@ describe('GameCreationDialog', () => {
     // 白をたろうに変更
     const selects = screen.getAllByRole('combobox');
     fireEvent.change(selects[1], { target: { value: 'たろう' } });
-    expect(screen.getByText('黒と白に同じプレイヤーは選べません')).toBeInTheDocument();
+    expect(screen.getByText('黒と白に同じプレイヤーは選べません')).toBeTruthy();
   });
 
   it('同じプレイヤーだと対局開始ボタンが無効', () => {
@@ -71,6 +87,6 @@ describe('GameCreationDialog', () => {
     const selects = screen.getAllByRole('combobox');
     fireEvent.change(selects[1], { target: { value: 'たろう' } });
     const startBtn = screen.getByText('対局開始');
-    expect(startBtn).toBeDisabled();
+    expect((startBtn as HTMLButtonElement).disabled).toBe(true);
   });
 });

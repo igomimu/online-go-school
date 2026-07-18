@@ -19,7 +19,7 @@ interface GameCreationDialogProps {
     handicap: number;
     komi: number;
     clock?: GameClock;
-  }) => void;
+  }) => void | Promise<void>;
   registeredStudents?: Student[];  // 登録済み生徒データ（棋力表示用）
   initialBlackPlayer?: string;     // 生徒一覧から「対局」を押した生徒を黒番に初期選択
 }
@@ -49,6 +49,13 @@ export default function GameCreationDialog({
   const [handicap, setHandicap] = useState(0);
   const [komi, setKomi] = useState(6.5);
   const [timeSettings, setTimeSettings] = useState<TimeSettings>(DEFAULT_TIME_SETTINGS);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!initialBlackPlayer) return;
+    setBlackPlayer(initialBlackPlayer);
+    setWhitePlayer(teacherName);
+  }, [initialBlackPlayer, teacherName]);
 
   // ダイアログ開口後に生徒が参加したケースへの保険:
   // 初期値が teacherName 固定のままで students propが埋まった瞬間、自動で生徒を選択し直す。
@@ -68,7 +75,7 @@ export default function GameCreationDialog({
 
   // identity → 表示名
   const displayName = (identity: string): string => {
-    if (identity === teacherName) return identity;
+    if (identity === teacherName) return getDisplayName(identity, registeredStudents);
     return getDisplayName(identity, registeredStudents);
   };
 
@@ -94,10 +101,16 @@ export default function GameCreationDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blackPlayer, whitePlayer, registeredStudents, handicapTouched]);
 
-  const handleSubmit = () => {
-    if (blackPlayer === whitePlayer) return;
+  const handleSubmit = async () => {
+    if (submitting || blackPlayer === whitePlayer) return;
+    setSubmitting(true);
     const clock = timeSettingsToClock(timeSettings);
-    onCreate({ blackPlayer, whitePlayer, boardSize, handicap, komi, clock });
+    try {
+      await onCreate({ blackPlayer, whitePlayer, boardSize, handicap, komi, clock });
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -233,10 +246,10 @@ export default function GameCreationDialog({
         <button
           data-testid="create-game-button"
           onClick={handleSubmit}
-          disabled={blackPlayer === whitePlayer}
+          disabled={submitting || blackPlayer === whitePlayer}
           className="premium-button w-full disabled:opacity-30"
         >
-          対局開始
+          {submitting ? '作成中...' : '対局開始'}
         </button>
       </div>
     </div>

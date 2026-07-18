@@ -36,9 +36,23 @@ describe('exportGameToSgf', () => {
       moves: [{ x: 10, y: 10, color: 'WHITE' }],
     });
     expect(sgf).toContain('HA[2]');
-    expect(sgf).toContain('AB['); // 置石あり
+    expect(sgf).toContain('AB[pd][dp]');
     // 白番から始まる
     expect(sgf).toContain(';W[jj]');
+  });
+
+  it('3子置石は左上を空けてSGF出力する', () => {
+    const sgf = exportGameToSgf({
+      boardSize: 19,
+      handicap: 3,
+      komi: 0.5,
+      blackPlayer: 'Black',
+      whitePlayer: 'White',
+      result: '',
+      moves: [],
+    });
+    expect(sgf).toContain('AB[pd][dp][pp]');
+    expect(sgf).not.toContain('AB[pd][dp][dd]');
   });
 
   it('パスを含む対局', () => {

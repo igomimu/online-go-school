@@ -1,11 +1,17 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { getSupabase } from './liveGameApi';
 import {
   cleanupDuplicateStudentsInClassrooms,
   loadCachedRoster,
   loadClassrooms,
   loadStudents,
+  upsertStudent,
 } from './classroomStore';
 import type { Student, Classroom } from '../types/classroom';
+
+vi.mock('./liveGameApi', () => ({
+  getSupabase: vi.fn(),
+}));
 
 const testStudent: Student = {
   id: 'S001',
@@ -27,6 +33,7 @@ const testClassroom: Classroom = {
 
 beforeEach(() => {
   localStorage.clear();
+  vi.mocked(getSupabase).mockReset();
 });
 
 describe('名簿キャッシュ', () => {
@@ -67,3 +74,119 @@ describe('教室メンバーの正規化', () => {
     expect(classrooms[1].studentIds).toEqual(['S003']);
   });
 });
+
+describe('生徒情報保存', () => {
+  it('生徒ID変更時に既存の教室所属と表示順を引き継ぐ', async () => {
+    const { upserts, deletes } = installSupabaseMock([
+      {
+        login_id: 'OLD001',
+        name: '旧IDの生徒',
+        classroom_id: 'CLASS-A',
+        classroom_position: 2,
+      },
+    ]);
+
+    await upsertStudent(
+      {
+        id: 'NEW001',
+        studentCode: 'NEW001',
+        name: '新IDの生徒',
+        rank: '1D',
+        internalRating: 'R2',
+        type: 'ネット生',
+        grade: '小5',
+        country: '千葉県',
+        birthdate: '2015-04-02',
+      },
+      'OLD001',
+    );
+
+    expect(upserts).toHaveLength(1);
+    expect(upserts[0]).toMatchObject({
+      login_id: 'NEW001',
+      name: '新IDの生徒',
+      classroom_id: 'CLASS-A',
+      classroom_position: 2,
+      rank: '1D',
+      internal_rating: 'R2',
+      student_type: 'ネット生',
+      grade: '小5',
+      country: '千葉県',
+      birthdate: '2015-04-02',
+    });
+    expect(deletes).toEqual(['OLD001']);
+  });
+
+  it('変更後の生徒IDが既に存在する場合は保存しない', async () => {
+    const { upserts, deletes } = installSupabaseMock([
+      {
+        login_id: 'OLD001',
+        name: '旧IDの生徒',
+        classroom_id: 'CLASS-A',
+        classroom_position: 2,
+      },
+      {
+        login_id: 'NEW001',
+        name: '既存生徒',
+        classroom_id: 'CLASS-B',
+        classroom_position: 0,
+      },
+    ]);
+
+    await expect(upsertStudent(
+      {
+        id: 'NEW001',
+        studentCode: 'NEW001',
+        name: '新IDの生徒',
+        rank: '',
+        internalRating: '',
+        type: '',
+        grade: '',
+        country: '',
+      },
+      'OLD001',
+    )).rejects.toThrow('生徒ID「NEW001」は既に使われています');
+
+    expect(upserts).toHaveLength(0);
+    expect(deletes).toHaveLength(0);
+  });
+});
+
+function installSupabaseMock(initialRows: Array<Partial<{
+  login_id: string;
+  name: string | null;
+  classroom_id: string | null;
+  classroom_position: number | null;
+}>>) {
+  const rows = new Map(initialRows.map(row => [row.login_id, row]));
+  const upserts: unknown[] = [];
+  const deletes: string[] = [];
+
+  const supabase = {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn((_: string, value: string) => ({
+          maybeSingle: vi.fn(async () => ({
+            data: rows.get(value) ?? null,
+            error: null,
+          })),
+        })),
+      })),
+      upsert: vi.fn(async (row: { login_id: string }) => {
+        upserts.push(row);
+        rows.set(row.login_id, row);
+        return { error: null };
+      }),
+      delete: vi.fn(() => ({
+        eq: vi.fn(async (_: string, value: string) => {
+          deletes.push(value);
+          rows.delete(value);
+          return { error: null };
+        }),
+      })),
+    })),
+  };
+
+  vi.mocked(getSupabase).mockReturnValue(supabase as never);
+  return { upserts, deletes };
+}

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
+import { teardownSupabaseRoster } from './helpers/setup';
 
 // 環境変数
 const supabaseUrl = process.env.VITE_DOJO_SUPABASE_URL || 'https://yzsyrtesydpulctjgdog.supabase.co';
@@ -22,6 +23,13 @@ test.describe('セキュリティ・認可バリデーション検証 (Stage 9)'
     // メールログインにてJWTを取得（429レートリミット回避）
     jwtA = await getStudentJwt(studentA, classroomA);
     jwtB = await getStudentJwt(studentB, classroomB);
+  });
+
+  test.afterAll(async () => {
+    await Promise.all([
+      teardownSupabaseRoster(classroomA),
+      teardownSupabaseRoster(classroomB),
+    ]);
   });
 
   // メールログインして検証済みセッション（JWT）を取得するヘルパー

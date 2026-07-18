@@ -8,7 +8,7 @@ import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './
 import type { ViewMode, AudioPermissions, SavedGame } from './types/game';
 import type { Student, Classroom } from './types/classroom';
 import { fetchToken } from './utils/livekitToken';
-import { makeStudentIdentity } from './utils/identityUtils';
+import { getTeacherDisplayName, identityMatchesPlayer, makeStudentIdentity, TEACHER_IDENTITY } from './utils/identityUtils';
 import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession, interruptAllGames, interruptGame, resumeLiveGame } from './utils/liveGameApi';
@@ -373,7 +373,7 @@ function App() {
         username:
           connectRole === 'STUDENT'
             ? (userName || connectUserName)
-            : (connectUserName === 'teacher' ? '先生' : connectUserName),
+            : getTeacherDisplayName(),
       });
 
       await classroom.connect(livekitUrl, connectToken);
@@ -426,7 +426,7 @@ function App() {
             setSelectedClassroomId(lastCls);
             setRoomName(rn);
             setTeacherPhase('classroom');
-            void connectLiveKit('TEACHER', userName.trim() || 'teacher', rn, lastCls);
+            void connectLiveKit('TEACHER', TEACHER_IDENTITY, rn, lastCls);
           } else {
             setTeacherPhase('manage');
           }
@@ -457,7 +457,8 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (role === 'TEACHER') {
+    const mode = new URLSearchParams(window.location.search).get('mode');
+    if (role === 'TEACHER' || mode === 'game') {
       void reloadClassroomData();
     }
   }, [role, reloadClassroomData]);
@@ -584,7 +585,8 @@ function App() {
     // ログアウト時、自分が打ち手の進行中対局を「中断」にする（playing/scoringで放置しない）
     const myId = classroomRef.current?.localIdentity ?? userName;
     const myActiveGame = games.find(
-      g => (g.status === 'playing' || g.status === 'scoring') && (g.blackPlayer === myId || g.whitePlayer === myId),
+      g => (g.status === 'playing' || g.status === 'scoring') &&
+        (identityMatchesPlayer(myId, g.blackPlayer) || identityMatchesPlayer(myId, g.whitePlayer)),
     );
 
     // 中断にしてからサインアウト（順序重要: signOut前に認証付きで実行）
@@ -629,7 +631,7 @@ function App() {
     const wantMic = isMicEnabled;
     const wantCam = isCameraEnabled;
     const identity = role === 'TEACHER'
-      ? (userName.trim() || 'teacher')
+      ? TEACHER_IDENTITY
       : (studentId ? makeStudentIdentity(studentId) : userName);
     setIsReconnecting(true);
     try {
@@ -660,17 +662,18 @@ function App() {
 
   // 対局選択
   const handleSelectGame = (gameId: string) => {
+    setSyncedDrawings([]);
     setActiveGameId(gameId);
     setViewMode('game');
   };
 
   // 講師専用の対局別ウィンドウを開く/前面化する（固定ウィンドウ名により、既存ウィンドウがあれば再利用される）。
   const openTeacherGameWindow = useCallback((classroomId: string) => {
-    const identity = classroomRef.current?.localIdentity ?? userName;
+    const identity = classroomRef.current?.localIdentity ?? TEACHER_IDENTITY;
     const url = `${window.location.origin}${window.location.pathname}?mode=game&role=TEACHER&teacherClassroomId=${encodeURIComponent(classroomId)}&identity=${encodeURIComponent(identity)}`;
     const win = window.open(url, TEACHER_GAME_WINDOW_NAME, 'width=1000,height=800,menubar=no,toolbar=no,location=no,status=no');
     win?.focus();
-  }, [userName]);
+  }, []);
 
   // 対局作成（Supabase insert、Realtime経由で全員に配信）
   const handleCreateGame = async (opts: {
@@ -686,7 +689,7 @@ function App() {
     // 全画面の対局盤に埋め込むと対局追加など他の操作ができなくなるため、
     // 講師の対局は面数に関わらず別ウィンドウに一本化する（2026-07-14 三村さん指示、07-15 別ウィンドウ方式へ再設計）。
     const me = classroomRef.current?.localIdentity ?? userName;
-    if (selectedClassroomId && (opts.blackPlayer === me || opts.whitePlayer === me)) {
+    if (selectedClassroomId && (identityMatchesPlayer(me, opts.blackPlayer) || identityMatchesPlayer(me, opts.whitePlayer))) {
       openTeacherGameWindow(selectedClassroomId);
     }
     await liveGameList.createGame(opts);
@@ -773,13 +776,15 @@ function App() {
     // ポップアップブロッカー対策のため、await resumeLiveGame() より前・クリックの同期区間内で呼ぶ。
     const row = liveGameList.games.find(g => g.id === gameId);
     const me = classroomRef.current?.localIdentity ?? userName;
-    const teacherIsParticipant = role === 'TEACHER' && !!row && (row.black_player === me || row.white_player === me);
+    const teacherIsParticipant = role === 'TEACHER' && !!row &&
+      (identityMatchesPlayer(me, row.black_player) || identityMatchesPlayer(me, row.white_player));
     if (teacherIsParticipant && selectedClassroomId) {
       openTeacherGameWindow(selectedClassroomId);
     }
     try {
       await resumeLiveGame(gameId);
       if (!teacherIsParticipant) {
+        setSyncedDrawings([]);
         setActiveGameId(gameId);
         setViewMode('game');
       }
@@ -805,7 +810,8 @@ function App() {
     if (role !== 'STUDENT') return;
     const myId = classroomRef.current?.localIdentity ?? userName;
     const myActiveGame = games.find(
-      g => (g.status === 'playing' || g.status === 'scoring') && (g.blackPlayer === myId || g.whitePlayer === myId),
+      g => (g.status === 'playing' || g.status === 'scoring') &&
+        (identityMatchesPlayer(myId, g.blackPlayer) || identityMatchesPlayer(myId, g.whitePlayer)),
     );
     if (!myActiveGame) return;
 
@@ -824,7 +830,7 @@ function App() {
     const pendingGame = games.find(
       g => g.id === pendingGameId &&
         g.status === 'interrupted' &&
-        (g.blackPlayer === myId || g.whitePlayer === myId),
+        (identityMatchesPlayer(myId, g.blackPlayer) || identityMatchesPlayer(myId, g.whitePlayer)),
     );
     if (!pendingGame) return;
 
@@ -1102,7 +1108,7 @@ function App() {
             const newRoomName = `go-${launchClassroomId}`;
             setRoomName(newRoomName);
             setTeacherPhase('classroom');
-            connectLiveKit('TEACHER', userName.trim() || 'teacher', newRoomName, launchClassroomId);
+            connectLiveKit('TEACHER', TEACHER_IDENTITY, newRoomName, launchClassroomId);
           }}
           onOpenSettings={() => setShowSettings(true)}
           onOpenStudentManager={() => setShowStudentManager(true)}
@@ -1127,13 +1133,14 @@ function App() {
     ? games.find(
         (g) =>
           (g.status === 'playing' || g.status === 'scoring') &&
-          (g.blackPlayer === myIdentityForGame || g.whitePlayer === myIdentityForGame),
+          (identityMatchesPlayer(myIdentityForGame, g.blackPlayer) || identityMatchesPlayer(myIdentityForGame, g.whitePlayer)),
       )
     : null;
   const myPlayingGame = myGame?.status === 'playing' ? myGame : null;
 
   if (myPlayingGame && autoOpenedGameId !== myPlayingGame.id) {
     setAutoOpenedGameId(myPlayingGame.id);
+    setSyncedDrawings([]);
     setActiveGameId(myPlayingGame.id);
     setViewMode('game');
   } else if (!myPlayingGame && autoOpenedGameId !== null) {
@@ -1159,7 +1166,7 @@ function App() {
       {!isBoardFocusMode && (
         <Header
           role={role}
-          userName={userName}
+          userName={role === 'TEACHER' ? getTeacherDisplayName() : userName}
           connectionState={connectionState}
           remoteCount={classroomRef.current?.remoteParticipantCount ?? 0}
           isMicEnabled={isMicEnabled}
@@ -1228,6 +1235,7 @@ function App() {
             selectedClassroomId={selectedClassroomId}
             onSelectClassroom={setSelectedClassroomId}
             games={games}
+            liveGames={liveGameList.games}
             audioPermissions={audioPermissions}
             onToggleHear={handleToggleHear}
             onToggleMic={handleToggleStudentMic}
@@ -1245,6 +1253,13 @@ function App() {
             onOpenStudentManager={() => setShowStudentManager(true)}
             onReloadData={reloadClassroomData}
             onCreateGames={async (pairs) => {
+              const me = classroomRef.current?.localIdentity ?? userName;
+              if (
+                selectedClassroomId &&
+                pairs.some(p => identityMatchesPlayer(me, p.blackPlayer) || identityMatchesPlayer(me, p.whitePlayer))
+              ) {
+                openTeacherGameWindow(selectedClassroomId);
+              }
               for (const p of pairs) {
                 await liveGameList.createGame(p);
               }
@@ -1293,6 +1308,7 @@ function App() {
               onMoveSubmitted={undefined}
               classroom={classroomRef.current}
               students={students}
+              syncedDrawings={syncedDrawings}
             />
           </div>
         )}
@@ -1384,7 +1400,7 @@ function App() {
       {showGameCreation && role === 'TEACHER' && (
         <GameCreationDialog
           students={participants.filter(p => p.identity !== (classroomRef.current?.localIdentity ?? '')).map(p => p.identity)}
-          teacherName={classroomRef.current?.localIdentity || userName || '先生'}
+          teacherName={classroomRef.current?.localIdentity || TEACHER_IDENTITY}
           onClose={() => { setShowGameCreation(false); setGameCreationBlack(null); }}
           onCreate={handleCreateGame}
           registeredStudents={students}

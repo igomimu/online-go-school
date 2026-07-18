@@ -4,7 +4,7 @@ import type { GameSession, SavedGame } from '../types/game';
 import type { ParticipantInfo } from '../utils/classroomLiveKit';
 import type { Student, Classroom } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
-import { findStudentByIdentity, getDisplayName } from '../utils/identityUtils';
+import { findStudentByIdentity, getDisplayName, identityMatchesPlayer } from '../utils/identityUtils';
 import GameThumbnail from './GameThumbnail';
 import SavedGameList from './SavedGameList';
 import ClassroomSelector from './ClassroomSelector';
@@ -83,12 +83,14 @@ export default function Lobby({
 
   // 自分が参加中の対局
   const myGame = games.find(g =>
-    g.status === 'playing' && (g.blackPlayer === myIdentity || g.whitePlayer === myIdentity)
+    g.status === 'playing' &&
+    (identityMatchesPlayer(myIdentity, g.blackPlayer) || identityMatchesPlayer(myIdentity, g.whitePlayer))
   );
 
   // 自分が参加中の中断対局
   const mySuspendedGame = games.find(g =>
-    g.status === 'interrupted' && (g.blackPlayer === myIdentity || g.whitePlayer === myIdentity)
+    g.status === 'interrupted' &&
+    (identityMatchesPlayer(myIdentity, g.blackPlayer) || identityMatchesPlayer(myIdentity, g.whitePlayer))
   );
 
   return (
@@ -288,7 +290,8 @@ export default function Lobby({
               const isSpeaking = activeSpeakers.includes(p.identity);
               // この生徒は対局中か？
               const inGame = games.some(g =>
-                g.status === 'playing' && (g.blackPlayer === p.identity || g.whitePlayer === p.identity)
+                g.status === 'playing' &&
+                (identityMatchesPlayer(p.identity, g.blackPlayer) || identityMatchesPlayer(p.identity, g.whitePlayer))
               );
               // 登録生徒の棋力をID/名前マッチで検索
               const registered = findStudentByIdentity(p.identity, students);

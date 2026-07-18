@@ -47,4 +47,21 @@ describe('exportLiveGameToSgf', () => {
     assertStringIncludes(sgf, 'HA[2]');
     assertStringIncludes(sgf, 'AB[gc][cg]');
   });
+
+  it('3子置石は左上を空けてSGF生成する', () => {
+    const sgf = exportLiveGameToSgf(
+      {
+        board_size: 9,
+        handicap: 3,
+        komi: 0.5,
+        black_player: 'Black',
+        white_player: 'White',
+      },
+      [],
+      '',
+      '2026-07-07',
+    );
+
+    assertStringIncludes(sgf, 'AB[gc][cg][gg]');
+  });
 });

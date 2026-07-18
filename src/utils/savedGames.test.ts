@@ -88,12 +88,32 @@ describe('savedGames (localStorage)', () => {
     expect(loadSavedGames()).toEqual([]);
   });
 
-  it('生徒別履歴検索では bare UUID と sid: UUID の両方を検索する', async () => {
+  it('生徒別履歴検索では生徒名ではなく bare ID と sid: ID の両方を検索する', async () => {
     await loadSavedGamesForStudent('たろう', 'student-uuid');
 
     expect(mockFrom).toHaveBeenCalledWith('go_school_games');
     expect(mockOr).toHaveBeenCalledWith(
-      'black_player.eq."たろう",white_player.eq."たろう",black_player.eq."student-uuid",white_player.eq."student-uuid",black_player.eq."sid:student-uuid",white_player.eq."sid:student-uuid"',
+      'black_player.eq."student-uuid",white_player.eq."student-uuid",black_player.eq."sid:student-uuid",white_player.eq."sid:student-uuid"',
+    );
+  });
+
+  it('同姓同名でも別IDの棋譜は検索条件に混ぜない', async () => {
+    await loadSavedGamesForStudent('同じ名前', '1002');
+    expect(mockOr).toHaveBeenLastCalledWith(
+      'black_player.eq."1002",white_player.eq."1002",black_player.eq."sid:1002",white_player.eq."sid:1002"',
+    );
+
+    await loadSavedGamesForStudent('同じ名前', '1003');
+    expect(mockOr).toHaveBeenLastCalledWith(
+      'black_player.eq."1003",white_player.eq."1003",black_player.eq."sid:1003",white_player.eq."sid:1003"',
+    );
+  });
+
+  it('IDが不明な旧データ検索時だけ名前をフォールバックに使う', async () => {
+    await loadSavedGamesForStudent('たろう');
+
+    expect(mockOr).toHaveBeenCalledWith(
+      'black_player.eq."たろう",white_player.eq."たろう"',
     );
   });
 });

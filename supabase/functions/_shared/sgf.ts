@@ -31,13 +31,13 @@ function handicapStones(boardSize: number, handicap: number): Array<{ x: number;
 
   const points: Record<number, Array<{ x: number; y: number }>> = {
     2: [{ x: high, y: low }, { x: low, y: high }],
-    3: [{ x: high, y: low }, { x: low, y: high }, { x: low, y: low }],
-    4: [{ x: high, y: low }, { x: low, y: high }, { x: low, y: low }, { x: high, y: high }],
-    5: [{ x: high, y: low }, { x: low, y: high }, { x: low, y: low }, { x: high, y: high }, { x: mid, y: mid }],
-    6: [{ x: high, y: low }, { x: low, y: high }, { x: low, y: low }, { x: high, y: high }, { x: low, y: mid }, { x: high, y: mid }],
-    7: [{ x: high, y: low }, { x: low, y: high }, { x: low, y: low }, { x: high, y: high }, { x: low, y: mid }, { x: high, y: mid }, { x: mid, y: mid }],
-    8: [{ x: high, y: low }, { x: low, y: high }, { x: low, y: low }, { x: high, y: high }, { x: low, y: mid }, { x: high, y: mid }, { x: mid, y: low }, { x: mid, y: high }],
-    9: [{ x: high, y: low }, { x: low, y: high }, { x: low, y: low }, { x: high, y: high }, { x: low, y: mid }, { x: high, y: mid }, { x: mid, y: low }, { x: mid, y: high }, { x: mid, y: mid }],
+    3: [{ x: high, y: low }, { x: low, y: high }, { x: high, y: high }],
+    4: [{ x: high, y: low }, { x: low, y: high }, { x: high, y: high }, { x: low, y: low }],
+    5: [{ x: high, y: low }, { x: low, y: high }, { x: high, y: high }, { x: low, y: low }, { x: mid, y: mid }],
+    6: [{ x: high, y: low }, { x: low, y: high }, { x: high, y: high }, { x: low, y: low }, { x: low, y: mid }, { x: high, y: mid }],
+    7: [{ x: high, y: low }, { x: low, y: high }, { x: high, y: high }, { x: low, y: low }, { x: low, y: mid }, { x: high, y: mid }, { x: mid, y: mid }],
+    8: [{ x: high, y: low }, { x: low, y: high }, { x: high, y: high }, { x: low, y: low }, { x: low, y: mid }, { x: high, y: mid }, { x: mid, y: low }, { x: mid, y: high }],
+    9: [{ x: high, y: low }, { x: low, y: high }, { x: high, y: high }, { x: low, y: low }, { x: low, y: mid }, { x: high, y: mid }, { x: mid, y: low }, { x: mid, y: high }, { x: mid, y: mid }],
   };
 
   return points[handicap] ?? [];

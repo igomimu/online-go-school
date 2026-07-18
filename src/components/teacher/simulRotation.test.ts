@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { getNextTeacherTurnGameId, type GameSessionInfo } from './simulRotation';
+import { getNextTeacherTurnGameId, isTeacherParticipant, type GameSessionInfo } from './simulRotation';
 
 describe('getNextTeacherTurnGameId (次盤選定ロジック)', () => {
   const teacherId = 'teacher';
+
+  it('sid prefix の有無が違っても講師対局として扱う', () => {
+    expect(isTeacherParticipant({ black_player: 'sid:teacher', white_player: 'sid:student-a' }, teacherId)).toBe(true);
+  });
 
   it('0面（空配列）の場合は null を返す', () => {
     const result = getNextTeacherTurnGameId([], teacherId);

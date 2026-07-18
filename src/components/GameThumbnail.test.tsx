@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import GameThumbnail from './GameThumbnail';
 import { createEmptyBoard } from '../utils/gameLogic';
 import type { GameSession } from '../types/game';
+import { setTeacherDisplayName } from '../utils/identityUtils';
 
 function createMockGame(overrides: Partial<GameSession> = {}): GameSession {
   return {
@@ -24,10 +25,21 @@ function createMockGame(overrides: Partial<GameSession> = {}): GameSession {
 }
 
 describe('GameThumbnail', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it('対局者名を表示する', () => {
     render(<GameThumbnail game={createMockGame()} onClick={vi.fn()} />);
     expect(screen.getByText('たろう')).toBeInTheDocument();
     expect(screen.getByText('はなこ')).toBeInTheDocument();
+  });
+
+  it('講師identityはteacherではなく講師名で表示する', () => {
+    setTeacherDisplayName('三村智保 九段');
+    render(<GameThumbnail game={createMockGame({ whitePlayer: 'teacher' })} onClick={vi.fn()} />);
+    expect(screen.getByText('三村智保 九段')).toBeInTheDocument();
+    expect(screen.queryByText('teacher')).not.toBeInTheDocument();
   });
 
   it('進行中は手数を表示', () => {

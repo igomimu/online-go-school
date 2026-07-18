@@ -28,11 +28,11 @@ describe('AutoPairingDialog', () => {
 
   it('持ち時間を項目ごとに設定するUIが表示される', () => {
     render(<AutoPairingDialog {...defaultProps} />);
-    expect(screen.getByText('対局時計（全対局共通）')).toBeInTheDocument();
-    expect(screen.getByText('持ち時間（分）')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'あり' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'なし' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '30秒' })).toBeInTheDocument();
+    expect(screen.getByText('対局時計（全対局共通）')).toBeTruthy();
+    expect(screen.getByText('持ち時間（分）')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'あり' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'なし' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '30秒' })).toBeTruthy();
   });
 
   it('デフォルト設定（持0分・秒読30秒×1）で clock が付与される', () => {

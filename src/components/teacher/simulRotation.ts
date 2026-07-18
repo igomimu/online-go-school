@@ -1,3 +1,5 @@
+import { identityMatchesPlayer } from '../../utils/identityUtils';
+
 // 多面打ちの手番判定・次盤選定ロジック（純関数）。
 // TeacherGameWindow から分離しているのは react-refresh/only-export-components 対応
 // （コンポーネントファイルから関数を export しない）。
@@ -19,7 +21,7 @@ export function isTeacherParticipant(
   game: { black_player: string; white_player: string },
   teacherIdentity: string,
 ): boolean {
-  return game.black_player === teacherIdentity || game.white_player === teacherIdentity;
+  return identityMatchesPlayer(teacherIdentity, game.black_player) || identityMatchesPlayer(teacherIdentity, game.white_player);
 }
 
 export function isTeacherTurn(
@@ -27,8 +29,8 @@ export function isTeacherTurn(
   currentColor: 'BLACK' | 'WHITE',
   teacherIdentity: string,
 ): boolean {
-  if (game.black_player === teacherIdentity) return currentColor === 'BLACK';
-  if (game.white_player === teacherIdentity) return currentColor === 'WHITE';
+  if (identityMatchesPlayer(teacherIdentity, game.black_player)) return currentColor === 'BLACK';
+  if (identityMatchesPlayer(teacherIdentity, game.white_player)) return currentColor === 'WHITE';
   return false;
 }
 

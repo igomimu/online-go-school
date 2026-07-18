@@ -10,6 +10,7 @@ import {
 } from '../utils/authStore';
 import type { SavedAccount } from '../utils/authStore';
 import { usePwaInstall } from '../hooks/usePwaInstall';
+import { getTeacherDisplayName, setTeacherDisplayName } from '../utils/identityUtils';
 
 interface LoginScreenProps {
   onStudentLogin: (studentId: string, classroomId: string, rawCode?: string, displayName?: string) => void;
@@ -36,6 +37,7 @@ export default function LoginScreen({
   // 先生
   const [teacherPw, setTeacherPw] = useState('');
   const [teacherError, setTeacherError] = useState('');
+  const [teacherDisplayName, setTeacherDisplayNameState] = useState(() => getTeacherDisplayName());
 
   useEffect(() => {
     const saved = loadAccounts();
@@ -128,6 +130,7 @@ export default function LoginScreen({
 
     // 認証成功 → ローカルキャッシュをサーバーと同期
     await setTeacherPassword(teacherPw);
+    setTeacherDisplayName(teacherDisplayName);
     onTeacherLogin();
   };
 
@@ -164,6 +167,18 @@ export default function LoginScreen({
                 onChange={e => setTeacherPw(e.target.value)}
                 className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
                 autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-zinc-400 mb-1">講師表示名</label>
+              <input
+                data-testid="teacher-display-name-input"
+                type="text"
+                value={teacherDisplayName}
+                onChange={e => setTeacherDisplayNameState(e.target.value)}
+                placeholder="三村九段"
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
               />
             </div>
 

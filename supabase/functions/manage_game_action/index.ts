@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { studentMatchesPlayer } from '../_shared/identity.ts'
+import { playersMatchPair, studentMatchesPlayer } from '../_shared/identity.ts'
 import { exportLiveGameToSgf, formatTokyoSgfDate } from '../_shared/sgf.ts'
 import { versionResponse } from '../_shared/version.ts'
 
@@ -10,7 +10,7 @@ const corsHeaders = {
 }
 
 interface ActionBody {
-  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all'
+  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all' | 'list_active_for_players'
   game_id?: string
   params?: any
 }
@@ -150,10 +150,54 @@ Deno.serve(async (req) => {
 
   try {
     // 2. アクションの実行
+    if (action === 'list_active_for_players') {
+      if (!isTeacher && !isServiceRole) {
+        return json({ error: 'Forbidden: Only teachers can list active games' }, 403)
+      }
+
+      const identities = Array.isArray(params?.identities)
+        ? params.identities.filter((identity: unknown): identity is string => typeof identity === 'string' && identity.trim().length > 0)
+        : []
+      if (identities.length === 0) {
+        return json({ ok: true, games: [] })
+      }
+
+      const { data, error } = await supabase
+        .from('go_school_live_games')
+        .select('*')
+        .in('status', ['playing', 'scoring', 'interrupted'])
+        .order('updated_at', { ascending: false })
+
+      if (error) throw error
+
+      const games = (data ?? []).filter((game: any) =>
+        identities.some((identity: string) =>
+          studentMatchesPlayer(identity, game.black_player) ||
+          studentMatchesPlayer(identity, game.white_player),
+        ),
+      )
+
+      return json({ ok: true, games })
+    }
+
     if (action === 'create') {
       const { classroom_id, black_player, white_player, board_size, handicap, komi, clock } = params || {}
       if (!classroom_id || !black_player || !white_player || !board_size) {
         return json({ error: 'Missing params for create' }, 400)
+      }
+
+      const { data: activeGames, error: activeGamesError } = await supabase
+        .from('go_school_live_games')
+        .select('id, black_player, white_player')
+        .eq('classroom_id', classroom_id)
+        .in('status', ['playing', 'scoring', 'interrupted'])
+
+      if (activeGamesError) throw activeGamesError
+      const duplicate = (activeGames ?? []).find((game: any) =>
+        playersMatchPair(game.black_player, game.white_player, black_player, white_player),
+      )
+      if (duplicate) {
+        return json({ error: 'Active game already exists for these players', game: duplicate }, 409)
       }
       
       const { data, error } = await supabase

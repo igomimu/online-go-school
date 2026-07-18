@@ -152,6 +152,27 @@ describe('Lobby', () => {
     expect(screen.getByText('碁盤を開く')).toBeInTheDocument();
   });
 
+  it('sid付きidentityと素の生徒IDが混在しても自分の対局として扱う（生徒）', () => {
+    const onSelectGame = vi.fn();
+    render(
+      <Lobby
+        role="STUDENT"
+        participants={[
+          { identity: 'sid:S001', isSpeaking: false, audioEnabled: true, videoEnabled: false },
+        ]}
+        localIdentity="sid:S001"
+        activeSpeakers={[]}
+        games={[{ ...mockGame, id: 'game-sid', blackPlayer: 'S001', whitePlayer: 'teacher' }]}
+        studentJoinInfo=""
+        onSelectGame={onSelectGame}
+        myIdentity="sid:S001"
+      />
+    );
+
+    fireEvent.click(screen.getByText('碁盤を開く'));
+    expect(onSelectGame).toHaveBeenCalledWith('game-sid');
+  });
+
   it('自分が参加中の中断対局に再開ボタンを表示する（生徒）', () => {
     const onResumeGame = vi.fn();
     render(
