@@ -332,6 +332,10 @@ export function useLiveGame(
         const p = msg.payload as GameUndoResponsePayload;
         if (p.gameId !== gameId) return;
         setGame((prev) => prev ? { ...prev, undo_request: null } : null);
+        // DBのDELETE realtimeが届かない場合の保険。idempotentなので二重適用しても無害。
+        if (p.accepted) {
+          setMoves((prev) => prev.filter((m) => m.move_number !== p.targetMoveNumber));
+        }
       }
     };
 
@@ -775,17 +779,17 @@ export function useLiveGame(
 
   // 「待った」への応答（承諾/拒否/取り下げ）
   const respondUndoFn = useCallback(async (accept: boolean) => {
-    if (!activeGame) return;
+    if (!activeGame || !activeGame.undo_request) return;
+    const targetMoveNumber = activeGame.undo_request.target_move_number;
     // 承諾時は楽観的に最後の手をローカルからも先に消す（DBのDELETE realtime到着を待たない）
-    if (accept && activeGame.undo_request) {
-      const target = activeGame.undo_request.target_move_number;
-      setMoves((prev) => prev.filter((m) => m.move_number !== target));
+    if (accept) {
+      setMoves((prev) => prev.filter((m) => m.move_number !== targetMoveNumber));
     }
 
     if (classroom && classroom.isConnected) {
       classroom.broadcast({
         type: 'GAME_UNDO_RESPONSE',
-        payload: { gameId: activeGame.id } as GameUndoResponsePayload,
+        payload: { gameId: activeGame.id, accepted: accept, targetMoveNumber } as GameUndoResponsePayload,
       }).catch((err) => console.error('[LiveKit undo response broadcast error]', err));
     }
 

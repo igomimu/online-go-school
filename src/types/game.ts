@@ -118,7 +118,8 @@ export interface GameResignPayload {
   color: StoneColor;
 }
 
-// バナー表示の即時通知専用（非正本）。盤面変更の正本はDBのDELETE realtimeのみ。
+// バナー表示・盤面反映の即時通知。DBのDELETE realtimeが届かない場合の保険として、
+// 受信側でも targetMoveNumber を使って直接 moves から除去する（idempotent、二重適用しても無害）。
 export interface GameUndoRequestPayload {
   gameId: string;
   requestedBy: string;
@@ -128,6 +129,8 @@ export interface GameUndoRequestPayload {
 
 export interface GameUndoResponsePayload {
   gameId: string;
+  accepted: boolean;
+  targetMoveNumber: number;
 }
 
 export interface GameEndedPayload {

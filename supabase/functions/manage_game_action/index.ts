@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { studentMatchesPlayer, toStudentIdentity, playersMatchPair } from '../_shared/identity.ts'
+import { studentMatchesPlayer, toStudentIdentity, playersMatchPair, resolvePlayerColor, TEACHER_IDENTITY } from '../_shared/identity.ts'
 import { exportLiveGameToSgf, formatTokyoSgfDate } from '../_shared/sgf.ts'
 import { versionResponse } from '../_shared/version.ts'
 
@@ -395,8 +395,10 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'request_undo') {
-      // 待った申請は先生の強制介入不可、対局者本人のみ（対局者どうしの同意制）
-      if (isTeacher || isServiceRole) {
+      // 待った申請は対局者本人のみ（対局者どうしの同意制）。先生自身が対局者
+      // （黒番/白番に teacher が登録されている）場合はその先生も対局者として扱うが、
+      // 生徒vs生徒の対局を観戦しているだけの先生は対局者ではないので不可。
+      if (isServiceRole) {
         return json({ error: 'Forbidden: only players can request undo' }, 403)
       }
 
@@ -410,11 +412,7 @@ Deno.serve(async (req) => {
       if (g.status !== 'playing') return json({ error: 'Game is not in playing status' }, 409)
       if (g.undo_request) return json({ error: 'Undo request already pending' }, 409)
 
-      const requestedColor = studentMatchesPlayer(validatedStudentId, g.black_player)
-        ? 'BLACK'
-        : studentMatchesPlayer(validatedStudentId, g.white_player)
-          ? 'WHITE'
-          : null
+      const requestedColor = resolvePlayerColor({ isTeacher, studentId: validatedStudentId }, g)
       if (!requestedColor) {
         return json({ error: 'Forbidden: not a player of this game' }, 403)
       }
@@ -431,7 +429,7 @@ Deno.serve(async (req) => {
       if (!lastMove) return json({ error: 'No move to undo' }, 409)
 
       const undo_request = {
-        requested_by: toStudentIdentity(validatedStudentId!),
+        requested_by: isTeacher ? TEACHER_IDENTITY : toStudentIdentity(validatedStudentId!),
         requested_color: requestedColor,
         target_move_number: lastMove.move_number,
         requested_at: new Date().toISOString(),
@@ -447,7 +445,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'respond_undo') {
-      if (isTeacher || isServiceRole) {
+      if (isServiceRole) {
         return json({ error: 'Forbidden: only players can respond to undo' }, 403)
       }
 
@@ -463,11 +461,7 @@ Deno.serve(async (req) => {
         return json({ error: 'No pending undo request' }, 409)
       }
 
-      const callerColor = studentMatchesPlayer(validatedStudentId, g.black_player)
-        ? 'BLACK'
-        : studentMatchesPlayer(validatedStudentId, g.white_player)
-          ? 'WHITE'
-          : null
+      const callerColor = resolvePlayerColor({ isTeacher, studentId: validatedStudentId }, g)
       if (!callerColor) {
         return json({ error: 'Forbidden: not a player of this game' }, 403)
       }

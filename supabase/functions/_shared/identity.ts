@@ -32,6 +32,30 @@ export function studentMatchesPlayer(
   return stripSid(studentId) === stripSid(player);
 }
 
+// 先生自身が対局者（黒番/白番）として対局に参加する場合の identity 固定値。
+// src/utils/identityUtils.ts の TEACHER_IDENTITY と同じ値（フロントとサーバーで単一の真実）。
+export const TEACHER_IDENTITY = 'teacher';
+
+/**
+ * 呼び出し者（生徒 or 対局者としての先生）が、この対局のどちらの色の対局者かを判定する。
+ * 生徒: studentId(bare/sid:) が black_player/white_player と一致するか。
+ * 先生: 対局そのものに `teacher` が対局者として登録されている場合のみ対局者として扱う
+ *       （生徒vs生徒の対局を観戦している先生は対局者ではない）。
+ */
+export function resolvePlayerColor(
+  caller: { isTeacher: boolean; studentId: string | null },
+  game: { black_player: string; white_player: string },
+): 'BLACK' | 'WHITE' | null {
+  if (caller.isTeacher) {
+    if (stripSid(game.black_player) === TEACHER_IDENTITY) return 'BLACK';
+    if (stripSid(game.white_player) === TEACHER_IDENTITY) return 'WHITE';
+    return null;
+  }
+  if (studentMatchesPlayer(caller.studentId, game.black_player)) return 'BLACK';
+  if (studentMatchesPlayer(caller.studentId, game.white_player)) return 'WHITE';
+  return null;
+}
+
 export function playersMatchPair(
   aBlack: string | null | undefined,
   aWhite: string | null | undefined,
