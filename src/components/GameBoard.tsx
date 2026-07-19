@@ -508,35 +508,37 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
         </div>
       )}
 
-      {/* 操作ボタン（パス・投了とも手番の対局者本人のみ、「待った」申請中は不可） */}
-      {game.status === 'playing' && isMyTurn && !undoRequest && (
+      {/* 操作ボタン行（パス・投了は手番の対局者本人のみ、「待った」は手番に関係なく対局者に表示）
+          パス・投了と「待った」を同じ行にまとめ、着手のたびに行自体が出現/消失してレイアウトが
+          揺れないようにしている（片方だけ消えても行の高さは変わらない）。 */}
+      {game.status === 'playing' && ((isMyTurn && !undoRequest) || canRequestUndo) && (
         <div className="shrink-0 flex justify-center gap-3">
-          <button
-            onClick={handlePassClick}
-            className="secondary-button flex items-center gap-2 text-sm"
-          >
-            <SkipForward className="w-4 h-4" /> パス
-          </button>
-          <button
-            onClick={handleResignClick}
-            className="secondary-button flex items-center gap-2 text-sm border-red-500/20 hover:bg-red-500/10 hover:text-red-400"
-          >
-            <Flag className="w-4 h-4" /> 投了
-          </button>
-        </div>
-      )}
-
-      {/* 「待った」申請（対局者どうしの同意制、手番に関係なく双方に表示） */}
-      {canRequestUndo && (
-        <div className="shrink-0 flex justify-center">
-          <button
-            onClick={() => {
-              if (confirm('直前の一手について「待った」を相手に申請しますか？')) requestUndo();
-            }}
-            className="secondary-button flex items-center gap-2 text-sm"
-          >
-            <Undo2 className="w-4 h-4" /> 待った
-          </button>
+          {isMyTurn && !undoRequest && (
+            <>
+              <button
+                onClick={handlePassClick}
+                className="secondary-button flex items-center gap-2 text-sm"
+              >
+                <SkipForward className="w-4 h-4" /> パス
+              </button>
+              <button
+                onClick={handleResignClick}
+                className="secondary-button flex items-center gap-2 text-sm border-red-500/20 hover:bg-red-500/10 hover:text-red-400"
+              >
+                <Flag className="w-4 h-4" /> 投了
+              </button>
+            </>
+          )}
+          {canRequestUndo && (
+            <button
+              onClick={() => {
+                if (confirm('直前の一手について「待った」を相手に申請しますか？')) requestUndo();
+              }}
+              className="secondary-button flex items-center gap-2 text-sm"
+            >
+              <Undo2 className="w-4 h-4" /> 待った
+            </button>
+          )}
         </div>
       )}
 
