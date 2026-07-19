@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { deriveLiveBoardSnapshots } from './useLiveBoards';
+import { applyLiveBoardSnapshotsToSessions, deriveLiveBoardSnapshots } from './useLiveBoards';
+import { createEmptyBoard } from '../utils/gameLogic';
+import type { GameSession } from '../types/game';
 import type { LiveGameRow, LiveMoveRow } from '../utils/liveGameApi';
 
 function game(overrides: Partial<LiveGameRow>): LiveGameRow {
@@ -62,5 +64,33 @@ describe('deriveLiveBoardSnapshots', () => {
     expect(c.moveNumber).toBe(0);
     expect(c.currentColor).toBe('WHITE');
     expect(c.boardState.flat().filter(Boolean)).toHaveLength(2);
+  });
+
+  it('GameSessionプレースホルダへ実盤面スナップショットを反映する', () => {
+    const sessions: GameSession[] = [{
+      id: 'game-a',
+      blackPlayer: 'sid:a',
+      whitePlayer: 'teacher',
+      boardSize: 9,
+      handicap: 0,
+      komi: 6.5,
+      status: 'playing',
+      boardState: createEmptyBoard(9),
+      currentColor: 'BLACK',
+      moveNumber: 0,
+      moveHistory: [],
+      blackCaptures: 0,
+      whiteCaptures: 0,
+    }];
+    const boards = deriveLiveBoardSnapshots(
+      [game({ id: 'game-a', board_size: 9 })],
+      [move({ game_id: 'game-a', move_number: 1, x: 3, y: 3, color: 'BLACK' })],
+    );
+
+    const hydrated = applyLiveBoardSnapshotsToSessions(sessions, boards);
+
+    expect(hydrated[0].moveNumber).toBe(1);
+    expect(hydrated[0].currentColor).toBe('WHITE');
+    expect(hydrated[0].boardState[2][2]?.color).toBe('BLACK');
   });
 });

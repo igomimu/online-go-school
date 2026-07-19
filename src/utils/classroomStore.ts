@@ -236,9 +236,36 @@ export async function upsertStudent(student: Student, previousId?: string): Prom
   if (!normalized.id) throw new Error('ログインコードが空です');
 
   const supabase = getSupabase();
+  let previousMembership: Pick<GoSchoolStudentRow, 'classroom_id' | 'classroom_position'> | null = null;
+
+  if (previousId && previousId !== normalized.id) {
+    const [{ data: existing, error: existingError }, { data: previous, error: previousError }] = await Promise.all([
+      supabase
+        .from('go_school_students')
+        .select('login_id')
+        .eq('login_id', normalized.id)
+        .maybeSingle(),
+      supabase
+        .from('go_school_students')
+        .select('classroom_id,classroom_position')
+        .eq('login_id', previousId)
+        .maybeSingle(),
+    ]);
+
+    if (existingError) throw new Error(existingError.message);
+    if (previousError) throw new Error(previousError.message);
+    if (existing) throw new Error(`生徒ID「${normalized.id}」は既に使われています`);
+
+    previousMembership = previous as Pick<GoSchoolStudentRow, 'classroom_id' | 'classroom_position'> | null;
+  }
+
+  const row = previousMembership
+    ? toStudentRow(normalized, previousMembership.classroom_id, previousMembership.classroom_position)
+    : toStudentProfileRow(normalized);
+
   const { error } = await supabase
     .from('go_school_students')
-    .upsert(toStudentProfileRow(normalized), { onConflict: 'login_id' });
+    .upsert(row, { onConflict: 'login_id' });
   if (error) throw new Error(error.message);
 
   if (previousId && previousId !== normalized.id) {

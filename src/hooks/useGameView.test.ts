@@ -213,6 +213,19 @@ describe('useGameView', () => {
       expect(result.current.getMyGame('たろう')?.id).toBe('game-1');
     });
 
+    it('sid付きidentityと素の生徒IDが混在しても自分の対局を返す', () => {
+      const { result } = renderHook(() => useGameView());
+
+      act(() => {
+        result.current.handleGameMessage({
+          type: 'GAME_CREATED',
+          payload: { game: createMockGame({ blackPlayer: 'S001' }) },
+        });
+      });
+
+      expect(result.current.getMyGame('sid:S001')?.id).toBe('game-1');
+    });
+
     it('終局済みの対局は返さない', () => {
       const { result } = renderHook(() => useGameView());
 

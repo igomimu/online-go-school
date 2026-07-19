@@ -1,7 +1,7 @@
 import type { GameSession } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student } from '../../types/classroom';
-import { makeStudentIdentity } from '../../utils/identityUtils';
+import { anyIdentityMatchesPlayer, studentIdentityCandidates } from '../../utils/identityUtils';
 import GameThumbnail from '../GameThumbnail';
 
 interface BoardThumbnailGridProps {
@@ -61,11 +61,11 @@ export default function BoardThumbnailGrid({
       }}
     >
       {students.map(student => {
-        const studentIdentity = makeStudentIdentity(student.id);
-        const isConnected = connectedIdentities.has(studentIdentity) || connectedIdentities.has(student.name);
+        const candidates = studentIdentityCandidates(student);
+        const isConnected = candidates.some(identity => connectedIdentities.has(identity));
         const game = games.find(g =>
-          g.blackPlayer === studentIdentity || g.whitePlayer === studentIdentity ||
-          g.blackPlayer === student.name || g.whitePlayer === student.name
+          anyIdentityMatchesPlayer(candidates, g.blackPlayer) ||
+          anyIdentityMatchesPlayer(candidates, g.whitePlayer)
         );
 
         // IGC風ラベル: 名前(Rxx)

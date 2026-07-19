@@ -63,6 +63,10 @@ describe('useGameManager', () => {
       );
       expect(stones).toHaveLength(2);
       stones.forEach(s => expect(s!.color).toBe('BLACK'));
+      expect(stones).toEqual([
+        { x: 7, y: 3, color: 'BLACK' },
+        { x: 3, y: 7, color: 'BLACK' },
+      ]);
     });
 
     it('GAME_CREATEDをbroadcastする', () => {

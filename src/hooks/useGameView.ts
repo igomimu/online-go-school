@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { GameSession, GameBoardUpdatePayload, GameCreatedPayload, GameEndedPayload, GameListSyncPayload, ScoringUpdatePayload } from '../types/game';
 import type { ClassroomMessage } from '../utils/classroomLiveKit';
+import { identityMatchesPlayer } from '../utils/identityUtils';
 
 // --- 生徒側も対局データをlocalStorageにキャッシュ ---
 const STUDENT_GAMES_KEY = 'go-school-student-games';
@@ -78,7 +79,7 @@ export function useGameView() {
   const getMyGame = useCallback((identity: string): GameSession | undefined => {
     return games.find(g =>
       (g.status === 'playing' || g.status === 'scoring') &&
-      (g.blackPlayer === identity || g.whitePlayer === identity)
+      (identityMatchesPlayer(identity, g.blackPlayer) || identityMatchesPlayer(identity, g.whitePlayer))
     );
   }, [games]);
 

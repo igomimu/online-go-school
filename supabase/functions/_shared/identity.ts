@@ -31,3 +31,18 @@ export function studentMatchesPlayer(
   if (!studentId || !player) return false;
   return stripSid(studentId) === stripSid(player);
 }
+
+export function playersMatchPair(
+  aBlack: string | null | undefined,
+  aWhite: string | null | undefined,
+  bBlack: string | null | undefined,
+  bWhite: string | null | undefined,
+): boolean {
+  return (
+    studentMatchesPlayer(aBlack, bBlack) &&
+    studentMatchesPlayer(aWhite, bWhite)
+  ) || (
+    studentMatchesPlayer(aBlack, bWhite) &&
+    studentMatchesPlayer(aWhite, bBlack)
+  );
+}

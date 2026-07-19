@@ -12,18 +12,26 @@ describe('getHandicapStones', () => {
 
   it('19路 2子置石', () => {
     const stones = getHandicapStones(19, 2);
-    expect(stones.length).toBe(2);
-    // 全て星の位置（4, 10, 16）にあること
-    stones.forEach(s => {
-      expect([4, 10, 16]).toContain(s.x);
-      expect([4, 10, 16]).toContain(s.y);
-    });
+    expect(stones).toEqual([
+      { x: 16, y: 4 },
+      { x: 4, y: 16 },
+    ]);
+  });
+
+  it('19路 3子置石は左上を空ける', () => {
+    const stones = getHandicapStones(19, 3);
+    expect(stones).toEqual([
+      { x: 16, y: 4 },
+      { x: 4, y: 16 },
+      { x: 16, y: 16 },
+    ]);
+    expect(stones.some(s => s.x === 4 && s.y === 4)).toBe(false);
   });
 
   it('19路 2子置石は右上・左下（対角）', () => {
     const stones = getHandicapStones(19, 2);
     expect(stones).toEqual(
-      expect.arrayContaining([{ x: 4, y: 4 }, { x: 16, y: 16 }]),
+      expect.arrayContaining([{ x: 16, y: 4 }, { x: 4, y: 16 }]),
     );
   });
 
@@ -31,8 +39,9 @@ describe('getHandicapStones', () => {
     const stones = getHandicapStones(19, 3);
     expect(stones.length).toBe(3);
     expect(stones).toEqual(
-      expect.arrayContaining([{ x: 4, y: 4 }, { x: 16, y: 16 }, { x: 4, y: 16 }]),
+      expect.arrayContaining([{ x: 16, y: 4 }, { x: 4, y: 16 }, { x: 16, y: 16 }]),
     );
+    expect(stones.some(s => s.x === 4 && s.y === 4)).toBe(false);
   });
 
   it('19路 9子置石', () => {
@@ -45,6 +54,11 @@ describe('getHandicapStones', () => {
   it('13路 5子置石', () => {
     const stones = getHandicapStones(13, 5);
     expect(stones.length).toBe(5);
+    expect(stones.slice(0, 3)).toEqual([
+      { x: 10, y: 4 },
+      { x: 4, y: 10 },
+      { x: 10, y: 10 },
+    ]);
     // 天元(7,7)を含む
     expect(stones.some(s => s.x === 7 && s.y === 7)).toBe(true);
   });
@@ -57,6 +71,11 @@ describe('getHandicapStones', () => {
       expect([3, 5, 7]).toContain(s.x);
       expect([3, 5, 7]).toContain(s.y);
     });
+    expect(stones.slice(0, 3)).toEqual([
+      { x: 7, y: 3 },
+      { x: 3, y: 7 },
+      { x: 7, y: 7 },
+    ]);
   });
 
   it('未対応の盤面サイズは空配列', () => {

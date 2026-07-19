@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { BoardState, StoneColor } from '../components/GoBoard';
+import type { GameSession } from '../types/game';
 import { createEmptyBoard } from '../utils/gameLogic';
 import {
   ensureRealtimeAuth,
@@ -59,6 +60,22 @@ export function deriveLiveBoardSnapshots(
   }
 
   return boards;
+}
+
+export function applyLiveBoardSnapshotsToSessions(
+  games: GameSession[],
+  boards: Map<string, LiveBoardSnapshot>,
+): GameSession[] {
+  return games.map((game) => {
+    const snapshot = boards.get(game.id);
+    if (!snapshot) return game;
+    return {
+      ...game,
+      boardState: snapshot.boardState,
+      currentColor: snapshot.currentColor,
+      moveNumber: snapshot.moveNumber,
+    };
+  });
 }
 
 export function useLiveBoards(games: LiveGameRow[]): UseLiveBoardsResult {

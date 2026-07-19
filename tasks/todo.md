@@ -1,6 +1,64 @@
 # 三村囲碁オンライン 修正タスク
 
+## 2026-07-19 未コミット変更の整理
+- [x] 未コミット差分を機能別に確認する
+- [x] Deno検証で自動生成された不要なlock差分を除外する
+- [x] 全体テスト・Denoテスト・ビルドを再実行する
+- [x] 整合した変更一式をコミットしてmainへpushする
+- [x] push後のリポジトリ状態を確認する
+
+### Review
+- 実施結果: 置石、ID厳格化、生徒編集、進行中対局復旧、講師名表示、対局作成保護、E2E清掃、碁盤描画を現在の整合した状態で1コミットに集約。Deno検証が生成しただけの `deno.lock` 差分は除外した。
+- 検証結果: Vitest 38ファイル394件、Deno 6 suites/16 steps、ESLint（エラー0、既存警告6件）、`npm run build` が成功した。
+- 残課題: なし。ビルド時の既存chunk-size警告とBrowserslist更新警告は今回の変更外。
+
 ## タスク一覧
+- [x] 14. テスト由来の未終了対局を清掃し、再発を防止
+  - [x] OSプロセス・LiveKitルーム・本番DBの残留状態を確認する
+  - [x] 明確なE2E用教室IDの対局・教室データだけを削除する
+  - [x] セキュリティE2Eに終了時清掃を追加する
+  - [x] 清掃後の本番状態とテストを確認する
+- [x] 13. 1001/1002相手の多面対局で1局だけになる問題を修正
+  - [x] 手動対局作成ダイアログが開始後に閉じるようにする
+  - [x] 別生徒から開き直した時に `initialBlackPlayer` を反映する
+  - [x] 作成中の二重押しを禁止する
+  - [x] Edge Functionで同じ2人の進行中対局の二重作成を拒否する
+  - [x] テスト・Edgeデプロイ・Vercelデプロイで検証する
+- [x] 12. 4桁IDのユーザー認識を部分一致から完全一致に修正
+  - [x] `/api/token` の LiveKit 入室認可で `identity.includes(student_id)` を廃止する
+  - [x] `sid:` 正規化後の完全一致ヘルパーを追加する
+  - [x] 1002 と 10020 / x1002 を同一人物扱いしないテストを追加する
+  - [x] テスト・Vercel build・本番デプロイで検証する
+- [x] 11. 教師ホームの進行中碁盤と別ウィンドウ対局盤の表示を修正
+  - [x] 教師ホームの進行中碁盤一覧へライブ着手から復元した実盤面を反映する
+  - [x] 別ウィンドウの対局盤でも名簿を読み込み、`sid:<id>` / `teacher` を表示名へ解決する
+  - [x] 関連テスト・全体テスト・ビルド・本番デプロイで検証する
+- [x] 10. 講師側の `teacher` 表示を講師表示名にする
+  - [x] `teacher` は内部IDとして残し、画面表示では講師名へ変換する
+  - [x] 講師ログイン画面で講師表示名を変更・保存できるようにする
+  - [x] 既定値を `三村九段` にする
+  - [x] テスト・ビルド・本番デプロイで検証する
+- [x] 9. 棋譜保存・対局中判定で別ID同名生徒が混ざる問題を修正
+  - [x] 生徒別棋譜履歴はIDがある場合に名前検索を混ぜない
+  - [x] 講師生徒表・サムネイル・接続中判定から名前照合/部分一致を除去する
+  - [x] 講師画面に、通常一覧に出ていない進行中対局の検出・状態解除導線を追加する
+  - [x] Edge Function経由で教室IDに依存せず生徒IDの進行中対局を検出できるようにする
+  - [x] 全体テスト・ビルド・本番デプロイで検証する
+- [x] 8. 講師の2局同時対局で片方の生徒が対局を開けない/着手できない問題を修正
+  - [x] `sid:<id>` と素の `<id>` が混在しても同一対局者として判定する
+  - [x] 生徒ロビー・講師生徒表・講師サムネイル・多面打ち手番判定を同じidentity比較に統一する
+  - [x] 講師を含む複数対局の一括作成でも講師対局ウィンドウを開く
+  - [x] 関連テスト/全体テスト/ビルドで検証する
+- [ ] 7. 講師が教室内で生徒IDを含む全生徒情報を編集できるようにする
+  - [x] リモート `origin/main` の更新を確認してローカル `main` を追従
+  - [x] 講師ダッシュボードの生徒編集を生徒ID・姓名・棋力・内部R・種別・生年月日・学年・所在地対応に拡張
+  - [x] 生徒ID変更時に教室所属・表示順を保持し、重複IDを拒否する
+  - [x] テスト/ビルドで検証する
+- [x] 6. 置き石配置を三村囲碁オンライン仕様に変更
+  - [x] 2子は右上と左下に置く
+  - [x] 3子は左上を空け、右下を3子目にする
+  - [x] ローカル対局生成とSGF出力の両方を同じ配置にする
+  - [x] 関連テストで検証する
 - [x] 5. 対局・検討・問題・棋譜を開いた時にホーム画面項目を隠して碁盤を大きく表示
   - [x] `game` / `review` / `problem` 中はヘッダー、動画タイル、接続/音声パネルを非表示にする
   - [x] 詰碁画面も対局・検討と同じ全画面オーバーレイにする
@@ -26,6 +84,25 @@
   - [x] 本番環境（Vercel）へのデプロイ
 
 ## レビュー結果
+- 2026-07-18: 本番DBに残っていた `test-class-*` / `wiring-*` / `debugfull-*` / `verify-*` / `single-*` / `reconnect-*` の未終了E2E対局59件と、教室レコードがなくE2E専用生徒1010だけが参加していた孤立 `CLS001` 中断局1件、対応する残存テスト教室2件を削除。実教室 `CLS20160919347` は清掃前から未終了0件で、1001/1002の直近局はいずれも正常終局済みだったため変更していない。
+- 再発防止: `e2e/security.spec.ts` に `afterAll` 清掃を追加し、`teardownSupabaseRoster` が対局削除・生徒紐付け解除のエラーを黙殺しないよう修正。Playwrightの古い `.bin` リンクもnpm版へ戻した。
+- 検証: OS defunct 0件、重複開発サーバー0件、LiveKitルーム0件、自動テスト由来の未終了対局0件・テスト教室0件。`BASE_URL=https://online.mimura15.jp npx playwright test e2e/security.spec.ts --project=chromium --reporter=line` 3/3 passed、実行後も残骸0件、`npm run build` 成功。
+- 2026-07-18: 1001/1002をログインさせて講師が2名相手に対局を始めたが1局だけになる問題を調査。実教室 `CLS20160919347` の直近DBでは、作成された対局は `sid:1002 vs teacher` が2回で、`sid:1001 vs teacher` は新規作成されていなかった。原因候補として、手動対局作成ダイアログが開始後に閉じず、別生徒から開き直しても内部stateが最初の `initialBlackPlayer` のまま残る挙動を修正。開始後は閉じ、作成中は二重押し不可にした。さらに `manage_game_action` create で同一教室・同じ2人の進行中対局を409で拒否する保険を追加。
+- 検証: 関連Vitest 22/22 passed、Deno identity shared test 4 suites/12 steps passed、`deno check manage_game_action` 成功、`npm run build` 成功、`npx vitest run --testTimeout=10000` 392/392 passed。本番Edgeで同じ `sid:1002 vs teacher` の2回作成を実測し、1回目200・2回目409を確認後、検証用対局を強制終局で清掃。Supabase `manage_game_action` と Vercel production `dpl_7PuABgJGiGe7LxHveEjbRVtCcvrK` を本番反映。実教室の進行中対局は最終確認で0件。
+- 2026-07-18: 教師ホームの進行中碁盤一覧が `liveRowToSession` の空盤プレースホルダを表示していたため、`useLiveBoards` のライブ着手スナップショットを `GameSession` へ合成して実盤面・手数・手番が出るようにした。別ウィンドウ対局盤は `?mode=game` でも名簿を再読込し、対局者欄を `sid:<id>` や `teacher` ではなく生徒名・講師表示名で出すようにした。
+- 2026-07-18: 4桁IDのユーザー認識で、Vercel `/api/token` が `identity.includes(student_id)` による部分一致認可をしていたため、`sid:` を剥がした完全一致に変更。`sid:1002` は `1002` と一致するが、`sid:10020` / `sid:x1002` は一致しないテストを追加した。DB実データ確認では1002=清水 菜奈子、1003=志賀 愛美として名簿・保存棋譜とも `sid:1002` / `sid:1003` に分離済み。
+- 検証: 関連Vitest 16/16 passed、Deno identity shared test 3 suites/10 steps passed、`npx vitest run --testTimeout=10000` 391/391 passed、`npm run build` 成功、`npx vercel build --prod --yes` 成功。Vercel production deploy `dpl_3UN5mkRFteB4HBKuhgRtXgu5dz3D` 完了、`https://online.mimura15.jp/api/token` がモジュールエラーなく403応答することと、本番JSに `講師表示名` / `go-school-teacher-display-name` / `講師一覧に出ていない対局` / `状態解除` が含まれることを確認。
+- 2026-07-18: 講師の保存用identity `teacher` が画面に出ていたため、表示名へ変換する共通処理を追加。講師ログイン画面に「講師表示名」欄を追加し、この端末のブラウザに保存できるようにした。未設定時の既定値は `三村九段`。LiveKit入室時の表示名にも保存値を使い、内部identityは常に `teacher` のまま維持する。
+- 検証: 関連Vitest 40/40 passed、`npm run test` 385/385 passed、`npm run build` 成功。Vercel production deploy `dpl_Fmb2LdB6CktSQ7nzsVKd8tSFoZNw` 完了、`https://online.mimura15.jp` 配信JSに `講師表示名` / `go-school-teacher-display-name` / `三村九段` が含まれることを確認。
+- 2026-07-18: 棋譜保存まわりの異常として、1002/1003のような別ID同名生徒が同じ生徒として扱われる経路を修正。`loadSavedGamesForStudent` はID指定時に名前検索を混ぜず、`studentIdentityCandidates` / `findStudentByIdentity` / `getDisplayName` も `sid:` 生徒identityではID・ログインコードのみ照合するようにした。講師生徒表・サムネイル・接続中判定の `includes` / 名前照合も除去。
+- 2026-07-18: 生徒側だけに残り、講師側通常一覧に出ない進行中対局を解除できるよう、講師画面に「講師一覧に出ていない対局」警告欄と「状態解除」ボタンを追加。`manage_game_action` に講師専用 `list_active_for_players` を追加し、RLSや教室ID絞り込みで通常一覧に出ない対局もID基準で検出できるようにした。
+- 検証: 関連Vitest 70/70 passed、`npm run test` 382/382 passed、`npm run build` 成功、`/home/mimura/.deno/bin/deno check --node-modules-dir=auto supabase/functions/manage_game_action/index.ts` 成功、Deno shared tests 5 suites passed。Supabase `manage_game_action` を本番デプロイし、GETで `local-20260718171351` を確認。Vercel production deploy `dpl_2ThnrzybXh8K8JktjwKtYUSKLx8L` 完了、`https://online.mimura15.jp` 配信JSに `list_active_for_players` / `講師一覧に出ていない対局` / `状態解除` が含まれることを確認。
+- 2026-07-18: 講師の2局同時対局で、`sid:<id>` と素の `<id>` の表記差により片方の生徒が自分の対局として認識できず、碁盤を開けない/着手できない可能性を修正。`identityMatchesPlayer` / `studentIdentityCandidates` を追加し、生徒ロビー、講師生徒表、講師サムネイル、多面打ち手番判定、旧LiveKit経路の対局者判定を統一。講師を含む複数対局の一括作成時も講師対局ウィンドウを開くようにした。あわせて置き石定義の座標コメント/実座標の逆転を修正。
+- 検証: 関連Vitest 81/81 passed、`npm run test` 375/375 passed、`npm run build` 成功、`/home/mimura/.deno/bin/deno test --allow-env --allow-net supabase/functions/_shared/sgf.test.ts` 成功。
+- 2026-07-18: 講師が教室内の生徒一覧から、生徒ID/ログインコードを含む全生徒情報（姓名、棋力、内部R、種別、生年月日、学年、所在地）を編集できるように修正。生徒ID変更時は旧ID行の教室所属と表示順を新IDへ引き継ぎ、既存IDとの重複は保存前に拒否する。
+- 検証: `npm run test -- src/utils/classroomStore.test.ts` 6/6 passed、`npm run build` 成功。
+- 2026-07-17: 置き石配置を三村囲碁オンライン仕様に変更。2子は右上・左下、3子は左上を空けて右下を追加する順序に統一し、ローカル対局生成・通常SGF出力・Supabase Edge側SGF出力のテストを追加。
+- 検証: 対象Vitest 36/36 passed、`/home/mimura/.deno/bin/deno test --allow-env --allow-net supabase/functions/_shared/sgf.test.ts` 成功、`npm run build` 成功。`npm run test` は 365/366 passed、`AutoPairingDialog` の1件が全体並列実行でタイムアウトしたが、単体再実行では4/4 passed。
 - 2026-07-07: Live対局の終局時に保存棋譜テーブルへSGFが作られず、生徒別履歴検索も `sid:<uuid>` 形式を見ていなかったため、終局後の棋譜履歴に出ない問題を修正。
 - 検証: `npm run test` 309/309 passed、`npm run build` 成功、`deno test --allow-env --allow-net supabase/functions/_shared/sgf.test.ts supabase/functions/_shared/identity.test.ts` 成功。
 - 2026-07-07: 対局・検討/棋譜・問題を碁盤フォーカスの全画面表示に統一し、全画面中はホーム画面のヘッダー/参加者/音声パネルを隠すように修正。各画面に「閉じてホーム」ボタンを追加。

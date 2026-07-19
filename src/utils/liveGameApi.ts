@@ -151,7 +151,7 @@ async function getRoleAuthToken(sb: SupabaseClient): Promise<string | null> {
 }
 
 async function executeGameAction(
-  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all' | 'request_undo' | 'respond_undo',
+  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all' | 'request_undo' | 'respond_undo' | 'list_active_for_players',
   gameId?: string,
   params?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
@@ -203,6 +203,13 @@ export async function fetchLiveGames(classroomId: string): Promise<LiveGameRow[]
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as LiveGameRow[];
+}
+
+export async function fetchActiveLiveGamesForPlayers(identities: string[]): Promise<LiveGameRow[]> {
+  if (identities.length === 0) return [];
+
+  const res = await executeGameAction('list_active_for_players', undefined, { identities });
+  return (res.games ?? []) as LiveGameRow[];
 }
 
 export async function fetchLiveGame(gameId: string): Promise<LiveGameRow | null> {

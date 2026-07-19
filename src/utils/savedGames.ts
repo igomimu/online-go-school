@@ -107,16 +107,16 @@ export async function loadSavedGamesForStudent(studentName: string, studentIdent
 
   const query = sb.from('go_school_games').select('*');
 
-  const orConditions = [
-    `black_player.eq."${studentName}"`,
-    `white_player.eq."${studentName}"`
-  ];
+  const orConditions: string[] = [];
   if (studentIdentity) {
     orConditions.push(`black_player.eq."${studentIdentity}"`);
     orConditions.push(`white_player.eq."${studentIdentity}"`);
     const sid = makeStudentIdentity(studentIdentity);
     orConditions.push(`black_player.eq."${sid}"`);
     orConditions.push(`white_player.eq."${sid}"`);
+  } else {
+    orConditions.push(`black_player.eq."${studentName}"`);
+    orConditions.push(`white_player.eq."${studentName}"`);
   }
 
   const { data, error } = await query

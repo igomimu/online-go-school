@@ -128,16 +128,22 @@ export async function teardownSupabaseRoster(classroomId: string): Promise<void>
     });
 
     // 1. この教室での対局を削除
-    await supabase
+    const { error: liveGamesError } = await supabase
       .from('go_school_live_games')
       .delete()
       .eq('classroom_id', classroomId);
+    if (liveGamesError) {
+      throw new Error(`Failed to delete live games: ${liveGamesError.message}`);
+    }
 
     // 2. 生徒の紐付けを解除
-    await supabase
+    const { error: studentsError } = await supabase
       .from('go_school_students')
       .update({ classroom_id: null, classroom_position: null })
       .eq('classroom_id', classroomId);
+    if (studentsError) {
+      throw new Error(`Failed to detach students: ${studentsError.message}`);
+    }
 
     // 3. 教室を削除
     const { error } = await supabase

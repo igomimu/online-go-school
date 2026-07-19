@@ -8,6 +8,7 @@ import { exportGameToSgf, todaySgfDate } from '../utils/sgfExport';
 import { saveGame } from '../utils/savedGames';
 import { switchClock, useGameClockTick } from './useGameClock';
 import { calculateTerritory, formatScoringResult } from '../utils/scoring';
+import { identityMatchesPlayer } from '../utils/identityUtils';
 
 // --- 進行中の対局をlocalStorageに永続化 ---
 const ACTIVE_GAMES_KEY = 'go-school-active-games';
@@ -337,8 +338,8 @@ export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | 
       const game = gamesRef.current.find(g => g.id === p.gameId);
       if (!game) return;
 
-      const isBlack = game.blackPlayer === sender;
-      const isWhite = game.whitePlayer === sender;
+      const isBlack = identityMatchesPlayer(sender, game.blackPlayer);
+      const isWhite = identityMatchesPlayer(sender, game.whitePlayer);
       if (!isBlack && !isWhite) return;
 
       const expectedColor = isBlack ? 'BLACK' : 'WHITE';

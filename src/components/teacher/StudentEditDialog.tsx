@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Student } from '../../types/classroom';
 import { RANK_OPTIONS } from '../../types/classroom';
 import { upsertStudent } from '../../utils/classroomStore';
+import { resolveGrade } from '../../utils/gradeCalc';
 
 interface StudentEditDialogProps {
   student: Student;
@@ -9,21 +10,43 @@ interface StudentEditDialogProps {
   onSaved: () => void | Promise<void>;
 }
 
-/**
- * 生徒一覧から講師が段級位（ランク）・内部レーティングを変更するダイアログ。
- * 保存先は online 専用の go_school_students（dojo-app の students には触れない）。
- */
+const GRADES = ['', '小1', '小2', '小3', '小4', '小5', '小6', '中1', '中2', '中3', '高1', '高2', '高3', '大学', '大人'];
+const TYPES = ['', 'ネット生', '教室生', 'ネット教室生', '大人会員', '家族', '体験', 'プロ志望', '元生徒', 'Jネット生', 'スポット', 'ネット道場生', '道場生'];
+
+// 保存先は online 専用の go_school_students（dojo-app の students には触れない）。
 export default function StudentEditDialog({ student, onClose, onSaved }: StudentEditDialogProps) {
-  const [rank, setRank] = useState(student.rank || '');
-  const [internalRating, setInternalRating] = useState(student.internalRating || '');
+  const [form, setForm] = useState<Student>({
+    ...student,
+    studentCode: student.studentCode || student.id,
+    birthdate: student.birthdate || '',
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
+    const nextId = (form.studentCode || form.id || '').trim();
+    const nextName = form.name.trim();
+    if (!nextId) {
+      setError('生徒IDを入力してください');
+      return;
+    }
+    if (!nextName) {
+      setError('姓名を入力してください');
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
-      await upsertStudent({ ...student, rank, internalRating }, student.id);
+      await upsertStudent(
+        {
+          ...form,
+          id: nextId,
+          studentCode: nextId,
+          name: nextName,
+        },
+        student.id,
+      );
       await onSaved();
       onClose();
     } catch (e) {
@@ -34,6 +57,7 @@ export default function StudentEditDialog({ student, onClose, onSaved }: Student
 
   const label: React.CSSProperties = { fontSize: 12, color: '#333', display: 'block', marginBottom: 2 };
   const field: React.CSSProperties = { width: '100%', fontSize: 13, border: '1px solid #999', padding: '4px 6px', background: '#fff' };
+  const readonlyField: React.CSSProperties = { ...field, opacity: 0.5 };
 
   return (
     <div style={{
@@ -41,7 +65,7 @@ export default function StudentEditDialog({ student, onClose, onSaved }: Student
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100,
     }}>
       <div style={{
-        background: '#e8e8e0', border: '2px solid #666', width: 340,
+        background: '#e8e8e0', border: '2px solid #666', width: 540,
         fontFamily: 'MS Gothic, "Noto Sans JP", monospace', color: '#333',
         boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
       }}>
@@ -53,10 +77,28 @@ export default function StudentEditDialog({ student, onClose, onSaved }: Student
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'white', fontSize: 18, cursor: 'pointer' }}>&times;</button>
         </div>
 
-        <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ padding: 14, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <label style={label}>生徒ID / ログインコード</label>
+            <input
+              type="text"
+              value={form.studentCode || form.id}
+              onChange={e => setForm(f => ({ ...f, id: e.target.value, studentCode: e.target.value }))}
+              style={field}
+            />
+          </div>
+          <div>
+            <label style={label}>姓名</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              style={field}
+            />
+          </div>
           <div>
             <label style={label}>段級位（棋力）</label>
-            <select value={rank} onChange={e => setRank(e.target.value)} style={field}>
+            <select value={form.rank} onChange={e => setForm(f => ({ ...f, rank: e.target.value }))} style={field}>
               <option value="">未設定</option>
               {RANK_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
@@ -65,15 +107,55 @@ export default function StudentEditDialog({ student, onClose, onSaved }: Student
             <label style={label}>内部レーティング</label>
             <input
               type="text"
-              value={internalRating}
-              onChange={e => setInternalRating(e.target.value)}
+              value={form.internalRating}
+              onChange={e => setForm(f => ({ ...f, internalRating: e.target.value }))}
               placeholder="R3 など（任意）"
+              style={field}
+            />
+          </div>
+          <div>
+            <label style={label}>生徒種別</label>
+            <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={field}>
+              {TYPES.map(t => <option key={t} value={t}>{t || '未設定'}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={label}>生年月日</label>
+            <input
+              type="date"
+              value={form.birthdate || ''}
+              onChange={e => setForm(f => ({ ...f, birthdate: e.target.value }))}
+              style={field}
+            />
+          </div>
+          <div>
+            <label style={label}>
+              学年
+              {form.birthdate && (
+                <span style={{ color: '#666', marginLeft: 6 }}>自動: {resolveGrade(form.birthdate, '')}</span>
+              )}
+            </label>
+            <select
+              value={form.grade}
+              onChange={e => setForm(f => ({ ...f, grade: e.target.value }))}
+              disabled={!!form.birthdate}
+              style={form.birthdate ? readonlyField : field}
+            >
+              {GRADES.map(g => <option key={g} value={g}>{g || '未設定'}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={label}>所在地</label>
+            <input
+              type="text"
+              value={form.country}
+              onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
               style={field}
             />
           </div>
 
           {error && (
-            <div style={{ fontSize: 12, color: '#cc0000', background: '#fdd', padding: '4px 6px', border: '1px solid #e99' }}>
+            <div style={{ gridColumn: '1 / -1', fontSize: 12, color: '#cc0000', background: '#fdd', padding: '4px 6px', border: '1px solid #e99' }}>
               エラー: {error}
             </div>
           )}

@@ -2,6 +2,7 @@ import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student } from '../../types/classroom';
 import type { GameSession, AudioPermissions } from '../../types/game';
 import { resolveGrade } from '../../utils/gradeCalc';
+import { anyIdentityMatchesPlayer, identityMatchesPlayer, studentIdentityCandidates } from '../../utils/identityUtils';
 
 interface StudentTableProps {
   participants: ParticipantInfo[];
@@ -291,10 +292,15 @@ function buildRows(
   // 登録されている生徒の順序で rows を作る（クラスで決められた表示順を維持）
   for (let i = 0; i < students.length; i++) {
     const s = students[i];
-    const p = participants.find(part => part.identity === s.id || part.identity.includes(s.id));
+    const studentCandidates = studentIdentityCandidates(s);
+    const p = participants.find(part => studentCandidates.some(candidate => identityMatchesPlayer(part.identity, candidate)));
     const isConnected = !!p && p.identity !== localIdentity;
     const identity = p?.identity || s.id;
-    const game = games.find(g => g.blackPlayer === identity || g.whitePlayer === identity);
+    const candidates = [...studentCandidates, identity];
+    const game = games.find(g =>
+      anyIdentityMatchesPlayer(candidates, g.blackPlayer) ||
+      anyIdentityMatchesPlayer(candidates, g.whitePlayer)
+    );
 
     rows.push({
       identity,
@@ -311,10 +317,15 @@ function buildRows(
   // 登録されていないが接続中の参加者（先生を除く）を末尾に追加
   for (const p of participants) {
     if (p.identity === localIdentity) continue;
-    const sId = students.find(s => p.identity === s.id || p.identity.includes(s.id))?.id;
+    const sId = students.find(s =>
+      studentIdentityCandidates(s).some(candidate => identityMatchesPlayer(p.identity, candidate)),
+    )?.id;
     if (sId && matched.has(sId)) continue;
 
-    const game = games.find(g => g.blackPlayer === p.identity || g.whitePlayer === p.identity);
+    const game = games.find(g =>
+      identityMatchesPlayer(p.identity, g.blackPlayer) ||
+      identityMatchesPlayer(p.identity, g.whitePlayer)
+    );
     rows.push({
       identity: p.identity,
       displayName: p.name || p.identity,

@@ -2,6 +2,7 @@ import { AccessToken } from 'livekit-server-sdk';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { identityBelongsToStudent } from './tokenAuth.js';
 
 // SHA-256 ハッシュ化ヘルパー
 function sha256(text: string): string {
@@ -57,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const studentUuid = joinToken.student_id;
       
       const isRoomValid = roomName === expectedRoom;
-      const isIdentityValid = identity.includes(studentUuid);
+      const isIdentityValid = identityBelongsToStudent(identity, studentUuid);
 
       if (isRoomValid && isIdentityValid) {
         authorized = true;
@@ -84,9 +85,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else if (role === 'student') {
           const studentClassroomId = meta.classroom_id;
           const studentId = meta.student_id;
-          // 生徒は自身の classroom_id に対応するルーム、かつ自身のIDを含む identity のみ許可
+          // 生徒は自身の classroom_id に対応するルーム、かつ自身のIDと完全一致する identity のみ許可
           const expectedRoom = `go-${studentClassroomId}`;
-          if (roomName === expectedRoom && identity.includes(studentId)) {
+          if (roomName === expectedRoom && identityBelongsToStudent(identity, studentId)) {
             authorized = true;
           }
         }

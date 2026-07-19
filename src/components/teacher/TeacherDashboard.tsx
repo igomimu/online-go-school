@@ -3,8 +3,8 @@ import type { GameSession, AudioPermissions, SavedGame } from '../../types/game'
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
-import { parseIdentity, resolvePlayerName, stripSid } from '../../utils/identityUtils';
-import { getSupabase } from '../../utils/liveGameApi';
+import { identityMatchesPlayer, parseIdentity, resolvePlayerName, stripSid, studentIdentityCandidates } from '../../utils/identityUtils';
+import { fetchActiveLiveGamesForPlayers, finishGame, getSupabase, liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
 import { parseSGFTree } from '../../utils/sgfUtils';
 import { createEmptyBoard } from '../../utils/gameLogic';
 import type { Problem } from '../../types/problem';
@@ -22,6 +22,7 @@ import AutoPairingDialog from './AutoPairingDialog';
 import GameObserverPanel from './GameObserverPanel';
 import StudentEditDialog from './StudentEditDialog';
 import { upsertClassroom } from '../../utils/classroomStore';
+import { applyLiveBoardSnapshotsToSessions, useLiveBoards } from '../../hooks/useLiveBoards';
 
 interface TeacherDashboardProps {
   participants: ParticipantInfo[];
@@ -31,6 +32,7 @@ interface TeacherDashboardProps {
   selectedClassroomId: string | null;
   onSelectClassroom: (id: string | null) => void;
   games: GameSession[];
+  liveGames?: LiveGameRow[];
   audioPermissions: AudioPermissions;
   onToggleHear: (identity: string) => void;
   onToggleMic: (identity: string) => void;
@@ -67,6 +69,7 @@ export default function TeacherDashboard({
   selectedClassroomId,
   onSelectClassroom,
   games,
+  liveGames = [],
   audioPermissions,
   onToggleHear,
   onToggleMic,
@@ -98,6 +101,9 @@ export default function TeacherDashboard({
   const [showAutoPairing, setShowAutoPairing] = useState(false);
   const [observingGameId, setObservingGameId] = useState<string | null>(null);
   const [editingStudentInfo, setEditingStudentInfo] = useState<Student | null>(null);
+  const [orphanLiveGames, setOrphanLiveGames] = useState<LiveGameRow[]>([]);
+  const [orphanGamesError, setOrphanGamesError] = useState<string | null>(null);
+  const [clearingGameId, setClearingGameId] = useState<string | null>(null);
 
   // 棋譜履歴表示用のステート
   const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
@@ -136,7 +142,10 @@ export default function TeacherDashboard({
       }
     });
   }, [participants, students, resolvedStudents]);
-  const allStudents = [...students, ...resolvedStudents.filter(r => !students.find(s => s.id === r.id))];
+  const allStudents = useMemo(
+    () => [...students, ...resolvedStudents.filter(r => !students.find(s => s.id === r.id))],
+    [students, resolvedStudents],
+  );
 
   // 詰碁SGF読み込み
   const handleLoadProblem = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -221,12 +230,14 @@ export default function TeacherDashboard({
     });
     const extra = allStudents.filter(s =>
       !selectedClassroom.studentIds.includes(s.id) &&
-      participants.some(p => p.identity.includes(s.id))
+      participants.some(p => studentIdentityCandidates(s).some(candidate => identityMatchesPlayer(p.identity, candidate)))
     );
     const combined = [...enrolled, ...extra];
     // ログイン中(接続中)の生徒を先頭に。Array.sortは安定ソートなので、
     // 接続中グループ内・未接続グループ内それぞれの相対順序(studentIdsの並び)は維持される。
-    const isConnected = (s: Student) => participants.some(p => p.identity === s.id || p.identity.includes(s.id));
+    const isConnected = (s: Student) => participants.some(p =>
+      studentIdentityCandidates(s).some(candidate => identityMatchesPlayer(p.identity, candidate)),
+    );
     return combined.sort((a, b) => Number(isConnected(b)) - Number(isConnected(a)));
   }, [allStudents, selectedClassroom, participants]);
 
@@ -235,7 +246,60 @@ export default function TeacherDashboard({
 
   // 接続状況で絞らない: 教室の進行中対局はすべて表示する
   // （生徒が一時切断していても先生は対局を見失わない。gamesは既に教室単位で取得済み）
-  const filteredGames = games;
+  const { boards: liveBoards } = useLiveBoards(liveGames);
+  const filteredGames = useMemo(
+    () => applyLiveBoardSnapshotsToSessions(games, liveBoards),
+    [games, liveBoards],
+  );
+
+  const orphanLookupIdentities = useMemo(() => Array.from(new Set([
+    ...filteredStudents.flatMap(student => studentIdentityCandidates(student)),
+    ...participants
+      .map(p => p.identity)
+      .filter(identity => identity && identity !== localIdentity),
+  ])), [filteredStudents, participants, localIdentity]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (orphanLookupIdentities.length === 0) {
+      setOrphanLiveGames([]);
+      setOrphanGamesError(null);
+      return;
+    }
+
+    fetchActiveLiveGamesForPlayers(orphanLookupIdentities)
+      .then(rows => {
+        if (cancelled) return;
+        const visibleIds = new Set(games.map(g => g.id));
+        setOrphanLiveGames(rows.filter(row => !visibleIds.has(row.id)));
+        setOrphanGamesError(null);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setOrphanLiveGames([]);
+        setOrphanGamesError(String(err));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orphanLookupIdentities, games]);
+
+  const clearOrphanGame = useCallback(async (gameId: string) => {
+    if (!confirm('講師側の通常一覧に表示されていない対局を強制終了し、生徒の「対局中」状態を解除します。よろしいですか？')) {
+      return;
+    }
+    setClearingGameId(gameId);
+    try {
+      await finishGame(gameId, '強制解除');
+      setOrphanLiveGames(prev => prev.filter(game => game.id !== gameId));
+    } catch (err) {
+      alert(`対局状態の解除に失敗しました: ${err}`);
+    } finally {
+      setClearingGameId(null);
+    }
+  }, []);
 
   // タイトルバーのクラス名
   const classroomName = selectedClassroom?.name || '三村囲碁オンライン';
@@ -294,11 +358,12 @@ export default function TeacherDashboard({
           onOpenStudent={(identity) => {
             // 対局中(playing)の生徒のみ来る前提（StudentTable 側で gate 済み）
             const game = filteredGames.find(g =>
-              (g.blackPlayer === identity || g.whitePlayer === identity) && g.status === 'playing'
+              (identityMatchesPlayer(identity, g.blackPlayer) || identityMatchesPlayer(identity, g.whitePlayer)) &&
+              g.status === 'playing'
             );
             if (!game) return;
             // 先生自身の対局なら講師専用の別ウィンドウ（1盤表示+ローテーション）で開く
-            if (game.blackPlayer === localIdentity || game.whitePlayer === localIdentity) {
+            if (identityMatchesPlayer(localIdentity, game.blackPlayer) || identityMatchesPlayer(localIdentity, game.whitePlayer)) {
               setObservingGameId(null);
               onOpenTeacherGameWindow();
             } else {
@@ -312,6 +377,65 @@ export default function TeacherDashboard({
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {/* 碁盤エリア: サムネイルグリッド or 観戦パネル（対局は常に講師専用の別ウィンドウで行うため、教室ホーム画面には対局盤を埋め込まない） */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
+          {(orphanLiveGames.length > 0 || orphanGamesError) && (
+            <div style={{
+              margin: 8,
+              padding: 8,
+              background: '#fff4d6',
+              border: '2px solid #d97706',
+              color: '#4a2a00',
+              fontFamily: 'MS Gothic, "Noto Sans JP", monospace',
+              fontSize: 12,
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: 6 }}>
+                講師一覧に出ていない対局
+              </div>
+              {orphanGamesError ? (
+                <div>検出に失敗: {orphanGamesError}</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {orphanLiveGames.map(row => {
+                    const game = liveRowToSession(row);
+                    return (
+                      <div
+                        key={row.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 8,
+                          background: '#fff',
+                          border: '1px solid #e0b55d',
+                          padding: '5px 8px',
+                        }}
+                      >
+                        <span>
+                          {resolvePlayerName(game.blackPlayer, allStudents)} (黒) vs {resolvePlayerName(game.whitePlayer, allStudents)} (白)
+                          <span style={{ marginLeft: 8, color: '#8a5a00' }}>
+                            {row.status === 'interrupted' ? '中断' : row.status === 'scoring' ? '整地中' : '対局中'}
+                          </span>
+                        </span>
+                        <button
+                          onClick={() => clearOrphanGame(row.id)}
+                          disabled={clearingGameId === row.id}
+                          style={{
+                            border: '1px solid #b45309',
+                            background: clearingGameId === row.id ? '#ddd' : '#f59e0b',
+                            color: '#111',
+                            padding: '2px 10px',
+                            cursor: clearingGameId === row.id ? 'not-allowed' : 'pointer',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          状態解除
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
           {observingGameId && filteredGames.find(g => g.id === observingGameId) ? (
             <GameObserverPanel
               gameId={observingGameId}
@@ -327,7 +451,7 @@ export default function TeacherDashboard({
               onSelectGame={(gameId) => {
                 // 先生自身の対局なら講師専用の別ウィンドウ（1盤表示+ローテーション）で開く
                 const game = filteredGames.find(g => g.id === gameId);
-                if (game && (game.blackPlayer === localIdentity || game.whitePlayer === localIdentity)) {
+                if (game && (identityMatchesPlayer(localIdentity, game.blackPlayer) || identityMatchesPlayer(localIdentity, game.whitePlayer))) {
                   onOpenTeacherGameWindow();
                 } else {
                   setObservingGameId(gameId);
@@ -509,7 +633,7 @@ export default function TeacherDashboard({
                     // この生徒がその対局で黒か白か（保存値は sid:/uuid/コード/名前 いずれか）
                     const matchesHistoryStudent = (raw: string) => {
                       const v = stripSid(raw || '');
-                      return v === historyStudent.id || v === historyStudent.studentCode || v === historyStudent.name;
+                      return v === historyStudent.id || v === historyStudent.studentCode;
                     };
                     const studentColor = matchesHistoryStudent(game.blackPlayer)
                       ? 'BLACK'

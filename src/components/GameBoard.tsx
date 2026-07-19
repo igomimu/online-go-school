@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState, useEffect } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import GoBoard from './GoBoard';
 import ZoomTapConfirm from './ZoomTapConfirm';
-import { Flag, SkipForward, Check, RefreshCw, X, Undo2 } from 'lucide-react';
+import type { Drawing } from './GoBoard';
+import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2 } from 'lucide-react';
 import { calculateTerritory, formatScoringResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
@@ -20,9 +21,14 @@ interface GameBoardProps {
   onMoveSubmitted?: () => void;
   classroom?: ClassroomLiveKit | null;
   students?: Student[];  // 対局者名を解決するための名簿（IDは一切表示しない）
+  syncedDrawings?: Drawing[];
 }
 
-export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitted, classroom, students = [] }: GameBoardProps) {
+export default function GameBoard(props: GameBoardProps) {
+  return <GameBoardContent key={props.gameId} {...props} />;
+}
+
+function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitted, classroom, students = [], syncedDrawings = [] }: GameBoardProps) {
   const live = useLiveGame(gameId, myIdentity, !!isTeacher, classroom);
   const {
     game,
@@ -50,6 +56,10 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
   const [pendingTap, setPendingTap] = useState<{ x: number; y: number } | null>(null);
   const isTouch = useIsTouchDevice();
+  const [drawings, setDrawings] = useState<Drawing[]>([]);
+  const [drawMode, setDrawMode] = useState<'off' | 'line' | 'arrow'>('off');
+  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
+  const drawLastCell = useRef<{ x: number; y: number } | null>(null);
 
   const isScoring = game?.status === 'scoring';
   const undoRequest = game?.undo_request ?? null;
@@ -59,6 +69,8 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
   const isUndoRequester = !!undoRequest && myColor === undoRequest.requested_color;
   const canRespondToUndo = !!undoRequest && isParticipant && !isUndoRequester;
   const canRequestUndo = game?.status === 'playing' && !undoRequest && isParticipant && moveNumber > 0;
+  const isDrawing = !!isTeacher && drawMode !== 'off';
+  const effectiveDrawings = isTeacher ? drawings : syncedDrawings;
 
   // 相手の着手等で手番が失われたら、拡大確認オーバーレイを開いたままにしない
   useEffect(() => {
@@ -140,6 +152,51 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
     const resultStr = formatScoringResult(scoringResult);
     finishWithResult(resultStr);
   }, [scoringResult, finishWithResult]);
+
+  const broadcastDrawings = useCallback((nextDrawings: Drawing[]) => {
+    classroom?.broadcast({ type: 'DRAW_UPDATE', payload: nextDrawings });
+  }, [classroom]);
+
+  const handleDrawDragStart = useCallback((x: number, y: number) => {
+    if (!isDrawing) return;
+    setDrawStart({ x, y });
+    drawLastCell.current = { x, y };
+  }, [isDrawing]);
+
+  const handleDrawDragMove = useCallback((x: number, y: number) => {
+    if (!isDrawing) return;
+    drawLastCell.current = { x, y };
+  }, [isDrawing]);
+
+  const handleDrawDragEnd = useCallback(() => {
+    if (!isDrawing || !drawStart || !drawLastCell.current) return;
+
+    const end = drawLastCell.current;
+    if (drawStart.x !== end.x || drawStart.y !== end.y) {
+      const nextDrawing: Drawing = {
+        fromX: drawStart.x,
+        fromY: drawStart.y,
+        toX: end.x,
+        toY: end.y,
+        type: drawMode,
+      };
+      setDrawings(prev => {
+        const updated = [...prev, nextDrawing];
+        broadcastDrawings(updated);
+        return updated;
+      });
+    }
+    setDrawStart(null);
+    drawLastCell.current = null;
+  }, [broadcastDrawings, drawMode, drawStart, isDrawing]);
+
+  const handleClearDrawings = useCallback(() => {
+    setDrawings([]);
+    setDrawMode('off');
+    drawLastCell.current = null;
+    setDrawStart(null);
+    classroom?.broadcast({ type: 'DRAW_CLEAR', payload: null });
+  }, [classroom]);
 
   // 対局終了/中断時に自動で閉じる（結果を確認できるよう一律で猶予を置く）
   useEffect(() => {
@@ -300,7 +357,9 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
           className="max-w-[min(100%,calc(100dvh-9rem))]"
           maxHeight="calc(100dvh - 9rem)"
           onCellClick={
-            isScoring
+            isDrawing
+              ? undefined
+              : isScoring
               ? isTeacher
                 ? handleBoardCellClick
                 : undefined
@@ -309,14 +368,20 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
                 : undefined
           }
           readOnly={
-            isScoring
+            isDrawing
+              ? false
+              : isScoring
               ? !isTeacher
               : game.status !== 'playing' || !isMyTurn || !!undoRequest
           }
-          onCellMouseEnter={canPlay ? (x, y) => setGhostPos({ x, y }) : undefined}
-          onCellMouseLeave={canPlay ? () => setGhostPos(null) : undefined}
-          ghostPosition={canPlay ? ghostPos : null}
-          ghostColor={canPlay ? currentColor : undefined}
+          onCellMouseEnter={canPlay && !isDrawing ? (x, y) => setGhostPos({ x, y }) : undefined}
+          onCellMouseLeave={canPlay && !isDrawing ? () => setGhostPos(null) : undefined}
+          onDragStart={isDrawing ? handleDrawDragStart : undefined}
+          onDragMove={isDrawing ? handleDrawDragMove : undefined}
+          onDragEnd={isDrawing ? handleDrawDragEnd : undefined}
+          drawings={effectiveDrawings}
+          ghostPosition={canPlay && !isDrawing ? ghostPos : null}
+          ghostColor={canPlay && !isDrawing ? currentColor : undefined}
           territoryMap={scoringResult?.territoryMap}
           deadStones={deadStonesSet.size > 0 ? deadStonesSet : undefined}
         />
@@ -335,6 +400,47 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
           />
         )}
       </div>
+
+      {isTeacher && game.status !== 'finished' && game.status !== 'interrupted' && (
+        <div className="shrink-0 flex justify-center">
+          <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/60 p-2">
+            <button
+              onClick={() => setDrawMode(mode => mode === 'line' ? 'off' : 'line')}
+              className={`p-2 rounded-lg border transition-all ${
+                drawMode === 'line'
+                  ? 'bg-red-500/20 border-red-500 text-red-400'
+                  : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+              }`}
+              title="線を描く"
+              aria-label="線を描く"
+            >
+              <Pen className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setDrawMode(mode => mode === 'arrow' ? 'off' : 'arrow')}
+              className={`p-2 rounded-lg border transition-all ${
+                drawMode === 'arrow'
+                  ? 'bg-red-500/20 border-red-500 text-red-400'
+                  : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+              }`}
+              title="矢印を描く"
+              aria-label="矢印を描く"
+            >
+              <ArrowRightIcon className="w-4 h-4" />
+            </button>
+            {drawings.length > 0 && (
+              <button
+                onClick={handleClearDrawings}
+                className="p-2 rounded-lg border border-red-500/30 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                title="描画を消去"
+                aria-label="描画を消去"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 整地モード */}
       {isScoring && scoringResult && (

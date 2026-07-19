@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import GameBoard from './GameBoard';
 import { createEmptyBoard } from '../utils/gameLogic';
 import type { GameSession } from '../types/game';
+import type { Student } from '../types/classroom';
 import { useLiveGame } from '../hooks/useLiveGame';
 
 // useLiveGame フックをモック化
@@ -40,6 +41,7 @@ describe('GameBoard', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   function setupMock(overrides: any = {}) {
@@ -110,6 +112,35 @@ describe('GameBoard', () => {
     expect(screen.getByText('たろう')).toBeInTheDocument();
     expect(screen.getByText('はなこ')).toBeInTheDocument();
     expect(screen.getByText('0手目')).toBeInTheDocument();
+  });
+
+  it('ID保存された対局者を名簿から名前表示する', () => {
+    const game = createMockGame({ blackPlayer: 'sid:1002', whitePlayer: 'teacher' });
+    const students: Student[] = [{
+      id: '1002',
+      studentCode: '1002',
+      name: '太郎',
+      rank: '10K',
+      internalRating: '',
+      type: 'ネット生',
+      grade: '',
+      country: '',
+    }];
+    setupMock({ game, myColor: null, isParticipant: false, isMyTurn: false });
+
+    render(
+      <GameBoard
+        gameId="game-1"
+        myIdentity="teacher"
+        isTeacher
+        students={students}
+      />,
+    );
+
+    expect(screen.getByText('太郎')).toBeInTheDocument();
+    expect(screen.getByText('三村九段')).toBeInTheDocument();
+    expect(screen.queryByText('sid:1002')).not.toBeInTheDocument();
+    expect(screen.queryByText('teacher')).not.toBeInTheDocument();
   });
 
   it('自分の番のとき「あなたの番です」を表示', () => {
@@ -252,5 +283,52 @@ describe('GameBoard', () => {
     );
     // 盤はロックされ、クリック可能なセルが存在しない
     expect(container.querySelector('[data-cell]')).toBeNull();
+  });
+
+  it('先生は相手の手番でも描画モードで線を引けるが代打ちはしない', () => {
+    const game = createMockGame({ blackPlayer: '生徒', whitePlayer: '先生', currentColor: 'BLACK' });
+    setupMock({ game, myColor: 'WHITE', isParticipant: true, isMyTurn: false });
+    const classroom = { broadcast: vi.fn() };
+    const { container } = render(
+      <GameBoard gameId="game-1" myIdentity="先生" isTeacher classroom={classroom as any} />
+    );
+
+    expect(container.querySelector('[data-cell]')).toBeNull();
+
+    fireEvent.click(screen.getByLabelText('線を描く'));
+    const cells = container.querySelectorAll('[data-cell]');
+    expect(cells.length).toBe(81);
+
+    fireEvent.mouseDown(cells[0], { buttons: 1 });
+    fireEvent.mouseEnter(cells[10], { buttons: 1 });
+    fireEvent.mouseUp(cells[10]);
+
+    expect(mockSubmitMove).not.toHaveBeenCalled();
+    expect(container.querySelector('line[stroke="#e53e3e"]')).toBeInTheDocument();
+    expect(classroom.broadcast).toHaveBeenCalledWith({
+      type: 'DRAW_UPDATE',
+      payload: [{ fromX: 1, fromY: 1, toX: 2, toY: 2, type: 'line' }],
+    });
+  });
+
+  it('別の対局へ切り替えると講師の一時描画をリセットする', () => {
+    const game = createMockGame({ blackPlayer: '生徒', whitePlayer: '先生', currentColor: 'BLACK' });
+    setupMock({ game, myColor: 'WHITE', isParticipant: true, isMyTurn: false });
+    const classroom = { broadcast: vi.fn() };
+    const { container, rerender } = render(
+      <GameBoard gameId="game-1" myIdentity="先生" isTeacher classroom={classroom as any} />
+    );
+
+    fireEvent.click(screen.getByLabelText('線を描く'));
+    const cells = container.querySelectorAll('[data-cell]');
+    fireEvent.mouseDown(cells[0], { buttons: 1 });
+    fireEvent.mouseEnter(cells[10], { buttons: 1 });
+    fireEvent.mouseUp(cells[10]);
+    expect(container.querySelector('line[stroke="#e53e3e"]')).toBeInTheDocument();
+
+    rerender(
+      <GameBoard gameId="game-2" myIdentity="先生" isTeacher classroom={classroom as any} />
+    );
+    expect(container.querySelector('line[stroke="#e53e3e"]')).not.toBeInTheDocument();
   });
 });
