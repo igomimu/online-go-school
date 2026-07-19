@@ -245,7 +245,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   };
 
   return (
-    <div className="flex min-h-full flex-col gap-3">
+    <div className="flex h-full flex-col gap-3">
       {/* 対局情報ヘッダー */}
       <div className="glass-panel shrink-0 px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3 sm:gap-4 overflow-x-auto">
@@ -285,7 +285,8 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                   ? '中断'
                   : `終局: ${game.result ?? ''}`}
           </span>
-          {!(new URLSearchParams(window.location.search).get('mode') === 'game') && (
+          {/* スマホでは別ウィンドウを開いても見づらいだけなので、タッチデバイスでは非表示にする */}
+          {!isTouch && !(new URLSearchParams(window.location.search).get('mode') === 'game') && (
             <button
               onClick={() => {
                 const role = isTeacher ? 'TEACHER' : 'STUDENT';
@@ -349,13 +350,15 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
         </div>
       )}
 
-      {/* 碁盤 */}
-      <div className="glass-panel flex flex-1 min-h-0 justify-center items-center p-2 sm:p-3 shadow-2xl">
+      {/* 碁盤: maxHeight="100%" で親(flex-1 min-h-0)の実際の余り高さに追従させる。
+          固定のcalc(100dvh - Nrem)だと、待ったバナー等でUI要素が増えるたびに
+          画面全体がoverflowしてスクロールバーが出てしまう（常に碁盤全体を映す要件）。 */}
+      <div className="glass-panel flex flex-1 min-h-0 justify-center items-center p-2 sm:p-3 shadow-2xl overflow-hidden">
         <GoBoard
           boardState={boardState}
           boardSize={game.board_size}
-          className="max-w-[min(100%,calc(100dvh-9rem))]"
-          maxHeight="calc(100dvh - 9rem)"
+          className="!w-auto h-full max-w-full"
+          maxHeight="100%"
           onCellClick={
             isDrawing
               ? undefined
