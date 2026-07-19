@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
   // 1. 対局取得
   const { data: game, error: gameErr } = await supabase
     .from('go_school_live_games')
-    .select('id, status, black_player, white_player, handicap')
+    .select('id, status, black_player, white_player, handicap, undo_request')
     .eq('id', game_id)
     .single()
 
@@ -120,6 +120,9 @@ Deno.serve(async (req) => {
   }
   if (game.status !== 'playing') {
     return json({ error: `Game status is ${game.status}, not playing` }, 409)
+  }
+  if (game.undo_request) {
+    return json({ error: 'Undo request pending, resolve it before moving' }, 409)
   }
 
   // 2. identity と color の整合性チェック（sid: prefix の有無を吸収して照合）

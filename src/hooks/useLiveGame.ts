@@ -16,12 +16,14 @@ import {
   updateDeadStones as apiUpdateDeadStones,
   finishGame as apiFinishGame,
   resetLiveGame as apiResetLiveGame,
+  requestUndo as apiRequestUndo,
+  respondUndo as apiRespondUndo,
   type LiveGameRow,
   type LiveMoveRow,
   type SubmitMoveResult,
 } from '../utils/liveGameApi';
 import type { ClassroomLiveKit, ClassroomMessage } from '../utils/classroomLiveKit';
-import type { GameMovePayload } from '../types/game';
+import type { GameMovePayload, GameUndoRequestPayload, GameUndoResponsePayload } from '../types/game';
 
 export interface DerivedState {
   boardState: BoardState;
@@ -164,6 +166,8 @@ export interface UseLiveGameResult {
   setDeadStones: (deadStones: string[]) => Promise<void>;
   finishWithResult: (result: string) => Promise<void>;
   resetGame: () => Promise<void>;
+  requestUndo: () => Promise<void>;
+  respondUndo: (accept: boolean) => Promise<void>;
 }
 
 export function useLiveGame(
@@ -235,6 +239,10 @@ export function useLiveGame(
             return [...prev, row].sort((a, b) => a.move_number - b.move_number);
           });
         },
+        // 「待った」承諾時の一手取り消し。盤面/手番/moveNumberはderived側で自動再計算される。
+        onMoveDelete: (row) => {
+          setMoves((prev) => prev.filter((m) => m.move_number !== row.move_number));
+        },
       });
       channelRef.current = channel;
     })();
@@ -299,9 +307,31 @@ export function useLiveGame(
       if (msg.type === 'GAME_RESIGN') {
         const p = msg.payload as { gameId: string; color: StoneColor };
         if (p.gameId !== gameId) return;
-        
+
         const winner = p.color === 'BLACK' ? 'W' : 'B';
         setGame((prev) => prev ? { ...prev, status: 'finished', result: `${winner}+R` } : null);
+      }
+
+      // 「待った」バナー表示専用の即時通知（非正本）。盤面/movesには一切触れない。
+      // 正本(DBのundo_request列/moves DELETE)のRealtime反映を待たずにUIだけ先に見せる。
+      if (msg.type === 'GAME_UNDO_REQUEST') {
+        const p = msg.payload as GameUndoRequestPayload;
+        if (p.gameId !== gameId) return;
+        setGame((prev) => prev ? {
+          ...prev,
+          undo_request: {
+            requested_by: p.requestedBy,
+            requested_color: p.requestedColor,
+            target_move_number: p.targetMoveNumber,
+            requested_at: new Date().toISOString(),
+          },
+        } : null);
+      }
+
+      if (msg.type === 'GAME_UNDO_RESPONSE') {
+        const p = msg.payload as GameUndoResponsePayload;
+        if (p.gameId !== gameId) return;
+        setGame((prev) => prev ? { ...prev, undo_request: null } : null);
       }
     };
 
@@ -716,6 +746,56 @@ export function useLiveGame(
     }
   }, [activeGame]);
 
+  // 「待った」申請（対局者どうしの同意制、先生の強制介入は不可）
+  const requestUndoFn = useCallback(async () => {
+    if (!activeGame || !effectivePlayer) return;
+    if (activeGame.undo_request) return;
+    const targetMoveNumber = derived.moveNumber;
+    if (targetMoveNumber <= 0) return;
+
+    // LiveKitで即時通知（バナー表示専用の非正本キャッシュ）
+    if (classroom && classroom.isConnected) {
+      classroom.broadcast({
+        type: 'GAME_UNDO_REQUEST',
+        payload: {
+          gameId: activeGame.id,
+          requestedBy: effectivePlayer.identity,
+          requestedColor: effectivePlayer.color,
+          targetMoveNumber,
+        } as GameUndoRequestPayload,
+      }).catch((err) => console.error('[LiveKit undo request broadcast error]', err));
+    }
+
+    try {
+      await apiRequestUndo(activeGame.id);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [activeGame, effectivePlayer, derived.moveNumber, classroom]);
+
+  // 「待った」への応答（承諾/拒否/取り下げ）
+  const respondUndoFn = useCallback(async (accept: boolean) => {
+    if (!activeGame) return;
+    // 承諾時は楽観的に最後の手をローカルからも先に消す（DBのDELETE realtime到着を待たない）
+    if (accept && activeGame.undo_request) {
+      const target = activeGame.undo_request.target_move_number;
+      setMoves((prev) => prev.filter((m) => m.move_number !== target));
+    }
+
+    if (classroom && classroom.isConnected) {
+      classroom.broadcast({
+        type: 'GAME_UNDO_RESPONSE',
+        payload: { gameId: activeGame.id } as GameUndoResponsePayload,
+      }).catch((err) => console.error('[LiveKit undo response broadcast error]', err));
+    }
+
+    try {
+      await apiRespondUndo(activeGame.id, accept);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [activeGame, classroom]);
+
   const setDeadStones = useCallback(
     async (deadStones: string[]) => {
       if (!activeGame) return;
@@ -771,5 +851,7 @@ export function useLiveGame(
     setDeadStones,
     finishWithResult,
     resetGame,
+    requestUndo: requestUndoFn,
+    respondUndo: respondUndoFn,
   };
 }

@@ -29,6 +29,8 @@ function loadEnvFile(filePath: string) {
 
 // .env (VITE_ prefixed, frontend vars)
 loadEnvFile(path.resolve(process.cwd(), '.env'));
+// .env.local (dev/E2E専用LiveKit接続先。.env より優先、Viteの読み込み順に合わせる)
+loadEnvFile(path.resolve(process.cwd(), '.env.local'));
 // ~/.secrets/supabase-dojo-service.env (SUPABASE_SERVICE_ROLE_KEY for server-side use)
 loadEnvFile(path.join(process.env.HOME || '', '.secrets', 'supabase-dojo-service.env'));
 

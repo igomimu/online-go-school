@@ -43,6 +43,13 @@ export function ensureRealtimeAuth(): Promise<void> {
   return realtimeAuthReady;
 }
 
+export interface UndoRequest {
+  requested_by: string;
+  requested_color: StoneColor;
+  target_move_number: number;
+  requested_at: string;
+}
+
 export interface LiveGameRow {
   id: string;
   classroom_id: string;
@@ -55,6 +62,7 @@ export interface LiveGameRow {
   result: string | null;
   scoring_dead_stones: string[];
   clock: GameClock | null;
+  undo_request: UndoRequest | null;
   created_at: string;
   updated_at: string;
 }
@@ -143,7 +151,7 @@ async function getRoleAuthToken(sb: SupabaseClient): Promise<string | null> {
 }
 
 async function executeGameAction(
-  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all',
+  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all' | 'request_undo' | 'respond_undo',
   gameId?: string,
   params?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
@@ -290,12 +298,25 @@ export async function updateClock(gameId: string, clock: GameClock): Promise<voi
   await executeGameAction('update_clock', gameId, { clock });
 }
 
-/** 対局ごとのRealtimeチャンネル購読（games更新 + moves挿入） */
+/** 「待った」を申請する（対局者本人のみ、直前の1手が対象） */
+export async function requestUndo(gameId: string): Promise<void> {
+  await executeGameAction('request_undo', gameId);
+}
+
+/** 「待った」への応答（承諾/拒否/取り下げ） */
+export async function respondUndo(gameId: string, accept: boolean): Promise<void> {
+  await executeGameAction('respond_undo', gameId, { accept });
+}
+
+/** 対局ごとのRealtimeチャンネル購読（games更新 + moves挿入/削除） */
 export function subscribeLiveGame(
   gameId: string,
   handlers: {
     onGameChange?: (row: LiveGameRow) => void;
     onMoveInsert?: (row: LiveMoveRow) => void;
+    // 「待った」承諾時に go_school_live_moves から該当手がDELETEされる。
+    // これを購読しないと相手側クライアントの盤面が1手前へ戻らない。
+    onMoveDelete?: (row: { game_id: string; move_number: number }) => void;
   },
 ): RealtimeChannel {
   const sb = getSupabase();
@@ -310,6 +331,11 @@ export function subscribeLiveGame(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'go_school_live_moves', filter: `game_id=eq.${gameId}` },
       (payload) => handlers.onMoveInsert?.(payload.new as LiveMoveRow),
+    )
+    .on(
+      'postgres_changes',
+      { event: 'DELETE', schema: 'public', table: 'go_school_live_moves', filter: `game_id=eq.${gameId}` },
+      (payload) => handlers.onMoveDelete?.(payload.old as { game_id: string; move_number: number }),
     )
     .subscribe();
   return channel;

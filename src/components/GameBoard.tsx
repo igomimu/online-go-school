@@ -1,10 +1,12 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
 import GoBoard from './GoBoard';
-import { Flag, SkipForward, Check, RefreshCw, X } from 'lucide-react';
+import ZoomTapConfirm from './ZoomTapConfirm';
+import { Flag, SkipForward, Check, RefreshCw, X, Undo2 } from 'lucide-react';
 import { calculateTerritory, formatScoringResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
 import { useLiveGame } from '../hooks/useLiveGame';
+import { useIsTouchDevice } from '../hooks/useIsTouchDevice';
 import { getSupabase } from '../utils/liveGameApi';
 import { resolvePlayerName } from '../utils/identityUtils';
 import { ClassroomLiveKit } from '../utils/classroomLiveKit';
@@ -31,6 +33,7 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
     whiteCaptures,
     isMyTurn,
     isParticipant,
+    myColor,
     clock,
     loading,
     error,
@@ -40,13 +43,27 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
     setDeadStones,
     finishWithResult,
     resetGame,
+    requestUndo,
+    respondUndo,
   } = live;
 
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
+  const [pendingTap, setPendingTap] = useState<{ x: number; y: number } | null>(null);
+  const isTouch = useIsTouchDevice();
 
   const isScoring = game?.status === 'scoring';
+  const undoRequest = game?.undo_request ?? null;
   // 着手できるのは手番の対局者本人のみ。対局中の代打ちは（先生でも）一切不可。
-  const canPlay = game?.status === 'playing' && isMyTurn;
+  // 「待った」申請中は双方とも着手不可（サーバー側のsubmit_move 409ガードと二重の防御）。
+  const canPlay = game?.status === 'playing' && isMyTurn && !undoRequest;
+  const isUndoRequester = !!undoRequest && myColor === undoRequest.requested_color;
+  const canRespondToUndo = !!undoRequest && isParticipant && !isUndoRequester;
+  const canRequestUndo = game?.status === 'playing' && !undoRequest && isParticipant && moveNumber > 0;
+
+  // 相手の着手等で手番が失われたら、拡大確認オーバーレイを開いたままにしない
+  useEffect(() => {
+    if (pendingTap && !canPlay) setPendingTap(null);
+  }, [canPlay, pendingTap]);
 
   const deadStonesSet = useMemo(
     () => new Set(game?.scoring_dead_stones ?? []),
@@ -84,12 +101,26 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
         setDeadStones(Array.from(currentDead));
         return;
       }
-      if (!isMyTurn) return;
+      if (!isMyTurn || game.undo_request) return;
       // 手番の対局者本人のみ着手できる（代打ち不可）。
       await submitMove(x, y);
       onMoveSubmitted?.();
     },
     [game, isScoring, isTeacher, boardState, isMyTurn, submitMove, setDeadStones, onMoveSubmitted],
+  );
+
+  // スマホのタップミス対策: 対局中の自分の手番のみ、1回目のタップでは確定せず
+  // 拡大確認オーバーレイ(ZoomTapConfirm)を開く。整地の死石マーキングやPCでの
+  // hover+クリックは従来どおり即時反映（handleCellClickへ素通し）。
+  const handleBoardCellClick = useCallback(
+    (x: number, y: number) => {
+      if (isTouch && game?.status === 'playing' && !isScoring && isMyTurn) {
+        setPendingTap({ x, y });
+        return;
+      }
+      handleCellClick(x, y);
+    },
+    [isTouch, game?.status, isScoring, isMyTurn, handleCellClick],
   );
 
   const handlePassClick = useCallback(async () => {
@@ -271,16 +302,16 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
           onCellClick={
             isScoring
               ? isTeacher
-                ? handleCellClick
+                ? handleBoardCellClick
                 : undefined
               : game.status === 'playing'
-                ? handleCellClick
+                ? handleBoardCellClick
                 : undefined
           }
           readOnly={
             isScoring
               ? !isTeacher
-              : game.status !== 'playing' || !isMyTurn
+              : game.status !== 'playing' || !isMyTurn || !!undoRequest
           }
           onCellMouseEnter={canPlay ? (x, y) => setGhostPos({ x, y }) : undefined}
           onCellMouseLeave={canPlay ? () => setGhostPos(null) : undefined}
@@ -289,6 +320,20 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
           territoryMap={scoringResult?.territoryMap}
           deadStones={deadStonesSet.size > 0 ? deadStonesSet : undefined}
         />
+        {pendingTap && (
+          <ZoomTapConfirm
+            boardState={boardState}
+            boardSize={game.board_size}
+            x={pendingTap.x}
+            y={pendingTap.y}
+            color={currentColor}
+            onConfirm={(cx, cy) => {
+              setPendingTap(null);
+              handleCellClick(cx, cy);
+            }}
+            onCancel={() => setPendingTap(null)}
+          />
+        )}
       </div>
 
       {/* 整地モード */}
@@ -329,8 +374,36 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
         </div>
       )}
 
-      {/* 操作ボタン（パス・投了とも手番の対局者本人のみ） */}
-      {game.status === 'playing' && isMyTurn && (
+      {/* 「待った」申請中バナー */}
+      {undoRequest && (
+        <div className="glass-panel px-4 py-3 flex items-center justify-between gap-4 border border-amber-500/30 bg-amber-500/10">
+          <span className="text-sm text-amber-200">
+            {isUndoRequester
+              ? '「待った」を申請中です。相手の返答をお待ちください。'
+              : `${resolvePlayerName(undoRequest.requested_by, students)} が「待った」を申請しています。`}
+          </span>
+          <div className="flex gap-2 shrink-0">
+            {isUndoRequester && (
+              <button onClick={() => respondUndo(false)} className="secondary-button text-xs">
+                取り下げる
+              </button>
+            )}
+            {canRespondToUndo && (
+              <>
+                <button onClick={() => respondUndo(true)} className="premium-button text-xs">
+                  承諾する
+                </button>
+                <button onClick={() => respondUndo(false)} className="secondary-button text-xs">
+                  拒否する
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 操作ボタン（パス・投了とも手番の対局者本人のみ、「待った」申請中は不可） */}
+      {game.status === 'playing' && isMyTurn && !undoRequest && (
         <div className="shrink-0 flex justify-center gap-3">
           <button
             onClick={handlePassClick}
@@ -343,6 +416,20 @@ export default function GameBoard({ gameId, myIdentity, isTeacher, onBack, onMov
             className="secondary-button flex items-center gap-2 text-sm border-red-500/20 hover:bg-red-500/10 hover:text-red-400"
           >
             <Flag className="w-4 h-4" /> 投了
+          </button>
+        </div>
+      )}
+
+      {/* 「待った」申請（対局者どうしの同意制、手番に関係なく双方に表示） */}
+      {canRequestUndo && (
+        <div className="shrink-0 flex justify-center">
+          <button
+            onClick={() => {
+              if (confirm('直前の一手について「待った」を相手に申請しますか？')) requestUndo();
+            }}
+            className="secondary-button flex items-center gap-2 text-sm"
+          >
+            <Undo2 className="w-4 h-4" /> 待った
           </button>
         </div>
       )}

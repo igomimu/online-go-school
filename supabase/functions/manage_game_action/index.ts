@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { studentMatchesPlayer } from '../_shared/identity.ts'
+import { studentMatchesPlayer, toStudentIdentity } from '../_shared/identity.ts'
 import { exportLiveGameToSgf, formatTokyoSgfDate } from '../_shared/sgf.ts'
 import { versionResponse } from '../_shared/version.ts'
 
@@ -10,7 +10,7 @@ const corsHeaders = {
 }
 
 interface ActionBody {
-  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all'
+  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all' | 'request_undo' | 'respond_undo'
   game_id?: string
   params?: any
 }
@@ -220,6 +220,7 @@ Deno.serve(async (req) => {
         .update({
           status: 'finished',
           result: normalizedResult,
+          undo_request: null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', game_id)
@@ -252,6 +253,7 @@ Deno.serve(async (req) => {
           status: 'interrupted',
           result: '中断',
           clock: pauseClock(gameToInterrupt.clock),
+          undo_request: null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', game_id)
@@ -290,6 +292,7 @@ Deno.serve(async (req) => {
             status: 'interrupted',
             result: '中断',
             clock: pauseClock(gameToInterrupt.clock),
+            undo_request: null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', gameToInterrupt.id)
@@ -338,12 +341,115 @@ Deno.serve(async (req) => {
           result: null,
           scoring_dead_stones: [],
           clock: null,
+          undo_request: null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', game_id)
 
       if (resetGameError) throw resetGameError
       return json({ ok: true })
+    }
+
+    if (action === 'request_undo') {
+      // 待った申請は先生の強制介入不可、対局者本人のみ（対局者どうしの同意制）
+      if (isTeacher || isServiceRole) {
+        return json({ error: 'Forbidden: only players can request undo' }, 403)
+      }
+
+      const { data: g, error: gErr } = await supabase
+        .from('go_school_live_games')
+        .select('status, black_player, white_player, undo_request')
+        .eq('id', game_id)
+        .single()
+
+      if (gErr || !g) return json({ error: 'Game not found' }, 404)
+      if (g.status !== 'playing') return json({ error: 'Game is not in playing status' }, 409)
+      if (g.undo_request) return json({ error: 'Undo request already pending' }, 409)
+
+      const requestedColor = studentMatchesPlayer(validatedStudentId, g.black_player)
+        ? 'BLACK'
+        : studentMatchesPlayer(validatedStudentId, g.white_player)
+          ? 'WHITE'
+          : null
+      if (!requestedColor) {
+        return json({ error: 'Forbidden: not a player of this game' }, 403)
+      }
+
+      const { data: lastMoves, error: movesErr } = await supabase
+        .from('go_school_live_moves')
+        .select('move_number')
+        .eq('game_id', game_id)
+        .order('move_number', { ascending: false })
+        .limit(1)
+
+      if (movesErr) throw movesErr
+      const lastMove = lastMoves?.[0]
+      if (!lastMove) return json({ error: 'No move to undo' }, 409)
+
+      const undo_request = {
+        requested_by: toStudentIdentity(validatedStudentId!),
+        requested_color: requestedColor,
+        target_move_number: lastMove.move_number,
+        requested_at: new Date().toISOString(),
+      }
+
+      const { error } = await supabase
+        .from('go_school_live_games')
+        .update({ undo_request, updated_at: new Date().toISOString() })
+        .eq('id', game_id)
+
+      if (error) throw error
+      return json({ ok: true, undo_request })
+    }
+
+    if (action === 'respond_undo') {
+      if (isTeacher || isServiceRole) {
+        return json({ error: 'Forbidden: only players can respond to undo' }, 403)
+      }
+
+      const { accept } = params || {}
+      const { data: g, error: gErr } = await supabase
+        .from('go_school_live_games')
+        .select('status, black_player, white_player, undo_request')
+        .eq('id', game_id)
+        .single()
+
+      if (gErr || !g) return json({ error: 'Game not found' }, 404)
+      if (g.status !== 'playing' || !g.undo_request) {
+        return json({ error: 'No pending undo request' }, 409)
+      }
+
+      const callerColor = studentMatchesPlayer(validatedStudentId, g.black_player)
+        ? 'BLACK'
+        : studentMatchesPlayer(validatedStudentId, g.white_player)
+          ? 'WHITE'
+          : null
+      if (!callerColor) {
+        return json({ error: 'Forbidden: not a player of this game' }, 403)
+      }
+
+      const isRequester = callerColor === g.undo_request.requested_color
+      if (accept && isRequester) {
+        return json({ error: 'Only the other player can accept an undo request' }, 403)
+      }
+
+      if (accept) {
+        const { error: delErr } = await supabase
+          .from('go_school_live_moves')
+          .delete()
+          .eq('game_id', game_id)
+          .eq('move_number', g.undo_request.target_move_number)
+
+        if (delErr) throw delErr
+      }
+
+      const { error } = await supabase
+        .from('go_school_live_games')
+        .update({ undo_request: null, updated_at: new Date().toISOString() })
+        .eq('id', game_id)
+
+      if (error) throw error
+      return json({ ok: true, accepted: !!accept })
     }
 
     if (action === 'resume') {

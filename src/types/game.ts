@@ -81,7 +81,9 @@ export type GameMessageType =
   | 'REVIEW_END'
   | 'AUDIO_CONTROL'
   | 'MEDIA_CONTROL'
-  | 'CHAT_MESSAGE';
+  | 'CHAT_MESSAGE'
+  | 'GAME_UNDO_REQUEST'
+  | 'GAME_UNDO_RESPONSE';
 
 export interface GameCreatedPayload {
   game: GameSession;
@@ -114,6 +116,18 @@ export interface GamePassPayload {
 export interface GameResignPayload {
   gameId: string;
   color: StoneColor;
+}
+
+// バナー表示の即時通知専用（非正本）。盤面変更の正本はDBのDELETE realtimeのみ。
+export interface GameUndoRequestPayload {
+  gameId: string;
+  requestedBy: string;
+  requestedColor: StoneColor;
+  targetMoveNumber: number;
+}
+
+export interface GameUndoResponsePayload {
+  gameId: string;
 }
 
 export interface GameEndedPayload {
