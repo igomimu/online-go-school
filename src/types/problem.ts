@@ -11,6 +11,7 @@ export interface Problem {
   difficulty?: string;         // 初級/中級/上級
   createdAt: string;           // ISO date
   viewRange?: ViewRange;       // 詰碁データベース由来: 部分盤面の表示範囲
+  sourceId?: number;           // 詰碁データベース由来: tsumego_problems.source_id（まちがい報告用）
 }
 
 export interface ProblemAttempt {

@@ -74,3 +74,24 @@ export async function fetchRandomTsumegoProblem(filter: TsumegoFilter = {}): Pro
   const row = data?.[0];
   return row ? (row as unknown as TsumegoProblemRow) : null;
 }
+
+/**
+ * 詰碁問題のまちがいを報告する。tsumego_reports へINSERTするだけで、
+ * 通知(dojo@1kawa15.comへのメール)は既存のDBトリガー(notify-tsumego-report
+ * Edge Function、dojo-appと共有)が自動で行う。
+ */
+export async function reportTsumegoProblem(params: {
+  problemId: string;
+  sourceId: number;
+  reason: string;
+}): Promise<void> {
+  const supabase = getSupabase();
+  const { data: userData } = await supabase.auth.getUser();
+  const { error } = await supabase.from('tsumego_reports').insert({
+    problem_id: params.problemId,
+    source_id: params.sourceId,
+    reporter_id: userData.user?.id ?? null,
+    reason: params.reason.trim() || null,
+  });
+  if (error) throw error;
+}

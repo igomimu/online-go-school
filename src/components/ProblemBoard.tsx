@@ -1,8 +1,9 @@
 import GoBoard from './GoBoard';
 import type { Problem } from '../types/problem';
 import { useProblemSession } from '../hooks/useProblemSession';
-import { useEffect } from 'react';
-import { Check, X, RotateCcw } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, X, RotateCcw, Flag } from 'lucide-react';
+import TsumegoReportModal from './TsumegoReportModal';
 
 interface ProblemBoardProps {
   problem: Problem;
@@ -18,6 +19,7 @@ export default function ProblemBoard({
   isTeacher,
 }: ProblemBoardProps) {
   const { problemState, startProblem, makeMove, retry } = useProblemSession();
+  const [showReport, setShowReport] = useState(false);
 
   useEffect(() => {
     startProblem(problem);
@@ -65,12 +67,30 @@ export default function ProblemBoard({
           {problem.difficulty && (
             <span className="text-xs text-zinc-500 bg-white/5 px-2 py-0.5 rounded">{problem.difficulty}</span>
           )}
+          {problem.sourceId !== undefined && (
+            <button
+              onClick={() => setShowReport(true)}
+              title="この問題のまちがいを報告"
+              aria-label="この問題のまちがいを報告"
+              className="text-zinc-500 hover:text-orange-400 transition-colors p-1"
+            >
+              <Flag className="w-4 h-4" />
+            </button>
+          )}
         </div>
         <div className={`flex items-center gap-2 font-bold ${statusColor}`}>
           {statusIcon}
           {problemState.message}
         </div>
       </div>
+
+      {showReport && problem.sourceId !== undefined && (
+        <TsumegoReportModal
+          problemId={problem.id}
+          sourceId={problem.sourceId}
+          onClose={() => setShowReport(false)}
+        />
+      )}
 
       {/* 碁盤 */}
       <div className="glass-panel flex flex-1 min-h-0 justify-center items-center p-2 sm:p-3 shadow-2xl">

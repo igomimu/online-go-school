@@ -48,6 +48,7 @@ export function tsumegoRowToProblem(row: TsumegoProblemRow): Problem {
     sgfTree: convertAnswerNode(row.answer_tree),
     difficulty: row.level,
     createdAt: new Date().toISOString(),
+    sourceId: row.source_id,
     viewRange: {
       minX: row.view_range.x1,
       maxX: row.view_range.x2,
