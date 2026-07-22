@@ -114,7 +114,7 @@ export default function TeacherGameWindow({
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 8,
-        padding: 8,
+        padding: '4px 8px',
         borderBottom: '2px solid #999',
         background: '#e8e8e0',
       }}>
@@ -189,7 +189,7 @@ export default function TeacherGameWindow({
           })}
         </div>
       ) : resolvedActiveId ? (
-        <div data-testid="simul-active-board" className="flex-1 min-h-0 bg-zinc-950 p-2 text-white overflow-hidden">
+        <div data-testid="simul-active-board" className="flex-1 min-h-0 bg-zinc-950 p-1 text-white overflow-hidden">
           <GameBoard
             key={resolvedActiveId}
             gameId={resolvedActiveId}

@@ -671,7 +671,7 @@ function App() {
   const openTeacherGameWindow = useCallback((classroomId: string) => {
     const identity = classroomRef.current?.localIdentity ?? TEACHER_IDENTITY;
     const url = `${window.location.origin}${window.location.pathname}?mode=game&role=TEACHER&teacherClassroomId=${encodeURIComponent(classroomId)}&identity=${encodeURIComponent(identity)}`;
-    const win = window.open(url, TEACHER_GAME_WINDOW_NAME, 'width=1000,height=800,menubar=no,toolbar=no,location=no,status=no');
+    const win = window.open(url, TEACHER_GAME_WINDOW_NAME, 'width=700,height=800,menubar=no,toolbar=no,location=no,status=no');
     win?.focus();
   }, []);
 
@@ -945,7 +945,7 @@ function App() {
   if (isDedicatedGameMode && paramGameId && paramIdentity) {
     const isTeacherRole = paramRole === 'TEACHER';
     return (
-      <div className="fixed inset-0 bg-zinc-950 text-white p-2 overflow-hidden">
+      <div className="fixed inset-0 bg-zinc-950 text-white p-1 overflow-hidden">
         <GameBoard
           gameId={paramGameId}
           myIdentity={decodeURIComponent(paramIdentity)}

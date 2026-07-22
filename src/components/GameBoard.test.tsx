@@ -285,15 +285,14 @@ describe('GameBoard', () => {
     expect(container.querySelector('[data-cell]')).toBeNull();
   });
 
-  it('先生は相手の手番でも描画モードで線を引けるが代打ちはしない', () => {
-    const game = createMockGame({ blackPlayer: '生徒', whitePlayer: '先生', currentColor: 'BLACK' });
+  it('先生は整地中に描画モードで線を引けるが死石マーキングとは別動作になる', () => {
+    // 描画機能は対局中(playing)には使わないため整地中(scoring)のみ表示される。
+    const game = createMockGame({ blackPlayer: '生徒', whitePlayer: '先生', currentColor: 'BLACK', status: 'scoring' });
     setupMock({ game, myColor: 'WHITE', isParticipant: true, isMyTurn: false });
     const classroom = { broadcast: vi.fn() };
     const { container } = render(
       <GameBoard gameId="game-1" myIdentity="先生" isTeacher classroom={classroom as any} />
     );
-
-    expect(container.querySelector('[data-cell]')).toBeNull();
 
     fireEvent.click(screen.getByLabelText('線を描く'));
     const cells = container.querySelectorAll('[data-cell]');
@@ -312,7 +311,7 @@ describe('GameBoard', () => {
   });
 
   it('別の対局へ切り替えると講師の一時描画をリセットする', () => {
-    const game = createMockGame({ blackPlayer: '生徒', whitePlayer: '先生', currentColor: 'BLACK' });
+    const game = createMockGame({ blackPlayer: '生徒', whitePlayer: '先生', currentColor: 'BLACK', status: 'scoring' });
     setupMock({ game, myColor: 'WHITE', isParticipant: true, isMyTurn: false });
     const classroom = { broadcast: vi.fn() };
     const { container, rerender } = render(

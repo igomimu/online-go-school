@@ -252,9 +252,9 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   };
 
   return (
-    <div className={`flex h-full flex-col ${isDedicatedWindow ? 'gap-2' : 'gap-3'}`}>
+    <div className={`flex h-full flex-col ${isDedicatedWindow ? 'gap-1.5' : 'gap-3'}`}>
       {/* 対局情報ヘッダー */}
-      <div className={`glass-panel shrink-0 flex items-center justify-between gap-3 ${isDedicatedWindow ? 'px-3 py-1.5' : 'px-3 py-2 sm:px-4 sm:py-3'}`}>
+      <div className={`glass-panel shrink-0 flex items-center justify-between gap-3 ${isDedicatedWindow ? 'px-3 py-1' : 'px-3 py-2 sm:px-4 sm:py-3'}`}>
         <div className="flex min-w-0 items-center gap-3 sm:gap-4 overflow-x-auto">
           {onBack && (
             <button
@@ -298,7 +298,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               onClick={() => {
                 const role = isTeacher ? 'TEACHER' : 'STUDENT';
                 const url = `${window.location.origin}${window.location.pathname}?mode=game&gameId=${gameId}&identity=${encodeURIComponent(myIdentity)}&role=${role}`;
-                window.open(url, '_blank', 'width=1000,height=800,menubar=no,toolbar=no,location=no,status=no');
+                window.open(url, '_blank', 'width=700,height=800,menubar=no,toolbar=no,location=no,status=no');
               }}
               className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold border border-blue-700 rounded px-3 py-1 transition-colors duration-150"
             >
@@ -360,7 +360,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
       {/* 碁盤: maxHeight="100%" で親(flex-1 min-h-0)の実際の余り高さに追従させる。
           固定のcalc(100dvh - Nrem)だと、待ったバナー等でUI要素が増えるたびに
           画面全体がoverflowしてスクロールバーが出てしまう（常に碁盤全体を映す要件）。 */}
-      <div className={`glass-panel flex flex-1 min-h-0 justify-center items-center shadow-2xl overflow-hidden ${isDedicatedWindow ? 'p-1' : 'p-2 sm:p-3'}`}>
+      <div className={`glass-panel flex flex-1 min-h-0 justify-center items-center shadow-2xl overflow-hidden ${isDedicatedWindow ? 'p-0.5' : 'p-2 sm:p-3'}`}>
         <GoBoard
           boardState={boardState}
           boardSize={game.board_size}
@@ -411,7 +411,8 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
         )}
       </div>
 
-      {isTeacher && game.status !== 'finished' && game.status !== 'interrupted' && (
+      {/* 描画機能は検討・解説用途。対局中は使わないため整地中のみ表示する。 */}
+      {isTeacher && game.status === 'scoring' && (
         <div className="shrink-0 flex justify-center">
           <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/60 p-2">
             <button
@@ -518,24 +519,23 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
         </div>
       )}
 
-      {/* 操作ボタン行（パス・投了は手番の対局者本人のみ、「待った」は手番に関係なく対局者に表示）
-          パス・投了と「待った」を同じ行にまとめ、着手のたびに行自体が出現/消失してレイアウトが
-          揺れないようにしている（片方だけ消えても行の高さは変わらない）。 */}
-      {game.status === 'playing' && ((isMyTurn && !undoRequest) || canRequestUndo) && (
-        <div className="shrink-0 flex justify-center gap-3">
+      {/* 操作ボタン行＋ターン表示を1行にまとめてコンパクト化
+          （パス・投了は手番の対局者本人のみ、「待った」は手番に関係なく対局者に表示）。 */}
+      {game.status === 'playing' && (
+        <div className="shrink-0 flex flex-wrap items-center justify-center gap-2">
           {isMyTurn && !undoRequest && (
             <>
               <button
                 onClick={handlePassClick}
-                className="secondary-button flex items-center gap-2 text-sm"
+                className="secondary-button flex items-center gap-1.5 text-xs px-3 py-1.5"
               >
-                <SkipForward className="w-4 h-4" /> パス
+                <SkipForward className="w-3.5 h-3.5" /> パス
               </button>
               <button
                 onClick={handleResignClick}
-                className="secondary-button flex items-center gap-2 text-sm border-red-500/20 hover:bg-red-500/10 hover:text-red-400"
+                className="secondary-button flex items-center gap-1.5 text-xs px-3 py-1.5 border-red-500/20 hover:bg-red-500/10 hover:text-red-400"
               >
-                <Flag className="w-4 h-4" /> 投了
+                <Flag className="w-3.5 h-3.5" /> 投了
               </button>
             </>
           )}
@@ -544,24 +544,20 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               onClick={() => {
                 if (confirm('直前の一手について「待った」を相手に申請しますか？')) requestUndo();
               }}
-              className="secondary-button flex items-center gap-2 text-sm"
+              className="secondary-button flex items-center gap-1.5 text-xs px-3 py-1.5"
             >
-              <Undo2 className="w-4 h-4" /> 待った
+              <Undo2 className="w-3.5 h-3.5" /> 待った
             </button>
           )}
-        </div>
-      )}
-
-      {/* ターン表示 */}
-      {game.status === 'playing' && (
-        <div data-testid="turn-indicator" className="shrink-0 text-center text-sm text-zinc-500">
-          {isMyTurn ? (
-            <span className="text-blue-400 font-bold">あなたの番です</span>
-          ) : isParticipant ? (
-            '相手の番です'
-          ) : (
-            `${resolvePlayerName(currentColor === 'BLACK' ? game.black_player : game.white_player, students)}の番`
-          )}
+          <span data-testid="turn-indicator" className="text-xs text-zinc-500">
+            {isMyTurn ? (
+              <span className="text-blue-400 font-bold">あなたの番です</span>
+            ) : isParticipant ? (
+              '相手の番です'
+            ) : (
+              `${resolvePlayerName(currentColor === 'BLACK' ? game.black_player : game.white_player, students)}の番`
+            )}
+          </span>
         </div>
       )}
 
@@ -572,8 +568,8 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
         </div>
       )}
 
-      {/* 先生用管理者機能 */}
-      {isTeacher && (
+      {/* 先生用管理者機能（テスト・開発時のみ。本番の対局画面には出さない） */}
+      {isTeacher && import.meta.env.DEV && (
         <div className="shrink-0 flex flex-col sm:flex-row justify-center gap-3 pt-2 border-t border-white/5">
           {game.status !== 'finished' && game.status !== 'interrupted' && (
             <button
