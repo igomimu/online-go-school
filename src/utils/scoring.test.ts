@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateTerritory, formatScoringResult } from './scoring';
+import { calculateTerritory, formatScoringResult, formatGameResultMessage } from './scoring';
 import type { BoardState, Stone } from '../components/GoBoard';
 
 function makeBoard(size: number, stones: { x: number; y: number; color: 'BLACK' | 'WHITE' }[]): BoardState {
@@ -95,5 +95,27 @@ describe('formatScoringResult', () => {
       blackTotal: 30, whiteTotal: 30,
     });
     expect(result).toBe('ジゴ');
+  });
+});
+
+describe('formatGameResultMessage', () => {
+  it('白の投了（黒の中押し勝ち）', () => {
+    expect(formatGameResultMessage('B+R')).toBe('白が投了しました。黒の中押し勝ち');
+  });
+
+  it('黒の投了（白の中押し勝ち）', () => {
+    expect(formatGameResultMessage('W+R')).toBe('黒が投了しました。白の中押し勝ち');
+  });
+
+  it('黒の目数勝ち', () => {
+    expect(formatGameResultMessage('B+8.5')).toBe('黒の8.5目勝ち');
+  });
+
+  it('白の目数勝ち（整数目数）', () => {
+    expect(formatGameResultMessage('W+5')).toBe('白の5目勝ち');
+  });
+
+  it('時間切れはラベル付きでそのまま表示', () => {
+    expect(formatGameResultMessage('W+T')).toBe('結果: W+T');
   });
 });

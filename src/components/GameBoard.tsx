@@ -3,7 +3,7 @@ import GoBoard from './GoBoard';
 import ZoomTapConfirm from './ZoomTapConfirm';
 import type { Drawing } from './GoBoard';
 import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2 } from 'lucide-react';
-import { calculateTerritory, formatScoringResult } from '../utils/scoring';
+import { calculateTerritory, formatScoringResult, formatGameResultMessage } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
 import { useLiveGame } from '../hooks/useLiveGame';
@@ -561,10 +561,10 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
         </div>
       )}
 
-      {/* 終局結果 */}
+      {/* 終局結果（投了は「〇が投了しました。〇の中押し勝ち」の分かりやすい文言にする） */}
       {(game.status === 'finished' || game.status === 'interrupted') && game.result && (
-        <div className="shrink-0 text-center text-sm text-zinc-400">
-          結果: <span className="text-white font-bold">{game.result}</span>
+        <div className="shrink-0 text-center text-sm text-white font-bold">
+          {formatGameResultMessage(game.result)}
         </div>
       )}
 

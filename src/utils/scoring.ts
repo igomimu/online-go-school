@@ -148,3 +148,23 @@ export function formatScoringResult(scoring: ScoringResult): string {
   }
   return 'ジゴ';
 }
+
+/**
+ * 終局結果の文字列（例: "B+R", "W+12.5"）を対局者向けの分かりやすい日本語文言に変換する。
+ * 投了（+R）のみ「〇が投了しました。〇の中押し勝ち」の専用文言にし、
+ * それ以外（目数勝ち・時間切れ等）は簡潔な結果表記のまま返す。
+ */
+export function formatGameResultMessage(result: string): string {
+  const resignMatch = result.match(/^([BW])\+R$/);
+  if (resignMatch) {
+    const winnerColor = resignMatch[1] === 'B' ? '黒' : '白';
+    const loserColor = resignMatch[1] === 'B' ? '白' : '黒';
+    return `${loserColor}が投了しました。${winnerColor}の中押し勝ち`;
+  }
+  const territoryMatch = result.match(/^([BW])\+(\d+(?:\.\d+)?)$/);
+  if (territoryMatch) {
+    const winnerColor = territoryMatch[1] === 'B' ? '黒' : '白';
+    return `${winnerColor}の${territoryMatch[2]}目勝ち`;
+  }
+  return `結果: ${result}`;
+}
