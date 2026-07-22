@@ -900,22 +900,6 @@ function App() {
     });
   };
 
-  const handleResetVideo = useCallback(async () => {
-    if (!classroomRef.current || !classroomRef.current.isConnected) return;
-    try {
-      setAudioDebug(prev => prev + ' [ビデオリセット開始]');
-      await classroomRef.current.room.localParticipant.setCameraEnabled(false);
-      setIsCameraEnabled(false);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await classroomRef.current.room.localParticipant.setCameraEnabled(true);
-      setIsCameraEnabled(true);
-      setAudioDebug(prev => prev + ' [ビデオリセット成功]');
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setAudioDebug(prev => prev + ` [ビデオリセットエラー: ${msg}]`);
-    }
-  }, []);
-
   // --- 別タブ対局専用モード ---
   const params = new URLSearchParams(window.location.search);
   const isDedicatedGameMode = params.get('mode') === 'game';
@@ -1270,7 +1254,6 @@ function App() {
             onClearAudioM={handleClearAudioM}
             onClearAudioS={handleClearAudioS}
             onClearSharing={() => setReviewTargetStudents([])}
-            onResetVideo={handleResetVideo}
             onSelectSavedGame={handleSelectSavedGame}
             onResumeGame={handleResumeGame}
             onOpenTeacherGameWindow={() => selectedClassroomId && openTeacherGameWindow(selectedClassroomId)}

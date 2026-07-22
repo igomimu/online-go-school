@@ -54,7 +54,6 @@ interface TeacherDashboardProps {
   onClearAudioM?: () => void;
   onClearAudioS?: () => void;
   onClearSharing?: () => void;
-  onResetVideo?: () => void;
   onSelectSavedGame?: (game: SavedGame) => void;
   onResumeGame?: (gameId: string) => void;
   /** 講師専用の対局別ウィンドウを開く/前面化する（対局は常にこの別ウィンドウで行う） */
@@ -91,7 +90,6 @@ export default function TeacherDashboard({
   onClearAudioM,
   onClearAudioS,
   onClearSharing,
-  onResetVideo,
   onSelectSavedGame,
   onResumeGame,
   onOpenTeacherGameWindow,
@@ -536,7 +534,6 @@ export default function TeacherDashboard({
         onClearAudioM={onClearAudioM}
         onClearAudioS={onClearAudioS}
         onClearSharing={onClearSharing}
-        onResetVideo={onResetVideo}
       />
 
       {/* 教室設定ダイアログ（生徒入替） */}

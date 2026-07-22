@@ -20,7 +20,6 @@ interface TeacherToolbarProps {
   onClearAudioM?: () => void;
   onClearAudioS?: () => void;
   onClearSharing?: () => void;
-  onResetVideo?: () => void;
 }
 
 // IGC風のボタン
@@ -66,7 +65,6 @@ export default function TeacherToolbar({
   onClearAudioM,
   onClearAudioS,
   onClearSharing,
-  onResetVideo,
 }: TeacherToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const problemInputRef = useRef<HTMLInputElement>(null);
@@ -208,7 +206,6 @@ export default function TeacherToolbar({
           onClick={onReconnect}
           disabled={isReconnecting}
         />
-        <IgcButton label="ビデオリセット" color="#d0a0d0" onClick={onResetVideo} />
 
         {/* 日時表示 */}
         <div style={{
