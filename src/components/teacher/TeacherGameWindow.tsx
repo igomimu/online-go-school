@@ -189,7 +189,7 @@ export default function TeacherGameWindow({
           })}
         </div>
       ) : resolvedActiveId ? (
-        <div data-testid="simul-active-board" className="flex-1 min-h-0 bg-zinc-950 p-2 sm:p-4 text-white overflow-hidden">
+        <div data-testid="simul-active-board" className="flex-1 min-h-0 bg-zinc-950 p-2 text-white overflow-hidden">
           <GameBoard
             key={resolvedActiveId}
             gameId={resolvedActiveId}

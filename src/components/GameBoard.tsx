@@ -58,6 +58,9 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   const [pendingTap, setPendingTap] = useState<{ x: number; y: number } | null>(null);
   const isTouch = useIsTouchDevice();
   const isPinchZoomed = useIsPinchZoomed();
+  // 対局専用の別ウィンドウ（?mode=game）は碁盤表示に特化した画面なので、
+  // 通常画面より余白を切り詰めて碁盤を大きく見せる。
+  const isDedicatedWindow = new URLSearchParams(window.location.search).get('mode') === 'game';
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [drawMode, setDrawMode] = useState<'off' | 'line' | 'arrow'>('off');
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
@@ -249,9 +252,9 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   };
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className={`flex h-full flex-col ${isDedicatedWindow ? 'gap-2' : 'gap-3'}`}>
       {/* 対局情報ヘッダー */}
-      <div className="glass-panel shrink-0 px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between gap-3">
+      <div className={`glass-panel shrink-0 flex items-center justify-between gap-3 ${isDedicatedWindow ? 'px-3 py-1.5' : 'px-3 py-2 sm:px-4 sm:py-3'}`}>
         <div className="flex min-w-0 items-center gap-3 sm:gap-4 overflow-x-auto">
           {onBack && (
             <button
@@ -290,7 +293,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                   : `終局: ${game.result ?? ''}`}
           </span>
           {/* スマホでは別ウィンドウを開いても見づらいだけなので、タッチデバイスでは非表示にする */}
-          {!isTouch && !(new URLSearchParams(window.location.search).get('mode') === 'game') && (
+          {!isTouch && !isDedicatedWindow && (
             <button
               onClick={() => {
                 const role = isTeacher ? 'TEACHER' : 'STUDENT';
@@ -357,7 +360,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
       {/* 碁盤: maxHeight="100%" で親(flex-1 min-h-0)の実際の余り高さに追従させる。
           固定のcalc(100dvh - Nrem)だと、待ったバナー等でUI要素が増えるたびに
           画面全体がoverflowしてスクロールバーが出てしまう（常に碁盤全体を映す要件）。 */}
-      <div className="glass-panel flex flex-1 min-h-0 justify-center items-center p-2 sm:p-3 shadow-2xl overflow-hidden">
+      <div className={`glass-panel flex flex-1 min-h-0 justify-center items-center shadow-2xl overflow-hidden ${isDedicatedWindow ? 'p-1' : 'p-2 sm:p-3'}`}>
         <GoBoard
           boardState={boardState}
           boardSize={game.board_size}
