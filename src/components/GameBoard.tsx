@@ -8,6 +8,7 @@ import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
 import { useLiveGame } from '../hooks/useLiveGame';
 import { useIsTouchDevice } from '../hooks/useIsTouchDevice';
+import { useIsPinchZoomed } from '../hooks/useIsPinchZoomed';
 import { getSupabase } from '../utils/liveGameApi';
 import { resolvePlayerName } from '../utils/identityUtils';
 import { ClassroomLiveKit } from '../utils/classroomLiveKit';
@@ -56,6 +57,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
   const [pendingTap, setPendingTap] = useState<{ x: number; y: number } | null>(null);
   const isTouch = useIsTouchDevice();
+  const isPinchZoomed = useIsPinchZoomed();
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [drawMode, setDrawMode] = useState<'off' | 'line' | 'arrow'>('off');
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
@@ -124,15 +126,17 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   // スマホのタップミス対策: 対局中の自分の手番のみ、1回目のタップでは確定せず
   // 拡大確認オーバーレイ(ZoomTapConfirm)を開く。整地の死石マーキングやPCでの
   // hover+クリックは従来どおり即時反映（handleCellClickへ素通し）。
+  // ただしユーザーが既にピンチアウトで碁盤を拡大表示している場合は、アプリ側の
+  // 自動拡大と二重にならないよう即座に着手を確定する。
   const handleBoardCellClick = useCallback(
     (x: number, y: number) => {
-      if (isTouch && game?.status === 'playing' && !isScoring && isMyTurn) {
+      if (isTouch && !isPinchZoomed && game?.status === 'playing' && !isScoring && isMyTurn) {
         setPendingTap({ x, y });
         return;
       }
       handleCellClick(x, y);
     },
-    [isTouch, game?.status, isScoring, isMyTurn, handleCellClick],
+    [isTouch, isPinchZoomed, game?.status, isScoring, isMyTurn, handleCellClick],
   );
 
   const handlePassClick = useCallback(async () => {

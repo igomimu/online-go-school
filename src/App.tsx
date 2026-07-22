@@ -927,9 +927,11 @@ function App() {
   const paramRole = params.get('role');
 
   // 講師用: 教師が持つ全対局をこのウィンドウ単体で購読し、常に1盤だけ表示（手番になるたびに自動切替）。
+  // fixed inset-0 で #root の padding(2rem) をバイパスし、ウィンドウのビューポートに正確に一致させる
+  // （h-screen + #root paddingだと必ずビューポートをはみ出しスクロールバーが出ていた）。
   if (isDedicatedGameMode && paramRole === 'TEACHER' && paramClassroomId && paramIdentity) {
     return (
-      <div className="w-full h-screen overflow-y-auto">
+      <div className="fixed inset-0 overflow-hidden">
         <TeacherGameWindow
           classroomId={paramClassroomId}
           teacherIdentity={decodeURIComponent(paramIdentity)}
@@ -943,7 +945,7 @@ function App() {
   if (isDedicatedGameMode && paramGameId && paramIdentity) {
     const isTeacherRole = paramRole === 'TEACHER';
     return (
-      <div className="w-full h-screen bg-zinc-950 text-white p-4 overflow-y-auto">
+      <div className="fixed inset-0 bg-zinc-950 text-white p-4 overflow-hidden">
         <GameBoard
           gameId={paramGameId}
           myIdentity={decodeURIComponent(paramIdentity)}

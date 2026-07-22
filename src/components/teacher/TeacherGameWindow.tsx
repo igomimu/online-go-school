@@ -100,7 +100,7 @@ export default function TeacherGameWindow({
 
   return (
     <div style={{
-      minHeight: '100%',
+      height: '100%',
       background: '#d0d0c8',
       color: '#333',
       fontFamily: 'MS Gothic, "Noto Sans JP", monospace',
@@ -109,6 +109,7 @@ export default function TeacherGameWindow({
     }}>
       {/* 上部バー */}
       <div style={{
+        flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -188,7 +189,7 @@ export default function TeacherGameWindow({
           })}
         </div>
       ) : resolvedActiveId ? (
-        <div data-testid="simul-active-board" className="flex-1 bg-zinc-950 p-2 sm:p-4 text-white overflow-y-auto">
+        <div data-testid="simul-active-board" className="flex-1 min-h-0 bg-zinc-950 p-2 sm:p-4 text-white overflow-hidden">
           <GameBoard
             key={resolvedActiveId}
             gameId={resolvedActiveId}
