@@ -58,6 +58,10 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   const [pendingTap, setPendingTap] = useState<{ x: number; y: number } | null>(null);
   const isTouch = useIsTouchDevice();
   const isPinchZoomed = useIsPinchZoomed();
+  // GoBoard内蔵のピンチズーム(useViewBox由来)の現在倍率。ズーム済みならZoomTapConfirmを
+  // 二重に出さない（useIsPinchZoomedはブラウザネイティブズームの検知、こちらはアプリ内ズーム）。
+  const [boardZoom, setBoardZoom] = useState(1);
+  const BOARD_ZOOM_CONFIRM_SKIP = 1.15;
   // 対局専用の別ウィンドウ（?mode=game）は碁盤表示に特化した画面なので、
   // 通常画面より余白を切り詰めて碁盤を大きく見せる。
   const isDedicatedWindow = new URLSearchParams(window.location.search).get('mode') === 'game';
@@ -133,13 +137,14 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   // 自動拡大と二重にならないよう即座に着手を確定する。
   const handleBoardCellClick = useCallback(
     (x: number, y: number) => {
-      if (isTouch && !isPinchZoomed && game?.status === 'playing' && !isScoring && isMyTurn) {
+      const alreadyZoomed = isPinchZoomed || boardZoom > BOARD_ZOOM_CONFIRM_SKIP;
+      if (isTouch && !alreadyZoomed && game?.status === 'playing' && !isScoring && isMyTurn) {
         setPendingTap({ x, y });
         return;
       }
       handleCellClick(x, y);
     },
-    [isTouch, isPinchZoomed, game?.status, isScoring, isMyTurn, handleCellClick],
+    [isTouch, isPinchZoomed, boardZoom, game?.status, isScoring, isMyTurn, handleCellClick],
   );
 
   const handlePassClick = useCallback(async () => {
@@ -366,6 +371,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
           boardSize={game.board_size}
           className="!w-auto h-full max-w-full"
           maxHeight="100%"
+          onZoomChange={setBoardZoom}
           onCellClick={
             isDrawing
               ? undefined

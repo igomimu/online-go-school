@@ -1,6 +1,7 @@
 // Simplified GoBoard for Web
-import { forwardRef, useMemo, type ReactElement } from 'react';
+import { forwardRef, useMemo, useEffect, type ReactElement } from 'react';
 import type { TerritoryOwner } from '../utils/scoring';
+import { useViewBox } from '../hooks/useViewBox';
 
 export interface ViewRange {
     minX: number;
@@ -70,6 +71,9 @@ export interface GoBoardProps {
     // Scoring overlay
     territoryMap?: TerritoryOwner[][];
     deadStones?: Set<string>;       // "x,y" (1-indexed)
+
+    // ピンチズーム/パン（pokekata由来のuseViewBox）の現在の倍率を親に通知する
+    onZoomChange?: (zoom: number) => void;
 }
 
 const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
@@ -96,6 +100,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     ghostColor,
     territoryMap,
     deadStones,
+    onZoomChange,
 }, ref) => {
     const CELL_SIZE = 40;
     const MARGIN = 40;
@@ -148,6 +153,32 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         return { x: finalX, y: finalY, w: finalW, h: finalH, str: `${finalX} ${finalY} ${finalW} ${finalH}` };
     }, [viewRange, showCoordinates, boardSize]);
 
+    // タッチのピンチズーム/パン（pokekata由来）。マウス/ペン入力は素通りするため
+    // 既存のマウス操作・描画ドラッグには影響しない。
+    const {
+        viewBox,
+        zoom,
+        handleGesturePointerDown,
+        handleGesturePointerMove,
+        handleGesturePointerUp,
+        handleGesturePointerCancel,
+        isGesturing,
+    } = useViewBox({ x: viewBoxData.x, y: viewBoxData.y, w: viewBoxData.w, h: viewBoxData.h });
+
+    useEffect(() => {
+        onZoomChange?.(zoom);
+    }, [zoom, onZoomChange]);
+
+    const handleSvgPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+        if (handleGesturePointerDown(e)) e.preventDefault();
+    };
+    const handleSvgPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+        if (handleGesturePointerMove(e)) e.preventDefault();
+    };
+    const handleSvgPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+        if (handleGesturePointerUp(e)) e.preventDefault();
+    };
+
     const lines = [];
     for (let i = 1; i <= boardSize; i++) {
         const pos = MARGIN + (i - 1) * CELL_SIZE;
@@ -190,7 +221,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                         onMouseEnter={(e) => { onCellMouseEnter?.(x, y); if (e.buttons === 1) onDragMove?.(x, y); }}
                         onMouseLeave={() => onCellMouseLeave?.()}
                         onMouseUp={onDragEnd}
-                        onClick={() => onCellClick?.(x, y)}
+                        onClick={() => { if (isGesturing()) return; onCellClick?.(x, y); }}
                         className="cursor-pointer hover:fill-blue-500 hover:fill-opacity-10"
                     />
                 );
@@ -364,17 +395,22 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         <svg
             ref={ref}
             data-testid="go-board"
-            viewBox={viewBoxData.str}
+            viewBox={viewBox}
             xmlns="http://www.w3.org/2000/svg"
             className={`select-none mx-auto block w-full max-w-[800px] ${className}`}
             style={{
                 aspectRatio: '1 / 1',
                 maxHeight,
+                touchAction: 'none',
             }}
             shapeRendering="geometricPrecision"
             onMouseUp={onDragEnd}
             onMouseLeave={onDragEnd}
             onWheel={(e) => onBoardWheel?.(e.deltaY)}
+            onPointerDown={handleSvgPointerDown}
+            onPointerMove={handleSvgPointerMove}
+            onPointerUp={handleSvgPointerUp}
+            onPointerCancel={handleGesturePointerCancel}
         >
             <defs>
                 <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
