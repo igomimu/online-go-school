@@ -57,14 +57,63 @@ describe('tsumegoRowToProblem', () => {
     expect(problem.sgfTree.move).toBeUndefined();
   });
 
-  it('view_rangeをGoBoardのViewRange形式(minX/maxX/minY/maxY)に変換する', () => {
+  it('DBのview_rangeが石の配置範囲を覆っていればそのまま使う(GoBoardのViewRange形式へ変換)', () => {
     const problem = tsumegoRowToProblem(makeSimpleRow());
     expect(problem.viewRange).toEqual({ minX: 6, maxX: 18, minY: 1, maxY: 13 });
+  });
+
+  it('DBのview_range.x2が実際の石より狭い場合は拡張する(sumatsume由来データの既知の不具合対策)', () => {
+    // 実データで確認済みのパターン(例: source_id=22912): 19路盤で石がx=19にあるのに
+    // 変換元(101weiqi.com)由来のview_range.x2が18で止まり、盤の右端が表示から漏れていた。
+    const problem = tsumegoRowToProblem(makeSimpleRow({
+      board_size: 19,
+      initial_black: ['nh', 'sd'], // "sd" -> x=19(盤の右端), y=4
+      initial_white: ['mi'],
+      view_range: { x1: 10, x2: 18, y1: 1, y2: 7 }, // x2=18のまま(石のx=19を覆っていない)
+    }));
+    expect(problem.viewRange!.maxX).toBeGreaterThanOrEqual(19);
+    expect(problem.viewRange!.maxX).toBeLessThanOrEqual(19); // board_sizeでクランプされる
+  });
+
+  it('DBのview_rangeが解答手順の座標より狭い場合も拡張する', () => {
+    const problem = tsumegoRowToProblem(makeSimpleRow({
+      board_size: 19,
+      view_range: { x1: 6, x2: 15, y1: 1, y2: 10 }, // "og"(x=15)はギリギリ入るが解答の続きが外に出る想定
+      answer_tree: {
+        color: '', coord: '',
+        children: [
+          { color: 'B', coord: 'og', isCorrect: true, children: [
+            { color: 'W', coord: 'sg', children: [] }, // "sg" -> x=19, 元のview_rangeを超える
+          ] },
+        ],
+      },
+    }));
+    expect(problem.viewRange!.maxX).toBe(19);
   });
 
   it('タイトルはproblem_typeとlevelから生成する', () => {
     const problem = tsumegoRowToProblem(makeSimpleRow({ problem_type: '死活', level: '9K' }));
     expect(problem.title).toBe('死活 9K');
     expect(problem.difficulty).toBe('9K');
+  });
+
+  it('本番DBの実データ(source_id=22912)でも盤の右端(x=19)の石が表示範囲に含まれる', () => {
+    // 本番DBから取得済み。initial_white/blackに"sf","sc","sb"(x=19)があるのに
+    // view_range.x2=18のまま(このsource_idで実際に発生していたバグを再現)。
+    const problem = tsumegoRowToProblem({
+      id: 'e4ed7f3a-d0df-422c-8f89-ba86155438cb',
+      source_id: 22912,
+      board_size: 19,
+      black_first: true,
+      level: '4D+',
+      problem_type: '死活',
+      book_info: null,
+      initial_black: ['mb', 'md', 're', 'na', 'ma', 'ne', 'qe', 'nd', 'sf', 'of', 'pe', 'mc'],
+      initial_white: ['nc', 'nb', 'pa', 'sc', 'pd', 'qa', 'qd', 'oe', 'sb'],
+      answer_tree: { color: '', coord: '', children: [] },
+      view_range: { x1: 10, x2: 18, y1: 1, y2: 7 },
+      status: 'verified',
+    });
+    expect(problem.viewRange!.maxX).toBe(19);
   });
 });
