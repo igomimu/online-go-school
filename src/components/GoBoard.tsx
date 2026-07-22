@@ -406,7 +406,14 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             shapeRendering="geometricPrecision"
             onMouseUp={onDragEnd}
             onMouseLeave={onDragEnd}
-            onWheel={(e) => onBoardWheel?.(e.deltaY)}
+            onWheel={(e) => {
+                // onBoardWheelを使う画面(検討モード等)のみpreventDefaultしてページスクロールを止める。
+                // 未使用の画面(対局盤等)には一切影響しない。
+                if (onBoardWheel) {
+                    e.preventDefault();
+                    onBoardWheel(e.deltaY);
+                }
+            }}
             onPointerDown={handleSvgPointerDown}
             onPointerMove={handleSvgPointerMove}
             onPointerUp={handleSvgPointerUp}

@@ -1,12 +1,13 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import GoBoard from './GoBoard';
 import type { Drawing, Marker, StoneColor } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
-import { getMainPath, addMove } from '../utils/treeUtilsV2';
+import { getMainPath, addMove, removeNode } from '../utils/treeUtilsV2';
+import { findNearestDrawingIndex } from '../utils/drawingUtils';
 import type { ParticipantInfo, ClassroomLiveKit } from '../utils/classroomLiveKit';
 import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2 } from 'lucide-react';
 import { checkCapture } from '../utils/gameLogic';
 import { getDisplayName } from '../utils/identityUtils';
 import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
@@ -122,21 +123,63 @@ export default function ReviewBoard({
     ));
   }, [currentNode.id]);
 
-  const goToRoot = () => onSetCurrentNode(rootNode);
-  const goBack = () => {
+  const goToRoot = useCallback(() => onSetCurrentNode(rootNode), [rootNode, onSetCurrentNode]);
+  const goBack = useCallback(() => {
     if (currentNode.parent) onSetCurrentNode(currentNode.parent);
-  };
-  const goForward = () => {
+  }, [currentNode, onSetCurrentNode]);
+  const goForward = useCallback(() => {
     if (currentNode.children.length > 0) onSetCurrentNode(currentNode.children[0]);
-  };
+  }, [currentNode, onSetCurrentNode]);
   const goForwardBranch = (index: number) => {
     if (currentNode.children[index]) onSetCurrentNode(currentNode.children[index]);
   };
-  const goLast = () => {
+  const goLast = useCallback(() => {
     let curr = currentNode;
     while (curr.children.length > 0) curr = curr.children[0];
     onSetCurrentNode(curr);
-  };
+  }, [currentNode, onSetCurrentNode]);
+
+  // 直近の一手を取り消す（誤クリックで作った分岐をツリーから除去する）
+  const handleUndo = useCallback(() => {
+    const parent = removeNode(currentNode);
+    if (parent) onSetCurrentNode(parent);
+  }, [currentNode, onSetCurrentNode]);
+
+  // マウスホイールで手順送り/戻り（pokekata踏襲）
+  const handleBoardWheel = useCallback((delta: number) => {
+    if (!isTeacher) return;
+    if (delta > 0) goForward();
+    else if (delta < 0) goBack();
+  }, [isTeacher, goForward, goBack]);
+
+  // 右クリックで、クリック位置に最も近い描画(線・矢印)を1つ消す（pokekata踏襲、石は対象外）
+  const handleCellRightClick = useCallback((x: number, y: number) => {
+    if (!isTeacher || drawings.length === 0) return;
+    const idx = findNearestDrawingIndex(drawings, x, y);
+    if (idx < 0) return;
+    const updated = drawings.filter((_, i) => i !== idx);
+    setDrawings(updated);
+    classroomRef.current?.broadcast({ type: 'DRAW_UPDATE', payload: updated });
+  }, [isTeacher, drawings, classroomRef]);
+
+  // キーボードショートカット（pokekata踏襲）。チャット等の入力中は無効化する。
+  useEffect(() => {
+    if (!isTeacher) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (e.key === 'ArrowLeft' || e.key === 'Backspace') { e.preventDefault(); goBack(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); goForward(); }
+      else if (e.key === 'Home') { e.preventDefault(); goToRoot(); }
+      else if (e.key === 'End') { e.preventDefault(); goLast(); }
+      else if (e.key === 'Delete') { e.preventDefault(); handleUndo(); }
+      else if (ctrl && e.key === 'z') { e.preventDefault(); handleUndo(); }
+      else if (e.key === 'Escape') { setToolMode('play'); setDrawMode('off'); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isTeacher, handleUndo, goBack, goForward, goToRoot, goLast]);
 
   // 描画ハンドラ
   const handleDrawDragStart = useCallback((x: number, y: number) => {
@@ -370,6 +413,8 @@ export default function ReviewBoard({
             drawings={drawings}
             readOnly={!isTeacher}
             onCellClick={isTeacher ? handleCellClick : undefined}
+            onCellRightClick={isTeacher ? handleCellRightClick : undefined}
+            onBoardWheel={isTeacher ? handleBoardWheel : undefined}
             onCellMouseEnter={handleCellMouseEnter}
             onCellMouseLeave={handleCellMouseLeave}
             onDragStart={drawMode !== 'off' ? handleDrawDragStart : undefined}
@@ -394,6 +439,15 @@ export default function ReviewBoard({
               </button>
               <button onClick={goLast} disabled={currentNode.children.length === 0} className="p-3 glass-panel hover:bg-white/10 disabled:opacity-30">
                 <ChevronLast />
+              </button>
+              <div className="w-px h-8 bg-white/10 mx-1 self-center" />
+              <button
+                onClick={handleUndo}
+                disabled={!currentNode.parent}
+                title="直近の一手を取り消す (Delete / Ctrl+Z)"
+                className="p-3 glass-panel hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30"
+              >
+                <Undo2 />
               </button>
             </div>
 

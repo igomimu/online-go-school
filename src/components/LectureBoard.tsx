@@ -5,18 +5,19 @@ import type { GameNode } from '../utils/treeUtilsV2';
 import type { ClassroomLiveKit, ParticipantInfo } from '../utils/classroomLiveKit';
 import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
-import { createNode, addMove, getMainPath } from '../utils/treeUtilsV2';
+import { createNode, addMove, getMainPath, removeNode } from '../utils/treeUtilsV2';
 import { checkCapture, createEmptyBoard } from '../utils/gameLogic';
 import { parseSGFTree } from '../utils/sgfUtils';
 import type { SgfMetadata } from '../utils/sgfUtils';
 import { convertSgfToGameTree } from '../utils/treeUtilsV2';
+import { findNearestDrawingIndex } from '../utils/drawingUtils';
 import { getDisplayName } from '../utils/identityUtils';
 import MoveCounter from './MoveCounter';
 import ChatPanel from './teacher/ChatPanel';
 import {
   ChevronFirst, ChevronLast, ChevronLeft, ChevronRight,
   GitBranch, Grid3X3, Pen, ArrowRight as ArrowRightIcon, Trash2, Upload, MessageSquare,
-  Circle, Triangle, Square, X, Type, Hash, Eraser
+  Circle, Triangle, Square, X, Type, Hash, Eraser, Undo2
 } from 'lucide-react';
 
 interface LectureBoardProps {
@@ -148,28 +149,73 @@ export default function LectureBoard({
   }, [isTeacher, classroomRef, boardSize]);
 
   // ナビゲーション
-  const goToRoot = () => { setCurrentNode(rootNode); broadcastBoard(rootNode); };
-  const goBack = () => {
+  const goToRoot = useCallback(() => { setCurrentNode(rootNode); broadcastBoard(rootNode); }, [rootNode, broadcastBoard]);
+  const goBack = useCallback(() => {
     if (currentNode.parent) { setCurrentNode(currentNode.parent); broadcastBoard(currentNode.parent); }
-  };
-  const goForward = () => {
+  }, [currentNode, broadcastBoard]);
+  const goForward = useCallback(() => {
     if (currentNode.children.length > 0) {
       setCurrentNode(currentNode.children[0]);
       broadcastBoard(currentNode.children[0]);
     }
-  };
+  }, [currentNode, broadcastBoard]);
   const goForwardBranch = (index: number) => {
     if (currentNode.children[index]) {
       setCurrentNode(currentNode.children[index]);
       broadcastBoard(currentNode.children[index]);
     }
   };
-  const goLast = () => {
+  const goLast = useCallback(() => {
     let curr = currentNode;
     while (curr.children.length > 0) curr = curr.children[0];
     setCurrentNode(curr);
     broadcastBoard(curr);
-  };
+  }, [currentNode, broadcastBoard]);
+
+  // 直近の一手を取り消す（誤クリックで作った分岐をツリーから除去する）
+  const handleUndo = useCallback(() => {
+    const parent = removeNode(currentNode);
+    if (parent) {
+      setCurrentNode(parent);
+      broadcastBoard(parent);
+    }
+  }, [currentNode, broadcastBoard]);
+
+  // マウスホイールで手順送り/戻り（pokekata踏襲）
+  const handleBoardWheel = useCallback((delta: number) => {
+    if (!isTeacher) return;
+    if (delta > 0) goForward();
+    else if (delta < 0) goBack();
+  }, [isTeacher, goForward, goBack]);
+
+  // 右クリックで、クリック位置に最も近い描画(線・矢印)を1つ消す（pokekata踏襲、石は対象外）
+  const handleCellRightClick = useCallback((x: number, y: number) => {
+    if (!isTeacher || drawings.length === 0) return;
+    const idx = findNearestDrawingIndex(drawings, x, y);
+    if (idx < 0) return;
+    const updated = drawings.filter((_, i) => i !== idx);
+    setDrawings(updated);
+    classroomRef.current?.broadcast({ type: 'DRAW_UPDATE', payload: updated });
+  }, [isTeacher, drawings, classroomRef]);
+
+  // キーボードショートカット（pokekata踏襲）。チャット等の入力中は無効化する。
+  useEffect(() => {
+    if (!isTeacher) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (e.key === 'ArrowLeft' || e.key === 'Backspace') { e.preventDefault(); goBack(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); goForward(); }
+      else if (e.key === 'Home') { e.preventDefault(); goToRoot(); }
+      else if (e.key === 'End') { e.preventDefault(); goLast(); }
+      else if (e.key === 'Delete') { e.preventDefault(); handleUndo(); }
+      else if (ctrl && e.key === 'z') { e.preventDefault(); handleUndo(); }
+      else if (e.key === 'Escape') { setToolMode('play'); setDrawMode('off'); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isTeacher, handleUndo, goBack, goForward, goToRoot, goLast]);
 
   // 授業モード開始時に初期盤面を生徒に同期し、生徒側のロビー待機画面を自動で授業画面に遷移させる
   useEffect(() => {
@@ -367,6 +413,8 @@ export default function LectureBoard({
             boardState={boardState}
             boardSize={effectiveBoardSize}
             onCellClick={isTeacher ? handleCellClick : undefined}
+            onCellRightClick={isTeacher ? handleCellRightClick : undefined}
+            onBoardWheel={isTeacher ? handleBoardWheel : undefined}
             markers={cursorMarkers}
             drawings={effectiveDrawings}
             readOnly={!isTeacher}
@@ -396,6 +444,15 @@ export default function LectureBoard({
               </button>
               <button onClick={goLast} disabled={currentNode.children.length === 0} className="p-3 glass-panel hover:bg-white/10 disabled:opacity-30">
                 <ChevronLast />
+              </button>
+              <div className="w-px h-8 bg-white/10 mx-1 self-center" />
+              <button
+                onClick={handleUndo}
+                disabled={!currentNode.parent}
+                title="直近の一手を取り消す (Delete / Ctrl+Z)"
+                className="p-3 glass-panel hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30"
+              >
+                <Undo2 />
               </button>
             </div>
 

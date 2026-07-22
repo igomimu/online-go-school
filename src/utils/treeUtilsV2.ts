@@ -80,6 +80,18 @@ export const addMove = (
     return newNode;
 };
 
+/**
+ * 直近の一手を取り消す（誤クリックで作った分岐をツリーから除去する）。
+ * addMoveと同じ流儀でparent.childrenを直接ミューテーションする。
+ * 戻り値: 遷移先にすべき親ノード（rootノードなら常にnull=戻れない）。
+ */
+export const removeNode = (node: GameNode): GameNode | null => {
+    if (!node.parent) return null;
+    const parent = node.parent;
+    parent.children = parent.children.filter(c => c.id !== node.id);
+    return parent;
+};
+
 export const recalculateBoards = (node: GameNode) => {
     // This function assumes 'node' has the CORRECT board (e.g. Root was updated manually).
     // We update all children recursively based on their moves.

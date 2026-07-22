@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createNode, findNode, getPath, addMove, getMainPath, recalculateBoards, convertSgfToGameTree } from './treeUtilsV2';
+import { createNode, findNode, getPath, addMove, getMainPath, recalculateBoards, convertSgfToGameTree, removeNode } from './treeUtilsV2';
 import { createEmptyBoard } from './gameLogic';
 import type { SgfTreeNode } from './sgfUtils';
 
@@ -95,6 +95,41 @@ describe('addMove', () => {
     addMove(root, board1, 2, 'WHITE', 9, { x: 5, y: 5, color: 'BLACK' });
     addMove(root, board2, 2, 'WHITE', 9, { x: 3, y: 3, color: 'BLACK' });
     expect(root.children.length).toBe(2);
+  });
+});
+
+describe('removeNode', () => {
+  it('子ノードを親のchildrenから除去し、親を返す（直近の一手取り消し）', () => {
+    const root = makeRoot();
+    const board = createEmptyBoard(9);
+    board[4][4] = { color: 'BLACK', number: 1 };
+    const child = addMove(root, board, 2, 'WHITE', 9, { x: 5, y: 5, color: 'BLACK' });
+    expect(root.children.length).toBe(1);
+
+    const result = removeNode(child);
+    expect(result).toBe(root);
+    expect(root.children.length).toBe(0);
+  });
+
+  it('分岐が複数ある場合、除去対象のノードだけを消す', () => {
+    const root = makeRoot();
+    const board1 = createEmptyBoard(9);
+    board1[4][4] = { color: 'BLACK', number: 1 };
+    const board2 = createEmptyBoard(9);
+    board2[2][2] = { color: 'BLACK', number: 1 };
+    const child1 = addMove(root, board1, 2, 'WHITE', 9, { x: 5, y: 5, color: 'BLACK' });
+    addMove(root, board2, 2, 'WHITE', 9, { x: 3, y: 3, color: 'BLACK' });
+    expect(root.children.length).toBe(2);
+
+    removeNode(child1);
+    expect(root.children.length).toBe(1);
+    expect(root.children[0].move).toEqual({ x: 3, y: 3, color: 'BLACK' });
+  });
+
+  it('ルートノード（親なし）はnullを返し、何も変更しない', () => {
+    const root = makeRoot();
+    const result = removeNode(root);
+    expect(result).toBeNull();
   });
 });
 
