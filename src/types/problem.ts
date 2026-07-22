@@ -1,4 +1,4 @@
-import type { BoardState, StoneColor } from '../components/GoBoard';
+import type { BoardState, StoneColor, ViewRange } from '../components/GoBoard';
 import type { SgfTreeNode } from '../utils/sgfUtils';
 
 export interface Problem {
@@ -10,6 +10,7 @@ export interface Problem {
   sgfTree: SgfTreeNode;        // Solution tree
   difficulty?: string;         // 初級/中級/上級
   createdAt: string;           // ISO date
+  viewRange?: ViewRange;       // 詰碁データベース由来: 部分盤面の表示範囲
 }
 
 export interface ProblemAttempt {

@@ -16,7 +16,7 @@ interface TeacherToolbarProps {
   onEditClassroom?: () => void;
   onShowStudentLinks?: () => void;
   onAutoPairing?: () => void;
-  onLoadProblem?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onOpenTsumegoPicker?: () => void;
   onClearAudioM?: () => void;
   onClearAudioS?: () => void;
   onClearSharing?: () => void;
@@ -61,13 +61,12 @@ export default function TeacherToolbar({
   onEditClassroom,
   onShowStudentLinks,
   onAutoPairing,
-  onLoadProblem,
+  onOpenTsumegoPicker,
   onClearAudioM,
   onClearAudioS,
   onClearSharing,
 }: TeacherToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const problemInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
   const [copiedClassroomId, setCopiedClassroomId] = useState(false);
 
@@ -181,11 +180,8 @@ export default function TeacherToolbar({
         <input ref={fileInputRef} type="file" accept=".sgf" onChange={onLoadSgf} className="hidden" />
         <IgcButton label="SGF読込" color="#d0d0c8" onClick={() => fileInputRef.current?.click()} />
 
-        {onLoadProblem && (
-          <>
-            <input ref={problemInputRef} type="file" accept=".sgf" onChange={onLoadProblem} className="hidden" />
-            <IgcButton label="詰碁" color="#e0b0ff" onClick={() => problemInputRef.current?.click()} />
-          </>
+        {onOpenTsumegoPicker && (
+          <IgcButton label="詰碁DB" color="#e0b0ff" onClick={onOpenTsumegoPicker} />
         )}
 
         <IgcButton label="生徒入替" color="#f0e060" onClick={onEditClassroom} />

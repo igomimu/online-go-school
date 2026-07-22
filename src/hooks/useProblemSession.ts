@@ -15,6 +15,20 @@ interface ProblemState {
   message: string;
 }
 
+// 応手候補が複数ある場合、途中で手順が切れないよう「続きが最も深い」枝を優先して見せる。
+// (詰碁データベース由来のanswer_treeは相手の応手が複数記録されていることがある)
+function getNodeDepth(node: SgfTreeNode): number {
+  if (node.children.length === 0) return 0;
+  return 1 + Math.max(...node.children.map(getNodeDepth));
+}
+
+function getPreferredResponseNode(node: SgfTreeNode): SgfTreeNode | undefined {
+  if (node.children.length === 0) return undefined;
+  return node.children.reduce((best, current) =>
+    getNodeDepth(current) > getNodeDepth(best) ? current : best
+  );
+}
+
 export function useProblemSession() {
   const [problemState, setProblemState] = useState<ProblemState | null>(null);
   const [attempts, setAttempts] = useState<ProblemAttempt[]>([]);
@@ -51,21 +65,77 @@ export function useProblemSession() {
 
     const newMoves = [...state.movesMade, { x, y, color }];
 
-    // Check if this move matches any correct answer in the SGF tree
+    // Check if this move matches any known answer in the SGF tree
     const matchingChild = currentSgfNode.children.find(child => {
       if (!child.move) return false;
       return child.move.x === x && child.move.y === y && child.move.color === color;
     });
 
-    if (matchingChild) {
-      // Correct move!
-      if (matchingChild.children.length === 0) {
-        // Problem solved! (no more moves = end of solution)
+    if (!matchingChild) {
+      // Wrong move (手順に無い手)
+      const newState: ProblemState = {
+        ...state,
+        boardState: capturedBoard,
+        status: 'incorrect',
+        movesMade: newMoves,
+        message: '不正解',
+      };
+      stateRef.current = newState;
+      setProblemState(newState);
+      return;
+    }
+
+    // 不正解手（isWrong）。ただしisCorrectも同時に立っている場合は
+    // 「正解パス上の手だが不正解扱い」という矛盾データなので、isCorrectを優先する
+    // （詰碁データベース由来のanswer_treeにこの矛盾ケースが実際に存在する）。
+    if (matchingChild.isWrong && !matchingChild.isCorrect) {
+      const newState: ProblemState = {
+        ...state,
+        boardState: capturedBoard,
+        status: 'incorrect',
+        currentSgfNode: matchingChild,
+        movesMade: newMoves,
+        message: '不正解',
+      };
+      stateRef.current = newState;
+      setProblemState(newState);
+      return;
+    }
+
+    if (matchingChild.children.length === 0) {
+      // Problem solved! (no more moves = end of solution)
+      const newState: ProblemState = {
+        ...state,
+        boardState: capturedBoard,
+        status: 'correct',
+        currentSgfNode: matchingChild,
+        movesMade: newMoves,
+        message: '正解！',
+      };
+      stateRef.current = newState;
+      setProblemState(newState);
+      return;
+    }
+
+    // There's a response move (opponent's response). 応手候補が複数ある場合は
+    // 最も深い枝(=手順の続きがある枝)を優先する。
+    const responseNode = getPreferredResponseNode(matchingChild)!;
+    if (responseNode.move) {
+      const rx = responseNode.move.x;
+      const ry = responseNode.move.y;
+      const rColor = responseNode.move.color;
+      // Place response
+      capturedBoard[ry - 1][rx - 1] = { color: rColor };
+      const { board: responseBoard } = checkCapture(capturedBoard, rx, ry, rColor, size);
+      newMoves.push({ x: rx, y: ry, color: rColor });
+
+      if (responseNode.children.length === 0) {
+        // Problem solved after response!
         const newState: ProblemState = {
           ...state,
-          boardState: capturedBoard,
+          boardState: responseBoard,
           status: 'correct',
-          currentSgfNode: matchingChild,
+          currentSgfNode: responseNode,
           movesMade: newMoves,
           message: '正解！',
         };
@@ -74,64 +144,26 @@ export function useProblemSession() {
         return;
       }
 
-      // There's a response move (opponent's response)
-      const responseNode = matchingChild.children[0]; // Take main line response
-      if (responseNode.move) {
-        const rx = responseNode.move.x;
-        const ry = responseNode.move.y;
-        const rColor = responseNode.move.color;
-        // Place response
-        capturedBoard[ry - 1][rx - 1] = { color: rColor };
-        const { board: responseBoard } = checkCapture(capturedBoard, rx, ry, rColor, size);
-        newMoves.push({ x: rx, y: ry, color: rColor });
-
-        if (responseNode.children.length === 0) {
-          // Problem solved after response!
-          const newState: ProblemState = {
-            ...state,
-            boardState: responseBoard,
-            status: 'correct',
-            currentSgfNode: responseNode,
-            movesMade: newMoves,
-            message: '正解！',
-          };
-          stateRef.current = newState;
-          setProblemState(newState);
-          return;
-        }
-
-        // Continue solving
-        const newState: ProblemState = {
-          ...state,
-          boardState: responseBoard,
-          status: 'solving',
-          currentSgfNode: responseNode,
-          movesMade: newMoves,
-          message: '続けてください',
-        };
-        stateRef.current = newState;
-        setProblemState(newState);
-      } else {
-        // No response move but has children - keep going
-        const newState: ProblemState = {
-          ...state,
-          boardState: capturedBoard,
-          status: 'correct',
-          currentSgfNode: matchingChild,
-          movesMade: newMoves,
-          message: '正解！',
-        };
-        stateRef.current = newState;
-        setProblemState(newState);
-      }
+      // Continue solving
+      const newState: ProblemState = {
+        ...state,
+        boardState: responseBoard,
+        status: 'solving',
+        currentSgfNode: responseNode,
+        movesMade: newMoves,
+        message: '続けてください',
+      };
+      stateRef.current = newState;
+      setProblemState(newState);
     } else {
-      // Wrong move
+      // No response move but has children - keep going
       const newState: ProblemState = {
         ...state,
         boardState: capturedBoard,
-        status: 'incorrect',
+        status: 'correct',
+        currentSgfNode: matchingChild,
         movesMade: newMoves,
-        message: '不正解',
+        message: '正解！',
       };
       stateRef.current = newState;
       setProblemState(newState);

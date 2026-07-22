@@ -20,7 +20,7 @@ export function toSgfCoord(c: number): string {
     return String.fromCharCode(96 + c); // 'a' is 97. 96+1 = 97.
 }
 
-function fromSgfCoord(c: string): number {
+export function fromSgfCoord(c: string): number {
     if (!c || c.length < 1) return -1;
     const code = c.toLowerCase().charCodeAt(0);
     return code - 96; // 'a'(97) - 96 = 1.
@@ -312,6 +312,10 @@ export interface SgfTreeNode {
     markers?: { x: number, y: number, type: string, value: string }[];
     comment?: string;
     children: SgfTreeNode[];
+    // 詰碁データベース(tsumego_problems.answer_tree)由来のノードにのみ付与される。
+    // 通常のSGF検討棋譜由来のノードでは常にundefined。
+    isCorrect?: boolean;
+    isWrong?: boolean;
 }
 
 export interface ParsedSGFTree {

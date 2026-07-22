@@ -5,10 +5,6 @@ import type { Student, Classroom } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
 import { identityMatchesPlayer, parseIdentity, resolvePlayerName, stripSid, studentIdentityCandidates } from '../../utils/identityUtils';
 import { fetchActiveLiveGamesForPlayers, finishGame, getSupabase, liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
-import { parseSGFTree } from '../../utils/sgfUtils';
-import { createEmptyBoard } from '../../utils/gameLogic';
-import type { Problem } from '../../types/problem';
-import type { StoneColor } from '../GoBoard';
 import { loadSavedGamesForStudent } from '../../utils/savedGames';
 
 import StudentTable from './StudentTable';
@@ -21,6 +17,7 @@ import StudentLinkGenerator from './StudentLinkGenerator';
 import AutoPairingDialog from './AutoPairingDialog';
 import GameObserverPanel from './GameObserverPanel';
 import StudentEditDialog from './StudentEditDialog';
+import TsumegoPickerDialog from './TsumegoPickerDialog';
 import { upsertClassroom } from '../../utils/classroomStore';
 import { applyLiveBoardSnapshotsToSessions, useLiveBoards } from '../../hooks/useLiveBoards';
 
@@ -145,39 +142,8 @@ export default function TeacherDashboard({
     [students, resolvedStudents],
   );
 
-  // 詰碁SGF読み込み
-  const handleLoadProblem = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !onProblemAssign) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      if (!content) return;
-      try {
-        const parsed = parseSGFTree(content);
-        const root = parsed.root;
-        const boardSize = parsed.size || 19;
-        let correctColor: StoneColor = 'BLACK';
-        if (root.children.length > 0 && root.children[0].move) {
-          correctColor = root.children[0].move.color;
-        }
-        const problem: Problem = {
-          id: crypto.randomUUID(),
-          title: parsed.metadata?.gameName || file.name.replace(/\.sgf$/i, '') || '詰碁',
-          boardSize,
-          initialBoard: parsed.board || createEmptyBoard(boardSize),
-          correctColor,
-          sgfTree: root,
-          createdAt: new Date().toISOString(),
-        };
-        onProblemAssign(problem);
-      } catch (err) {
-        console.error('Problem SGF parse error:', err);
-      }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
-  }, [onProblemAssign]);
+  // 詰碁データベース選択ダイアログ
+  const [showTsumegoPicker, setShowTsumegoPicker] = useState(false);
 
   // 教室が未選択で教室データがあれば最初の教室を自動選択
   useEffect(() => {
@@ -525,7 +491,7 @@ export default function TeacherDashboard({
         isReconnecting={isReconnecting}
         onOpenStudentManager={onOpenStudentManager}
         onOpenTeacherGameWindow={onOpenTeacherGameWindow}
-        onLoadProblem={handleLoadProblem}
+        onOpenTsumegoPicker={onProblemAssign ? () => setShowTsumegoPicker(true) : undefined}
         onEditClassroom={() => {
           if (selectedClassroom) setEditingClassroom(selectedClassroom);
         }}
@@ -535,6 +501,14 @@ export default function TeacherDashboard({
         onClearAudioS={onClearAudioS}
         onClearSharing={onClearSharing}
       />
+
+      {/* 詰碁データベース選択ダイアログ */}
+      {showTsumegoPicker && onProblemAssign && (
+        <TsumegoPickerDialog
+          onAssign={onProblemAssign}
+          onClose={() => setShowTsumegoPicker(false)}
+        />
+      )}
 
       {/* 教室設定ダイアログ（生徒入替） */}
       {editingClassroom && (

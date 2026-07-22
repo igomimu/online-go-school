@@ -77,6 +77,7 @@ export default function ProblemBoard({
         <GoBoard
           boardState={problemState.boardState}
           boardSize={problem.boardSize}
+          viewRange={problem.viewRange}
           className="max-w-[min(100%,calc(100dvh-8.5rem))]"
           maxHeight="calc(100dvh - 8.5rem)"
           onCellClick={problemState.status === 'solving' ? handleCellClick : undefined}
