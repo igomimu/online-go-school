@@ -8,7 +8,7 @@ import TsumegoReportModal from './TsumegoReportModal';
 interface ProblemBoardProps {
   problem: Problem;
   onBack: () => void;
-  onResult?: (result: 'correct' | 'incorrect') => void;
+  onResult?: (result: 'correct' | 'incorrect', moveCount: number) => void;
   isTeacher?: boolean;
 }
 
@@ -27,9 +27,9 @@ export default function ProblemBoard({
 
   useEffect(() => {
     if (problemState?.status === 'correct' || problemState?.status === 'incorrect') {
-      onResult?.(problemState.status);
+      onResult?.(problemState.status, problemState.movesMade.length);
     }
-  }, [problemState?.status, onResult]);
+  }, [problemState?.status, problemState?.movesMade.length, onResult]);
 
   if (!problemState) return null;
 

@@ -35,6 +35,7 @@ import StudentManager from './components/StudentManager';
 import TeacherDashboard from './components/teacher/TeacherDashboard';
 import ClassroomManager from './components/teacher/ClassroomManager';
 import ProblemBoard from './components/ProblemBoard';
+import ProblemMonitorPanel from './components/teacher/ProblemMonitorPanel';
 import { useChat } from './hooks/useChat';
 import { useNotificationSound } from './hooks/useNotificationSound';
 import type { ChatMessagePayload } from './types/chat';
@@ -96,6 +97,8 @@ function App() {
 
   // 詰碁モード用
   const [activeProblem, setActiveProblem] = useState<import('./types/problem').Problem | null>(null);
+  // 先生用: 生徒identityごとの解答状況(PROBLEM_RESULT受信結果)
+  const [problemResults, setProblemResults] = useState<Record<string, { result: 'correct' | 'incorrect'; moveCount: number }>>({});
 
   // オーディオデバッグ
   const [audioDebug, setAudioDebug] = useState('');
@@ -277,6 +280,12 @@ function App() {
           const p = msg.payload as import('./types/problem').ProblemAssignPayload;
           setActiveProblem(p.problem);
           setViewMode('problem');
+        }
+
+        // 詰碁の解答結果（先生用: 生徒ごとの挑戦中/正解/不正解を集計する）
+        if (msg.type === 'PROBLEM_RESULT' && connectRole === 'TEACHER' && msg.payload && sender) {
+          const p = msg.payload as import('./types/problem').ProblemResultPayload;
+          setProblemResults(prev => ({ ...prev, [sender]: { result: p.result, moveCount: p.moveCount } }));
         }
 
         if (msg.type === 'REVIEW_END' && connectRole === 'STUDENT') {
@@ -701,11 +710,19 @@ function App() {
   const handleProblemAssign = (problem: import('./types/problem').Problem) => {
     if (role !== 'TEACHER') return;
     setActiveProblem(problem);
+    setProblemResults({});
     setViewMode('problem');
     classroomRef.current?.broadcast({
       type: 'PROBLEM_ASSIGN',
       payload: { problem, targetStudents: [] },
     });
+  };
+
+  // 詰碁: 配信終了（先生用）。生徒側にもREVIEW_ENDを送って詰碁モードから戻す。
+  const handleProblemMonitorBack = () => {
+    setViewMode('lobby');
+    setActiveProblem(null);
+    classroomRef.current?.broadcast({ type: 'REVIEW_END', payload: {} });
   };
 
   // SGF読込（ロビーから）
@@ -1339,28 +1356,38 @@ function App() {
           </div>
         )}
 
-        {/* 詰碁モード */}
-        {effectiveViewMode === 'problem' && activeProblem && (
+        {/* 詰碁モード: 先生は一緒に解くのではなく、生徒の解答状況を見るモニター画面 */}
+        {effectiveViewMode === 'problem' && activeProblem && role === 'TEACHER' && (
+          <div className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto p-2 sm:p-4">
+            <ProblemMonitorPanel
+              problem={activeProblem}
+              students={students}
+              participants={participants}
+              results={problemResults}
+              localIdentity={classroomRef.current?.localIdentity ?? TEACHER_IDENTITY}
+              onBack={handleProblemMonitorBack}
+            />
+          </div>
+        )}
+
+        {/* 詰碁モード（生徒） */}
+        {effectiveViewMode === 'problem' && activeProblem && role === 'STUDENT' && (
           <div className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto p-2 sm:p-4">
             <ProblemBoard
               problem={activeProblem}
-              isTeacher={role === 'TEACHER'}
               onBack={() => {
                 setViewMode('lobby');
                 setActiveProblem(null);
               }}
-              onResult={(result) => {
-                // 生徒: 結果を先生に送信
-                if (role === 'STUDENT') {
-                  classroomRef.current?.broadcast({
-                    type: 'PROBLEM_RESULT',
-                    payload: {
-                      problemId: activeProblem.id,
-                      result,
-                      moveCount: 0,
-                    },
-                  });
-                }
+              onResult={(result, moveCount) => {
+                classroomRef.current?.broadcast({
+                  type: 'PROBLEM_RESULT',
+                  payload: {
+                    problemId: activeProblem.id,
+                    result,
+                    moveCount,
+                  },
+                });
               }}
             />
           </div>
