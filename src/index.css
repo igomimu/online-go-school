@@ -3,6 +3,7 @@
 @theme {
   --font-inter: 'Inter', 'Noto Sans JP', system-ui, sans-serif;
   --font-outfit: 'Outfit', 'Noto Sans JP', sans-serif;
+  --color-wa-ai: #1e3a8a;
 }
 
 @layer base {

@@ -269,7 +269,9 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               <X className="w-4 h-4" /> 閉じてホーム
             </button>
           )}
-          <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-2 px-2 py-1 rounded-lg transition-shadow duration-200 ${
+            game.status === 'playing' && currentColor === 'BLACK' ? 'ring-1 ring-amber-500 shadow-[0_0_10px_rgba(217,119,6,0.45)]' : ''
+          }`}>
             <span className="w-3 h-3 rounded-full bg-black border border-white/20" />
             <span className={currentColor === 'BLACK' ? 'font-bold text-white' : 'text-zinc-400'}>
               {resolvePlayerName(game.black_player, students)}
@@ -278,7 +280,9 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
             {renderBlackClock()}
           </div>
           <span className="text-zinc-600">vs</span>
-          <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-2 px-2 py-1 rounded-lg transition-shadow duration-200 ${
+            game.status === 'playing' && currentColor === 'WHITE' ? 'ring-1 ring-amber-500 shadow-[0_0_10px_rgba(217,119,6,0.45)]' : ''
+          }`}>
             <span className="w-3 h-3 rounded-full bg-white border border-white/20" />
             <span className={currentColor === 'WHITE' ? 'font-bold text-white' : 'text-zinc-400'}>
               {resolvePlayerName(game.white_player, students)}
@@ -305,7 +309,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                 const url = `${window.location.origin}${window.location.pathname}?mode=game&gameId=${gameId}&identity=${encodeURIComponent(myIdentity)}&role=${role}`;
                 window.open(url, '_blank', 'width=700,height=800,menubar=no,toolbar=no,location=no,status=no');
               }}
-              className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold border border-blue-700 rounded px-3 py-1 transition-colors duration-150"
+              className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold border border-zinc-700 rounded px-3 py-1 transition-colors duration-150"
             >
               別ウィンドウ ↗
             </button>
@@ -483,7 +487,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               </div>
               <div className="text-center">
                 <div className="text-zinc-400">結果</div>
-                <div className="text-blue-400 font-bold text-lg">{formatScoringResult(scoringResult)}</div>
+                <div className="text-amber-400 font-bold text-lg">{formatScoringResult(scoringResult)}</div>
               </div>
             </div>
           </div>
@@ -557,7 +561,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
           )}
           <span data-testid="turn-indicator" className="text-xs text-zinc-500">
             {isMyTurn ? (
-              <span className="text-blue-400 font-bold">あなたの番です</span>
+              <span className="text-amber-400 font-bold">あなたの番です</span>
             ) : isParticipant ? (
               '相手の番です'
             ) : (
