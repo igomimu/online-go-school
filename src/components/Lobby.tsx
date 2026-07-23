@@ -98,7 +98,7 @@ export default function Lobby({
       {/* 入室ヘッダー: どの教室に入ったか明示（生徒の「部屋に入った」感） */}
       {role === 'STUDENT' && currentClassroomName && (
         <div
-          className="glass-panel p-6 border-blue-400/40"
+          className="glass-panel p-6 border-amber-400/40"
           style={{
             background: 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(99,102,241,0.12))',
             boxShadow: '0 0 30px rgba(59,130,246,0.15)',
@@ -106,7 +106,7 @@ export default function Lobby({
         >
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="min-w-0">
-              <p className="text-xs font-medium text-blue-300 uppercase tracking-wider">
+              <p className="text-xs font-medium text-amber-300 uppercase tracking-wider">
                 入室中
               </p>
               <h2 className="text-2xl sm:text-3xl font-bold text-white mt-1 truncate">
@@ -133,10 +133,10 @@ export default function Lobby({
       <div className="flex-1 space-y-4">
         {/* 自分の対局があればハイライト */}
         {myGame && role === 'STUDENT' && (
-          <div className="glass-panel p-4 bg-blue-500/10 border-blue-500/30">
+          <div className="glass-panel p-4 bg-amber-500/10 border-amber-500/30">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-blue-400">対局中</h3>
+                <h3 className="font-bold text-amber-400">対局中</h3>
                 <p className="text-sm text-zinc-400">
                   {myGame.blackPlayer} vs {myGame.whitePlayer} ({myGame.moveNumber}手目)
                 </p>

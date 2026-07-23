@@ -142,14 +142,14 @@ export default function LoginScreen({
     return (
       <div className="flex flex-col items-center min-h-screen py-12 gap-6">
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-black bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-extrabold text-zinc-100 tracking-tight">
             三村囲碁オンライン
           </h1>
         </div>
 
         <div className="glass-panel p-8 w-full max-w-sm space-y-6">
           <div className="flex items-center gap-2">
-            <Lock className="w-5 h-5 text-blue-400" />
+            <Lock className="w-5 h-5 text-amber-400" />
             <h2 className="text-xl font-bold">先生ログイン</h2>
           </div>
 
@@ -165,7 +165,7 @@ export default function LoginScreen({
                 autoComplete="current-password"
                 value={teacherPw}
                 onChange={e => setTeacherPw(e.target.value)}
-                className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-amber-500"
                 autoFocus
               />
             </div>
@@ -178,7 +178,7 @@ export default function LoginScreen({
                 value={teacherDisplayName}
                 onChange={e => setTeacherDisplayNameState(e.target.value)}
                 placeholder="三村九段"
-                className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-amber-500"
               />
             </div>
 
@@ -268,7 +268,7 @@ export default function LoginScreen({
                 ))}
                 <div
                   onClick={handleNewAccount}
-                  className="flex items-center gap-2 px-4 py-3 hover:bg-white/10 cursor-pointer text-blue-400 border-t border-white/10"
+                  className="flex items-center gap-2 px-4 py-3 hover:bg-white/10 cursor-pointer text-amber-400 border-t border-white/10"
                 >
                   <Plus className="w-4 h-4" />
                   <span className="text-sm">新しいアカウントを追加</span>
@@ -288,7 +288,7 @@ export default function LoginScreen({
               value={studentId}
               onChange={e => { setStudentId(e.target.value); setError(''); }}
               placeholder="4桁の数字 または 生徒ID"
-              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-amber-500"
               autoFocus={accounts.length === 0}
             />
           </div>
@@ -300,10 +300,10 @@ export default function LoginScreen({
               value={classroomId}
               onChange={e => { setClassroomId(e.target.value); setError(''); }}
               placeholder="先生から受け取った教室ID"
-              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 focus:outline-none focus:border-amber-500"
             />
             {selectedAccount?.classroomName && classroomId === selectedAccount.classroomId && (
-              <p className="mt-1 text-sm text-blue-300">
+              <p className="mt-1 text-sm text-amber-300">
                 接続先: <span className="font-bold">{selectedAccount.classroomName}</span>
               </p>
             )}
