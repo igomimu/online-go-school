@@ -219,10 +219,10 @@ export default function LoginScreen({
   return (
     <div className="flex flex-col items-center min-h-screen py-12 gap-6">
       <div className="text-center space-y-2">
-        <h1 className="text-4xl font-black bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">
+        <h1 className="text-4xl font-extrabold text-zinc-100 tracking-tight">
           三村囲碁オンライン
         </h1>
-        <p className="text-zinc-400">オンライン囲碁指導プラットフォーム</p>
+        <p className="text-zinc-400 text-sm font-medium">オンライン囲碁指導プラットフォーム</p>
       </div>
 
       <div className="glass-panel p-8 w-full max-w-sm space-y-6">
@@ -232,7 +232,7 @@ export default function LoginScreen({
             <button
               type="button"
               onClick={() => setShowDropdown(!showDropdown)}
-              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-left flex items-center justify-between hover:bg-white/15 transition-colors"
+              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-left flex items-center justify-between hover:bg-zinc-800 transition-colors"
             >
               <span className={selectedAccount ? 'text-white' : 'text-zinc-400'}>
                 {selectedAccount

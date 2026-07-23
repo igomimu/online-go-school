@@ -424,7 +424,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                     <polygon points="0 0, 10 3.5, 0 7" fill="#e53e3e" />
                 </marker>
             </defs>
-            <rect x={viewBoxData.x} y={viewBoxData.y} width={viewBoxData.w} height={viewBoxData.h} fill={isMonochrome ? 'white' : '#DCB35C'} stroke="none" />
+            <rect x={viewBoxData.x} y={viewBoxData.y} width={viewBoxData.w} height={viewBoxData.h} fill={isMonochrome ? 'white' : '#d8a25e'} stroke="none" />
             {lines}
             {coords}
             {starPoints.map(([sx, sy], i) => (

@@ -64,8 +64,8 @@ export default function Header({
               onClick={onToggleMic}
               className={`p-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 isMicEnabled
-                  ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                  : 'bg-white/5 text-zinc-500 hover:bg-white/10'
+                  ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800 hover:bg-emerald-900/80'
+                  : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700'
               }`}
               title={isMicEnabled ? 'マイクOFF' : 'マイクON'}
             >
@@ -80,8 +80,8 @@ export default function Header({
               onClick={onToggleMute}
               className={`p-2 rounded-lg transition-all ${
                 isMuted
-                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                  : 'bg-white/5 text-zinc-400 hover:bg-white/10'
+                  ? 'bg-rose-950/80 text-rose-400 border border-rose-800 hover:bg-rose-900/80'
+                  : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700'
               }`}
               title={isMuted ? '音声ON' : '音声OFF'}
             >
@@ -92,8 +92,8 @@ export default function Header({
                 onClick={onToggleCamera}
                 className={`p-2 rounded-lg transition-all flex items-center gap-1.5 ${
                   isCameraEnabled
-                    ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                    : 'bg-white/5 text-zinc-500 hover:bg-white/10'
+                    ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800 hover:bg-emerald-900/80'
+                    : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700'
                 }`}
                 title={isCameraEnabled ? 'カメラOFF' : 'カメラON'}
               >
