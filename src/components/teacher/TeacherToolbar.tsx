@@ -33,9 +33,10 @@ function IgcButton({ label, color, onClick, disabled, 'data-testid': testId }: {
         padding: '4px 14px',
         fontSize: 12,
         fontWeight: 'bold',
-        fontFamily: 'MS Gothic, monospace',
-        border: '1px solid #666',
-        background: color || '#d0d0c8',
+        fontFamily: 'var(--font-inter)',
+        border: '1px solid #3f3f46',
+        background: color || '#27272a',
+        color: '#fff',
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.6 : 1,
         whiteSpace: 'nowrap',
@@ -90,7 +91,7 @@ export default function TeacherToolbar({
   const dayStr = dayNames[now.getDay()];
 
   return (
-    <div style={{ fontFamily: 'MS Gothic, monospace' }}>
+    <div style={{ fontFamily: 'var(--font-inter)' }}>
       {/* 上段: 教室ID + クリアボタン群 */}
       <div style={{
         display: 'flex',
@@ -98,7 +99,7 @@ export default function TeacherToolbar({
         flexWrap: 'wrap',
         gap: 4,
         padding: '3px 6px',
-        background: '#4040a0',
+        background: '#b45309',
         color: 'white',
       }}>
         <span style={{ fontWeight: 'bold', fontSize: 14, marginRight: 6 }}>
@@ -109,16 +110,16 @@ export default function TeacherToolbar({
             onClick={copyClassroomId}
             title="クリックで教室IDをコピー"
             style={{
-              background: copiedClassroomId ? '#90ee90' : '#2020a0',
-              color: copiedClassroomId ? '#333' : '#ffff00',
-              border: '1px solid #6060c0',
+              background: copiedClassroomId ? '#059669' : '#78350f',
+              color: '#fff',
+              border: '1px solid #d97706',
               borderRadius: 3,
               padding: '1px 10px',
               fontSize: 12,
               fontWeight: 'bold',
               cursor: 'pointer',
               marginRight: 16,
-              fontFamily: 'MS Gothic, monospace',
+              fontFamily: 'var(--font-inter)',
             }}
           >
             {copiedClassroomId ? '✓ 教室IDコピー済み' : `教室ID: ${classroomId}`}
@@ -131,9 +132,9 @@ export default function TeacherToolbar({
             onClick={copyLink}
             title="クリックでコピー"
             style={{
-              background: copied ? '#90ee90' : '#2020a0',
-              color: copied ? '#333' : '#aaccff',
-              border: '1px solid #6060c0',
+              background: copied ? '#059669' : '#78350f',
+              color: '#fff',
+              border: '1px solid #d97706',
               borderRadius: 3,
               padding: '1px 10px',
               fontSize: 11,
@@ -149,9 +150,9 @@ export default function TeacherToolbar({
         )}
 
         <div style={{ flex: 1 }} />
-        <IgcButton label="【音声M】クリア" color="#d8d0c0" onClick={onClearAudioM} />
-        <IgcButton label="【音声S】クリア" color="#d8d0c0" onClick={onClearAudioS} />
-        <IgcButton label="【共有】クリア" color="#d8d0c0" onClick={onClearSharing} />
+        <IgcButton label="【音声M】クリア" color="#57534e" onClick={onClearAudioM} />
+        <IgcButton label="【音声S】クリア" color="#57534e" onClick={onClearAudioS} />
+        <IgcButton label="【共有】クリア" color="#57534e" onClick={onClearSharing} />
       </div>
 
       {/* 下段: アクションボタン群 */}
@@ -161,44 +162,44 @@ export default function TeacherToolbar({
         flexWrap: 'wrap',
         gap: 4,
         padding: '3px 6px',
-        background: '#c0c0b8',
+        background: '#18181b',
       }}>
         {/* マイクアイコン的な表示 */}
         <span style={{ fontSize: 18, marginRight: 4 }}>🎤</span>
 
-        <IgcButton label="退室" color="#d0d0c8" onClick={onDisconnect} />
-        <IgcButton label="共有検討" color="#6090d0" onClick={onStartLecture} />
+        <IgcButton label="退室" color="#27272a" onClick={onDisconnect} />
+        <IgcButton label="共有検討" color="#0d9488" onClick={onStartLecture} />
 
         <div style={{ flex: 1 }} />
 
-        <IgcButton label="対局作成" color="#90d060" onClick={onCreateGame} data-testid="create-game-toolbar-button" />
+        <IgcButton label="対局作成" color="#16a34a" onClick={onCreateGame} data-testid="create-game-toolbar-button" />
         {onOpenTeacherGameWindow && (
           <IgcButton label="対局ウィンドウ" color="#f59e0b" onClick={onOpenTeacherGameWindow} data-testid="open-teacher-game-window-button" />
         )}
-        <IgcButton label="自動対局" color="#60c090" onClick={onAutoPairing} />
+        <IgcButton label="自動対局" color="#059669" onClick={onAutoPairing} />
 
         <input ref={fileInputRef} type="file" accept=".sgf" onChange={onLoadSgf} className="hidden" />
-        <IgcButton label="SGF読込" color="#d0d0c8" onClick={() => fileInputRef.current?.click()} />
+        <IgcButton label="SGF読込" color="#27272a" onClick={() => fileInputRef.current?.click()} />
 
         {onOpenTsumegoPicker && (
-          <IgcButton label="詰碁DB" color="#e0b0ff" onClick={onOpenTsumegoPicker} />
+          <IgcButton label="詰碁DB" color="#7c3aed" onClick={onOpenTsumegoPicker} />
         )}
 
-        <IgcButton label="生徒入替" color="#f0e060" onClick={onEditClassroom} />
-        <IgcButton label="生徒リンク" color="#a0d0f0" onClick={onShowStudentLinks} />
-        <IgcButton label="生徒管理" color="#d0d0c8" onClick={onOpenStudentManager} />
+        <IgcButton label="生徒入替" color="#ca8a04" onClick={onEditClassroom} />
+        <IgcButton label="生徒リンク" color="#be123c" onClick={onShowStudentLinks} />
+        <IgcButton label="生徒管理" color="#27272a" onClick={onOpenStudentManager} />
 
         {studentJoinInfo && (
           <IgcButton
             label={copied ? '✓ コピー済み' : '参加リンク'}
-            color={copied ? '#90ee90' : '#f0c060'}
+            color={copied ? '#059669' : '#d97706'}
             onClick={copyLink}
           />
         )}
 
         <IgcButton
           label={isReconnecting ? '復旧中...' : '回線復旧'}
-          color="#ff6060"
+          color="#dc2626"
           onClick={onReconnect}
           disabled={isReconnecting}
         />
@@ -208,7 +209,7 @@ export default function TeacherToolbar({
           marginLeft: 8,
           fontSize: 12,
           fontWeight: 'bold',
-          color: '#cc0000',
+          color: '#f59e0b',
           textAlign: 'right',
           lineHeight: 1.2,
         }}>

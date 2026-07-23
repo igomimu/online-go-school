@@ -3,9 +3,9 @@
 ## 基本情報
 - **技術**: Vite 7 + React 19 + TypeScript 5.9 + Tailwind 4 + LiveKit + Supabase
 - **状態**: ✅ 中核フロー（ログイン→対局作成→着手→同期）が実認証チェーンで成立（2026-06-13 根治、E2E 11/11 本物の緑）。断絶3点（生徒ログインのレース / authStore の握りつぶしフォールバック / 先生PWの二重真実）を修正済み。先生PWは `~/.secrets/online-go-school-teacher.env`（サーバー側 `TEACHER_PASSWORD_HASH` と整合、E2E は `TEST_TEACHER_PASSWORD` で注入）。✅ Vercel再公開完了(2026-06-13、`online.mimura15.jp`→Vercel production、バンドルにsecret無し検証済)。残: 実生徒との試験レッスン。詳細は `PROGRESS.md` と auto-memory `projects/online-go-school.md`。
-- **Dev server**: LEGION で `npm run dev`（vite.config.ts で port 5175・host true 設定済み）
-- **公開URL**: `https://online.mimura15.jp/`（Cloudflare Tunnel 経由で LEGION の dev server にルーティング）
-- **YOGAProから見る場合**: 公開URL、または `ssh -L 5175:localhost:5175 legion`
+- **本番**: `https://online.mimura15.jp/` は **Vercel Production**（DNS CNAME→`cname.vercel-dns.com`、レスポンスヘッダー`server: Vercel`で確認済み 2026-07-23）。GitHub `igomimu/online-go-school` の `main` へのpushで**自動デプロイ**される。旧`.cloudflared/config.yml`に残る`online.mimura15.jp→localhost:5175`のingress設定は2026-06-13のVercel切替以前の残骸で、現在DNSがVercelを指しているため到達しない（削除は未実施、混同注意）。
+- **Dev server**: LEGION の `/home/mimura/projects/online-go-school` で `npm run dev`（port 5175・host true）。**これは開発専用であり本番の配信元ではない**。LEGION側を編集しただけでは本番に反映されない、`git push`してVercelの自動デプロイを待つ必要がある。
+- **YOGAProから開発版を見る場合**: `ssh -L 5175:localhost:5175 legion` 後に `http://localhost:5175`
 
 ## 概要
 リアルタイムで先生と生徒が対局・検討できるオンライン囲碁教室プラットフォーム。
@@ -100,10 +100,13 @@ e2e/                                  # Playwright E2E（multi-user, multi-stude
 - **参考**: Linear, Vercel Dashboard
 
 ## デプロイ構成
-- `vercel.json` + `api/token.ts` により Vercel Functions デプロイ構成は整備済み
-- 現在の公開は Cloudflare Tunnel 経由で LEGION dev server を直接公開（本番用途ならVercel化が自然）
+- **本番は Vercel**（project: `online-go-school`, `prj_y5WHUn1KXyNoj7IDf8gsQRVgAZXT`, org `team_7JqT0ZVMnu8j5zvqb3OOpknH`、Vercel account `igomimu`）。`main`へのpushで自動デプロイ。手動デプロイ/env反映は `npx vercel deploy --prod`（要`npx vercel whoami`で認証確認）
+- 本番用の環境変数は **Vercelプロジェクト設定側に個別追加が必要**（`.env`はローカルdevのみ、Vercelには自動反映されない）。追加は `npx vercel env add <NAME> production`
+- KataGo連携: `api/katago-analyze.ts`がサーバーサイドで`KATAGO_API_KEY`(pokekataのサービス間キー)を使いpokekataへ中継。本番では`KATAGO_SERVER_URL=https://pokekata.mimura15.jp`（ローカルdevはデフォルト`http://localhost:5177`のまま、LEGION同居のため到達可）
+- `vercel.json` + `api/token.ts`/`api/katago-analyze.ts` により Vercel Functions デプロイ構成は整備済み
 
 ## トラブルシュート
 - dev server の挙動が編集内容と一致しない → `pgrep -fa vite` で稼働ディレクトリを確認
-- 2026-04-13 インシデント: 旧 `/home/mimura/online-go-school/`（git非管理）の dev server が走っていたため編集が反映されなかった。現在は削除済み、正規は `/home/mimura/projects/online-go-school/`
+- **本番の反映確認は `curl -sD- -o /dev/null https://online.mimura15.jp/ | grep -i vercel` でVercel配信であることをまず確認**。LEGION側を編集しても本番URLには直接反映されない（2026-07-23、この思い込みで一度誤診断した教訓）
+- 2026-04-13 インシデント: 旧 `/home/mimura/online-go-school/`（git非管理）の dev server が走っていたため編集が反映されなかった。現在は削除済み、正規は `/home/mimura/projects/online-go-school/`（YOGAPro/Antigravity側に同名の同期用ディレクトリが再出現することがあるが、これはgit管理外のデザイン作業コピーであり本番/開発いずれの配信元でもない）
 - LiveKit 接続不可 → `VITE_LIVEKIT_URL` が WSL2 の IP 直打ちなので、LEGION 再起動時に IP が変わると繋がらない（要見直し）

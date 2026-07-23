@@ -55,8 +55,8 @@ export default function StudentEditDialog({ student, onClose, onSaved }: Student
     }
   };
 
-  const label: React.CSSProperties = { fontSize: 12, color: '#333', display: 'block', marginBottom: 2 };
-  const field: React.CSSProperties = { width: '100%', fontSize: 13, border: '1px solid #999', padding: '4px 6px', background: '#fff' };
+  const label: React.CSSProperties = { fontSize: 12, color: '#e4e4e7', display: 'block', marginBottom: 2 };
+  const field: React.CSSProperties = { width: '100%', fontSize: 13, border: '1px solid #3f3f46', padding: '4px 6px', background: '#27272a', color: '#e4e4e7' };
   const readonlyField: React.CSSProperties = { ...field, opacity: 0.5 };
 
   return (
@@ -65,13 +65,13 @@ export default function StudentEditDialog({ student, onClose, onSaved }: Student
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100,
     }}>
       <div style={{
-        background: '#e8e8e0', border: '2px solid #666', width: 540,
-        fontFamily: 'MS Gothic, "Noto Sans JP", monospace', color: '#333',
+        background: '#1c1c20', border: '2px solid #27272a', width: 540,
+        fontFamily: 'var(--font-inter)', color: '#e4e4e7',
         boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
       }}>
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '6px 10px', background: '#3030a0', color: 'white', fontWeight: 'bold', fontSize: 13,
+          padding: '6px 10px', background: '#b45309', color: 'white', fontWeight: 'bold', fontSize: 13,
         }}>
           <span>生徒情報の編集 - {student.name} さん</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'white', fontSize: 18, cursor: 'pointer' }}>&times;</button>
@@ -132,7 +132,7 @@ export default function StudentEditDialog({ student, onClose, onSaved }: Student
             <label style={label}>
               学年
               {form.birthdate && (
-                <span style={{ color: '#666', marginLeft: 6 }}>自動: {resolveGrade(form.birthdate, '')}</span>
+                <span style={{ color: '#a1a1aa', marginLeft: 6 }}>自動: {resolveGrade(form.birthdate, '')}</span>
               )}
             </label>
             <select
@@ -155,7 +155,7 @@ export default function StudentEditDialog({ student, onClose, onSaved }: Student
           </div>
 
           {error && (
-            <div style={{ gridColumn: '1 / -1', fontSize: 12, color: '#cc0000', background: '#fdd', padding: '4px 6px', border: '1px solid #e99' }}>
+            <div style={{ gridColumn: '1 / -1', fontSize: 12, color: '#f87171', background: 'rgba(248,113,113,0.12)', padding: '4px 6px', border: '1px solid #7f1d1d' }}>
               エラー: {error}
             </div>
           )}
@@ -163,12 +163,12 @@ export default function StudentEditDialog({ student, onClose, onSaved }: Student
 
         <div style={{
           display: 'flex', justifyContent: 'flex-end', gap: 8,
-          padding: '8px 12px', background: '#d0d0c8', borderTop: '1px solid #999',
+          padding: '8px 12px', background: '#141416', borderTop: '1px solid #27272a',
         }}>
-          <button onClick={onClose} disabled={saving} style={{ padding: '4px 14px', fontSize: 12, background: '#fff', border: '1px solid #999', cursor: 'pointer' }}>
+          <button onClick={onClose} disabled={saving} style={{ padding: '4px 14px', fontSize: 12, background: '#27272a', color: '#e4e4e7', border: '1px solid #3f3f46', cursor: 'pointer' }}>
             キャンセル
           </button>
-          <button onClick={handleSave} disabled={saving} style={{ padding: '4px 18px', fontSize: 12, fontWeight: 'bold', background: saving ? '#aaa' : '#3030a0', color: '#fff', border: '1px solid #333', cursor: saving ? 'default' : 'pointer' }}>
+          <button onClick={handleSave} disabled={saving} style={{ padding: '4px 18px', fontSize: 12, fontWeight: 'bold', background: saving ? '#52525b' : '#b45309', color: '#fff', border: '1px solid #3f3f46', cursor: saving ? 'default' : 'pointer' }}>
             {saving ? '保存中...' : '保存'}
           </button>
         </div>

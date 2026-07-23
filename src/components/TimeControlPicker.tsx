@@ -4,7 +4,7 @@ import { BYOYOMI_SECONDS_OPTIONS } from '../hooks/useGameClock';
 interface TimeControlPickerProps {
   value: TimeSettings;
   onChange: (next: TimeSettings) => void;
-  /** 'dark' = 対局作成ダイアログ（グラス系） / 'light' = 自動ペアリング（IGC系） */
+  /** 'dark' = 通常の対局系ダイアログ（グラス系） / 'light' = 明るい背景向けの予備バリアント（現在未使用） */
   variant?: 'dark' | 'light';
 }
 
@@ -34,7 +34,7 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
           padding: '3px 10px',
           border: '1px solid #999',
           cursor: 'pointer',
-          background: active ? '#3030a0' : '#fff',
+          background: active ? '#b45309' : '#fff',
           color: active ? '#fff' : '#333',
           fontWeight: active ? 'bold' : 'normal',
         };

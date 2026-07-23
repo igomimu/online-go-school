@@ -151,7 +151,7 @@ export default function AutoPairingDialog({
 
   const cellStyle: React.CSSProperties = {
     padding: '3px 6px',
-    border: '1px solid #ccc',
+    border: '1px solid #3f3f46',
     fontSize: 11,
     textAlign: 'center',
   };
@@ -162,14 +162,14 @@ export default function AutoPairingDialog({
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
     }}>
       <div style={{
-        background: '#e8e8e0', border: '2px solid #666', padding: 0,
+        background: '#1c1c20', border: '2px solid #27272a', padding: 0,
         width: 750, maxHeight: '85vh', display: 'flex', flexDirection: 'column',
-        fontFamily: 'MS Gothic, monospace', fontSize: 12,
+        fontFamily: 'var(--font-inter)', fontSize: 12, color: '#e4e4e7',
       }}>
         {/* ヘッダー */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '6px 10px', background: '#3030a0', color: 'white', fontWeight: 'bold', fontSize: 13,
+          padding: '6px 10px', background: '#b45309', color: 'white', fontWeight: 'bold', fontSize: 13,
         }}>
           自動ペアリング（{studentIdentities.length}名）
           <button onClick={onClose} style={{
@@ -180,13 +180,13 @@ export default function AutoPairingDialog({
         {/* ペア一覧 */}
         <div style={{ padding: 10, overflowY: 'auto', flex: 1 }}>
           {pairs.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 32, color: '#666' }}>
+            <div style={{ textAlign: 'center', padding: 32, color: '#a1a1aa' }}>
               接続中の生徒が2名以上必要です
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: '#d0d0c8' }}>
+                <tr style={{ background: '#141416' }}>
                   <th style={{ ...cellStyle, width: 30 }}>No</th>
                   <th style={cellStyle}>黒番（弱い方）</th>
                   <th style={{ ...cellStyle, width: 36 }}>棋力</th>
@@ -201,18 +201,18 @@ export default function AutoPairingDialog({
               </thead>
               <tbody>
                 {pairs.map((p, i) => (
-                  <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f8f8f0' }}>
+                  <tr key={i} style={{ background: i % 2 === 0 ? '#27272a' : '#232327' }}>
                     <td style={cellStyle}>{i + 1}</td>
                     <td style={{ ...cellStyle, textAlign: 'left', fontWeight: 'bold' }}>
                       ● {p.blackName}
                     </td>
-                    <td style={{ ...cellStyle, color: '#cc6600' }}>{p.blackRank || '?'}</td>
+                    <td style={{ ...cellStyle, color: '#f59e0b' }}>{p.blackRank || '?'}</td>
                     <td style={cellStyle}>
                       <button
                         onClick={() => swapColors(i)}
                         title="黒白入替"
                         style={{
-                          border: '1px solid #999', background: '#e0e0d8',
+                          border: '1px solid #3f3f46', background: '#3f3f46', color: '#e4e4e7',
                           cursor: 'pointer', fontSize: 11, padding: '1px 4px',
                         }}
                       >⇄</button>
@@ -220,12 +220,12 @@ export default function AutoPairingDialog({
                     <td style={{ ...cellStyle, textAlign: 'left', fontWeight: 'bold' }}>
                       ○ {p.whiteName}
                     </td>
-                    <td style={{ ...cellStyle, color: '#cc6600' }}>{p.whiteRank || '?'}</td>
+                    <td style={{ ...cellStyle, color: '#f59e0b' }}>{p.whiteRank || '?'}</td>
                     <td style={cellStyle}>
                       <select
                         value={p.handicap}
                         onChange={e => changeHandicap(i, Number(e.target.value))}
-                        style={{ width: 32, fontSize: 11, border: '1px solid #999' }}
+                        style={{ width: 32, fontSize: 11, border: '1px solid #3f3f46', background: '#27272a', color: '#e4e4e7' }}
                       >
                         {HANDICAP_OPTIONS.map(n => (
                           <option key={n} value={n}>{n}</option>
@@ -237,7 +237,7 @@ export default function AutoPairingDialog({
                       <select
                         value={p.boardSize}
                         onChange={e => changeBoardSize(i, Number(e.target.value))}
-                        style={{ width: 36, fontSize: 11, border: '1px solid #999' }}
+                        style={{ width: 36, fontSize: 11, border: '1px solid #3f3f46', background: '#27272a', color: '#e4e4e7' }}
                       >
                         <option value={19}>19</option>
                         <option value={13}>13</option>
@@ -248,7 +248,7 @@ export default function AutoPairingDialog({
                       <button
                         onClick={() => removePair(i)}
                         style={{
-                          border: '1px solid #999', background: '#f0c0c0',
+                          border: '1px solid #7f1d1d', background: '#450a0a', color: '#f87171',
                           cursor: 'pointer', fontSize: 10, padding: '1px 6px',
                         }}
                       >削除</button>
@@ -263,8 +263,8 @@ export default function AutoPairingDialog({
           {unpairedIdentity && (
             <div style={{
               marginTop: 8, padding: '4px 8px',
-              background: '#fff8e0', border: '1px solid #cc9',
-              fontSize: 11, color: '#886600',
+              background: 'rgba(217,119,6,0.12)', border: '1px solid #d97706',
+              fontSize: 11, color: '#fbbf24',
             }}>
               ペアなし: {getDisplayName(unpairedIdentity, students)}
               （奇数のため先生と対局するか、見学になります）
@@ -274,25 +274,25 @@ export default function AutoPairingDialog({
 
         {/* 持ち時間設定（全対局共通・項目ごとに自由設定） */}
         <div style={{
-          padding: '8px 12px', borderTop: '1px solid #999',
-          background: '#e8e8e0',
+          padding: '8px 12px', borderTop: '1px solid #27272a',
+          background: '#1c1c20',
         }}>
-          <div style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 4, color: '#333' }}>対局時計（全対局共通）</div>
-          <TimeControlPicker variant="light" value={timeSettings} onChange={setTimeSettings} />
+          <div style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 4, color: '#e4e4e7' }}>対局時計（全対局共通）</div>
+          <TimeControlPicker variant="dark" value={timeSettings} onChange={setTimeSettings} />
         </div>
 
         {/* フッター */}
         <div style={{
-          padding: '8px 12px', borderTop: '1px solid #999',
-          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, background: '#d0d0c8',
+          padding: '8px 12px', borderTop: '1px solid #27272a',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, background: '#141416',
         }}>
           <button
             onClick={handleStart}
             disabled={pairs.length === 0}
             style={{
               padding: '6px 32px', fontSize: 13, fontWeight: 'bold',
-              border: '1px solid #333', cursor: pairs.length > 0 ? 'pointer' : 'default',
-              background: pairs.length > 0 ? '#60a060' : '#ccc',
+              border: '1px solid #3f3f46', cursor: pairs.length > 0 ? 'pointer' : 'default',
+              background: pairs.length > 0 ? '#16a34a' : '#3f3f46',
               color: 'white',
             }}
           >
@@ -300,7 +300,7 @@ export default function AutoPairingDialog({
           </button>
           <button onClick={onClose} style={{
             padding: '6px 32px', fontSize: 13, fontWeight: 'bold',
-            border: '1px solid #666', background: '#d0d0c8', cursor: 'pointer',
+            border: '1px solid #3f3f46', background: '#27272a', color: '#e4e4e7', cursor: 'pointer',
           }}>
             取消
           </button>
