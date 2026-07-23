@@ -366,7 +366,7 @@ export default function ReviewBoard({
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 w-full lg:h-full lg:min-h-0">
-      <div className="flex-1 space-y-4 lg:min-h-0 lg:flex lg:flex-col lg:overflow-y-auto">
+      <div className="flex-1 space-y-4 lg:min-h-0 lg:flex lg:flex-col lg:overflow-hidden">
         {/* 検討/授業ヘッダー */}
         <div className="glass-panel px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
