@@ -222,7 +222,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                         onMouseLeave={() => onCellMouseLeave?.()}
                         onMouseUp={onDragEnd}
                         onClick={() => { if (isGesturing()) return; onCellClick?.(x, y); }}
-                        className="cursor-pointer hover:fill-amber-500 hover:fill-opacity-10"
+                        className="cursor-pointer hover:fill-blue-500 hover:fill-opacity-10"
                     />
                 );
             }
@@ -231,7 +231,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 const isBlack = stone.color === 'BLACK';
                 cells.push(
                     <g key={`s-group-${x}-${y}`} data-stone={`${x}-${y}`} className="pointer-events-none">
-                        <circle cx={cx} cy={cy} r={STONE_RADIUS} fill={isBlack ? "url(#stoneBlack)" : "url(#stoneWhite)"} stroke={isBlack ? "#000000" : "#3a3a3a"} strokeWidth={isBlack ? 2 : 1.5} />
+                        <circle cx={cx} cy={cy} r={STONE_RADIUS} fill={isBlack ? "#000000" : "#FFFFFF"} stroke="#000000" strokeWidth={2} />
                         {showNumbers && stone.number && (
                             <text x={cx} y={cy} dy=".35em" textAnchor="middle" fill={isBlack ? "#FFFFFF" : "#000000"} fontSize={FONT_SIZE} fontWeight="bold">{stone.number}</text>
                         )}
@@ -423,23 +423,8 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#e53e3e" />
                 </marker>
-                <radialGradient id="stoneBlack" cx="35%" cy="30%" r="75%">
-                    <stop offset="0%" stopColor="#5a5a5a" />
-                    <stop offset="40%" stopColor="#1a1a1a" />
-                    <stop offset="100%" stopColor="#000000" />
-                </radialGradient>
-                <radialGradient id="stoneWhite" cx="35%" cy="30%" r="75%">
-                    <stop offset="0%" stopColor="#ffffff" />
-                    <stop offset="55%" stopColor="#f0ede4" />
-                    <stop offset="100%" stopColor="#d8d2c0" />
-                </radialGradient>
-                <linearGradient id="woodBoard" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#c9925a" />
-                    <stop offset="50%" stopColor="#dba668" />
-                    <stop offset="100%" stopColor="#b9814c" />
-                </linearGradient>
             </defs>
-            <rect x={viewBoxData.x} y={viewBoxData.y} width={viewBoxData.w} height={viewBoxData.h} fill={isMonochrome ? 'white' : 'url(#woodBoard)'} stroke="none" />
+            <rect x={viewBoxData.x} y={viewBoxData.y} width={viewBoxData.w} height={viewBoxData.h} fill={isMonochrome ? 'white' : '#DCB35C'} stroke="none" />
             {lines}
             {coords}
             {starPoints.map(([sx, sy], i) => (

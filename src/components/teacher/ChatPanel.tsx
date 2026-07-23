@@ -53,18 +53,17 @@ export default function ChatPanel({
   };
 
   return (
-    <div className="flex flex-col h-full" style={{ background: '#1c1c20', fontFamily: 'var(--font-inter)' }}>
+    <div className="flex flex-col h-full" style={{ background: '#e8e8e0', fontFamily: 'MS Gothic, monospace' }}>
       {/* 送信先 + トークルーム（先生のみ） */}
       {showTargetSelector && (
-        <div style={{ padding: '4px 6px', borderBottom: '1px solid #27272a', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ padding: '4px 6px', borderBottom: '1px solid #999', display: 'flex', alignItems: 'center', gap: 8 }}>
           <select
             value={target}
             onChange={e => setTarget(e.target.value)}
             style={{
               flex: 1,
-              border: '1px solid #3f3f46',
-              background: '#27272a',
-              color: '#e4e4e7',
+              border: '1px solid #999',
+              background: 'white',
               fontSize: 12,
               padding: '2px 4px',
             }}
@@ -85,8 +84,8 @@ export default function ChatPanel({
         style={{
           flex: 1,
           overflowY: 'auto',
-          background: '#141416',
-          color: '#e4e4e7',
+          background: '#1a1a1a',
+          color: '#ccc',
           padding: 4,
           fontSize: 11,
           minHeight: 0,
@@ -97,10 +96,10 @@ export default function ChatPanel({
           const isPrivate = msg.target !== 'all';
           return (
             <div key={msg.id}>
-              <span style={{ color: '#71717a' }}>[{formatTime(msg.timestamp)}]</span>
+              <span style={{ color: '#666' }}>[{formatTime(msg.timestamp)}]</span>
               {' '}
-              {isPrivate && <span style={{ color: '#d4d4d8' }}>(個別)</span>}
-              <span style={{ color: isMe ? '#fbbf24' : '#f59e0b' }}>
+              {isPrivate && <span style={{ color: '#88f' }}>(個別)</span>}
+              <span style={{ color: isMe ? '#8cf' : '#fc8' }}>
                 {getDisplayName(msg.sender, students)}:
               </span>
               {' '}
@@ -111,7 +110,7 @@ export default function ChatPanel({
       </div>
 
       {/* 入力 + チャットボタン */}
-      <div style={{ display: 'flex', gap: 2, padding: 4, borderTop: '1px solid #27272a' }}>
+      <div style={{ display: 'flex', gap: 2, padding: 4, borderTop: '1px solid #999' }}>
         <input
           type="text"
           value={text}
@@ -119,9 +118,8 @@ export default function ChatPanel({
           onKeyDown={handleKeyDown}
           style={{
             flex: 1,
-            border: '1px solid #3f3f46',
-            background: '#27272a',
-            color: '#e4e4e7',
+            border: '1px solid #999',
+            background: 'white',
             fontSize: 11,
             padding: '2px 4px',
           }}
@@ -133,9 +131,8 @@ export default function ChatPanel({
             padding: '2px 12px',
             fontSize: 12,
             fontWeight: 'bold',
-            border: '1px solid #f59e0b',
-            background: '#d97706',
-            color: '#fff',
+            border: '1px solid #999',
+            background: '#f0e0c0',
             cursor: text.trim() ? 'pointer' : 'default',
             opacity: text.trim() ? 1 : 0.5,
           }}

@@ -64,8 +64,8 @@ export default function Header({
               onClick={onToggleMic}
               className={`p-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 isMicEnabled
-                  ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800 hover:bg-emerald-900/80'
-                  : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700'
+                  ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                  : 'bg-white/5 text-zinc-500 hover:bg-white/10'
               }`}
               title={isMicEnabled ? 'マイクOFF' : 'マイクON'}
             >
@@ -80,8 +80,8 @@ export default function Header({
               onClick={onToggleMute}
               className={`p-2 rounded-lg transition-all ${
                 isMuted
-                  ? 'bg-rose-950/80 text-rose-400 border border-rose-800 hover:bg-rose-900/80'
-                  : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700'
+                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                  : 'bg-white/5 text-zinc-400 hover:bg-white/10'
               }`}
               title={isMuted ? '音声ON' : '音声OFF'}
             >
@@ -92,8 +92,8 @@ export default function Header({
                 onClick={onToggleCamera}
                 className={`p-2 rounded-lg transition-all flex items-center gap-1.5 ${
                   isCameraEnabled
-                    ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800 hover:bg-emerald-900/80'
-                    : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-zinc-700'
+                    ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                    : 'bg-white/5 text-zinc-500 hover:bg-white/10'
                 }`}
                 title={isCameraEnabled ? 'カメラOFF' : 'カメラON'}
               >
@@ -111,7 +111,7 @@ export default function Header({
         {pwaInstall.shouldShowInstall && (
           <button
             onClick={handleInstallClick}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-amber-600/15 text-amber-300 border border-amber-500/30 rounded-lg hover:bg-amber-600/25 transition-colors duration-150"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-600/15 text-blue-300 border border-blue-500/30 rounded-lg hover:bg-blue-600/25 transition-colors duration-150"
             title={pwaInstall.isIos && !pwaInstall.canInstall ? 'ホーム画面に追加' : 'アプリをインストール'}
           >
             <Download className="w-4 h-4" />

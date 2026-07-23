@@ -404,7 +404,7 @@ export default function LectureBoard({
         {/* 碁盤 */}
         <div className="glass-panel p-4 flex justify-center items-center shadow-2xl relative lg:flex-1 lg:min-h-0 overflow-hidden">
           {isTeacher && currentNode.children.length > 1 && (
-            <div className="absolute top-4 right-4 flex items-center gap-2 bg-amber-500/20 px-3 py-1 rounded-full text-amber-300 text-sm">
+            <div className="absolute top-4 right-4 flex items-center gap-2 bg-blue-500/20 px-3 py-1 rounded-full text-blue-300 text-sm">
               <GitBranch className="w-4 h-4" />
               <span>{currentNode.children.length}変化</span>
             </div>
@@ -463,7 +463,7 @@ export default function LectureBoard({
                 onClick={() => { setToolMode('play'); setDrawMode('off'); }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 ${
                   toolMode === 'play' && drawMode === 'off'
-                    ? 'bg-amber-600 border-amber-500 text-white'
+                    ? 'bg-blue-600 border-blue-500 text-white'
                     : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
                 }`}
                 title="通常の着手を行います (石を置く)"
@@ -478,7 +478,7 @@ export default function LectureBoard({
               <button
                 onClick={() => { setToolMode('circle'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'circle' ? 'bg-amber-600 border-amber-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  toolMode === 'circle' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
                 }`}
                 title="丸印 (CIR)"
               >
@@ -487,7 +487,7 @@ export default function LectureBoard({
               <button
                 onClick={() => { setToolMode('triangle'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'triangle' ? 'bg-amber-600 border-amber-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  toolMode === 'triangle' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
                 }`}
                 title="三角印 (TRI)"
               >
@@ -496,7 +496,7 @@ export default function LectureBoard({
               <button
                 onClick={() => { setToolMode('square'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'square' ? 'bg-amber-600 border-amber-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  toolMode === 'square' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
                 }`}
                 title="四角印 (SQR)"
               >
@@ -505,7 +505,7 @@ export default function LectureBoard({
               <button
                 onClick={() => { setToolMode('cross'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'cross' ? 'bg-amber-600 border-amber-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  toolMode === 'cross' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
                 }`}
                 title="バツ印 (X)"
               >
@@ -518,7 +518,7 @@ export default function LectureBoard({
               <button
                 onClick={() => { setToolMode('alpha'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all flex items-center gap-1 ${
-                  toolMode === 'alpha' ? 'bg-amber-600 border-amber-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  toolMode === 'alpha' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
                 }`}
                 title="アルファベット順ラベル (A, B, C...)"
               >
@@ -528,7 +528,7 @@ export default function LectureBoard({
               <button
                 onClick={() => { setToolMode('num'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all flex items-center gap-1 ${
-                  toolMode === 'num' ? 'bg-amber-600 border-amber-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  toolMode === 'num' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
                 }`}
                 title="数字順ラベル (1, 2, 3...)"
               >
@@ -604,7 +604,7 @@ export default function LectureBoard({
           <div className="flex justify-center gap-2 overflow-x-auto p-2">
             {currentNode.children.map((child, idx) => (
               <button key={idx} onClick={() => goForwardBranch(idx)}
-                className="px-3 py-1 bg-white/5 border border-white/10 rounded text-sm hover:bg-amber-500/20">
+                className="px-3 py-1 bg-white/5 border border-white/10 rounded text-sm hover:bg-blue-500/20">
                 変化{idx + 1} ({child.move ? (child.move.color === 'BLACK' ? '黒' : '白') : '?'})
               </button>
             ))}
@@ -649,7 +649,7 @@ export default function LectureBoard({
                 {BOARD_SIZES.map((size) => (
                   <button key={size} onClick={() => changeBoardSize(size)}
                     className={`px-2 py-1 rounded-lg text-sm font-medium transition-all ${
-                      boardSize === size ? 'bg-amber-500 text-white' : 'bg-white/5 hover:bg-white/10'
+                      boardSize === size ? 'bg-blue-500 text-white' : 'bg-white/5 hover:bg-white/10'
                     }`}>
                     {size}
                   </button>

@@ -4,7 +4,7 @@ import { BYOYOMI_SECONDS_OPTIONS } from '../hooks/useGameClock';
 interface TimeControlPickerProps {
   value: TimeSettings;
   onChange: (next: TimeSettings) => void;
-  /** 'dark' = 通常の対局系ダイアログ（グラス系） / 'light' = 明るい背景向けの予備バリアント（現在未使用） */
+  /** 'dark' = 対局作成ダイアログ（グラス系） / 'light' = 自動ペアリング（IGC系） */
   variant?: 'dark' | 'light';
 }
 
@@ -17,7 +17,7 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
   const set = (patch: Partial<TimeSettings>) => onChange({ ...value, ...patch });
 
   const numberInputCls = dark
-    ? 'w-20 bg-white/5 border border-white/10 rounded-md px-2 py-1 text-sm focus:outline-none focus:border-amber-500'
+    ? 'w-20 bg-white/5 border border-white/10 rounded-md px-2 py-1 text-sm focus:outline-none focus:border-blue-500'
     : '';
   const numberInputStyle: React.CSSProperties = dark
     ? {}
@@ -34,7 +34,7 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
           padding: '3px 10px',
           border: '1px solid #999',
           cursor: 'pointer',
-          background: active ? '#b45309' : '#fff',
+          background: active ? '#3030a0' : '#fff',
           color: active ? '#fff' : '#333',
           fontWeight: active ? 'bold' : 'normal',
         };
@@ -42,7 +42,7 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
     dark
       ? `px-3 py-1 rounded-md text-sm border transition-colors ${
           active
-            ? 'bg-amber-500 border-amber-500 text-white font-semibold'
+            ? 'bg-blue-500 border-blue-500 text-white font-semibold'
             : 'bg-white/5 border-white/10 text-zinc-300 hover:bg-white/10'
         }`
       : '';

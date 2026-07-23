@@ -40,7 +40,7 @@ export default function ProblemBoard({
 
   const statusColor = {
     waiting: 'text-zinc-400',
-    solving: 'text-amber-400',
+    solving: 'text-blue-400',
     correct: 'text-green-400',
     incorrect: 'text-red-400',
   }[problemState.status];

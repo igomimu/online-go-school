@@ -58,7 +58,7 @@ export default function TsumegoReportModal({ problemId, sourceId, onClose }: Tsu
               placeholder="例: 正解手順が成立しない／表示範囲がおかしい"
               rows={3}
               maxLength={500}
-              className="w-full resize-none bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-500"
+              className="w-full resize-none bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
             />
             {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
             <div className="flex gap-3 mt-4">

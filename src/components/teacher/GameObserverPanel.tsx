@@ -15,7 +15,7 @@ export default function GameObserverPanel({
   onBack,
 }: GameObserverPanelProps) {
   return (
-    <div style={{ padding: 8, background: '#141416', minHeight: '100%' }}>
+    <div style={{ padding: 8, background: '#d0d0c8', minHeight: '100%' }}>
       <GameBoard
         gameId={gameId}
         myIdentity={localIdentity}

@@ -32,7 +32,7 @@ export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnL
         }
       }}
       className={`glass-panel p-2 hover:bg-white/5 transition-all ${
-        isMyTurn ? 'ring-2 ring-amber-400' : isActive ? 'ring-2 ring-wa-ai' : ''
+        isMyTurn ? 'ring-2 ring-amber-400' : isActive ? 'ring-2 ring-blue-500' : ''
       } ${game.status === 'finished' || game.status === 'interrupted' ? 'opacity-60' : ''}`}
     >
       {/* ミニ碁盤 */}

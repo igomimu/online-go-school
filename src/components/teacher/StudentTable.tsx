@@ -38,35 +38,35 @@ export default function StudentTable({
   const rows = buildRows(students, participants, games, localIdentity);
 
   return (
-    <div className="overflow-x-auto" style={{ background: '#1c1c20' }}>
-      <table className="w-full text-xs border-collapse" style={{ fontFamily: 'var(--font-inter)' }}>
+    <div className="overflow-x-auto" style={{ background: '#e8e8e0' }}>
+      <table className="w-full text-xs border-collapse" style={{ fontFamily: 'MS Gothic, monospace' }}>
         <thead>
-          <tr style={{ background: '#141416', borderBottom: '1px solid #27272a' }}>
-            <th className="px-1 py-0.5 border border-zinc-700 text-center" style={{ width: 32 }}>状態</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-center" style={{ width: 32 }}>カメラ</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-center" style={{ width: 40 }}>音声M</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-center" style={{ width: 40 }}>音声S</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-center" style={{ width: 32 }}>共有</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-center" style={{ width: 32 }}>対局</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-center" style={{ width: 40 }}>詳細</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-center" style={{ width: 50 }}>棋譜</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-center" style={{ width: 40 }}>編集</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-center" style={{ width: 44 }}>順序</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-left" style={{ width: 130 }}>生徒ＩＤ</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-left">姓名</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-center" style={{ width: 36 }}>棋力</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-left" style={{ width: 70 }}>種別</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-center" style={{ width: 36 }}>学年</th>
-            <th className="px-1 py-0.5 border border-zinc-700 text-left">所在地</th>
+          <tr style={{ background: '#d0d0c8', borderBottom: '1px solid #999' }}>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 32 }}>状態</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 32 }}>カメラ</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 40 }}>音声M</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 40 }}>音声S</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 32 }}>共有</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 32 }}>対局</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 40 }}>詳細</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 50 }}>棋譜</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 40 }}>編集</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 44 }}>順序</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-left" style={{ width: 130 }}>生徒ＩＤ</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-left">姓名</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 36 }}>棋力</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-left" style={{ width: 70 }}>種別</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-center" style={{ width: 36 }}>学年</th>
+            <th className="px-1 py-0.5 border border-gray-400 text-left">所在地</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row, i) => {
             const perm = audioPermissions[row.identity] || { canHear: true, micAllowed: true, cameraAllowed: true };
-            // 接続中 = アンバー系オーバーレイ, 最初の行(アクティブ) = エメラルド系オーバーレイ
+            // IGC: 接続中 = 水色背景, 最初の行(アクティブ) = 黄緑
             const bgColor = row.isConnected
-              ? (i === 0 ? 'rgba(16,185,129,0.15)' : 'rgba(217,119,6,0.12)')
-              : '#1c1c20';
+              ? (i === 0 ? '#90ee90' : '#b0f0f0')
+              : '#e8e8e0';
 
             return (
               <tr
@@ -77,19 +77,19 @@ export default function StudentTable({
                 onClick={() => row.isConnected && row.identity && onSelectStudent?.(row.identity)}
               >
                 {/* 状態 */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-center">
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.isConnected ? '▶' : ''}
                 </td>
 
                 {/* カメラ */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-center">
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.isConnected && (
                     <input type="checkbox" checked readOnly className="w-3 h-3" />
                   )}
                 </td>
 
                 {/* 音声M（マイク） */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-center">
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.isConnected && row.identity !== localIdentity ? (
                     <input
                       type="checkbox"
@@ -104,7 +104,7 @@ export default function StudentTable({
                 </td>
 
                 {/* 音声S（スピーカー） */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-center">
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.isConnected && row.identity !== localIdentity ? (
                     <input
                       type="checkbox"
@@ -119,21 +119,21 @@ export default function StudentTable({
                 </td>
 
                 {/* 共有 */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-center">
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.isConnected && (
                     <input type="checkbox" checked readOnly className="w-3 h-3" />
                   )}
                 </td>
 
                 {/* 対局（進行中は状態表示、対局していない接続中の生徒は新規対局開始ボタン） */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-center">
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.gameStatus === 'playing' && '●'}
                   {row.gameStatus === 'scoring' && '整'}
                   {row.gameStatus === 'finished' && '済'}
                   {row.gameStatus === 'interrupted' && '断'}
                   {!row.gameStatus && row.isConnected && row.identity && onStartGame && (
                     <button
-                      className="px-1 border border-amber-700 bg-amber-600 text-white hover:bg-amber-700"
+                      className="px-1 border border-blue-700 bg-blue-600 text-white hover:bg-blue-700"
                       style={{ fontSize: 10 }}
                       title="この生徒と新規対局を開始"
                       onClick={e => {
@@ -147,12 +147,12 @@ export default function StudentTable({
                 </td>
 
                 {/* 詳細 — 対局中の生徒のみ観戦モードへ */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-center">
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.isConnected && (
                     <button
                       className={row.gameStatus === 'playing'
-                        ? "px-1 text-xs border border-zinc-600 bg-zinc-800 hover:bg-zinc-700"
-                        : "px-1 text-xs border border-zinc-700 bg-zinc-900 text-zinc-600 cursor-not-allowed"}
+                        ? "px-1 text-xs border border-gray-500 bg-gray-100 hover:bg-gray-200"
+                        : "px-1 text-xs border border-gray-300 bg-gray-50 text-gray-400 cursor-not-allowed"}
                       style={{ fontSize: 10 }}
                       disabled={row.gameStatus !== 'playing'}
                       onClick={e => {
@@ -166,10 +166,10 @@ export default function StudentTable({
                 </td>
 
                 {/* 棋譜履歴 */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-center">
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.student && (
                     <button
-                      className="px-1 text-xs border border-zinc-600 bg-zinc-800 hover:bg-zinc-700"
+                      className="px-1 text-xs border border-gray-500 bg-gray-100 hover:bg-gray-200"
                       style={{ fontSize: 10 }}
                       onClick={e => {
                         e.stopPropagation();
@@ -182,10 +182,10 @@ export default function StudentTable({
                 </td>
 
                 {/* 編集（段級位などの生徒情報を講師が変更） */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-center">
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.student && onEditStudent && (
                     <button
-                      className="px-1 text-xs border border-zinc-600 bg-zinc-800 hover:bg-zinc-700"
+                      className="px-1 text-xs border border-gray-500 bg-gray-100 hover:bg-gray-200"
                       style={{ fontSize: 10 }}
                       onClick={e => {
                         e.stopPropagation();
@@ -198,11 +198,11 @@ export default function StudentTable({
                 </td>
 
                 {/* 順序 */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-center">
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.student && onMoveStudent && (
                     <div className="flex justify-center gap-1">
                       <button
-                        className="px-1 border border-zinc-600 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 disabled:hover:bg-zinc-800"
+                        className="px-1 border border-gray-500 bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-gray-100"
                         style={{ fontSize: 9, lineHeight: 1 }}
                         disabled={!row.canMoveUp}
                         onClick={e => {
@@ -213,7 +213,7 @@ export default function StudentTable({
                         ▲
                       </button>
                       <button
-                        className="px-1 border border-zinc-600 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 disabled:hover:bg-zinc-800"
+                        className="px-1 border border-gray-500 bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-gray-100"
                         style={{ fontSize: 9, lineHeight: 1 }}
                         disabled={!row.canMoveDown}
                         onClick={e => {
@@ -228,35 +228,35 @@ export default function StudentTable({
                 </td>
 
                 {/* 生徒ID（4桁コード優先） */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-left" style={{ color: row.isConnected ? '#fbbf24' : '#71717a' }}>
+                <td className="px-1 py-0.5 border border-gray-400 text-left" style={{ color: row.isConnected ? '#0000cc' : '#666' }}>
                   {row.student?.studentCode || row.student?.id || ''}
                 </td>
 
                 {/* 姓名 */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-left font-bold" style={{ color: row.isConnected ? '#fbbf24' : '#e4e4e7' }}>
+                <td className="px-1 py-0.5 border border-gray-400 text-left font-bold" style={{ color: row.isConnected ? '#cc0000' : '#333' }}>
                   {row.displayName}
                   {!row.isConnected && row.gameStatus === 'playing' && (
-                    <span style={{ color: '#f59e0b', fontSize: 10, marginLeft: 4 }}>⚠切断</span>
+                    <span style={{ color: '#ff6600', fontSize: 10, marginLeft: 4 }}>⚠切断</span>
                   )}
                 </td>
 
                 {/* 棋力 */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-center">
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {row.student?.internalRating || row.student?.rank || ''}
                 </td>
 
                 {/* 種別 */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-left" style={{ color: row.isConnected ? '#fbbf24' : '#71717a' }}>
+                <td className="px-1 py-0.5 border border-gray-400 text-left" style={{ color: row.isConnected ? '#cc0000' : '#666' }}>
                   {row.student?.type || ''}
                 </td>
 
                 {/* 学年（生年月日があれば自動計算、なければ手入力） */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-center">
+                <td className="px-1 py-0.5 border border-gray-400 text-center">
                   {resolveGrade(row.student?.birthdate, row.student?.grade ?? '')}
                 </td>
 
                 {/* 所在地 */}
-                <td className="px-1 py-0.5 border border-zinc-700 text-left">
+                <td className="px-1 py-0.5 border border-gray-400 text-left">
                   {row.student?.country || ''}
                 </td>
               </tr>
