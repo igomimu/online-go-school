@@ -64,14 +64,17 @@ export function convertMovesToKatago(
 }
 
 /**
- * Send analysis request to KataGo API server
+ * Send analysis request to KataGo API server.
+ * サーバーサイドの/api/katago-analyzeプロキシ経由で呼ぶ(pokekataのサービス間API-Keyを
+ * クライアントに露出させないため)。pokekataは別Supabaseプロジェクトのため
+ * online-go-school側のユーザートークンでは認証できず、直接叩くと401になる。
  */
 export async function analyzePosition(
   request: AiAnalysisRequest,
-  serverUrl: string,
+  _serverUrl: string,
   signal?: AbortSignal,
 ): Promise<AiAnalysisResult> {
-  const response = await fetch(`${serverUrl}/api/analyze`, {
+  const response = await fetch(`/api/katago-analyze`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
