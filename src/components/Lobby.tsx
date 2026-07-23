@@ -203,7 +203,7 @@ export default function Lobby({
         {/* 進行中の対局一覧 */}
         {playingGames.length > 0 && (
           <div className="space-y-3">
-            <h3 className="font-bold text-lg">進行中の対局</h3>
+            <h3 className="heading-section text-base">進行中の対局</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {playingGames.map(game => (
                 <GameThumbnail
@@ -221,7 +221,7 @@ export default function Lobby({
         {/* 終了した対局 */}
         {finishedGames.length > 0 && (
           <div className="space-y-3">
-            <h3 className="font-bold">終了した対局</h3>
+            <h3 className="heading-section">終了した対局</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {finishedGames.map(game => (
                 <GameThumbnail
@@ -246,11 +246,11 @@ export default function Lobby({
       </div>
 
       {/* サイドバー */}
-      <div className="w-full lg:w-72 space-y-4">
+      <div className="w-full lg:w-72 space-y-5">
         {/* 参加リンク（先生のみ） */}
         {role === 'TEACHER' && studentJoinInfo && (
-          <div className="glass-panel p-4 space-y-3">
-            <h3 className="font-bold flex items-center gap-2 text-sm">
+          <div className="glass-panel p-5 space-y-3">
+            <h3 className="heading-section flex items-center gap-2">
               <Link className="w-4 h-4" /> 参加リンク
             </h3>
             <div className="bg-white/5 rounded-lg p-2 text-xs font-mono break-all max-h-16 overflow-y-auto">
@@ -268,7 +268,7 @@ export default function Lobby({
 
         {/* 教室セレクター（先生のみ） */}
         {role === 'TEACHER' && classrooms.length > 0 && onSelectClassroom && onOpenStudentManager && (
-          <div className="glass-panel p-4">
+          <div className="glass-panel p-5">
             <ClassroomSelector
               classrooms={classrooms}
               students={students}
@@ -280,8 +280,8 @@ export default function Lobby({
         )}
 
         {/* 参加者一覧 */}
-        <div className="glass-panel p-4 space-y-3">
-          <h3 className="font-bold flex items-center gap-2 text-sm">
+        <div className="glass-panel p-5 space-y-3">
+          <h3 className="heading-section flex items-center gap-2">
             <Users className="w-4 h-4" /> 参加者 ({participants.length})
           </h3>
           <div className="space-y-1">
@@ -325,8 +325,8 @@ export default function Lobby({
 
         {/* 保存棋譜（先生のみ） */}
         {role === 'TEACHER' && onSelectSavedGame && (
-          <div className="glass-panel p-4 space-y-3">
-            <h3 className="font-bold text-sm">保存棋譜</h3>
+          <div className="glass-panel p-5 space-y-3">
+            <h3 className="heading-section">保存棋譜</h3>
             <SavedGameList onSelectGame={onSelectSavedGame} />
           </div>
         )}

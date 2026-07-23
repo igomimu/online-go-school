@@ -230,8 +230,8 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             if (stone) {
                 const isBlack = stone.color === 'BLACK';
                 cells.push(
-                    <g key={`s-group-${x}-${y}`} data-stone={`${x}-${y}`} className="pointer-events-none">
-                        <circle cx={cx} cy={cy} r={STONE_RADIUS} fill={isBlack ? "#000000" : "#FFFFFF"} stroke="#000000" strokeWidth={2} />
+                    <g key={`s-group-${x}-${y}`} data-stone={`${x}-${y}`} className="pointer-events-none" filter="url(#stoneShadow)">
+                        <circle cx={cx} cy={cy} r={STONE_RADIUS} fill={isBlack ? "url(#stoneBlack)" : "url(#stoneWhite)"} stroke={isBlack ? "#000000" : "#3a3a3a"} strokeWidth={isBlack ? 2 : 1.5} />
                         {showNumbers && stone.number && (
                             <text x={cx} y={cy} dy=".35em" textAnchor="middle" fill={isBlack ? "#FFFFFF" : "#000000"} fontSize={FONT_SIZE} fontWeight="bold">{stone.number}</text>
                         )}
@@ -402,6 +402,10 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 aspectRatio: '1 / 1',
                 maxHeight,
                 touchAction: 'none',
+                borderRadius: '6px',
+                boxShadow: isMonochrome
+                    ? undefined
+                    : '3px 4px 0 0 #93683a, 6px 8px 0 0 #6b4d28, 0 14px 28px rgba(0,0,0,0.5)',
             }}
             shapeRendering="geometricPrecision"
             onMouseUp={onDragEnd}
@@ -423,8 +427,32 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#e53e3e" />
                 </marker>
+                <radialGradient id="stoneBlack" cx="35%" cy="30%" r="75%">
+                    <stop offset="0%" stopColor="#5a5a5a" />
+                    <stop offset="40%" stopColor="#1a1a1a" />
+                    <stop offset="100%" stopColor="#000000" />
+                </radialGradient>
+                <radialGradient id="stoneWhite" cx="35%" cy="30%" r="75%">
+                    <stop offset="0%" stopColor="#ffffff" />
+                    <stop offset="55%" stopColor="#f0ede4" />
+                    <stop offset="100%" stopColor="#d8d2c0" />
+                </radialGradient>
+                <filter id="stoneShadow" x="-60%" y="-60%" width="220%" height="220%">
+                    <feDropShadow dx="1.2" dy="2.2" stdDeviation="1.4" floodColor="#000000" floodOpacity={0.45} />
+                </filter>
             </defs>
-            <rect x={viewBoxData.x} y={viewBoxData.y} width={viewBoxData.w} height={viewBoxData.h} fill={isMonochrome ? 'white' : '#DCB35C'} stroke="none" />
+            {isMonochrome ? (
+                <rect x={viewBoxData.x} y={viewBoxData.y} width={viewBoxData.w} height={viewBoxData.h} fill="white" stroke="none" />
+            ) : (
+                // 木目は毎回SVGフィルターで計算せず、事前生成した静的画像(public/wood-board-texture.webp)を
+                // 敷き詰める。feTurbulenceは盤の新規マウントごとに計算コストが乗る(実測: 1盤あたり約
+                // 5〜10ms、12盤同時表示で約40ms)ため、低スペック端末での多面打ち・画面遷移の負荷を避ける。
+                <image
+                    href="/wood-board-texture.webp"
+                    x={viewBoxData.x} y={viewBoxData.y} width={viewBoxData.w} height={viewBoxData.h}
+                    preserveAspectRatio="none"
+                />
+            )}
             {lines}
             {coords}
             {starPoints.map(([sx, sy], i) => (

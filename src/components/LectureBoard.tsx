@@ -619,7 +619,7 @@ export default function LectureBoard({
             <>
           {/* SGF読込 */}
           <div className="glass-panel p-4 space-y-3">
-            <h3 className="font-bold border-b border-white/5 pb-2">SGFライブラリ</h3>
+            <h3 className="heading-section border-b border-white/5 pb-2">SGFライブラリ</h3>
             <input ref={fileInputRef} type="file" accept=".sgf" onChange={handleSgfLoad} className="hidden" />
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -639,7 +639,7 @@ export default function LectureBoard({
 
           {/* 碁盤設定 */}
           <div className="glass-panel p-4 space-y-4">
-            <h3 className="font-bold border-b border-white/5 pb-2">碁盤設定</h3>
+            <h3 className="heading-section border-b border-white/5 pb-2">碁盤設定</h3>
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-zinc-400 text-sm">
                 <Grid3X3 className="w-4 h-4" />
@@ -673,7 +673,7 @@ export default function LectureBoard({
           {/* 参加生徒リスト */}
           {participants.length > 0 && (
             <div className="glass-panel p-4 space-y-3">
-              <h3 className="font-bold border-b border-white/5 pb-2">
+              <h3 className="heading-section border-b border-white/5 pb-2">
                 参加生徒 ({participants.filter(p => p.identity !== localIdentity).length})
               </h3>
               <div className="space-y-1 max-h-60 overflow-y-auto">
