@@ -79,7 +79,7 @@ export default function ProblemImporter({ onImport }: ProblemImporterProps) {
 
   return (
     <div
-      className="border-2 border-dashed border-white/10 rounded-lg p-4 text-center hover:border-blue-500/30 transition-colors cursor-pointer"
+      className="border-2 border-dashed border-white/10 rounded-lg p-4 text-center hover:border-amber-500/30 transition-colors cursor-pointer"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onClick={() => fileRef.current?.click()}

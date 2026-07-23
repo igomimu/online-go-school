@@ -68,7 +68,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
               onClick={() => setLevel(null)}
               className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
                 level === null
-                  ? 'bg-blue-600 border-blue-500 text-white'
+                  ? 'bg-amber-600 border-amber-500 text-white'
                   : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
               }`}
             >
@@ -80,7 +80,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
                 onClick={() => setLevel(l)}
                 className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
                   level === l
-                    ? 'bg-blue-600 border-blue-500 text-white'
+                    ? 'bg-amber-600 border-amber-500 text-white'
                     : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
                 }`}
               >
@@ -99,7 +99,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
                 onClick={() => setBoardSize(size)}
                 className={`px-3 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
                   boardSize === size
-                    ? 'bg-blue-600 border-blue-500 text-white'
+                    ? 'bg-amber-600 border-amber-500 text-white'
                     : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
                 }`}
               >

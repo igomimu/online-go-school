@@ -33,7 +33,7 @@ export default function SavedGameList({ onSelectGame }: SavedGameListProps) {
         >
           <button
             onClick={() => onSelectGame(game)}
-            className="flex-1 text-left hover:text-blue-400 transition-colors"
+            className="flex-1 text-left hover:text-amber-400 transition-colors"
           >
             <div className="font-medium">
               {game.blackPlayer} vs {game.whitePlayer}
@@ -45,7 +45,7 @@ export default function SavedGameList({ onSelectGame }: SavedGameListProps) {
           <div className="flex items-center gap-1">
             <button
               onClick={() => onSelectGame(game)}
-              className="p-1 text-zinc-500 hover:text-blue-400"
+              className="p-1 text-zinc-500 hover:text-amber-400"
               title="検討する"
             >
               <Search className="w-3.5 h-3.5" />

@@ -137,7 +137,7 @@ export default function GameCreationDialog({
             data-testid="black-player-select"
             value={blackPlayer}
             onChange={e => setBlackPlayer(e.target.value)}
-            className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+            className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500"
           >
             {allPlayers.map(p => {
               const rank = getRank(p);
@@ -164,7 +164,7 @@ export default function GameCreationDialog({
             data-testid="white-player-select"
             value={whitePlayer}
             onChange={e => setWhitePlayer(e.target.value)}
-            className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+            className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500"
           >
             {allPlayers.map(p => {
               const rank = getRank(p);
@@ -191,7 +191,7 @@ export default function GameCreationDialog({
                 onClick={() => setBoardSize(size)}
                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                   boardSize === size
-                    ? 'bg-blue-500 text-white'
+                    ? 'bg-amber-500 text-white'
                     : 'bg-white/5 hover:bg-white/10'
                 }`}
               >
@@ -215,7 +215,7 @@ export default function GameCreationDialog({
                 }}
                 className={`flex-1 min-w-[3rem] py-2 rounded-lg text-sm font-medium transition-all ${
                   handicap === h
-                    ? 'bg-blue-500 text-white'
+                    ? 'bg-amber-500 text-white'
                     : 'bg-white/5 hover:bg-white/10'
                 }`}
               >
@@ -233,7 +233,7 @@ export default function GameCreationDialog({
             value={komi}
             step={0.5}
             onChange={e => { setKomi(parseFloat(e.target.value) || 0); setHandicapTouched(true); }}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-amber-500"
           />
         </div>
 

@@ -17,7 +17,7 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
   const set = (patch: Partial<TimeSettings>) => onChange({ ...value, ...patch });
 
   const numberInputCls = dark
-    ? 'w-20 bg-white/5 border border-white/10 rounded-md px-2 py-1 text-sm focus:outline-none focus:border-blue-500'
+    ? 'w-20 bg-white/5 border border-white/10 rounded-md px-2 py-1 text-sm focus:outline-none focus:border-amber-500'
     : '';
   const numberInputStyle: React.CSSProperties = dark
     ? {}
@@ -42,7 +42,7 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
     dark
       ? `px-3 py-1 rounded-md text-sm border transition-colors ${
           active
-            ? 'bg-blue-500 border-blue-500 text-white font-semibold'
+            ? 'bg-amber-500 border-amber-500 text-white font-semibold'
             : 'bg-white/5 border-white/10 text-zinc-300 hover:bg-white/10'
         }`
       : '';
