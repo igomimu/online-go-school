@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { StoneColor, BoardState } from '../components/GoBoard';
 import { createEmptyBoard, checkCapture, boardHash, isLegalMove } from '../utils/gameLogic';
 import { getHandicapStones } from '../utils/handicapStones';
-import { studentMatchesPlayer } from '../utils/identityUtils';
+import { studentMatchesPlayer, isTeacherIdentity } from '../utils/identityUtils';
 import { getByoyomiAnnouncement, speakByoyomi } from '../utils/byoyomiVoice';
 import { switchClock } from './useGameClock';
 import type { GameClock } from '../types/game';
@@ -16,6 +16,7 @@ import {
   updateDeadStones as apiUpdateDeadStones,
   finishGame as apiFinishGame,
   resetLiveGame as apiResetLiveGame,
+  resumeLiveGame as apiResumeLiveGame,
   requestUndo as apiRequestUndo,
   respondUndo as apiRespondUndo,
   type LiveGameRow,
@@ -143,6 +144,8 @@ export function decideSubmitRetry(
 
 export interface UseLiveGameResult {
   game: LiveGameRow | null;
+  /** 講師が対局者として参加している場合の色（講師は時間切れ負けにしない） */
+  teacherColor: StoneColor | null;
   boardState: BoardState;
   currentColor: StoneColor;
   moveNumber: number;
@@ -166,6 +169,8 @@ export interface UseLiveGameResult {
   setDeadStones: (deadStones: string[]) => Promise<void>;
   finishWithResult: (result: string) => Promise<void>;
   resetGame: () => Promise<void>;
+  /** 時間切れ・中断で終わった対局を再開する（終局からの再開は講師のみ、サーバー側で判定） */
+  resumeGame: () => Promise<void>;
   requestUndo: () => Promise<void>;
   respondUndo: (accept: boolean) => Promise<void>;
 }
@@ -369,6 +374,20 @@ export function useLiveGame(
   const isParticipant = isBlack || isWhite;
   const myColor: StoneColor | null = isBlack ? 'BLACK' : isWhite ? 'WHITE' : null;
   const isMyTurn = isParticipant && myColor === derived.currentColor;
+
+  // 講師が対局者として参加している場合の色。講師側は時間切れ負けにしない
+  // （指導碁で先生が複数面を持つため。切れてもそのまま続行できる）。
+  const teacherColor: StoneColor | null = !activeGame
+    ? null
+    : isTeacherIdentity(activeGame.black_player)
+      ? 'BLACK'
+      : isTeacherIdentity(activeGame.white_player)
+        ? 'WHITE'
+        : null;
+  const teacherColorRef = useRef<StoneColor | null>(teacherColor);
+  useEffect(() => {
+    teacherColorRef.current = teacherColor;
+  }, [teacherColor]);
 
   // 対局者本人のみ着手できる。対局中の代打ちは（先生でも）一切不可。
   const effectivePlayer = useMemo(() => {
@@ -590,6 +609,9 @@ export function useLiveGame(
     async (color: 'BLACK' | 'WHITE') => {
       if (!activeGame) return;
       
+      // 講師側は時間切れ負けにしない（切れてもそのまま続行）
+      if (color === teacherColorRef.current) return;
+
       // 自分がその時間切れになったプレイヤーである場合、または先生である場合のみ終局APIを投げる
       const isMyTimeUp = myColor === color;
       if (isMyTimeUp || isTeacher) {
@@ -635,6 +657,10 @@ export function useLiveGame(
         setLocalClock(next);
       };
 
+      // 講師が対局者のときは、その手番では切れ負けにしない。
+      // 秒読みありなら回数を戻して秒読みを繰り返し、秒読みなしなら0のまま続行する。
+      const isTeacherTurn = derived.currentColor === teacherColorRef.current;
+
       let newTimeLeft = timeLeft - elapsed;
       let newByoyomiLeft = byoyomiLeft;
       let newInByoyomi = inByoyomi ?? false;
@@ -646,6 +672,14 @@ export function useLiveGame(
             // 秒読み開始（回数はまだ消費しない）
             newInByoyomi = true;
             newTimeLeft = prev.byoyomiSeconds;
+          } else if (isTeacherTurn) {
+            // 講師は秒読みなしでも切れ負けにしない。0で止めたまま対局を続行する
+            commit({
+              ...prev,
+              lastTickTime: now,
+              ...(isBlackTurn ? { blackTimeLeft: 0 } : { whiteTimeLeft: 0 }),
+            });
+            return;
           } else {
             // 秒読みなし → 切れ負け
             speakByoyomi('時間切れ負けです');
@@ -663,6 +697,19 @@ export function useLiveGame(
         } else {
           // 秒読みを1回使い切った → 回数を消費
           newByoyomiLeft -= 1;
+          if (newByoyomiLeft <= 0 && isTeacherTurn) {
+            // 講師は最後の秒読みを使い切っても切れ負けにせず、同じ秒読みを繰り返す
+            newByoyomiLeft = 1;
+            newTimeLeft = prev.byoyomiSeconds;
+            commit({
+              ...prev,
+              lastTickTime: now,
+              ...(isBlackTurn
+                ? { blackTimeLeft: newTimeLeft, blackByoyomiLeft: 1, blackInByoyomi: true }
+                : { whiteTimeLeft: newTimeLeft, whiteByoyomiLeft: 1, whiteInByoyomi: true }),
+            });
+            return;
+          }
           if (newByoyomiLeft <= 0) {
             // 最後の秒読みを使い切り → 時間切れ負け。
             // 直前の秒読みで「10」を読み上げ済みなら重ねて「10」と言わない（10,10のダブり防止）
@@ -833,8 +880,20 @@ export function useLiveGame(
     }
   }, [activeGame]);
 
+  // 時間切れ・中断で終わった対局を再開する（講師のみ。サーバー側で権限と時計の復元を行う）
+  const resumeGameFn = useCallback(async () => {
+    if (!activeGame) return;
+    try {
+      await apiResumeLiveGame(activeGame.id);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [activeGame]);
+
   return {
     game: activeGame,
+    teacherColor,
+    resumeGame: resumeGameFn,
     boardState: derived.boardState,
     currentColor: derived.currentColor,
     moveNumber: derived.moveNumber,

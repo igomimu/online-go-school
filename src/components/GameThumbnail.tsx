@@ -1,6 +1,7 @@
 import type { GameSession } from '../types/game';
 import type { Student } from '../types/classroom';
 import { getDisplayName } from '../utils/identityUtils';
+import { isTimeoutResult } from '../utils/scoring';
 
 interface GameThumbnailProps {
   game: GameSession;
@@ -10,15 +11,21 @@ interface GameThumbnailProps {
   turnLabel?: string;
   students?: Student[];
   onResume?: (gameId: string) => void;
+  /** 時間切れで終わった対局の再開を許可する（講師のみ true） */
+  allowTimeoutResume?: boolean;
 }
 
-export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnLabel, students = [], onResume }: GameThumbnailProps) {
+export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnLabel, students = [], onResume, allowTimeoutResume }: GameThumbnailProps) {
   const size = game.boardSize;
   const cellSize = 8;
   const totalSize = size * cellSize;
 
   const blackName = getDisplayName(game.blackPlayer, students);
   const whiteName = getDisplayName(game.whitePlayer, students);
+
+  // 中断は本人も再開できる（回線復旧）。時間切れ終局からの再開は講師のみ。
+  const isTimedOut = game.status === 'finished' && isTimeoutResult(game.result);
+  const canResume = !!onResume && (game.status === 'interrupted' || (isTimedOut && !!allowTimeoutResume));
 
   return (
     <div
@@ -89,13 +96,16 @@ export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnL
               ? `${game.moveNumber}手目`
               : game.status === 'interrupted'
                 ? '中断'
-                : game.result || '終局'}
+                : isTimedOut
+                  ? '時間切れ'
+                  : game.result || '終局'}
           </span>
-          {game.status === 'interrupted' && onResume && (
+          {canResume && (
             <button
               onClick={e => {
                 e.stopPropagation();
-                onResume(game.id);
+                if (isTimedOut && !confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')) return;
+                onResume!(game.id);
               }}
               className="px-1.5 py-0.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-[10px] font-bold"
             >

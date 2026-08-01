@@ -6,6 +6,7 @@ import type { ChatMessage } from '../../types/chat';
 import { identityMatchesPlayer, parseIdentity, resolvePlayerName, stripSid, studentIdentityCandidates } from '../../utils/identityUtils';
 import { fetchActiveLiveGamesForPlayers, finishGame, getSupabase, liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
 import { loadSavedGamesForStudent } from '../../utils/savedGames';
+import { isTimeoutResult } from '../../utils/scoring';
 
 import StudentTable from './StudentTable';
 import BoardThumbnailGrid from './BoardThumbnailGrid';
@@ -600,7 +601,11 @@ export default function TeacherDashboard({
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {historyGames.map(game => {
-                    const interruptedLiveGame = games.find(g => g.id === game.id && g.status === 'interrupted');
+                    // 中断だけでなく、時間切れで終わった対局も講師なら再開できる（回線トラブル救済）
+                    const resumableLiveGame = games.find(g => g.id === game.id && (
+                      g.status === 'interrupted' ||
+                      (g.status === 'finished' && isTimeoutResult(g.result))
+                    ));
                     // この生徒がその対局で黒か白か（保存値は sid:/uuid/コード/名前 いずれか）
                     const matchesHistoryStudent = (raw: string) => {
                       const v = stripSid(raw || '');
@@ -647,11 +652,13 @@ export default function TeacherDashboard({
                             {outcome === 'win' && <span style={{ marginLeft: 6, fontSize: 11 }}>◯勝ち</span>}
                             {outcome === 'loss' && <span style={{ marginLeft: 6, fontSize: 11 }}>●負け</span>}
                           </span>
-                          {interruptedLiveGame && onResumeGame ? (
+                          {resumableLiveGame && onResumeGame ? (
                             <button
                               onClick={e => {
                                 e.stopPropagation();
-                                onResumeGame(interruptedLiveGame.id);
+                                if (resumableLiveGame.status === 'finished' &&
+                                    !confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')) return;
+                                onResumeGame(resumableLiveGame.id);
                                 setHistoryStudent(null);
                               }}
                               style={{

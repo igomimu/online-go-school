@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateTerritory, formatScoringResult, formatGameResultMessage } from './scoring';
+import { calculateTerritory, formatScoringResult, formatGameResultMessage, timedOutColorFromResult, isTimeoutResult } from './scoring';
 import type { BoardState, Stone } from '../components/GoBoard';
 
 function makeBoard(size: number, stones: { x: number; y: number; color: 'BLACK' | 'WHITE' }[]): BoardState {
@@ -115,7 +115,27 @@ describe('formatGameResultMessage', () => {
     expect(formatGameResultMessage('W+5')).toBe('白の5目勝ち');
   });
 
-  it('時間切れはラベル付きでそのまま表示', () => {
-    expect(formatGameResultMessage('W+T')).toBe('結果: W+T');
+  it('時間切れは日本語で表示する', () => {
+    expect(formatGameResultMessage('W+T')).toBe('黒の時間切れ。白の勝ち');
+    expect(formatGameResultMessage('B+T')).toBe('白の時間切れ。黒の勝ち');
+  });
+
+  it('未知の結果表記はそのままラベル付きで表示', () => {
+    expect(formatGameResultMessage('強制終局')).toBe('結果: 強制終局');
+  });
+});
+
+describe('timedOutColorFromResult / isTimeoutResult', () => {
+  it('勝者表記から時間切れした側の色を返す', () => {
+    expect(timedOutColorFromResult('B+T')).toBe('WHITE');
+    expect(timedOutColorFromResult('W+T')).toBe('BLACK');
+  });
+
+  it('時間切れ以外は null / false', () => {
+    expect(timedOutColorFromResult('B+R')).toBe(null);
+    expect(timedOutColorFromResult('W+5')).toBe(null);
+    expect(timedOutColorFromResult(null)).toBe(null);
+    expect(isTimeoutResult('強制終局')).toBe(false);
+    expect(isTimeoutResult('B+T')).toBe(true);
   });
 });

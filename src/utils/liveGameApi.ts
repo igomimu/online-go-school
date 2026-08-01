@@ -194,15 +194,41 @@ export async function createLiveGame(opts: CreateLiveGameOpts): Promise<LiveGame
   return res.game as LiveGameRow;
 }
 
+/**
+ * 時間切れで終わった対局を対局一覧に残しておく時間。
+ * 回線トラブルで切れた対局を講師が再開できるようにするため、終局後もしばらく一覧に出す。
+ */
+export const TIMEOUT_GAME_VISIBLE_MS = 3 * 60 * 60 * 1000;
+
 export async function fetchLiveGames(classroomId: string): Promise<LiveGameRow[]> {
-  const { data, error } = await getSupabase()
+  const supabase = getSupabase();
+  const { data, error } = await supabase
     .from('go_school_live_games')
     .select('*')
     .eq('classroom_id', classroomId)
     .in('status', ['playing', 'scoring', 'interrupted'])
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
-  return (data ?? []) as LiveGameRow[];
+  const active = (data ?? []) as LiveGameRow[];
+
+  // 時間切れ終局は「講師が再開できる対象」なので直近ぶんだけ別途拾う。
+  // ここが失敗しても進行中の対局一覧は返す（再開導線が出ないだけに留める）。
+  try {
+    const since = new Date(Date.now() - TIMEOUT_GAME_VISIBLE_MS).toISOString();
+    const { data: timedOut, error: timedOutErr } = await supabase
+      .from('go_school_live_games')
+      .select('*')
+      .eq('classroom_id', classroomId)
+      .eq('status', 'finished')
+      .in('result', ['B+T', 'W+T'])
+      .gte('updated_at', since)
+      .order('created_at', { ascending: false });
+    if (timedOutErr) throw new Error(timedOutErr.message);
+    return [...active, ...((timedOut ?? []) as LiveGameRow[])];
+  } catch (e) {
+    console.error('[fetchLiveGames] 時間切れ対局の取得に失敗:', e);
+    return active;
+  }
 }
 
 export async function fetchActiveLiveGamesForPlayers(identities: string[]): Promise<LiveGameRow[]> {

@@ -7,6 +7,7 @@ import {
   type LiveGameRow,
   type CreateLiveGameOpts,
 } from '../utils/liveGameApi';
+import { isTimeoutResult } from '../utils/scoring';
 
 export interface UseLiveGameListResult {
   games: LiveGameRow[];
@@ -74,8 +75,9 @@ export function useLiveGameList(classroomId: string | null): UseLiveGameListResu
         },
         onUpdate: (row) => {
           setGames((prev) => {
-            // finishedになったら一覧から除外
-            if (row.status === 'finished') {
+            // finishedになったら一覧から除外。
+            // ただし時間切れ終局だけは、講師が「再開」を押せるよう一覧に残す。
+            if (row.status === 'finished' && !isTimeoutResult(row.result)) {
               return prev.filter((g) => g.id !== row.id);
             }
             const idx = prev.findIndex((g) => g.id === row.id);

@@ -63,6 +63,35 @@ describe('GameThumbnail', () => {
     expect(onResume).toHaveBeenCalledWith('game-1');
   });
 
+  it('時間切れ終局は講師のみ再開ボタンを表示する（生徒には出さない）', () => {
+    const onResume = vi.fn();
+    const game = createMockGame({ status: 'finished', result: 'W+T' });
+
+    const { rerender } = render(<GameThumbnail game={game} onClick={vi.fn()} onResume={onResume} />);
+    expect(screen.getByText('時間切れ')).toBeInTheDocument();
+    expect(screen.queryByText('再開')).not.toBeInTheDocument();
+
+    rerender(<GameThumbnail game={game} onClick={vi.fn()} onResume={onResume} allowTimeoutResume />);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(screen.getByText('再開'));
+    expect(onResume).toHaveBeenCalledWith('game-1');
+  });
+
+  it('時間切れ以外の終局は講師でも再開ボタンを出さない', () => {
+    const game = createMockGame({ status: 'finished', result: 'B+R' });
+    render(<GameThumbnail game={game} onClick={vi.fn()} onResume={vi.fn()} allowTimeoutResume />);
+    expect(screen.queryByText('再開')).not.toBeInTheDocument();
+  });
+
+  it('再開確認をキャンセルしたら再開しない', () => {
+    const onResume = vi.fn();
+    const game = createMockGame({ status: 'finished', result: 'W+T' });
+    render(<GameThumbnail game={game} onClick={vi.fn()} onResume={onResume} allowTimeoutResume />);
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    fireEvent.click(screen.getByText('再開'));
+    expect(onResume).not.toHaveBeenCalled();
+  });
+
   it('クリックでonClickが呼ばれる', () => {
     const onClick = vi.fn();
     render(<GameThumbnail game={createMockGame()} onClick={onClick} />);

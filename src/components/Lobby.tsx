@@ -230,6 +230,7 @@ export default function Lobby({
                   onClick={() => onSelectGame(game.id)}
                   students={students}
                   onResume={onResumeGame}
+                  allowTimeoutResume={role === 'TEACHER'}
                 />
               ))}
             </div>

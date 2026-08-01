@@ -12,6 +12,7 @@ import { getTeacherDisplayName, identityMatchesPlayer, makeStudentIdentity, TEAC
 import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession, interruptAllGames, interruptGame, resumeLiveGame } from './utils/liveGameApi';
+import { isTimeoutResult } from './utils/scoring';
 import {
   clearPendingResumeGameId,
   getPendingResumeGameId,
@@ -814,13 +815,15 @@ function App() {
   useEffect(() => {
     if (!activeGameId) return;
     const currentGame = games.find(g => g.id === activeGameId);
+    // 時間切れ終局は先生が「対局を再開する」を押せるよう、先生の画面は自動で閉じない
+    if (role === 'TEACHER' && currentGame?.status === 'finished' && isTimeoutResult(currentGame.result)) return;
     if (currentGame && (currentGame.status === 'finished' || currentGame.status === 'interrupted')) {
       const timer = setTimeout(() => {
         handleBackToLobby();
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [activeGameId, games, handleBackToLobby]);
+  }, [activeGameId, games, handleBackToLobby, role]);
 
   // 生徒のブラウザ閉じ/リロードは keepalive fetch で中断を試みる。
   useEffect(() => {

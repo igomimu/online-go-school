@@ -166,5 +166,26 @@ export function formatGameResultMessage(result: string): string {
     const winnerColor = territoryMatch[1] === 'B' ? '黒' : '白';
     return `${winnerColor}の${territoryMatch[2]}目勝ち`;
   }
+  const timedOut = timedOutColorFromResult(result);
+  if (timedOut) {
+    const loserColor = timedOut === 'BLACK' ? '黒' : '白';
+    const winnerColor = timedOut === 'BLACK' ? '白' : '黒';
+    return `${loserColor}の時間切れ。${winnerColor}の勝ち`;
+  }
   return `結果: ${result}`;
+}
+
+/**
+ * 時間切れ負けで終わった対局なら、切れた側の色を返す（それ以外は null）。
+ * result は勝者側の表記なので "B+T" は「黒の勝ち＝白が時間切れ」。
+ */
+export function timedOutColorFromResult(result: string | null | undefined): 'BLACK' | 'WHITE' | null {
+  const m = result?.trim().match(/^([BW])\+T$/i);
+  if (!m) return null;
+  return m[1].toUpperCase() === 'B' ? 'WHITE' : 'BLACK';
+}
+
+/** 時間切れで終局した対局か（講師による再開の対象） */
+export function isTimeoutResult(result: string | null | undefined): boolean {
+  return timedOutColorFromResult(result) !== null;
 }

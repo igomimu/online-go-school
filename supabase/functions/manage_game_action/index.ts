@@ -1,6 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { studentMatchesPlayer, toStudentIdentity, playersMatchPair, resolvePlayerColor, TEACHER_IDENTITY } from '../_shared/identity.ts'
+import { studentMatchesPlayer, toStudentIdentity, playersMatchPair, resolvePlayerColor, stripSid, TEACHER_IDENTITY } from '../_shared/identity.ts'
 import { exportLiveGameToSgf, formatTokyoSgfDate } from '../_shared/sgf.ts'
+import { restoreClockForTimeout, timedOutColorFromResult } from '../_shared/clock.ts'
 import { versionResponse } from '../_shared/version.ts'
 
 const corsHeaders = {
@@ -259,6 +260,18 @@ Deno.serve(async (req) => {
 
       if (historyGameErr) throw historyGameErr
 
+      // 講師は時間切れ負けにしない（指導碁で複数面を持つため）。
+      // 古い/別端末のクライアントが切れ負けを投げてきても、ここで無視して対局を続行させる。
+      const timedOutColor = timedOutColorFromResult(normalizedResult)
+      if (timedOutColor) {
+        const timedOutPlayer = timedOutColor === 'BLACK'
+          ? gameForHistory.black_player
+          : gameForHistory.white_player
+        if (stripSid(timedOutPlayer ?? '') === TEACHER_IDENTITY) {
+          return json({ ok: true, skipped: 'teacher does not lose on time' })
+        }
+      }
+
       const { error } = await supabase
         .from('go_school_live_games')
         .update({
@@ -493,18 +506,30 @@ Deno.serve(async (req) => {
     if (action === 'resume') {
       const { data: gameToResume, error: resumeGameErr } = await supabase
         .from('go_school_live_games')
-        .select('clock')
+        .select('clock, status, result')
         .eq('id', game_id)
         .single()
 
       if (resumeGameErr) throw resumeGameErr
+
+      // 中断からの復帰は対局者本人も可（回線復旧の動線）。
+      // 一方、終局した対局の再開は先生のみ（負けた生徒が勝手に蒸し返せないようにする）。
+      if (gameToResume.status === 'finished' && !isTeacher && !isServiceRole) {
+        return json({ error: 'Forbidden: only the teacher can resume a finished game' }, 403)
+      }
+
+      // 時間切れ（"B+T"/"W+T"）で終わった対局は、切れた側の時計を戻さないと
+      // 再開直後にまた切れてしまう。秒読みがあれば規定回数ぶん復活させ、
+      // 秒読みなしの設定なら持ち時間を戻す。
+      const clock = restoreClockForTimeout(pauseClock(gameToResume.clock), gameToResume.result)
 
       const { error } = await supabase
         .from('go_school_live_games')
         .update({
           status: 'playing',
           result: null,
-          clock: pauseClock(gameToResume.clock),
+          undo_request: null,
+          clock,
           updated_at: new Date().toISOString(),
         })
         .eq('id', game_id)

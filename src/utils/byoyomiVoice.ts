@@ -64,10 +64,26 @@ export function isByoyomiVoiceEnabled(): boolean {
   return voiceEnabled;
 }
 
+// 直近に読み上げたフレーズ。同じ語が短時間に二度読まれるのを最後の砦として止める。
+// 呼び出し側（useLiveGameのtick）にも重複防止キーがあるが、時計のRealtime巻き戻しや
+// 盤コンポーネントの再マウントでキーの記憶ごとリセットされる経路が残っており、
+// 稀に「最後の考慮時間です」等が2連続で読まれる（2026-08-01 E2Eで再現）。
+// 秒読みのカウントは1秒刻みで必ず語が変わるため、同一語の連続は常に異常とみなせる。
+let lastSpoken: { text: string; at: number } | null = null;
+const DUPLICATE_SUPPRESS_MS = 1500;
+
+/** テスト用: 重複抑止の記憶をリセットする */
+export function resetByoyomiVoiceState(): void {
+  lastSpoken = null;
+}
+
 /** ブラウザ内蔵音声（Web Speech API）で日本語読み上げ。未対応環境では無音。 */
 export function speakByoyomi(text: string): void {
   if (!voiceEnabled) return;
   if (typeof window === 'undefined') return;
+  const now = Date.now();
+  if (lastSpoken && lastSpoken.text === text && now - lastSpoken.at < DUPLICATE_SUPPRESS_MS) return;
+  lastSpoken = { text, at: now };
   const synth = window.speechSynthesis;
   if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return;
   try {

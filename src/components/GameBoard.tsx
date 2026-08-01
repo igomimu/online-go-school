@@ -3,7 +3,7 @@ import GoBoard from './GoBoard';
 import ZoomTapConfirm from './ZoomTapConfirm';
 import type { Drawing } from './GoBoard';
 import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX } from 'lucide-react';
-import { calculateTerritory, formatScoringResult, formatGameResultMessage } from '../utils/scoring';
+import { calculateTerritory, formatScoringResult, formatGameResultMessage, isTimeoutResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
 import { useLiveGame } from '../hooks/useLiveGame';
@@ -52,6 +52,8 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     setDeadStones,
     finishWithResult,
     resetGame,
+    resumeGame,
+    teacherColor,
     requestUndo,
     respondUndo,
   } = live;
@@ -253,33 +255,29 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     );
   }
 
-  // 黒残り時間表示
-  const renderBlackClock = () => {
+  // 残り時間表示。講師側は時間切れ負けにならないので、秒読み回数は [∞] と出して
+  // 切迫した赤表示にもしない（切れてもそのまま打ち続けられることを見た目でも示す）。
+  const renderClock = (color: 'BLACK' | 'WHITE') => {
     if (!clock) return null;
-    const isLow = clock.blackTimeLeft <= 10 && clock.blackTimeLeft > 0;
-    const isByoyomi = !!clock.blackInByoyomi;
+    const isBlack = color === 'BLACK';
+    const timeLeft = isBlack ? clock.blackTimeLeft : clock.whiteTimeLeft;
+    const byoyomiLeft = isBlack ? clock.blackByoyomiLeft : clock.whiteByoyomiLeft;
+    const isByoyomi = isBlack ? !!clock.blackInByoyomi : !!clock.whiteInByoyomi;
+    const isTeacherSide = teacherColor === color;
+    const isLow = timeLeft <= 10 && timeLeft > 0;
+    const highlight = (isLow || isByoyomi) && !isTeacherSide;
     return (
-      <span data-testid="clock-black" className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
-        isLow || isByoyomi ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-300'
+      <span data-testid={isBlack ? 'clock-black' : 'clock-white'} className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
+        highlight ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-300'
       }`}>
-        {isByoyomi ? `秒読 ${Math.ceil(clock.blackTimeLeft)}秒 [${clock.blackByoyomiLeft}]` : formatTime(clock.blackTimeLeft)}
+        {isByoyomi
+          ? `秒読 ${Math.ceil(timeLeft)}秒 [${isTeacherSide ? '∞' : byoyomiLeft}]`
+          : formatTime(timeLeft)}
       </span>
     );
   };
-
-  // 白残り時間表示
-  const renderWhiteClock = () => {
-    if (!clock) return null;
-    const isLow = clock.whiteTimeLeft <= 10 && clock.whiteTimeLeft > 0;
-    const isByoyomi = !!clock.whiteInByoyomi;
-    return (
-      <span data-testid="clock-white" className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
-        isLow || isByoyomi ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-300'
-      }`}>
-        {isByoyomi ? `秒読 ${Math.ceil(clock.whiteTimeLeft)}秒 [${clock.whiteByoyomiLeft}]` : formatTime(clock.whiteTimeLeft)}
-      </span>
-    );
-  };
+  const renderBlackClock = () => renderClock('BLACK');
+  const renderWhiteClock = () => renderClock('WHITE');
 
   return (
     <div className={`flex h-full flex-col ${isDedicatedWindow ? 'gap-1.5' : 'gap-3'}`}>
@@ -614,8 +612,21 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
 
       {/* 終局結果（投了は「〇が投了しました。〇の中押し勝ち」の分かりやすい文言にする） */}
       {(game.status === 'finished' || game.status === 'interrupted') && game.result && (
-        <div className="shrink-0 text-center text-sm text-white font-bold">
-          {formatGameResultMessage(game.result)}
+        <div className="shrink-0 flex flex-col items-center gap-2 text-center text-sm text-white font-bold">
+          <span>{formatGameResultMessage(game.result)}</span>
+          {/* 回線トラブル等で不本意に切れた対局を、講師の判断でその場から再開する */}
+          {isTeacher && isTimeoutResult(game.result) && (
+            <button
+              data-testid="resume-timeout-game"
+              onClick={async () => {
+                if (!confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')) return;
+                await resumeGame();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/30 rounded-lg transition-colors duration-150 font-bold"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> 対局を再開する
+            </button>
+          )}
         </div>
       )}
 

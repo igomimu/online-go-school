@@ -330,4 +330,45 @@ describe('GameBoard', () => {
     );
     expect(container.querySelector('line[stroke="#e53e3e"]')).not.toBeInTheDocument();
   });
+  it('時間切れ終局では講師にだけ「対局を再開する」ボタンを出す', () => {
+    const mockResumeGame = vi.fn();
+    const game = createMockGame({ status: 'finished', result: 'W+T' });
+
+    setupMock({ game, resumeGame: mockResumeGame });
+    const { unmount } = render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+    expect(screen.getByText('黒の時間切れ。白の勝ち')).toBeInTheDocument();
+    expect(screen.queryByTestId('resume-timeout-game')).not.toBeInTheDocument();
+    unmount();
+
+    setupMock({ game, resumeGame: mockResumeGame });
+    render(<GameBoard gameId="game-1" myIdentity="先生" isTeacher />);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(screen.getByTestId('resume-timeout-game'));
+    expect(mockResumeGame).toHaveBeenCalled();
+  });
+
+  it('投了で終わった対局には再開ボタンを出さない', () => {
+    const game = createMockGame({ status: 'finished', result: 'B+R' });
+    setupMock({ game, resumeGame: vi.fn() });
+    render(<GameBoard gameId="game-1" myIdentity="先生" isTeacher />);
+    expect(screen.queryByTestId('resume-timeout-game')).not.toBeInTheDocument();
+  });
+
+  it('講師側の秒読み回数は[∞]と表示する（切れ負けにならないため）', () => {
+    const game = createMockGame({ blackPlayer: 'たろう', whitePlayer: 'teacher' });
+    setupMock({
+      game,
+      teacherColor: 'WHITE',
+      clock: {
+        mainTimeSeconds: 0, byoyomiSeconds: 30, byoyomiPeriods: 1,
+        blackTimeLeft: 25, whiteTimeLeft: 12,
+        blackByoyomiLeft: 1, whiteByoyomiLeft: 1,
+        blackInByoyomi: true, whiteInByoyomi: true,
+        lastTickTime: null,
+      },
+    });
+    render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+    expect(screen.getByTestId('clock-white')).toHaveTextContent('秒読 12秒 [∞]');
+    expect(screen.getByTestId('clock-black')).toHaveTextContent('秒読 25秒 [1]');
+  });
 });

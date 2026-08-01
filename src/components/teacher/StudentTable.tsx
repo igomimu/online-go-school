@@ -131,7 +131,8 @@ export default function StudentTable({
                   {row.gameStatus === 'scoring' && '整'}
                   {row.gameStatus === 'finished' && '済'}
                   {row.gameStatus === 'interrupted' && '断'}
-                  {!row.gameStatus && row.isConnected && row.identity && onStartGame && (
+                  {/* 時間切れ終局は再開できるよう一覧に残るが、次の対局は普通に始められる必要がある */}
+                  {(!row.gameStatus || row.gameStatus === 'finished') && row.isConnected && row.identity && onStartGame && (
                     <button
                       className="px-1 border border-blue-700 bg-blue-600 text-white hover:bg-blue-700"
                       style={{ fontSize: 10 }}
@@ -297,10 +298,12 @@ function buildRows(
     const isConnected = !!p && p.identity !== localIdentity;
     const identity = p?.identity || s.id;
     const candidates = [...studentCandidates, identity];
-    const game = games.find(g =>
+    // 時間切れ終局の対局は再開のため一覧に残るので、進行中の対局を優先して拾う
+    const matchesCandidates = (g: GameSession) =>
       anyIdentityMatchesPlayer(candidates, g.blackPlayer) ||
-      anyIdentityMatchesPlayer(candidates, g.whitePlayer)
-    );
+      anyIdentityMatchesPlayer(candidates, g.whitePlayer);
+    const game = games.find(g => matchesCandidates(g) && g.status !== 'finished')
+      ?? games.find(matchesCandidates);
 
     rows.push({
       identity,
@@ -322,10 +325,11 @@ function buildRows(
     )?.id;
     if (sId && matched.has(sId)) continue;
 
-    const game = games.find(g =>
+    const matchesParticipant = (g: GameSession) =>
       identityMatchesPlayer(p.identity, g.blackPlayer) ||
-      identityMatchesPlayer(p.identity, g.whitePlayer)
-    );
+      identityMatchesPlayer(p.identity, g.whitePlayer);
+    const game = games.find(g => matchesParticipant(g) && g.status !== 'finished')
+      ?? games.find(matchesParticipant);
     rows.push({
       identity: p.identity,
       displayName: p.name || p.identity,

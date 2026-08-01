@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { getByoyomiAnnouncement } from './byoyomiVoice';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { getByoyomiAnnouncement, speakByoyomi, resetByoyomiVoiceState } from './byoyomiVoice';
 
 describe('getByoyomiAnnouncement', () => {
   describe('30秒・最後の回（periodsLeft=1）', () => {
@@ -77,5 +77,46 @@ describe('getByoyomiAnnouncement', () => {
     expect(getByoyomiAnnouncement(30, 0, 1)).toBeNull();
     expect(getByoyomiAnnouncement(30, 31, 1)).toBeNull();
     expect(getByoyomiAnnouncement(0, 5, 1)).toBeNull();
+  });
+});
+
+describe('speakByoyomi の連続重複抑止', () => {
+  const spoken: string[] = [];
+
+  beforeEach(() => {
+    spoken.length = 0;
+    resetByoyomiVoiceState();
+    vi.stubGlobal('speechSynthesis', {
+      speak: (u: { text: string }) => { spoken.push(u.text); },
+      cancel: () => {},
+    });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { text: string; lang = ''; rate = 1; volume = 1;
+      constructor(text: string) { this.text = text; } });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('同じフレーズが連続で来たら2回目を読み上げない', () => {
+    speakByoyomi('最後の考慮時間です');
+    speakByoyomi('最後の考慮時間です');
+    expect(spoken).toEqual(['最後の考慮時間です']);
+  });
+
+  it('異なるフレーズは連続でも読み上げる', () => {
+    speakByoyomi('1');
+    speakByoyomi('2');
+    expect(spoken).toEqual(['1', '2']);
+  });
+
+  it('抑止時間を過ぎれば同じフレーズも読み上げる（秒読みの回が一周した場合）', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-01T00:00:00Z'));
+    speakByoyomi('10');
+    vi.setSystemTime(new Date('2026-08-01T00:00:02Z')); // 2秒後
+    speakByoyomi('10');
+    expect(spoken).toEqual(['10', '10']);
   });
 });

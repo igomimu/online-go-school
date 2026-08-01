@@ -1,0 +1,85 @@
+import { test, expect, type Page, type BrowserContext } from '@playwright/test';
+import { TEST_STUDENT_A, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
+import { clearAllData, setupTeacherPassword, setupClassroomData, teardownSupabaseRoster } from './helpers/setup';
+import { loginAsTeacher, openClassroomAndConnect, waitForStudentJoined, waitForTeacherGameWindow } from './helpers/teacher-actions';
+import { loginAsStudent, enterAssignedGame, waitForMyTurn, playMove } from './helpers/student-actions';
+
+// 回線トラブルで生徒が時間切れ負けになった対局を、講師がその場から再開できること（2026-08-01）。
+// 再開時は切れた側の時計（秒読み回数）が戻り、そのまま打ち続けられる必要がある。
+
+test('時間切れで終わった対局を講師が再開でき、切れた側の時計が戻る', async ({ browser }) => {
+  test.setTimeout(180_000);
+  const classroomId = generateClassroomId('resume');
+  const contexts: BrowserContext[] = [];
+  const newPage = async (): Promise<Page> => {
+    const ctx = await browser.newContext();
+    contexts.push(ctx);
+    return ctx.newPage();
+  };
+
+  const teacherPage = await newPage();
+  const studentAPage = await newPage();
+
+  try {
+    await teacherPage.goto('/');
+    await clearAllData(teacherPage);
+    await setupTeacherPassword(teacherPage, TEST_TEACHER_PASSWORD);
+    await setupClassroomData(teacherPage, classroomId);
+    await teacherPage.reload();
+
+    await studentAPage.goto('/');
+    await clearAllData(studentAPage);
+    await setupClassroomData(studentAPage, classroomId);
+    await studentAPage.reload();
+
+    await loginAsTeacher(teacherPage);
+    await openClassroomAndConnect(teacherPage);
+    await loginAsStudent(studentAPage, { studentCode: TEST_STUDENT_A.code, classroomId });
+    await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
+
+    // 対局作成: 生徒A(黒) vs 先生(白)、持ち時間0・秒読み10秒×1
+    await teacherPage.getByTestId('create-game-toolbar-button').click();
+    await teacherPage.getByTestId('create-game-button').waitFor({ timeout: 5_000 });
+    await teacherPage.getByRole('button', { name: '9路', exact: true }).click();
+
+    const blackSelect = teacherPage.getByTestId('black-player-select');
+    await expect(blackSelect.locator('option')).toHaveCount(2, { timeout: 20_000 });
+    const options = await blackSelect.locator('option').allTextContents();
+    await blackSelect.selectOption({ index: options.findIndex(o => o.includes(TEST_STUDENT_A.name)) });
+    await teacherPage.getByTestId('white-player-select').selectOption({ index: options.findIndex(o => o.includes('先生')) });
+
+    const numberInputs = teacherPage.locator('input[type="number"]');
+    await numberInputs.nth(1).fill('0');
+    await teacherPage.getByRole('button', { name: '10秒', exact: true }).click();
+    await numberInputs.nth(2).fill('1'); // 秒読み10秒×1
+
+    const teacherGameWindow = await waitForTeacherGameWindow(teacherPage, () =>
+      teacherPage.getByTestId('create-game-button').click(),
+    );
+    teacherGameWindow.on('dialog', d => d.accept());
+
+    // 黒(生徒A)→白(先生)と1手ずつ打つと、以降は黒(生徒A)の時計が動く
+    await enterAssignedGame(studentAPage);
+    await waitForMyTurn(studentAPage);
+    await playMove(studentAPage, 4, 4);
+    await playMove(teacherGameWindow, 6, 6);
+
+    // 生徒Aは以降着手しないので 10秒×1 で時間切れ負け（W+T）
+    await expect(teacherGameWindow.getByText('黒の時間切れ。白の勝ち')).toBeVisible({ timeout: 45_000 });
+
+    // 講師が対局を再開する
+    await teacherGameWindow.getByTestId('resume-timeout-game').click();
+
+    // 生徒側の盤が対局中に戻り、切れていた黒の秒読みが規定回数（1回）復元されている
+    await expect(studentAPage.getByTestId('clock-black')).toContainText('秒読 10秒 [1]', { timeout: 30_000 });
+    await expect(studentAPage.getByText('あなたの番です')).toBeVisible({ timeout: 15_000 });
+    await expect(studentAPage.getByText(/時間切れ/)).toHaveCount(0);
+
+    // 再開後も打てる
+    await playMove(studentAPage, 3, 3);
+    await expect(studentAPage.getByTestId('move-count')).toContainText('3手目', { timeout: 15_000 });
+  } finally {
+    for (const ctx of contexts) await ctx.close().catch(() => {});
+    await teardownSupabaseRoster(classroomId);
+  }
+});
