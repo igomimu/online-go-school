@@ -124,15 +124,6 @@ export default function AiAnalysisPanel({
           </summary>
           <div className="mt-2 space-y-2">
             <div>
-              <label className="text-zinc-500">サーバーURL</label>
-              <input
-                type="text"
-                value={settings.serverUrl}
-                onChange={e => onUpdateSettings({ serverUrl: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-xs"
-              />
-            </div>
-            <div>
               <label className="text-zinc-500">分析精度 (visits)</label>
               <select
                 value={settings.maxVisits}

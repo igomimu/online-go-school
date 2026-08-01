@@ -10,9 +10,8 @@ import {
 /**
  * 検討モードの AiAnalysisPanel 候補手クリックで盤面に SQR マーカーが付くことを検証する。
  *
- * 実 KataGo サーバ (VITE_KATAGO_SERVER_URL) は JWT 認証が必要で、E2E 環境では到達不能
- * もしくは 401 を返す。本テストの目的は **候補手行クリック→盤面マーカー追加** という
- * 配線そのものの検証なので、`page.route()` で /api/analyze を deterministic にモックする。
+ * 本テストの目的は **候補手行クリック→盤面マーカー追加** という配線そのものの検証なので、
+ * `page.route()` でサーバーサイドプロキシ /api/katago-analyze を deterministic にモックする。
  * これにより、KataGo の起動状態に依存せず、毎回同じ結果で wiring を検証できる。
  */
 
@@ -39,7 +38,7 @@ const MOCK_RESPONSE: MockAnalysisResult = {
 };
 
 async function mockKatagoApi(page: Page): Promise<void> {
-  await page.route('**/api/analyze', async (route) => {
+  await page.route('**/api/katago-analyze', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -58,17 +57,16 @@ test.describe('検討モード AI候補手クリック', () => {
     teacherContext = await browser.newContext();
     teacherPage = await teacherContext.newPage();
 
-    // /api/analyze をモック (route 設定はページ遷移前にしておく)
+    // /api/katago-analyze をモック (route 設定はページ遷移前にしておく)
     await mockKatagoApi(teacherPage);
 
     await teacherPage.goto('/');
     await clearAllData(teacherPage);
     await setupTeacherPassword(teacherPage, TEST_TEACHER_PASSWORD);
     await setupClassroomData(teacherPage, classroomId);
-    // AI設定を「ON + 任意のサーバURL」で書き込んでおく
+    // AI設定を「ON + 100 visits」で書き込んでおく
     await teacherPage.evaluate(() => {
       localStorage.setItem('go-school-ai-settings', JSON.stringify({
-        serverUrl: 'http://mock-katago.invalid',
         maxVisits: 100,
         enabled: true,
       }));

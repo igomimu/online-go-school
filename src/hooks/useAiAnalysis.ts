@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { AiAnalysisResult, AiSettings } from '../types/ai';
+import type { AiAnalysisRequest, AiAnalysisResult, AiSettings } from '../types/ai';
 import type { GameNode } from '../utils/treeUtilsV2';
 import { analyzePosition, convertMovesToKatago, loadAiSettings, saveAiSettings } from '../utils/katagoClient';
 
@@ -14,15 +14,13 @@ export function useAiAnalysis(
   moveHistory: { x: number; y: number; color: 'BLACK' | 'WHITE' }[],
   options: UseAiAnalysisOptions,
 ) {
-  const [resultState, setResultState] = useState<{ nodeId: string; result: AiAnalysisResult } | null>(null);
-  const [loadingNodeId, setLoadingNodeId] = useState<string | null>(null);
-  const [errorState, setErrorState] = useState<{ nodeId: string; message: string } | null>(null);
+  const [resultState, setResultState] = useState<{ key: string; result: AiAnalysisResult } | null>(null);
+  const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<{ key: string; message: string } | null>(null);
   const [settings, setSettings] = useState<AiSettings>(() => loadAiSettings());
 
-  // Cache: nodeId -> result
+  // Cache: 局面・分析条件を含む安定キー -> result
   const cacheRef = useRef(new Map<string, AiAnalysisResult>());
-  const abortRef = useRef<AbortController | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateSettings = useCallback((newSettings: Partial<AiSettings>) => {
     setSettings(prev => {
@@ -32,89 +30,87 @@ export function useAiAnalysis(
     });
   }, []);
 
-  // Analyze when node changes (debounced)
-  useEffect(() => {
-    if (!settings.enabled || !currentNode) {
-      return;
-    }
+  // 配列・オブジェクトの参照ではなく内容からキーを作る。
+  // Reactの再レンダーでmoveHistoryが同内容の新配列になっても、同じ局面を再送しない。
+  const analysisKey = settings.enabled && currentNode
+    ? JSON.stringify({
+        nodeId: currentNode.id,
+        request: {
+          moves: convertMovesToKatago(moveHistory, options.boardSize),
+          boardSize: options.boardSize,
+          komi: options.komi,
+          maxVisits: settings.maxVisits,
+          initialStones: options.handicapStones?.map(s => {
+            const col = s.x >= 9
+              ? String.fromCharCode(64 + s.x + 1)
+              : String.fromCharCode(64 + s.x);
+            const row = options.boardSize - s.y + 1;
+            return ['B', `${col}${row}`] as [string, string];
+          }),
+        } satisfies AiAnalysisRequest,
+      })
+    : null;
 
-    const nodeId = currentNode.id;
+  // Analyze when the semantic position changes (debounced)
+  useEffect(() => {
+    if (!analysisKey) return;
+
+    const parsed = JSON.parse(analysisKey) as { request: AiAnalysisRequest };
 
     // Check cache
-    const cached = cacheRef.current.get(nodeId);
+    const cached = cacheRef.current.get(analysisKey);
     if (cached) {
       queueMicrotask(() => {
-        setResultState({ nodeId, result: cached });
+        setResultState(prev => prev?.key === analysisKey ? prev : { key: analysisKey, result: cached });
         setErrorState(null);
-        setLoadingNodeId(null);
+        setLoadingKey(null);
       });
       return;
     }
 
-    // Debounce: wait 300ms before sending request
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    let controller: AbortController | null = null;
+    const debounce = setTimeout(() => {
+      controller = new AbortController();
+      const activeController = controller;
 
-    debounceRef.current = setTimeout(() => {
-      // Abort previous request
-      if (abortRef.current) abortRef.current.abort();
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      setLoadingNodeId(nodeId);
+      setLoadingKey(analysisKey);
       setErrorState(null);
 
-      const katagoMoves = convertMovesToKatago(moveHistory, options.boardSize);
-      const initialStones = options.handicapStones?.map(s => {
-        const col = s.x >= 9
-          ? String.fromCharCode(64 + s.x + 1)
-          : String.fromCharCode(64 + s.x);
-        const row = options.boardSize - s.y + 1;
-        return ['B', `${col}${row}`] as [string, string];
-      });
-
-      analyzePosition({
-        moves: katagoMoves,
-        boardSize: options.boardSize,
-        komi: options.komi,
-        maxVisits: settings.maxVisits,
-        initialStones: initialStones?.length ? initialStones : undefined,
-      }, settings.serverUrl, controller.signal)
+      analyzePosition(parsed.request, activeController.signal)
         .then(res => {
-          if (!controller.signal.aborted) {
-            cacheRef.current.set(nodeId, res);
+          if (!activeController.signal.aborted) {
+            cacheRef.current.set(analysisKey, res);
             // Keep cache size reasonable
             if (cacheRef.current.size > 200) {
               const firstKey = cacheRef.current.keys().next().value;
               if (firstKey) cacheRef.current.delete(firstKey);
             }
-            setResultState({ nodeId, result: res });
-            setLoadingNodeId(prev => (prev === nodeId ? null : prev));
+            setResultState({ key: analysisKey, result: res });
+            setLoadingKey(prev => (prev === analysisKey ? null : prev));
           }
         })
         .catch(err => {
-          if (!controller.signal.aborted) {
-            setErrorState({ nodeId, message: err.message });
-            setLoadingNodeId(prev => (prev === nodeId ? null : prev));
+          if (!activeController.signal.aborted) {
+            setErrorState({ key: analysisKey, message: err.message });
+            setLoadingKey(prev => (prev === analysisKey ? null : prev));
           }
         });
     }, 300);
 
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      clearTimeout(debounce);
+      controller?.abort();
     };
-  }, [currentNode?.id, settings.enabled, settings.serverUrl, settings.maxVisits, moveHistory, options.boardSize, options.komi, options.handicapStones]);
+  }, [analysisKey]);
 
   const clearCache = useCallback(() => {
     cacheRef.current.clear();
   }, []);
 
-  const activeNodeId = settings.enabled ? currentNode?.id ?? null : null;
-
   return {
-    result: resultState?.nodeId === activeNodeId ? resultState.result : null,
-    isLoading: loadingNodeId === activeNodeId,
-    error: errorState?.nodeId === activeNodeId ? errorState.message : null,
+    result: resultState?.key === analysisKey ? resultState.result : null,
+    isLoading: loadingKey === analysisKey,
+    error: errorState?.key === analysisKey ? errorState.message : null,
     settings,
     updateSettings,
     clearCache,

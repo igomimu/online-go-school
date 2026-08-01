@@ -1,18 +1,22 @@
 import type { AiAnalysisRequest, AiAnalysisResult, AiSettings } from '../types/ai';
 
 const DEFAULT_SETTINGS: AiSettings = {
-  serverUrl: 'http://localhost:5177',
   maxVisits: 1000,
   enabled: false,
 };
 
 const SETTINGS_KEY = 'go-school-ai-settings';
+const ANALYSIS_TIMEOUT_MS = 20_000;
 
 export function loadAiSettings(): AiSettings {
   try {
     const stored = localStorage.getItem(SETTINGS_KEY);
     if (stored) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+      const parsed = JSON.parse(stored) as Partial<AiSettings>;
+      return {
+        enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_SETTINGS.enabled,
+        maxVisits: typeof parsed.maxVisits === 'number' ? parsed.maxVisits : DEFAULT_SETTINGS.maxVisits,
+      };
     }
   } catch { /* ignore */ }
   return { ...DEFAULT_SETTINGS };
@@ -71,15 +75,39 @@ export function convertMovesToKatago(
  */
 export async function analyzePosition(
   request: AiAnalysisRequest,
-  _serverUrl: string,
   signal?: AbortSignal,
 ): Promise<AiAnalysisResult> {
-  const response = await fetch(`/api/katago-analyze`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
-    signal,
-  });
+  const controller = new AbortController();
+  let timedOut = false;
+  const forwardAbort = () => controller.abort();
+  if (signal?.aborted) {
+    controller.abort();
+  } else {
+    signal?.addEventListener('abort', forwardAbort, { once: true });
+  }
+
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, ANALYSIS_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`/api/katago-analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (timedOut) {
+      throw new Error('AI分析サーバーから20秒以内に応答がありませんでした');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener('abort', forwardAbort);
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));

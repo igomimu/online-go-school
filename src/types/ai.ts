@@ -1,7 +1,6 @@
 // KataGo AI analysis types
 
 export interface AiSettings {
-  serverUrl: string;       // KataGo API server URL
   maxVisits: number;       // Analysis depth (visits)
   enabled: boolean;
 }
