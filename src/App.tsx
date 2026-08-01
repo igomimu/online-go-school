@@ -41,6 +41,7 @@ import { useChat } from './hooks/useChat';
 import { useNotificationSound } from './hooks/useNotificationSound';
 import type { ChatMessagePayload } from './types/chat';
 import type { AiAnalysisSyncPayload } from './types/ai';
+import { resolveEffectiveViewMode } from './utils/viewMode';
 
 import { Settings } from 'lucide-react';
 
@@ -1190,13 +1191,7 @@ function App() {
   }
 
   // 生徒の自動ビュー判定
-  const effectiveViewMode: ViewMode = (() => {
-    if (role === 'STUDENT') {
-      if (syncedNode && viewMode !== 'game') return 'lecture';
-      if (myGame && viewMode === 'lobby') return 'lobby';
-    }
-    return viewMode;
-  })();
+  const effectiveViewMode = resolveEffectiveViewMode(role, viewMode, !!syncedNode);
   const isBoardFocusMode =
     effectiveViewMode === 'game' ||
     effectiveViewMode === 'review' ||
