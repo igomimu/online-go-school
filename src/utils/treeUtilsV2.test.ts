@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createNode, findNode, getPath, addMove, getMainPath, recalculateBoards, convertSgfToGameTree, removeNode } from './treeUtilsV2';
+import { createNode, findNode, getPath, addMove, getMainPath, recalculateBoards, convertSgfToGameTree, removeNode, isRemovableNode } from './treeUtilsV2';
 import { createEmptyBoard } from './gameLogic';
 import type { SgfTreeNode } from './sgfUtils';
 
@@ -131,6 +131,47 @@ describe('removeNode', () => {
     const result = removeNode(root);
     expect(result).toBeNull();
   });
+
+  // 2026-08-01: 検討中に取り消しを押しすぎると読み込んだ棋譜の手まで1手ずつ消え、
+  // 元手順が失われる事故があった（実機再現済み）。棋譜の手は消さず戻るだけにする。
+  it('読み込んだ棋譜の手(fromRecord)は削除せず、親を返して戻るだけにする', () => {
+    const root = makeRoot();
+    const board = createEmptyBoard(9);
+    board[4][4] = { color: 'BLACK', number: 1 };
+    const recordMove = addMove(root, board, 2, 'WHITE', 9, { x: 5, y: 5, color: 'BLACK' });
+    recordMove.fromRecord = true;
+
+    const result = removeNode(recordMove);
+    expect(result).toBe(root);
+    expect(root.children).toEqual([recordMove]); // 消えていない
+  });
+
+  it('棋譜の途中に足した検討の手は削除できる（元手順は残る）', () => {
+    const root = makeRoot();
+    const b1 = createEmptyBoard(9);
+    b1[4][4] = { color: 'BLACK', number: 1 };
+    const recordMove = addMove(root, b1, 2, 'WHITE', 9, { x: 5, y: 5, color: 'BLACK' });
+    recordMove.fromRecord = true;
+    const b2 = createEmptyBoard(9);
+    b2[0][0] = { color: 'BLACK', number: 1 };
+    const studyMove = addMove(root, b2, 2, 'WHITE', 9, { x: 1, y: 1, color: 'BLACK' });
+
+    expect(removeNode(studyMove)).toBe(root);
+    expect(root.children).toEqual([recordMove]);
+  });
+
+  it('isRemovableNode: 棋譜の手はfalse、検討の手はtrue、ルートはfalse', () => {
+    const root = makeRoot();
+    const board = createEmptyBoard(9);
+    board[4][4] = { color: 'BLACK', number: 1 };
+    const recordMove = addMove(root, board, 2, 'WHITE', 9, { x: 5, y: 5, color: 'BLACK' });
+    recordMove.fromRecord = true;
+    const studyMove = addMove(recordMove, board, 3, 'BLACK', 9, { x: 1, y: 1, color: 'WHITE' });
+
+    expect(isRemovableNode(root)).toBe(false);
+    expect(isRemovableNode(recordMove)).toBe(false);
+    expect(isRemovableNode(studyMove)).toBe(true);
+  });
 });
 
 describe('getMainPath', () => {
@@ -196,6 +237,24 @@ describe('convertSgfToGameTree', () => {
     expect(node.children.length).toBe(2);
     expect(node.children[0].move?.x).toBe(4);
     expect(node.children[1].move?.x).toBe(6);
+  });
+
+  it('読み込んだ棋譜のノードは全てfromRecordが立つ（取り消しから保護するため）', () => {
+    const sgfRoot: SgfTreeNode = {
+      move: { x: 5, y: 5, color: 'BLACK' },
+      children: [{ move: { x: 4, y: 4, color: 'WHITE' }, children: [
+        { move: { x: 6, y: 6, color: 'BLACK' }, children: [] },
+      ] }],
+    };
+    const node = convertSgfToGameTree(sgfRoot, null, 9, 1, createEmptyBoard(9));
+    expect(node.fromRecord).toBe(true);
+    expect(node.children[0].fromRecord).toBe(true);
+    expect(node.children[0].children[0].fromRecord).toBe(true);
+
+    // 棋譜の上に足した検討の手だけがfromRecordなし＝取り消せる
+    const study = addMove(node.children[0], createEmptyBoard(9), 3, 'BLACK', 9, { x: 1, y: 1, color: 'BLACK' });
+    expect(study.fromRecord).toBeUndefined();
+    expect(isRemovableNode(study)).toBe(true);
   });
 
   it('セットアップ（AB/AW）付きノード', () => {

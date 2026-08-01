@@ -12,6 +12,11 @@ export interface GameNode {
     markers: Marker[];
     move?: { x: number, y: number, color: StoneColor };
     comment?: string;
+    /**
+     * 読み込んだ棋譜（SGF・保存棋譜）そのものの手。
+     * 検討中に置いた手（分岐）と区別し、取り消し操作で元手順が消えないようにするための印。
+     */
+    fromRecord?: boolean;
 }
 
 export const createNode = (
@@ -84,13 +89,21 @@ export const addMove = (
  * 直近の一手を取り消す（誤クリックで作った分岐をツリーから除去する）。
  * addMoveと同じ流儀でparent.childrenを直接ミューテーションする。
  * 戻り値: 遷移先にすべき親ノード（rootノードなら常にnull=戻れない）。
+ *
+ * ⚠️ 読み込んだ棋譜の手（fromRecord）は削除しない。取り消しを押しすぎると
+ * 元手順が1手ずつ消えていく事故があったため（2026-08-01 実機再現）。
+ * その場合は削除せず「一手戻る」だけにする。
  */
 export const removeNode = (node: GameNode): GameNode | null => {
     if (!node.parent) return null;
     const parent = node.parent;
+    if (node.fromRecord) return parent; // 元手順は消さずに戻るだけ
     parent.children = parent.children.filter(c => c.id !== node.id);
     return parent;
 };
+
+/** 取り消し操作でツリーから削除できる手か（＝検討中に置いた手か） */
+export const isRemovableNode = (node: GameNode): boolean => !!node.parent && !node.fromRecord;
 
 export const recalculateBoards = (node: GameNode) => {
     // This function assumes 'node' has the CORRECT board (e.g. Root was updated manually).
@@ -219,6 +232,8 @@ export const convertSgfToGameTree = (
         markers: (sgfNode.markers || []).map(m => ({ ...m, type: m.type as 'LABEL' | 'SYMBOL' })),
         move: sgfNode.move,
         comment: sgfNode.comment,
+        // 読み込んだ棋譜の手は「元手順」として保護する（取り消しで消さない）
+        fromRecord: true,
     };
 
 

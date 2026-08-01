@@ -172,7 +172,8 @@ export default function LectureBoard({
     broadcastBoard(curr);
   }, [currentNode, broadcastBoard]);
 
-  // 直近の一手を取り消す（誤クリックで作った分岐をツリーから除去する）
+  // 直近の一手を取り消す（誤クリックで作った分岐をツリーから除去する）。
+  // 読み込んだ棋譜の手は削除されず「一手戻る」だけになる（元手順を守る）。
   const handleUndo = useCallback(() => {
     const parent = removeNode(currentNode);
     if (parent) {
@@ -449,7 +450,9 @@ export default function LectureBoard({
               <button
                 onClick={handleUndo}
                 disabled={!currentNode.parent}
-                title="直近の一手を取り消す (Delete / Ctrl+Z)"
+                title={currentNode.fromRecord
+                  ? '棋譜の手は消えません（一手戻ります）'
+                  : '解説で置いた直近の一手を取り消す (Delete / Ctrl+Z)'}
                 className="p-3 glass-panel hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30"
               >
                 <Undo2 />
