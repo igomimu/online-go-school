@@ -144,9 +144,60 @@ describe('ReviewBoard', () => {
         onSetTargetStudents={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByText('操作パネルを表示'));
     expect(screen.getByText('配信先の生徒')).toBeInTheDocument();
     expect(screen.getByText('全員に配信')).toBeInTheDocument();
     expect(screen.getByText('たろう')).toBeInTheDocument();
+  });
+
+  it('PCレイアウトは碁盤と情報パネルを半分ずつ表示する', () => {
+    const { root } = makeTree();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+    expect(screen.getByTestId('review-board-column')).toHaveClass('lg:flex-1', 'lg:basis-0');
+    expect(screen.getByTestId('review-info-column')).toHaveClass('lg:flex-1', 'lg:basis-0');
+  });
+
+  it('生徒側にも先生のAI候補手が表示され、ホバーでPVを表示する', () => {
+    const { root } = makeTree();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={false}
+        classroomRef={mockClassroomRef as never}
+        syncedAiAnalysis={{
+          enabled: true,
+          nodeId: root.id,
+          isLoading: false,
+          error: null,
+          result: {
+            winrate: 61.4,
+            scoreLead: 3.2,
+            topMoves: [{ move: 'D4', winrate: 61.4, scoreLead: 3.2, visits: 1000, pv: ['D4', 'E5', 'F6'] }],
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByTestId('ai-state')).toHaveTextContent('ON');
+    expect(screen.queryByTestId('ai-toggle')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ai-candidate-0')).toBeInTheDocument();
+
+    fireEvent.mouseEnter(screen.getByTestId('ai-move-0'));
+    expect(screen.getByTestId('pv-stone-1')).toBeInTheDocument();
+    expect(screen.getByTestId('pv-stone-2')).toBeInTheDocument();
+
+    fireEvent.mouseLeave(screen.getByTestId('ai-move-0'));
+    expect(screen.queryByTestId('pv-stone-1')).not.toBeInTheDocument();
   });
 });

@@ -21,6 +21,16 @@ export interface AiAnalysisResult {
   analysisTime?: number;   // Server-side analysis time in seconds
 }
 
+// 先生端末で実行した解析を生徒端末へ配信するための軽量スナップショット。
+// ownership は大きいため同期時には省略し、候補手とPVだけを共有する。
+export interface AiAnalysisSyncPayload {
+  enabled: boolean;
+  nodeId: string | null;
+  result: AiAnalysisResult | null;
+  isLoading: boolean;
+  error: string | null;
+}
+
 export interface AiAnalysisRequest {
   moves: [string, string][];    // [["B","D4"],["W","Q16"],...]
   boardSize: number;

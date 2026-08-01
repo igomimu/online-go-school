@@ -40,6 +40,7 @@ import ProblemMonitorPanel from './components/teacher/ProblemMonitorPanel';
 import { useChat } from './hooks/useChat';
 import { useNotificationSound } from './hooks/useNotificationSound';
 import type { ChatMessagePayload } from './types/chat';
+import type { AiAnalysisSyncPayload } from './types/ai';
 
 import { Settings } from 'lucide-react';
 
@@ -89,6 +90,13 @@ function App() {
   const [syncedBoardSize, setSyncedBoardSize] = useState(19);
   const [teacherCursor, setTeacherCursor] = useState<{ x: number; y: number } | null>(null);
   const [syncedDrawings, setSyncedDrawings] = useState<Drawing[]>([]);
+  const [syncedAiAnalysis, setSyncedAiAnalysis] = useState<AiAnalysisSyncPayload>({
+    enabled: false,
+    nodeId: null,
+    result: null,
+    isLoading: false,
+    error: null,
+  });
 
   // 検討モード用
   const [reviewRootNode, setReviewRootNode] = useState<GameNode | null>(null);
@@ -234,17 +242,43 @@ function App() {
           };
           if (!Array.isArray(p.boardState) || typeof p.boardSize !== 'number') return;
           const dummyNode: GameNode = {
-            id: 'synced',
+            id: `synced-${p.moveNumber ?? 0}`,
             parent: null,
             children: [],
             board: p.boardState,
             nextNumber: (p.moveNumber ?? 0) + 1,
+            // GameNode.activeColorは「直前に打った色」。同期盤では次手番の反対色を保持する。
             activeColor: p.nextColor === 'BLACK' ? 'WHITE' : 'BLACK',
             boardSize: p.boardSize,
             markers: p.markers || [],
+            move: (p.moveNumber ?? 0) > 0
+              ? { x: 0, y: 0, color: p.nextColor === 'BLACK' ? 'WHITE' : 'BLACK' }
+              : undefined,
           };
           setSyncedBoardSize(p.boardSize);
           setSyncedNode(dummyNode);
+          // 検討画面はreviewCurrentNodeを表示するため、授業用の同期盤面も同時に更新する。
+          setReviewCurrentNode(prev => prev ? dummyNode : prev);
+        }
+
+        // AI解析同期（生徒用）。KataGoへの問い合わせは先生端末だけで行う。
+        if (msg.type === 'AI_ANALYSIS_UPDATE' && connectRole === 'STUDENT' && msg.payload) {
+          const p = msg.payload as Partial<AiAnalysisSyncPayload>;
+          const validResult = p.result === null || (
+            typeof p.result === 'object' &&
+            typeof p.result?.winrate === 'number' &&
+            typeof p.result?.scoreLead === 'number' &&
+            Array.isArray(p.result?.topMoves)
+          );
+          if (typeof p.enabled === 'boolean' && typeof p.isLoading === 'boolean' && validResult) {
+            setSyncedAiAnalysis({
+              enabled: p.enabled,
+              nodeId: typeof p.nodeId === 'string' ? p.nodeId : null,
+              result: p.result ?? null,
+              isLoading: p.enabled && p.isLoading,
+              error: typeof p.error === 'string' ? p.error : null,
+            });
+          }
         }
 
         // カーソル同期（生徒用）
@@ -274,6 +308,7 @@ function App() {
           setReviewRootNode(root);
           setReviewCurrentNode(root);
           setReviewBoardSize(p.boardSize);
+          setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null });
           setViewMode('review');
         }
         // 詰碁配信（生徒用）
@@ -295,6 +330,7 @@ function App() {
           setReviewRootNode(null);
           setReviewCurrentNode(null);
           setSyncedNode(null);
+          setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null });
           setActiveProblem(null);
         }
 
@@ -1355,6 +1391,7 @@ function App() {
               registeredStudents={students}
               chatMessages={chat.messages}
               onChatSend={chat.sendMessage}
+              syncedAiAnalysis={syncedAiAnalysis}
             />
           </div>
         )}

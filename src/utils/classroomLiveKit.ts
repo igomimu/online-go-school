@@ -39,6 +39,7 @@ export interface DrawingPayload {
 // 既存 + 新規メッセージタイプ
 export type MessageType =
   | 'BOARD_UPDATE'
+  | 'AI_ANALYSIS_UPDATE'
   | 'CURSOR_MOVE'
   | 'CURSOR_CLEAR'
   | 'DRAW_UPDATE'
@@ -79,7 +80,7 @@ const decoder = new TextDecoder();
 // 信頼性が必要なメッセージタイプ
 // GAME_* は Supabase 権威型に移行済（2026-04-15）
 const RELIABLE_TYPES = new Set<string>([
-  'BOARD_UPDATE', 'DRAW_UPDATE', 'DRAW_CLEAR',
+  'BOARD_UPDATE', 'AI_ANALYSIS_UPDATE', 'DRAW_UPDATE', 'DRAW_CLEAR',
   'PROBLEM_ASSIGN', 'PROBLEM_RESULT',
   'REVIEW_START', 'REVIEW_END',
   'AUDIO_CONTROL', 'MEDIA_CONTROL', 'CHAT_MESSAGE',

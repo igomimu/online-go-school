@@ -7,6 +7,7 @@ interface UseAiAnalysisOptions {
   boardSize: number;
   komi: number;
   handicapStones?: { x: number; y: number }[];
+  active?: boolean;
 }
 
 export function useAiAnalysis(
@@ -32,7 +33,7 @@ export function useAiAnalysis(
 
   // 配列・オブジェクトの参照ではなく内容からキーを作る。
   // Reactの再レンダーでmoveHistoryが同内容の新配列になっても、同じ局面を再送しない。
-  const analysisKey = settings.enabled && currentNode
+  const analysisKey = options.active !== false && settings.enabled && currentNode
     ? JSON.stringify({
         nodeId: currentNode.id,
         request: {
@@ -76,26 +77,41 @@ export function useAiAnalysis(
       setLoadingKey(analysisKey);
       setErrorState(null);
 
-      analyzePosition(parsed.request, activeController.signal)
-        .then(res => {
+      // Pocket KataGoと同じ二段階解析。まず10 visitsの速報を表示し、
+      // 続けて設定値まで深く読む。深い解析中も速報の候補手を操作できる。
+      const runAnalysis = async () => {
+        try {
+          const quickVisits = Math.min(10, parsed.request.maxVisits);
+          const quickResult = await analyzePosition(
+            { ...parsed.request, maxVisits: quickVisits },
+            activeController.signal,
+          );
+          if (activeController.signal.aborted) return;
+          setResultState({ key: analysisKey, result: quickResult });
+
+          let finalResult = quickResult;
+          if (parsed.request.maxVisits > quickVisits) {
+            finalResult = await analyzePosition(parsed.request, activeController.signal);
+            if (activeController.signal.aborted) return;
+            setResultState({ key: analysisKey, result: finalResult });
+          }
+
+          cacheRef.current.set(analysisKey, finalResult);
+          if (cacheRef.current.size > 200) {
+            const firstKey = cacheRef.current.keys().next().value;
+            if (firstKey) cacheRef.current.delete(firstKey);
+          }
+          setLoadingKey(prev => (prev === analysisKey ? null : prev));
+        } catch (err) {
           if (!activeController.signal.aborted) {
-            cacheRef.current.set(analysisKey, res);
-            // Keep cache size reasonable
-            if (cacheRef.current.size > 200) {
-              const firstKey = cacheRef.current.keys().next().value;
-              if (firstKey) cacheRef.current.delete(firstKey);
-            }
-            setResultState({ key: analysisKey, result: res });
+            const message = err instanceof Error ? err.message : 'AI分析に失敗しました';
+            setErrorState({ key: analysisKey, message });
             setLoadingKey(prev => (prev === analysisKey ? null : prev));
           }
-        })
-        .catch(err => {
-          if (!activeController.signal.aborted) {
-            setErrorState({ key: analysisKey, message: err.message });
-            setLoadingKey(prev => (prev === analysisKey ? null : prev));
-          }
-        });
-    }, 300);
+        }
+      };
+      void runAnalysis();
+    }, 50);
 
     return () => {
       clearTimeout(debounce);

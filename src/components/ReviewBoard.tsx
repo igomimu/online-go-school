@@ -1,12 +1,14 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import GoBoard from './GoBoard';
-import type { Drawing, Marker, StoneColor } from './GoBoard';
+import type { AnalysisOverlay, Drawing, Marker, PvStone, StoneColor } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
 import { getMainPath, addMove, removeNode } from '../utils/treeUtilsV2';
 import { findNearestDrawingIndex } from '../utils/drawingUtils';
 import type { ParticipantInfo, ClassroomLiveKit } from '../utils/classroomLiveKit';
 import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
+import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';
+import { fromGtpCoord } from '../utils/katagoClient';
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2 } from 'lucide-react';
 import { checkCapture } from '../utils/gameLogic';
 import { getDisplayName } from '../utils/identityUtils';
@@ -35,6 +37,9 @@ interface ReviewBoardProps {
   registeredStudents?: Student[];
   chatMessages?: ChatMessage[];
   onChatSend?: (text: string, target: 'all' | string) => void;
+
+  // 生徒用: 先生端末からLiveKitで届いたAI解析
+  syncedAiAnalysis?: AiAnalysisSyncPayload;
 }
 
 // Helper functions for markers
@@ -94,34 +99,26 @@ export default function ReviewBoard({
   registeredStudents,
   chatMessages,
   onChatSend,
+  syncedAiAnalysis,
 }: ReviewBoardProps) {
-  const [isMaximized, setIsMaximized] = useState(true);
+  // PCは最初から碁盤と情報パネルを半々、スマホは碁盤優先で開始する。
+  const [isMaximized, setIsMaximized] = useState(() => (
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(max-width: 1023px)').matches
+      : false
+  ));
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [drawMode, setDrawMode] = useState<'off' | 'line' | 'arrow'>('off');
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const drawLastCell = useRef<{ x: number; y: number } | null>(null);
   const [toolMode, setToolMode] = useState<'play' | 'circle' | 'triangle' | 'square' | 'cross' | 'alpha' | 'num' | 'eraser'>('play');
+  const [hoveredCandidate, setHoveredCandidate] = useState<{ nodeId: string; rank: number } | null>(null);
 
   const boardState = currentNode.board;
   const nodeMarkers = currentNode.markers;
 
   // AI候補手のハイライト座標（1-indexed）。対象nodeが変わったら表示しない
   const [aiHighlight, setAiHighlight] = useState<{ nodeId: string; x: number; y: number } | null>(null);
-
-  const markers = useMemo<Marker[] | undefined>(() => {
-    if (!aiHighlight || aiHighlight.nodeId !== currentNode.id) return nodeMarkers;
-    const overlay: Marker = { x: aiHighlight.x, y: aiHighlight.y, type: 'SYMBOL', value: 'SQR' };
-    return nodeMarkers ? [...nodeMarkers, overlay] : [overlay];
-  }, [nodeMarkers, aiHighlight, currentNode.id]);
-
-  const handleHighlightMove = useCallback((x: number, y: number) => {
-    // 同じ手の再クリックでトグル解除（既存パターン: draw mode の re-toggle と同じ感覚）
-    setAiHighlight(prev => (
-      prev && prev.nodeId === currentNode.id && prev.x === x && prev.y === y
-        ? null
-        : { nodeId: currentNode.id, x, y }
-    ));
-  }, [currentNode.id]);
 
   const goToRoot = useCallback(() => onSetCurrentNode(rootNode), [rootNode, onSetCurrentNode]);
   const goBack = useCallback(() => {
@@ -322,11 +319,124 @@ export default function ReviewBoard({
   const aiAnalysis = useAiAnalysis(currentNode, moveHistory, {
     boardSize,
     komi: 6.5, // Default; could be passed via props
+    active: isTeacher, // KataGoへの接続は先生端末だけ。生徒は同期結果を表示する。
   });
+  const updateAiSettings = aiAnalysis.updateSettings;
+
+  const displayedAi = isTeacher
+    ? {
+        enabled: aiAnalysis.settings.enabled,
+        result: aiAnalysis.result,
+        isLoading: aiAnalysis.isLoading,
+        error: aiAnalysis.error,
+      }
+    : {
+        enabled: syncedAiAnalysis?.enabled ?? false,
+        result: syncedAiAnalysis?.result ?? null,
+        isLoading: syncedAiAnalysis?.isLoading ?? false,
+        error: syncedAiAnalysis?.error ?? null,
+      };
+
+  const hoveredCandidateIndex = displayedAi.enabled && hoveredCandidate?.nodeId === currentNode.id
+    ? hoveredCandidate.rank
+    : null;
+
+  const handleCandidateHover = useCallback((rank: number | null) => {
+    setHoveredCandidate(rank === null ? null : { nodeId: currentNode.id, rank });
+  }, [currentNode.id]);
+
+  const markers = useMemo<Marker[] | undefined>(() => {
+    if (!displayedAi.enabled || !aiHighlight || aiHighlight.nodeId !== currentNode.id) return nodeMarkers;
+    const overlay: Marker = { x: aiHighlight.x, y: aiHighlight.y, type: 'SYMBOL', value: 'SQR' };
+    return nodeMarkers ? [...nodeMarkers, overlay] : [overlay];
+  }, [displayedAi.enabled, nodeMarkers, aiHighlight, currentNode.id]);
+
+  const handleHighlightMove = useCallback((x: number, y: number) => {
+    setAiHighlight(prev => (
+      prev && prev.nodeId === currentNode.id && prev.x === x && prev.y === y
+        ? null
+        : { nodeId: currentNode.id, x, y }
+    ));
+  }, [currentNode.id]);
+
+  const handleUpdateAiSettings = useCallback((newSettings: Partial<AiSettings>) => {
+    if (newSettings.enabled === false) {
+      setHoveredCandidate(null);
+      setAiHighlight(null);
+    }
+    updateAiSettings(newSettings);
+  }, [updateAiSettings]);
+
+  // LiveKitのデータパケットを大きくしすぎないよう、授業表示に必要な上位5手と
+  // 各PVの先頭40手だけを共有する（ownership 361点は送らない）。
+  const sharedAiResult = useMemo<AiAnalysisResult | null>(() => {
+    if (!aiAnalysis.settings.enabled || !aiAnalysis.result) return null;
+    return {
+      winrate: aiAnalysis.result.winrate,
+      scoreLead: aiAnalysis.result.scoreLead,
+      analysisTime: aiAnalysis.result.analysisTime,
+      topMoves: aiAnalysis.result.topMoves.slice(0, 5).map(move => ({
+        ...move,
+        pv: move.pv.slice(0, 40),
+      })),
+    };
+  }, [aiAnalysis.settings.enabled, aiAnalysis.result]);
+
+  const participantCount = participants?.length ?? 0;
+  useEffect(() => {
+    if (!isTeacher) return;
+    const payload: AiAnalysisSyncPayload = {
+      enabled: aiAnalysis.settings.enabled,
+      nodeId: aiAnalysis.settings.enabled ? currentNode.id : null,
+      result: sharedAiResult,
+      isLoading: aiAnalysis.settings.enabled && aiAnalysis.isLoading,
+      error: aiAnalysis.settings.enabled ? aiAnalysis.error : null,
+    };
+    classroomRef.current?.broadcast({ type: 'AI_ANALYSIS_UPDATE', payload });
+  }, [
+    isTeacher,
+    currentNode.id,
+    aiAnalysis.settings.enabled,
+    aiAnalysis.isLoading,
+    aiAnalysis.error,
+    sharedAiResult,
+    classroomRef,
+    participantCount, // 途中参加した生徒にも現在の結果を再送する
+  ]);
+
+  const analysisOverlay = useMemo<AnalysisOverlay[]>(() => {
+    if (!displayedAi.enabled || !displayedAi.result) return [];
+    return displayedAi.result.topMoves.slice(0, 5).flatMap((move, rank) => {
+      const coord = fromGtpCoord(move.move, boardSize);
+      return coord ? [{ ...coord, rank, winrate: move.winrate, scoreLead: move.scoreLead, visits: move.visits }] : [];
+    });
+  }, [displayedAi.enabled, displayedAi.result, boardSize]);
+
+  const currentMoveColor = currentNode.move?.color;
+  const pvOverlay = useMemo<PvStone[] | undefined>(() => {
+    if (hoveredCandidateIndex === null || !displayedAi.enabled || !displayedAi.result) return undefined;
+    const candidate = displayedAi.result.topMoves[hoveredCandidateIndex];
+    if (!candidate?.pv?.length) return undefined;
+    let color: 'B' | 'W' = currentMoveColor
+      ? (currentMoveColor === 'BLACK' ? 'W' : 'B')
+      : (currentNode.activeColor === 'BLACK' ? 'B' : 'W');
+    const seen = new Set<string>();
+    const stones: PvStone[] = [];
+    candidate.pv.forEach((gtp, index) => {
+      const coord = fromGtpCoord(gtp, boardSize);
+      if (!coord) return;
+      const key = `${coord.x},${coord.y}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      stones.push({ ...coord, color, number: index + 1 });
+      color = color === 'B' ? 'W' : 'B';
+    });
+    return stones.length > 0 ? stones : undefined;
+  }, [hoveredCandidateIndex, displayedAi.enabled, displayedAi.result, currentMoveColor, currentNode.activeColor, boardSize]);
 
   // Build win rate graph data from main path
   const winRateData = useMemo(() => {
-    if (!aiAnalysis.settings.enabled) return [];
+    if (!displayedAi.enabled) return [];
     const mainPath = getMainPath(rootNode);
     const data: { moveNumber: number; winrate: number }[] = [];
     for (const node of mainPath) {
@@ -336,11 +446,11 @@ export default function ReviewBoard({
       data.push({ moveNumber: moveNum, winrate: 50 });
     }
     // Override with actual result for current node
-    if (aiAnalysis.result) {
-      data.push({ moveNumber: currentMoveNumber, winrate: aiAnalysis.result.winrate });
+    if (displayedAi.result) {
+      data.push({ moveNumber: currentMoveNumber, winrate: displayedAi.result.winrate });
     }
     return data;
-  }, [aiAnalysis.settings.enabled, aiAnalysis.result, rootNode, currentMoveNumber]);
+  }, [displayedAi.enabled, displayedAi.result, rootNode, currentMoveNumber]);
 
   // 生徒選択
   const studentParticipants = useMemo(() => {
@@ -366,8 +476,8 @@ export default function ReviewBoard({
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 w-full lg:h-full lg:min-h-0">
-      <div className="flex-1 space-y-4 lg:min-h-0 lg:flex lg:flex-col lg:overflow-hidden">
+    <div className="flex flex-col lg:flex-row gap-4 w-full lg:h-full lg:min-h-0" data-testid="review-workspace">
+      <div className={`${isMaximized ? 'w-full' : 'w-full lg:flex-1 lg:basis-0'} space-y-4 lg:min-h-0 lg:flex lg:flex-col lg:overflow-hidden`} data-testid="review-board-column">
         {/* 検討/授業ヘッダー */}
         <div className="glass-panel px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -385,15 +495,13 @@ export default function ReviewBoard({
             </span>
           </div>
           <div className="flex items-center gap-3">
-            {isTeacher && (
-              <button
-                onClick={() => setIsMaximized(!isMaximized)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white rounded-lg text-xs font-semibold transition-all"
-              >
-                {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-                {isMaximized ? '操作パネルを表示' : '碁盤のみ最大化'}
-              </button>
-            )}
+            <button
+              onClick={() => setIsMaximized(!isMaximized)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white rounded-lg text-xs font-semibold transition-all"
+            >
+              {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+              {isMaximized ? 'AI・チャットを表示' : '碁盤を広げる'}
+            </button>
             {isTeacher && currentNode.children.length > 1 && (
               <div className="flex items-center gap-2 text-blue-300 text-sm">
                 <GitBranch className="w-4 h-4" />
@@ -415,6 +523,10 @@ export default function ReviewBoard({
             maxHeight="100%"
             markers={markers}
             drawings={drawings}
+            analysisOverlay={analysisOverlay}
+            pvOverlay={pvOverlay}
+            hoveredCandidateIndex={hoveredCandidateIndex}
+            onCandidateHover={handleCandidateHover}
             readOnly={!isTeacher}
             onCellClick={isTeacher ? handleCellClick : undefined}
             onCellRightClick={isTeacher ? handleCellRightClick : undefined}
@@ -644,75 +756,70 @@ export default function ReviewBoard({
         )}
       </div>
 
-      {/* サイドバー（先生のみ） */}
-      {!isMaximized && isTeacher && (
-        <div className="w-full lg:w-64 space-y-4 lg:overflow-y-auto lg:min-h-0 flex-shrink-0">
-          {/* AI分析パネル */}
+      {/* PCでは碁盤と1:1になる授業情報カラム。生徒にもAI結果を同じ大きさで表示する。 */}
+      {!isMaximized && (
+        <aside className="w-full lg:flex-1 lg:basis-0 space-y-4 lg:overflow-y-auto lg:min-h-0 pr-0 lg:pr-1" data-testid="review-info-column">
           <AiAnalysisPanel
-            result={aiAnalysis.result}
-            isLoading={aiAnalysis.isLoading}
-            error={aiAnalysis.error}
-            settings={aiAnalysis.settings}
-            onUpdateSettings={aiAnalysis.updateSettings}
+            result={displayedAi.result}
+            isLoading={displayedAi.isLoading}
+            error={displayedAi.error}
+            settings={{ enabled: displayedAi.enabled, maxVisits: aiAnalysis.settings.maxVisits }}
+            onUpdateSettings={handleUpdateAiSettings}
             boardSize={boardSize}
             onHighlightMove={handleHighlightMove}
+            onCandidateHover={handleCandidateHover}
+            readOnly={!isTeacher}
           />
 
-          {/* 勝率グラフ */}
-          {aiAnalysis.settings.enabled && winRateData.length > 0 && (
-            <WinRateGraph
-              data={winRateData}
-              currentMove={currentMoveNumber}
-            />
+          {displayedAi.enabled && winRateData.length > 0 && (
+            <WinRateGraph data={winRateData} currentMove={currentMoveNumber} />
           )}
-        </div>
-      )}
-      {!isMaximized && isTeacher && studentParticipants.length > 0 && (
-        <div className="w-full lg:w-64 space-y-4 lg:overflow-y-auto lg:min-h-0 flex-shrink-0">
-          <div className="glass-panel p-4 space-y-3">
-            <h3 className="font-bold text-sm">配信先の生徒</h3>
-            <button
-              onClick={selectAllStudents}
-              className={`w-full text-sm py-1 rounded-lg transition-all ${
-                targetStudents?.length === 0 ? 'bg-blue-500/20 text-blue-400' : 'bg-white/5 hover:bg-white/10'
-              }`}
-            >
-              全員に配信
-            </button>
-            <div className="space-y-1">
-              {studentParticipants.map(s => {
-                const isSelected = !targetStudents || targetStudents.length === 0 || targetStudents.includes(s.identity);
-                return (
-                  <button
-                    key={s.identity}
-                    onClick={() => toggleStudent(s.identity)}
-                    className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
-                      isSelected ? 'bg-blue-500/10 text-blue-300' : 'bg-white/5 text-zinc-500'
-                    }`}
-                  >
-                    {s.name || getDisplayName(s.identity, registeredStudents ?? [])}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* チャット（先生・生徒共通） */}
-      {!isMaximized && chatMessages && onChatSend && (
-        <div className="w-full lg:w-64 lg:overflow-y-auto lg:min-h-0 flex-shrink-0">
-          <div className="glass-panel p-0 overflow-hidden" style={{ height: 320 }}>
-            <ChatPanel
-              messages={chatMessages}
-              participants={participants ?? []}
-              students={registeredStudents ?? []}
-              localIdentity={localIdentity ?? ''}
-              onSend={onChatSend}
-              showTargetSelector={isTeacher}
-            />
+          <div className={`grid gap-4 ${isTeacher && studentParticipants.length > 0 && chatMessages && onChatSend ? 'xl:grid-cols-2' : 'grid-cols-1'}`}>
+            {isTeacher && studentParticipants.length > 0 && (
+              <div className="glass-panel p-4 space-y-3">
+                <h3 className="font-bold text-sm">配信先の生徒</h3>
+                <button
+                  onClick={selectAllStudents}
+                  className={`w-full text-sm py-1 rounded-lg transition-all ${
+                    targetStudents?.length === 0 ? 'bg-blue-500/20 text-blue-400' : 'bg-white/5 hover:bg-white/10'
+                  }`}
+                >
+                  全員に配信
+                </button>
+                <div className="space-y-1">
+                  {studentParticipants.map(s => {
+                    const isSelected = !targetStudents || targetStudents.length === 0 || targetStudents.includes(s.identity);
+                    return (
+                      <button
+                        key={s.identity}
+                        onClick={() => toggleStudent(s.identity)}
+                        className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
+                          isSelected ? 'bg-blue-500/10 text-blue-300' : 'bg-white/5 text-zinc-500'
+                        }`}
+                      >
+                        {s.name || getDisplayName(s.identity, registeredStudents ?? [])}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {chatMessages && onChatSend && (
+              <div className="glass-panel p-0 overflow-hidden min-h-[320px]">
+                <ChatPanel
+                  messages={chatMessages}
+                  participants={participants ?? []}
+                  students={registeredStudents ?? []}
+                  localIdentity={localIdentity ?? ''}
+                  onSend={onChatSend}
+                  showTargetSelector={isTeacher}
+                />
+              </div>
+            )}
           </div>
-        </div>
+        </aside>
       )}
     </div>
   );

@@ -90,16 +90,27 @@ test.describe('検討モード AI候補手クリック', () => {
     // SGF を流し込んで検討モードに遷移（9路、黒1手）
     await loadSgfForReview(teacherPage, '(;FF[4]GM[1]SZ[9];B[ee])');
 
-    // 検討モードのヘッダが出るまで待つ
-    // 8a387f6以降は「碁盤のみ最大化」がデフォルトで操作パネル（AI分析含む）が非表示
-    // → 「操作パネルを表示」で開いてから AiAnalysisPanel を検証する
+    // PCでは碁盤とAI情報を最初から半分ずつ表示する。
     await expect(teacherPage.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
-    await teacherPage.getByRole('button', { name: '操作パネルを表示' }).click();
     await expect(teacherPage.getByRole('heading', { name: 'AI分析' })).toBeVisible({ timeout: 15_000 });
+
+    const boardColumn = teacherPage.getByTestId('review-board-column');
+    const infoColumn = teacherPage.getByTestId('review-info-column');
+    const [boardBox, infoBox] = await Promise.all([boardColumn.boundingBox(), infoColumn.boundingBox()]);
+    expect(boardBox).not.toBeNull();
+    expect(infoBox).not.toBeNull();
+    expect(Math.abs((boardBox?.width ?? 0) - (infoBox?.width ?? 0))).toBeLessThan(24);
+    expect((infoBox?.x ?? 0) + (infoBox?.width ?? 0)).toBeLessThanOrEqual(teacherPage.viewportSize()?.width ?? 1440);
 
     // モック応答後、候補手リストに 'D4' / 'G5' が出る
     const moveD4 = teacherPage.locator('text=D4').first();
     await expect(moveD4).toBeVisible({ timeout: 10_000 });
+    await expect(teacherPage.getByTestId('ai-candidate-0')).toBeVisible();
+
+    // Pocket KataGoと同じく、候補手へホバーするとPVが番号付きで盤上に出る。
+    const candidateRow = teacherPage.getByTestId('ai-move-0');
+    await candidateRow.hover();
+    await expect(teacherPage.getByTestId('pv-stone-1')).toBeVisible();
 
     // クリック前: 盤面上に SQR マーカーは無い
     // GoBoard が SQR を `<rect fill="none" stroke=...>` で描画する (GoBoard.tsx:272)
@@ -111,7 +122,6 @@ test.describe('検討モード AI候補手クリック', () => {
 
     // 候補手 D4 の行をクリック
     // AiAnalysisPanel.tsx の候補手は div.cursor-pointer に GTP移動文字列を持つ
-    const candidateRow = teacherPage.locator('div.cursor-pointer').filter({ hasText: 'D4' }).first();
     await expect(candidateRow).toBeVisible();
     await candidateRow.click();
 

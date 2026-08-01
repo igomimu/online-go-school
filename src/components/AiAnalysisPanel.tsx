@@ -10,6 +10,8 @@ interface AiAnalysisPanelProps {
   onUpdateSettings: (settings: Partial<AiSettings>) => void;
   boardSize: number;
   onHighlightMove?: (x: number, y: number) => void;
+  onCandidateHover?: (rank: number | null) => void;
+  readOnly?: boolean;
 }
 
 export default function AiAnalysisPanel({
@@ -20,32 +22,43 @@ export default function AiAnalysisPanel({
   onUpdateSettings,
   boardSize,
   onHighlightMove,
+  onCandidateHover,
+  readOnly = false,
 }: AiAnalysisPanelProps) {
   return (
-    <div className="glass-panel p-4 space-y-3">
+    <div className="glass-panel p-4 sm:p-5 space-y-4" data-testid="ai-analysis-panel">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Brain className="w-4 h-4 text-amber-400" />
           <h3 className="font-bold text-sm">AI分析</h3>
-          {isLoading && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
+          {settings.enabled && isLoading && <Loader2 className="w-4 h-4 animate-spin text-amber-400" aria-label="AI解析中" />}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => onUpdateSettings({ enabled: !settings.enabled })}
-            className={`px-2 py-0.5 text-xs rounded ${
-              settings.enabled
-                ? 'bg-amber-500/20 text-amber-400'
-                : 'bg-white/5 text-zinc-500'
-            }`}
-          >
-            {settings.enabled ? 'ON' : 'OFF'}
-          </button>
+          {readOnly ? (
+            <span data-testid="ai-state" className={`px-3 py-1 text-xs font-bold rounded-md border ${
+              settings.enabled ? 'bg-amber-500/15 border-amber-500/40 text-amber-300' : 'bg-zinc-900 border-zinc-700 text-zinc-500'
+            }`}>{settings.enabled ? 'ON' : 'OFF'}</span>
+          ) : (
+            <button
+              type="button"
+              data-testid="ai-toggle"
+              aria-pressed={settings.enabled}
+              onClick={() => onUpdateSettings({ enabled: !settings.enabled })}
+              className={`px-3 py-1 text-xs font-bold rounded-md border transition-colors duration-150 ${
+                settings.enabled
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25'
+                  : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-white'
+              }`}
+            >
+              {settings.enabled ? 'ON' : 'OFF'}
+            </button>
+          )}
         </div>
       </div>
 
       {!settings.enabled && (
-        <div className="text-xs text-zinc-600">AI分析を有効にするとKataGoで局面を分析します</div>
+        <div className="text-sm text-zinc-500">OFFです。ONにすると局面を自動解析します。</div>
       )}
 
       {/* Error */}
@@ -60,27 +73,23 @@ export default function AiAnalysisPanel({
       {settings.enabled && result && (
         <>
           {/* Winrate bar */}
-          <div className="space-y-1">
+          <div className="space-y-2">
             <div className="flex justify-between text-xs">
-              <span className="text-zinc-400">勝率</span>
-              <span className="font-mono font-bold text-white">{result.winrate}%</span>
+              <span className="font-semibold text-zinc-300">黒 {result.winrate.toFixed(1)}%</span>
+              <span className="font-semibold text-zinc-300">白 {(100 - result.winrate).toFixed(1)}%</span>
             </div>
-            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-3 bg-zinc-100 rounded-full overflow-hidden border border-zinc-600">
               <div
-                className="h-full bg-gradient-to-r from-zinc-700 to-zinc-400 rounded-full transition-all"
+                className="h-full bg-blue-500 transition-all duration-300"
                 style={{ width: `${result.winrate}%` }}
               />
-            </div>
-            <div className="flex justify-between text-xs text-zinc-600">
-              <span>黒 {result.winrate.toFixed(1)}%</span>
-              <span>白 {(100 - result.winrate).toFixed(1)}%</span>
             </div>
           </div>
 
           {/* Score */}
           <div className="flex justify-between text-xs">
-            <span className="text-zinc-400">形勢</span>
-            <span className="font-mono font-bold text-white">
+            <span className="text-zinc-400">目数差</span>
+            <span className="font-mono font-bold text-base text-white">
               {result.scoreLead > 0 ? `B+${result.scoreLead.toFixed(1)}` : `W+${Math.abs(result.scoreLead).toFixed(1)}`}
             </span>
           </div>
@@ -88,21 +97,25 @@ export default function AiAnalysisPanel({
           {/* Top moves */}
           {result.topMoves.length > 0 && (
             <div className="space-y-1">
-              <div className="text-xs text-zinc-400">候補手</div>
-              <div className="space-y-0.5">
+              <div className="text-xs text-zinc-400">候補手（マウスを置くと予想手順を表示）</div>
+              <div className="space-y-1">
                 {result.topMoves.slice(0, 5).map((move, i) => {
                   const coord = fromGtpCoord(move.move, boardSize);
+                  const candidateColor = i === 0 ? 'bg-sky-400' : i === 1 ? 'bg-green-500' : 'bg-yellow-400';
                   return (
                     <div
                       key={i}
-                      className="flex items-center gap-2 text-xs hover:bg-white/5 px-1 py-0.5 rounded cursor-pointer"
+                      data-testid={`ai-move-${i}`}
+                      className="grid grid-cols-[1.25rem_2.75rem_1fr_1fr_auto] items-center gap-2 text-xs hover:bg-white/10 px-2 py-2 rounded-md cursor-pointer transition-colors duration-150"
+                      onMouseEnter={() => onCandidateHover?.(i)}
+                      onMouseLeave={() => onCandidateHover?.(null)}
                       onClick={() => coord && onHighlightMove?.(coord.x, coord.y)}
                     >
-                      <span className="w-4 text-center text-zinc-600">{i + 1}</span>
-                      <span className="font-mono font-bold text-white w-8">{move.move}</span>
-                      <span className="text-zinc-400">{move.winrate}%</span>
-                      <span className="text-zinc-600">{move.scoreLead > 0 ? '+' : ''}{move.scoreLead}</span>
-                      <span className="text-zinc-700 ml-auto">{move.visits}v</span>
+                      <span className={`w-5 h-5 rounded-full ${candidateColor} text-zinc-950 font-bold flex items-center justify-center`}>{i + 1}</span>
+                      <span className="font-mono font-bold text-white">{move.move}</span>
+                      <span className="text-zinc-300">{move.winrate.toFixed(1)}%</span>
+                      <span className="text-zinc-400">{move.scoreLead >= 0 ? '+' : ''}{move.scoreLead.toFixed(1)}目</span>
+                      <span className="text-zinc-600">{move.visits}v</span>
                     </div>
                   );
                 })}
@@ -117,7 +130,7 @@ export default function AiAnalysisPanel({
       )}
 
       {/* Settings */}
-      {settings.enabled && (
+      {settings.enabled && !readOnly && (
         <details className="text-xs">
           <summary className="text-zinc-600 cursor-pointer flex items-center gap-1">
             <Settings2 className="w-3 h-3" /> 設定

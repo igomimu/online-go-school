@@ -34,6 +34,22 @@ export interface Drawing {
     type: 'line' | 'arrow';
 }
 
+export interface AnalysisOverlay {
+    x: number;
+    y: number;
+    rank: number;
+    winrate: number;
+    scoreLead: number;
+    visits: number;
+}
+
+export interface PvStone {
+    x: number;
+    y: number;
+    color: 'B' | 'W';
+    number: number;
+}
+
 export interface GoBoardProps {
     boardState: BoardState;
     boardSize: number;
@@ -61,6 +77,10 @@ export interface GoBoardProps {
 
     markers?: Marker[];
     drawings?: Drawing[];
+    analysisOverlay?: AnalysisOverlay[];
+    pvOverlay?: PvStone[];
+    hoveredCandidateIndex?: number | null;
+    onCandidateHover?: (rank: number | null) => void;
     activeColor?: StoneColor;
     readOnly?: boolean;
 
@@ -95,6 +115,10 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     onDragEnd,
     markers,
     drawings,
+    analysisOverlay = [],
+    pvOverlay,
+    hoveredCandidateIndex,
+    onCandidateHover,
     readOnly = false,
     ghostPosition,
     ghostColor,
@@ -391,6 +415,86 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         });
     }
 
+    // Pocket KataGoと同じ候補手表示。1位=水色、2位=緑、3位以降=黄。
+    // 数値は上から勝率・visits・目数差を表す。
+    const analysisElements = analysisOverlay.map(item => {
+        const cx = MARGIN + (item.x - 1) * CELL_SIZE;
+        const cy = MARGIN + (item.y - 1) * CELL_SIZE;
+        const isHovered = hoveredCandidateIndex === item.rank;
+        const dimmed = pvOverlay && !isHovered;
+        const fill = item.rank === 0
+            ? 'rgba(56,189,248,0.94)'
+            : item.rank === 1
+                ? 'rgba(34,197,94,0.94)'
+                : 'rgba(250,204,21,0.94)';
+        return (
+            <g
+                key={`ai-${item.rank}-${item.x}-${item.y}`}
+                data-testid={`ai-candidate-${item.rank}`}
+                className="pointer-events-none"
+                style={{ opacity: dimmed ? 0.2 : 1 }}
+            >
+                <circle cx={cx} cy={cy} r={CELL_SIZE * 0.58} fill={fill}
+                    stroke={isHovered ? '#fff' : 'rgba(20,20,20,0.25)'} strokeWidth={isHovered ? 2.5 : 1} />
+                <text x={cx} y={cy - CELL_SIZE * 0.69} textAnchor="middle" dominantBaseline="middle"
+                    fill="#18181b" fontSize={CELL_SIZE * 0.30} fontWeight="bold">{item.rank + 1}</text>
+                <text x={cx} y={cy - 10} textAnchor="middle" dominantBaseline="middle"
+                    fill="#18181b" fontSize={CELL_SIZE * 0.42} fontWeight="bold">{item.winrate.toFixed(1)}</text>
+                <text x={cx} y={cy + 4} textAnchor="middle" dominantBaseline="middle"
+                    fill="#27272a" fontSize={CELL_SIZE * 0.34} fontWeight="bold">
+                    {item.visits >= 1000 ? `${(item.visits / 1000).toFixed(1)}k` : item.visits}
+                </text>
+                <text x={cx} y={cy + 17} textAnchor="middle" dominantBaseline="middle"
+                    fill="#18181b" fontSize={CELL_SIZE * 0.34} fontWeight="bold">
+                    {item.scoreLead >= 0 ? '+' : ''}{item.scoreLead.toFixed(1)}
+                </text>
+            </g>
+        );
+    });
+
+    // 候補へマウスを置いた時の予想手順(PV)。実際の石と同じ黒白で番号を表示する。
+    const pvElements = (pvOverlay || []).map(pv => {
+        if (boardState[pv.y - 1]?.[pv.x - 1]) return null;
+        const cx = MARGIN + (pv.x - 1) * CELL_SIZE;
+        const cy = MARGIN + (pv.y - 1) * CELL_SIZE;
+        const isBlack = pv.color === 'B';
+        return (
+            <g key={`pv-${pv.number}-${pv.x}-${pv.y}`} data-testid={`pv-stone-${pv.number}`} className="pointer-events-none">
+                <circle cx={cx} cy={cy} r={STONE_RADIUS}
+                    fill={isBlack ? '#171717' : '#f4f4f5'} stroke="#000" strokeWidth={2} />
+                <text x={cx} y={cy} dy=".35em" textAnchor="middle"
+                    fill={isBlack ? '#fff' : '#000'} fontSize={pv.number >= 10 ? CELL_SIZE * 0.42 : CELL_SIZE * 0.5}
+                    fontWeight="bold">{pv.number}</text>
+            </g>
+        );
+    });
+
+    // SVGの表示要素はpointer-events:noneのため、候補位置だけ最前面に透明なホバー面を置く。
+    // 生徒盤はreadOnlyでもPVを確認できる。
+    const candidateHoverTargets = analysisOverlay.map(item => {
+        const cx = MARGIN + (item.x - 1) * CELL_SIZE;
+        const cy = MARGIN + (item.y - 1) * CELL_SIZE;
+        return (
+            <rect
+                key={`ai-hover-${item.rank}`}
+                data-testid={`ai-candidate-hover-${item.rank}`}
+                x={cx - CELL_SIZE / 2} y={cy - CELL_SIZE / 2}
+                width={CELL_SIZE} height={CELL_SIZE}
+                fill="transparent"
+                className="cursor-pointer"
+                onMouseEnter={() => {
+                    onCandidateHover?.(item.rank);
+                    onCellMouseEnter?.(item.x, item.y);
+                }}
+                onMouseLeave={() => {
+                    onCandidateHover?.(null);
+                    onCellMouseLeave?.();
+                }}
+                onClick={() => { if (!readOnly && !isGesturing()) onCellClick?.(item.x, item.y); }}
+            />
+        );
+    });
+
     return (
         <svg
             ref={ref}
@@ -465,6 +569,9 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             {deadStoneElements}
             {markerElements}
             {drawingElements}
+            {analysisElements}
+            {pvElements}
+            {candidateHoverTargets}
         </svg>
     );
 });
