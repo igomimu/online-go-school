@@ -122,6 +122,58 @@ test.describe('「待った」機能（対局者どうしの同意制）', () =>
     await waitForMyTurn(studentAPage);
   });
 
+  // 2026-08-02 三村さん指定: 黒が置き間違えて白が打ち返した後に待った→承諾なら、
+  // 白の応手と黒の誤着の2手をまとめて戻し、黒の手番に戻す。
+  test('相手が打ち返した後に申請→承諾で2手戻り、申請者の手番に戻る', async () => {
+    await loginAsTeacher(teacherPage);
+    await openClassroomAndConnect(teacherPage);
+
+    await Promise.all([
+      loginAsStudent(studentAPage, { studentCode: TEST_STUDENT_A.code, classroomId }),
+      loginAsStudent(studentBPage, { studentCode: TEST_STUDENT_B.code, classroomId }),
+    ]);
+    await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
+    await waitForStudentJoined(teacherPage, TEST_STUDENT_B.id);
+
+    await createGame(teacherPage, {
+      blackName: TEST_STUDENT_A.name,
+      whiteName: TEST_STUDENT_B.name,
+      boardSize: 9,
+      expectedPlayersCount: 3,
+    });
+
+    const openBtn = getOpenStudentButton(teacherPage, TEST_STUDENT_A.id);
+    await expect(openBtn).toBeEnabled({ timeout: 10_000 });
+    await openBtn.click();
+    await waitForObserverPanel(teacherPage);
+
+    await Promise.all([
+      enterAssignedGame(studentAPage),
+      enterAssignedGame(studentBPage),
+    ]);
+
+    // 黒(A)が誤着 → 白(B)が打ち返す
+    await waitForMyTurn(studentAPage);
+    await playMove(studentAPage, 4, 4);
+    await waitForMyTurn(studentBPage);
+    await playMove(studentBPage, 6, 6);
+    await expect(studentAPage.getByTestId('move-count')).toContainText('2手目', { timeout: 10_000 });
+
+    // 黒(A)が「待った」を申請 → 白(B)が承諾
+    studentAPage.on('dialog', (d) => d.accept());
+    await studentAPage.getByRole('button', { name: /待った/ }).click();
+    await expect(studentBPage.getByText(/待った」を申請しています/)).toBeVisible({ timeout: 10_000 });
+    await studentBPage.getByRole('button', { name: '承諾する' }).click();
+
+    // 白の応手と黒の誤着が両方消えて0手目、手番は黒(A)に戻る
+    await expect(studentAPage.getByTestId('move-count')).toContainText('0手目', { timeout: 10_000 });
+    await expect(studentBPage.getByTestId('move-count')).toContainText('0手目', { timeout: 10_000 });
+    await expect(studentAPage.locator('[data-stone="4-4"]')).not.toBeVisible();
+    await expect(studentAPage.locator('[data-stone="6-6"]')).not.toBeVisible();
+    await expect(studentBPage.locator('[data-stone="6-6"]')).not.toBeVisible();
+    await waitForMyTurn(studentAPage);
+  });
+
   test('拒否すると盤面は変わらず、双方とも再び着手できる', async () => {
     await loginAsTeacher(teacherPage);
     await openClassroomAndConnect(teacherPage);

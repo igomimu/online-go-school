@@ -81,7 +81,10 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   const canPlay = game?.status === 'playing' && isMyTurn && !undoRequest;
   const isUndoRequester = !!undoRequest && myColor === undoRequest.requested_color;
   const canRespondToUndo = !!undoRequest && isParticipant && !isUndoRequester;
-  const canRequestUndo = game?.status === 'playing' && !undoRequest && isParticipant && moveNumber > 0;
+  // 「待った」は自分の手を戻す申請なので、自分がまだ1手も打っていない間は出さない
+  // （黒の初手直後に白が申請しても戻す対象がない）。
+  const hasOwnMove = myColor === 'BLACK' ? moveNumber >= 1 : moveNumber >= 2;
+  const canRequestUndo = game?.status === 'playing' && !undoRequest && isParticipant && hasOwnMove;
   const isDrawing = !!isTeacher && drawMode !== 'off';
   const effectiveDrawings = isTeacher ? drawings : syncedDrawings;
 
@@ -591,7 +594,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
           {canRequestUndo && (
             <button
               onClick={() => {
-                if (confirm('直前の一手について「待った」を相手に申請しますか？')) requestUndo();
+                if (confirm('自分の最後の一手を取り消す「待った」を相手に申請しますか？\n（相手が既に打っていれば、その一手も一緒に戻ります）')) requestUndo();
               }}
               className="secondary-button flex items-center gap-1.5 text-xs px-3 py-1.5"
             >

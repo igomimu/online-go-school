@@ -430,15 +430,19 @@ Deno.serve(async (req) => {
         return json({ error: 'Forbidden: not a player of this game' }, 403)
       }
 
-      const { data: lastMoves, error: movesErr } = await supabase
+      // 戻すのは「申請者自身の最後の手」から先の全ての手。
+      // 相手が既に打ち返していれば、その応手も一緒に消えて申請者の手番に戻る
+      // （黒が置き間違え→白が着手→黒が待った→承諾で2手戻る、が三村さん指定の挙動）。
+      const { data: myMoves, error: movesErr } = await supabase
         .from('go_school_live_moves')
         .select('move_number')
         .eq('game_id', game_id)
+        .eq('color', requestedColor)
         .order('move_number', { ascending: false })
         .limit(1)
 
       if (movesErr) throw movesErr
-      const lastMove = lastMoves?.[0]
+      const lastMove = myMoves?.[0]
       if (!lastMove) return json({ error: 'No move to undo' }, 409)
 
       const undo_request = {
@@ -485,11 +489,12 @@ Deno.serve(async (req) => {
       }
 
       if (accept) {
+        // 申請者の手以降を全て消す（相手の応手が既にあれば2手戻る）
         const { error: delErr } = await supabase
           .from('go_school_live_moves')
           .delete()
           .eq('game_id', game_id)
-          .eq('move_number', g.undo_request.target_move_number)
+          .gte('move_number', g.undo_request.target_move_number)
 
         if (delErr) throw delErr
       }

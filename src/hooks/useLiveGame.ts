@@ -339,7 +339,8 @@ export function useLiveGame(
         setGame((prev) => prev ? { ...prev, undo_request: null } : null);
         // DBのDELETE realtimeが届かない場合の保険。idempotentなので二重適用しても無害。
         if (p.accepted) {
-          setMoves((prev) => prev.filter((m) => m.move_number !== p.targetMoveNumber));
+          // 申請者の手以降（相手の応手があればそれも）をまとめて消す
+          setMoves((prev) => prev.filter((m) => m.move_number < p.targetMoveNumber));
         }
       }
     };
@@ -801,7 +802,10 @@ export function useLiveGame(
   const requestUndoFn = useCallback(async () => {
     if (!activeGame || !effectivePlayer) return;
     if (activeGame.undo_request) return;
-    const targetMoveNumber = derived.moveNumber;
+    // 戻すのは「自分の最後の手」から先。相手が既に打ち返していれば2手戻る
+    // （黒が置き間違え→白が着手→黒が待った→承諾で黒白2手が消えて黒の手番に戻る）。
+    const myLastMove = [...moves].reverse().find((m) => m.color === effectivePlayer.color);
+    const targetMoveNumber = myLastMove?.move_number ?? 0;
     if (targetMoveNumber <= 0) return;
 
     // LiveKitで即時通知（バナー表示専用の非正本キャッシュ）
@@ -822,15 +826,15 @@ export function useLiveGame(
     } catch (e) {
       setError(String(e));
     }
-  }, [activeGame, effectivePlayer, derived.moveNumber, classroom]);
+  }, [activeGame, effectivePlayer, moves, classroom]);
 
   // 「待った」への応答（承諾/拒否/取り下げ）
   const respondUndoFn = useCallback(async (accept: boolean) => {
     if (!activeGame || !activeGame.undo_request) return;
     const targetMoveNumber = activeGame.undo_request.target_move_number;
-    // 承諾時は楽観的に最後の手をローカルからも先に消す（DBのDELETE realtime到着を待たない）
+    // 承諾時は楽観的に対象手以降をローカルからも先に消す（DBのDELETE realtime到着を待たない）
     if (accept) {
-      setMoves((prev) => prev.filter((m) => m.move_number !== targetMoveNumber));
+      setMoves((prev) => prev.filter((m) => m.move_number < targetMoveNumber));
     }
 
     if (classroom && classroom.isConnected) {
