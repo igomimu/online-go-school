@@ -405,7 +405,8 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 borderRadius: '6px',
                 boxShadow: isMonochrome
                     ? undefined
-                    : '3px 4px 0 0 #93683a, 6px 8px 0 0 #6b4d28, 0 14px 28px rgba(0,0,0,0.5)',
+                    // 盤の厚み（側面）は天面の明るさに合わせた木口色。天面を明るくしたら側面も追随させる。
+                    : '3px 4px 0 0 #c68c4e, 6px 8px 0 0 #906836, 0 14px 28px rgba(0,0,0,0.45)',
             }}
             shapeRendering="geometricPrecision"
             onMouseUp={onDragEnd}
@@ -444,11 +445,11 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             {isMonochrome ? (
                 <rect x={viewBoxData.x} y={viewBoxData.y} width={viewBoxData.w} height={viewBoxData.h} fill="white" stroke="none" />
             ) : (
-                // 木目は毎回SVGフィルターで計算せず、事前生成した静的画像(public/wood-board-texture.webp)を
+                // 木目は毎回SVGフィルターで計算せず、事前生成した静的画像(public/wood-board-texture-v2.webp)を
                 // 敷き詰める。feTurbulenceは盤の新規マウントごとに計算コストが乗る(実測: 1盤あたり約
                 // 5〜10ms、12盤同時表示で約40ms)ため、低スペック端末での多面打ち・画面遷移の負荷を避ける。
                 <image
-                    href="/wood-board-texture.webp"
+                    href="/wood-board-texture-v2.webp"
                     x={viewBoxData.x} y={viewBoxData.y} width={viewBoxData.w} height={viewBoxData.h}
                     preserveAspectRatio="none"
                 />

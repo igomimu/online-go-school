@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import GoBoard from './GoBoard';
 import ZoomTapConfirm from './ZoomTapConfirm';
 import type { Drawing } from './GoBoard';
-import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2 } from 'lucide-react';
+import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX } from 'lucide-react';
 import { calculateTerritory, formatScoringResult, formatGameResultMessage } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
@@ -12,6 +12,7 @@ import { useIsPinchZoomed } from '../hooks/useIsPinchZoomed';
 import { getSupabase } from '../utils/liveGameApi';
 import { resolvePlayerName } from '../utils/identityUtils';
 import { ClassroomLiveKit } from '../utils/classroomLiveKit';
+import { isStoneSoundEnabled, setStoneSoundEnabled, playStoneSound, playCaptureSound, unlockStoneSound, shouldPlayMoveSound } from '../utils/stoneSound';
 import type { Student } from '../types/classroom';
 
 interface GameBoardProps {
@@ -36,6 +37,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     boardState,
     currentColor,
     moveNumber,
+    lastMove,
     blackCaptures,
     whiteCaptures,
     isMyTurn,
@@ -85,6 +87,29 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   useEffect(() => {
     if (pendingTap && !canPlay) setPendingTap(null);
   }, [canPlay, pendingTap]);
+
+  // ── 着手音・石を取る音 ──────────────────────────────────────────
+  const [soundOn, setSoundOn] = useState(isStoneSoundEnabled);
+  // ブラウザの自動再生ポリシー対策: 最初のユーザー操作で AudioContext を起こす
+  useEffect(() => {
+    window.addEventListener('pointerdown', unlockStoneSound, { once: true });
+    return () => window.removeEventListener('pointerdown', unlockStoneSound);
+  }, []);
+
+  const prevMoveNumberRef = useRef<number | null>(null);
+  const prevCapturesRef = useRef(0);
+  useEffect(() => {
+    const totalCaptures = blackCaptures + whiteCaptures;
+    const prevMoveNumber = prevMoveNumberRef.current;
+    const prevCaptures = prevCapturesRef.current;
+    prevMoveNumberRef.current = moveNumber;
+    prevCapturesRef.current = totalCaptures;
+
+    if (!shouldPlayMoveSound(prevMoveNumber, moveNumber, lastMove)) return;
+
+    playStoneSound();
+    if (totalCaptures > prevCaptures) playCaptureSound(totalCaptures - prevCaptures);
+  }, [moveNumber, lastMove, blackCaptures, whiteCaptures]);
 
   const deadStonesSet = useMemo(
     () => new Set(game?.scoring_dead_stones ?? []),
@@ -297,6 +322,26 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                   ? '中断'
                   : `終局: ${game.result ?? ''}`}
           </span>
+          {/* 石音（着手音・石を取る音）のON/OFF。端末ごとにlocalStorageへ保存される */}
+          <button
+            data-testid="stone-sound-toggle"
+            onClick={() => {
+              const next = !soundOn;
+              setStoneSoundEnabled(next);
+              setSoundOn(next);
+              if (next) playStoneSound(); // ONにしたら音量確認のため1回鳴らす
+            }}
+            title={soundOn ? '石音を消す' : '石音を鳴らす'}
+            aria-pressed={soundOn}
+            className={`flex items-center gap-1 rounded border px-2 py-1 text-xs font-bold transition-colors duration-150 ${
+              soundOn
+                ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-200'
+                : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-500'
+            }`}
+          >
+            {soundOn ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">石音</span>
+          </button>
           {/* スマホでは別ウィンドウを開いても見づらいだけなので、タッチデバイスでは非表示にする */}
           {!isTouch && !isDedicatedWindow && (
             <button
