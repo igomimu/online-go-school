@@ -1,29 +1,38 @@
 import type { AiAnalysisRequest, AiAnalysisResult, AiSettings } from '../types/ai';
 
 const DEFAULT_SETTINGS: AiSettings = {
-  maxVisits: 1000,
+  // Pocket KataGoの1局面分析と同じ探索数
+  maxVisits: 3000,
   enabled: false,
 };
 
 const SETTINGS_KEY = 'go-school-ai-settings';
+const SETTINGS_VERSION = 2;
 const ANALYSIS_TIMEOUT_MS = 20_000;
+
+type StoredAiSettings = Partial<AiSettings> & { version?: number };
 
 export function loadAiSettings(): AiSettings {
   try {
     const stored = localStorage.getItem(SETTINGS_KEY);
     if (stored) {
-      const parsed = JSON.parse(stored) as Partial<AiSettings>;
-      return {
+      const parsed = JSON.parse(stored) as StoredAiSettings;
+      const storedVisits = typeof parsed.maxVisits === 'number' ? parsed.maxVisits : DEFAULT_SETTINGS.maxVisits;
+      // v1では100/500/1000等が端末に残り、Pocket KataGoより浅いままになる。
+      // 既存利用者は選択値によらず一度3000へ揃え、v2以降の本人の選択は維持する。
+      const settings: AiSettings = {
         enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_SETTINGS.enabled,
-        maxVisits: typeof parsed.maxVisits === 'number' ? parsed.maxVisits : DEFAULT_SETTINGS.maxVisits,
+        maxVisits: parsed.version !== SETTINGS_VERSION ? 3000 : storedVisits,
       };
+      if (parsed.version !== SETTINGS_VERSION) saveAiSettings(settings);
+      return settings;
     }
   } catch { /* ignore */ }
   return { ...DEFAULT_SETTINGS };
 }
 
 export function saveAiSettings(settings: AiSettings): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings, version: SETTINGS_VERSION }));
 }
 
 /**

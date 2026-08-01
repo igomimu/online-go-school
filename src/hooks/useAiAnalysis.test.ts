@@ -10,7 +10,7 @@ vi.mock('../utils/katagoClient', async (importOriginal) => {
   return {
     ...actual,
     analyzePosition: analyzePositionMock,
-    loadAiSettings: () => ({ enabled: true, maxVisits: 1000 }),
+    loadAiSettings: () => ({ enabled: true, maxVisits: 3000 }),
     saveAiSettings: vi.fn(),
   };
 });
@@ -61,7 +61,7 @@ describe('useAiAnalysis', () => {
     );
     expect(analyzePositionMock).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ maxVisits: 1000 }),
+      expect.objectContaining({ maxVisits: 3000 }),
       expect.any(AbortSignal),
     );
 

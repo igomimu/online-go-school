@@ -145,8 +145,9 @@ export default function AiAnalysisPanel({
               >
                 <option value={100} className="bg-zinc-800 text-white">100 (速い)</option>
                 <option value={500} className="bg-zinc-800 text-white">500</option>
-                <option value={1000} className="bg-zinc-800 text-white">1000 (標準)</option>
-                <option value={2000} className="bg-zinc-800 text-white">2000 (精密)</option>
+                <option value={1000} className="bg-zinc-800 text-white">1000 (軽量)</option>
+                <option value={2000} className="bg-zinc-800 text-white">2000</option>
+                <option value={3000} className="bg-zinc-800 text-white">3000 (Pocket KataGo標準)</option>
                 <option value={5000} className="bg-zinc-800 text-white">5000 (高精度)</option>
               </select>
             </div>

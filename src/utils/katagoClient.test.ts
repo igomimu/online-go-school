@@ -1,5 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { analyzePosition } from './katagoClient';
+import { analyzePosition, loadAiSettings, saveAiSettings } from './katagoClient';
+
+describe('AI設定', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('未設定時はPocket KataGoと同じ3000 visitsを使う', () => {
+    expect(loadAiSettings()).toEqual({ enabled: false, maxVisits: 3000 });
+  });
+
+  it('旧端末設定が100 visitsでも一度だけ3000へ移行する', () => {
+    localStorage.setItem('go-school-ai-settings', JSON.stringify({ enabled: true, maxVisits: 100 }));
+    expect(loadAiSettings()).toEqual({ enabled: true, maxVisits: 3000 });
+    expect(JSON.parse(localStorage.getItem('go-school-ai-settings') || '{}')).toMatchObject({
+      enabled: true,
+      maxVisits: 3000,
+      version: 2,
+    });
+  });
+
+  it('移行後に利用者が1000を選んだ場合は維持する', () => {
+    saveAiSettings({ enabled: true, maxVisits: 1000 });
+    expect(loadAiSettings()).toEqual({ enabled: true, maxVisits: 1000 });
+  });
+});
 
 describe('analyzePosition', () => {
   beforeEach(() => {
