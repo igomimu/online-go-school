@@ -64,12 +64,10 @@ test.describe('検討モード AI候補手クリック', () => {
     await clearAllData(teacherPage);
     await setupTeacherPassword(teacherPage, TEST_TEACHER_PASSWORD);
     await setupClassroomData(teacherPage, classroomId);
-    // AI設定を「ON + 100 visits」で書き込んでおく
+    // 探索数だけ端末に入れておく。AIのON/OFFは保存されず毎回オフ始まりなので、
+    // 検討モードに入ってから ai-toggle でONにする（2026-08-02 仕様変更）。
     await teacherPage.evaluate(() => {
-      localStorage.setItem('go-school-ai-settings', JSON.stringify({
-        maxVisits: 100,
-        enabled: true,
-      }));
+      localStorage.setItem('go-school-ai-settings', JSON.stringify({ maxVisits: 100, version: 2 }));
     });
     await teacherPage.reload();
     // reload で route 設定が消えるのでもう一度貼る
@@ -93,6 +91,8 @@ test.describe('検討モード AI候補手クリック', () => {
     // PCでは碁盤とAI情報を最初から半分ずつ表示する。
     await expect(teacherPage.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
     await expect(teacherPage.getByRole('heading', { name: 'AI分析' })).toBeVisible({ timeout: 15_000 });
+    // 検討開始時はAIオフなので、講師がONにしてから解析結果を待つ
+    await teacherPage.getByTestId('ai-toggle').click();
 
     const boardColumn = teacherPage.getByTestId('review-board-column');
     const infoColumn = teacherPage.getByTestId('review-info-column');

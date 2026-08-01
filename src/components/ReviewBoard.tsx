@@ -366,6 +366,18 @@ export default function ReviewBoard({
     ));
   }, [currentNode.id]);
 
+  // 別の棋譜を読み込んで検討を始め直したら、AIは必ずオフから始める。
+  // （前の検討でONのままだと、開いた瞬間に新しい局面の解析がKataGoへ飛ぶ）
+  const updateAiSettingsRef = useRef(updateAiSettings);
+  updateAiSettingsRef.current = updateAiSettings;
+  useEffect(() => {
+    updateAiSettingsRef.current({ enabled: false });
+    setHoveredCandidate(null);
+    setAiHighlight(null);
+    // rootNode（＝読み込んだ棋譜）が変わった時だけ走らせる
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rootNode.id]);
+
   const handleUpdateAiSettings = useCallback((newSettings: Partial<AiSettings>) => {
     if (newSettings.enabled === false) {
       setHoveredCandidate(null);
@@ -511,7 +523,8 @@ export default function ReviewBoard({
               className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white rounded-lg text-xs font-semibold transition-all"
             >
               {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-              {isMaximized ? 'AI・チャットを表示' : '碁盤を広げる'}
+              {/* 生徒側はAI欄が出ないので「チャットを表示」と正しく名乗る */}
+              {isMaximized ? (isTeacher ? 'AI・チャットを表示' : 'チャットを表示') : '碁盤を広げる'}
             </button>
             {isTeacher && currentNode.children.length > 1 && (
               <div className="flex items-center gap-2 text-blue-300 text-sm">
@@ -770,6 +783,8 @@ export default function ReviewBoard({
       {/* PCでは碁盤と1:1になる授業情報カラム。生徒にもAI結果を同じ大きさで表示する。 */}
       {!isMaximized && (
         <aside className="w-full lg:flex-1 lg:basis-0 space-y-4 lg:overflow-y-auto lg:min-h-0 pr-0 lg:pr-1" data-testid="review-info-column">
+          {/* 生徒側はAIがオンで配信されている時だけAI欄を出す（オフの間は存在ごと隠す） */}
+          {(isTeacher || displayedAi.enabled) && (
           <AiAnalysisPanel
             result={displayedAi.result}
             isLoading={displayedAi.isLoading}
@@ -788,6 +803,7 @@ export default function ReviewBoard({
             readOnly={!isTeacher}
             allowCandidateInteraction={allowStudentInteraction}
           />
+          )}
 
           {displayedAi.enabled && winRateData.length > 0 && (
             <WinRateGraph data={winRateData} currentMove={currentMoveNumber} />

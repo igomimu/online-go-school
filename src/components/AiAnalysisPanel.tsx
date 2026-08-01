@@ -38,11 +38,9 @@ export default function AiAnalysisPanel({
           {settings.enabled && isLoading && <Loader2 className="w-4 h-4 animate-spin text-amber-400" aria-label="AI解析中" />}
         </div>
         <div className="flex items-center gap-2">
-          {readOnly ? (
-            <span data-testid="ai-state" className={`px-3 py-1 text-xs font-bold rounded-md border ${
-              settings.enabled ? 'bg-amber-500/15 border-amber-500/40 text-amber-300' : 'bg-zinc-900 border-zinc-700 text-zinc-500'
-            }`}>{settings.enabled ? 'ON' : 'OFF'}</span>
-          ) : (
+          {/* 生徒側にAIのON/OFF表示は出さない（操作できないものを見せない）。
+              AIの入切は講師の判断で、生徒には解析結果だけが届く。 */}
+          {readOnly ? null : (
             <button
               type="button"
               data-testid="ai-toggle"

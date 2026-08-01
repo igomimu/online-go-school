@@ -40,7 +40,8 @@ test.describe('検討モード AI先生→生徒同期', () => {
     await clearAllData(teacherPage);
     await setupTeacherPassword(teacherPage, TEST_TEACHER_PASSWORD);
     await setupClassroomData(teacherPage, classroomId);
-    await teacherPage.evaluate(() => localStorage.setItem('go-school-ai-settings', JSON.stringify({ maxVisits: 100, enabled: true })));
+    // AIのON/OFFは保存されない（毎回オフ始まり）。探索数だけ入れて、後で ai-toggle でONにする。
+    await teacherPage.evaluate(() => localStorage.setItem('go-school-ai-settings', JSON.stringify({ maxVisits: 100, version: 2 })));
     await teacherPage.reload();
     await mockKatagoApi(teacherPage);
 
@@ -65,7 +66,12 @@ test.describe('検討モード AI先生→生徒同期', () => {
     await loadSgfForReview(teacherPage, '(;FF[4]GM[1]SZ[9];B[ee])');
 
     await expect(studentPage.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
-    await expect(studentPage.getByTestId('ai-state')).toHaveText('ON', { timeout: 15_000 });
+    // 検討開始時はAIオフ。講師がONにして初めて生徒へ解析が配信される
+    await expect(teacherPage.getByRole('heading', { name: 'AI分析' })).toBeVisible({ timeout: 15_000 });
+    await teacherPage.getByTestId('ai-toggle').click();
+    // 生徒側にAIのON/OFFボタン・表示は出さない（講師が入切し、生徒には結果だけ届く）
+    await expect(studentPage.getByTestId('ai-state')).toHaveCount(0);
+    await expect(studentPage.getByTestId('ai-toggle')).toHaveCount(0);
     await expect(studentPage.getByTestId('ai-candidate-0')).toBeVisible({ timeout: 15_000 });
     await expect(studentPage.getByTestId('ai-move-0')).toContainText('D4');
     await expect(studentPage.getByTestId('ai-move-0')).toContainText('63.7%');

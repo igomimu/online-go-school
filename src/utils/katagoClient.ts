@@ -22,7 +22,9 @@ export function loadAiSettings(): AiSettings {
       // v1では100/500/1000等が端末に残り、Pocket KataGoより浅いままになる。
       // 既存利用者は選択値によらず一度3000へ揃え、v2以降の本人の選択は維持する。
       const settings: AiSettings = {
-        enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_SETTINGS.enabled,
+        // AIのON/OFFは端末に残さない。検討・授業は毎回AIオフで始める（三村さん指定 2026-08-02）。
+        // 前回ONのまま次の検討を始めると、開いた瞬間にKataGoへ解析が飛んでGPUを使ってしまう。
+        enabled: DEFAULT_SETTINGS.enabled,
         maxVisits: parsed.version !== SETTINGS_VERSION ? 3000 : storedVisits,
         allowStudentInteraction: typeof parsed.allowStudentInteraction === 'boolean'
           ? parsed.allowStudentInteraction
@@ -36,7 +38,12 @@ export function loadAiSettings(): AiSettings {
 }
 
 export function saveAiSettings(settings: AiSettings): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...settings, version: SETTINGS_VERSION }));
+  // enabled は保存しない（次回の検討開始時は必ずオフ）。探索数と生徒操作許可だけ端末に残す。
+  const { maxVisits, allowStudentInteraction } = settings;
+  localStorage.setItem(
+    SETTINGS_KEY,
+    JSON.stringify({ maxVisits, allowStudentInteraction, version: SETTINGS_VERSION }),
+  );
 }
 
 /**

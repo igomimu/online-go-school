@@ -192,7 +192,8 @@ describe('ReviewBoard', () => {
       />
     );
 
-    expect(screen.getByTestId('ai-state')).toHaveTextContent('ON');
+    // 生徒側にAIのON/OFF表示・操作は出さない（解析結果だけが届く）
+    expect(screen.queryByTestId('ai-state')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ai-toggle')).not.toBeInTheDocument();
     expect(screen.getByTestId('ai-candidate-0')).toBeInTheDocument();
 

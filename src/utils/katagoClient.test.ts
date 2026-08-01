@@ -10,9 +10,8 @@ describe('AI設定', () => {
 
   it('旧端末設定が100 visitsでも一度だけ3000へ移行する', () => {
     localStorage.setItem('go-school-ai-settings', JSON.stringify({ enabled: true, maxVisits: 100 }));
-    expect(loadAiSettings()).toEqual({ enabled: true, maxVisits: 3000, allowStudentInteraction: false });
+    expect(loadAiSettings()).toEqual({ enabled: false, maxVisits: 3000, allowStudentInteraction: false });
     expect(JSON.parse(localStorage.getItem('go-school-ai-settings') || '{}')).toMatchObject({
-      enabled: true,
       maxVisits: 3000,
       version: 2,
     });
@@ -20,7 +19,14 @@ describe('AI設定', () => {
 
   it('移行後に利用者が1000を選んだ場合は維持する', () => {
     saveAiSettings({ enabled: true, maxVisits: 1000, allowStudentInteraction: true });
-    expect(loadAiSettings()).toEqual({ enabled: true, maxVisits: 1000, allowStudentInteraction: true });
+    expect(loadAiSettings()).toEqual({ enabled: false, maxVisits: 1000, allowStudentInteraction: true });
+  });
+
+  // 検討・授業は毎回AIオフで始める（前回ONのまま開くとGPUへ解析が飛ぶ）
+  it('AIのON/OFFは端末に保存せず、読み込み時は必ずオフになる', () => {
+    saveAiSettings({ enabled: true, maxVisits: 3000, allowStudentInteraction: false });
+    expect(JSON.parse(localStorage.getItem('go-school-ai-settings') || '{}')).not.toHaveProperty('enabled');
+    expect(loadAiSettings().enabled).toBe(false);
   });
 });
 
