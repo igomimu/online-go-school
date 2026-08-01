@@ -821,12 +821,16 @@ export function useLiveGame(
       }).catch((err) => console.error('[LiveKit undo request broadcast error]', err));
     }
 
-    try {
-      await apiRequestUndo(activeGame.id);
-    } catch (e) {
-      setError(String(e));
-    }
-  }, [activeGame, effectivePlayer, moves, classroom]);
+    // 直前の着手がまだサーバーへ入り切っていないと 'No move to undo' で弾かれる。
+    // 着手と同じ送信キューに乗せ、自分の手の登録が終わってから申請する。
+    await enqueueSubmit(async () => {
+      try {
+        await apiRequestUndo(activeGame.id);
+      } catch (e) {
+        setError(String(e));
+      }
+    });
+  }, [activeGame, effectivePlayer, moves, classroom, enqueueSubmit]);
 
   // 「待った」への応答（承諾/拒否/取り下げ）
   const respondUndoFn = useCallback(async (accept: boolean) => {
