@@ -403,13 +403,16 @@ export default function ReviewBoard({
           </div>
         </div>
 
-        {/* 碁盤 */}
-        <div className="glass-panel p-4 flex justify-center items-center shadow-2xl lg:flex-1 lg:min-h-0">
+        {/* 碁盤: 高さは親(flex-1 min-h-0)の実際の余りに追従させる。
+            固定の calc(100dvh - Nrem) だと、ナビ・ツール列のぶんだけ碁盤が大きくなり、
+            PCでは下のボタン列に重なり、スマホでは画面からはみ出して見切れる
+            （対局盤で同じ問題を解決済みの方式に揃えた 2026-08-01）。 */}
+        <div className="glass-panel p-2 sm:p-4 flex justify-center items-center shadow-2xl overflow-hidden lg:flex-1 lg:min-h-0">
           <GoBoard
             boardState={boardState}
             boardSize={boardSize}
-            className="max-w-[min(100%,calc(100dvh-10rem))]"
-            maxHeight="calc(100dvh - 10rem)"
+            className="w-full max-w-full lg:!w-auto lg:h-full"
+            maxHeight="100%"
             markers={markers}
             drawings={drawings}
             readOnly={!isTeacher}
