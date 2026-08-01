@@ -97,6 +97,8 @@ function App() {
     result: null,
     isLoading: false,
     error: null,
+    hoveredCandidateRank: null,
+    allowStudentInteraction: false,
   });
 
   // 検討モード用
@@ -278,6 +280,10 @@ function App() {
               result: p.result ?? null,
               isLoading: p.enabled && p.isLoading,
               error: typeof p.error === 'string' ? p.error : null,
+              hoveredCandidateRank: typeof p.hoveredCandidateRank === 'number' && p.hoveredCandidateRank >= 0
+                ? p.hoveredCandidateRank
+                : null,
+              allowStudentInteraction: p.allowStudentInteraction === true,
             });
           }
         }
@@ -309,7 +315,7 @@ function App() {
           setReviewRootNode(root);
           setReviewCurrentNode(root);
           setReviewBoardSize(p.boardSize);
-          setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null });
+          setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null, hoveredCandidateRank: null, allowStudentInteraction: false });
           setViewMode('review');
         }
         // 詰碁配信（生徒用）
@@ -331,7 +337,7 @@ function App() {
           setReviewRootNode(null);
           setReviewCurrentNode(null);
           setSyncedNode(null);
-          setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null });
+          setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null, hoveredCandidateRank: null, allowStudentInteraction: false });
           setActiveProblem(null);
         }
 

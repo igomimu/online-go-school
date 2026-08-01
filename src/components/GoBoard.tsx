@@ -469,9 +469,8 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         );
     });
 
-    // SVGの表示要素はpointer-events:noneのため、候補位置だけ最前面に透明なホバー面を置く。
-    // 生徒盤はreadOnlyでもPVを確認できる。
-    const candidateHoverTargets = analysisOverlay.map(item => {
+    // 講師盤だけ、候補位置へ透明なホバー面を置く。生徒盤は講師の操作結果を見る専用。
+    const candidateHoverTargets = onCandidateHover ? analysisOverlay.map(item => {
         const cx = MARGIN + (item.x - 1) * CELL_SIZE;
         const cy = MARGIN + (item.y - 1) * CELL_SIZE;
         return (
@@ -493,7 +492,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 onClick={() => { if (!readOnly && !isGesturing()) onCellClick?.(item.x, item.y); }}
             />
         );
-    });
+    }) : [];
 
     return (
         <svg

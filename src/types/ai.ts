@@ -3,6 +3,7 @@
 export interface AiSettings {
   maxVisits: number;       // Analysis depth (visits)
   enabled: boolean;
+  allowStudentInteraction: boolean;
 }
 
 export interface AiTopMove {
@@ -29,6 +30,9 @@ export interface AiAnalysisSyncPayload {
   result: AiAnalysisResult | null;
   isLoading: boolean;
   error: string | null;
+  // 講師がマウスを置いている候補順位。生徒盤へ同じPVを表示する。
+  hoveredCandidateRank: number | null;
+  allowStudentInteraction: boolean;
 }
 
 export interface AiAnalysisRequest {

@@ -10,7 +10,7 @@ vi.mock('../utils/katagoClient', async (importOriginal) => {
   return {
     ...actual,
     analyzePosition: analyzePositionMock,
-    loadAiSettings: () => ({ enabled: true, maxVisits: 3000 }),
+    loadAiSettings: () => ({ enabled: true, maxVisits: 3000, allowStudentInteraction: false }),
     saveAiSettings: vi.fn(),
   };
 });

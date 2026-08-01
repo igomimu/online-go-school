@@ -70,9 +70,13 @@ test.describe('検討モード AI先生→生徒同期', () => {
     await expect(studentPage.getByTestId('ai-move-0')).toContainText('D4');
     await expect(studentPage.getByTestId('ai-move-0')).toContainText('63.7%');
 
-    await studentPage.getByTestId('ai-move-0').hover();
+    // 講師が候補手へマウスを置くと、生徒は操作しなくても同じPVが出る。
+    await teacherPage.getByTestId('ai-move-0').hover();
     await expect(studentPage.getByTestId('pv-stone-1')).toBeVisible();
     await expect(studentPage.getByTestId('pv-stone-2')).toBeVisible();
     await expect(studentPage.getByTestId('pv-stone-3')).toBeVisible();
+
+    await teacherPage.getByText('目数差').hover();
+    await expect(studentPage.getByTestId('pv-stone-1')).not.toBeVisible();
   });
 });

@@ -12,6 +12,7 @@ interface AiAnalysisPanelProps {
   onHighlightMove?: (x: number, y: number) => void;
   onCandidateHover?: (rank: number | null) => void;
   readOnly?: boolean;
+  allowCandidateInteraction?: boolean;
 }
 
 export default function AiAnalysisPanel({
@@ -24,7 +25,9 @@ export default function AiAnalysisPanel({
   onHighlightMove,
   onCandidateHover,
   readOnly = false,
+  allowCandidateInteraction = false,
 }: AiAnalysisPanelProps) {
+  const canInteractWithCandidates = !readOnly || allowCandidateInteraction;
   return (
     <div className="glass-panel p-4 sm:p-5 space-y-4" data-testid="ai-analysis-panel">
       {/* Header */}
@@ -106,10 +109,12 @@ export default function AiAnalysisPanel({
                     <div
                       key={i}
                       data-testid={`ai-move-${i}`}
-                      className="grid grid-cols-[1.25rem_2.75rem_1fr_1fr_auto] items-center gap-2 text-xs hover:bg-white/10 px-2 py-2 rounded-md cursor-pointer transition-colors duration-150"
-                      onMouseEnter={() => onCandidateHover?.(i)}
-                      onMouseLeave={() => onCandidateHover?.(null)}
-                      onClick={() => coord && onHighlightMove?.(coord.x, coord.y)}
+                      className={`grid grid-cols-[1.25rem_2.75rem_1fr_1fr_auto] items-center gap-2 text-xs px-2 py-2 rounded-md transition-colors duration-150 ${
+                        canInteractWithCandidates ? 'hover:bg-white/10 cursor-pointer' : 'cursor-default'
+                      }`}
+                      onMouseEnter={canInteractWithCandidates ? () => onCandidateHover?.(i) : undefined}
+                      onMouseLeave={canInteractWithCandidates ? () => onCandidateHover?.(null) : undefined}
+                      onClick={canInteractWithCandidates ? () => coord && onHighlightMove?.(coord.x, coord.y) : undefined}
                     >
                       <span className={`w-5 h-5 rounded-full ${candidateColor} text-zinc-950 font-bold flex items-center justify-center`}>{i + 1}</span>
                       <span className="font-mono font-bold text-white">{move.move}</span>
@@ -151,6 +156,18 @@ export default function AiAnalysisPanel({
                 <option value={5000} className="bg-zinc-800 text-white">5000 (高精度)</option>
               </select>
             </div>
+            <label className="flex items-start gap-2 rounded-md border border-zinc-700 bg-zinc-900/60 px-2 py-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings.allowStudentInteraction}
+                onChange={e => onUpdateSettings({ allowStudentInteraction: e.target.checked })}
+                className="mt-0.5 accent-amber-500"
+              />
+              <span>
+                <span className="block text-zinc-300">生徒の候補手操作を許可</span>
+                <span className="block text-zinc-600 mt-0.5">OFF時は講師が示した手順だけを表示します</span>
+              </span>
+            </label>
           </div>
         </details>
       )}

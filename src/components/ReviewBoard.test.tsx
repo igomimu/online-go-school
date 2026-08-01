@@ -165,9 +165,22 @@ describe('ReviewBoard', () => {
     expect(screen.getByTestId('review-info-column')).toHaveClass('lg:flex-1', 'lg:basis-0');
   });
 
-  it('生徒側にも先生のAI候補手が表示され、ホバーでPVを表示する', () => {
+  it('生徒側にも先生のAI候補手とホバー中のPVを同時表示する', () => {
     const { root } = makeTree();
-    render(
+    const syncedResult = {
+      enabled: true,
+      nodeId: root.id,
+      isLoading: false,
+      error: null,
+      hoveredCandidateRank: 0,
+      allowStudentInteraction: false,
+      result: {
+        winrate: 61.4,
+        scoreLead: 3.2,
+        topMoves: [{ move: 'D4', winrate: 61.4, scoreLead: 3.2, visits: 1000, pv: ['D4', 'E5', 'F6'] }],
+      },
+    };
+    const { rerender } = render(
       <ReviewBoard
         rootNode={root}
         currentNode={root}
@@ -175,17 +188,7 @@ describe('ReviewBoard', () => {
         onSetCurrentNode={vi.fn()}
         isTeacher={false}
         classroomRef={mockClassroomRef as never}
-        syncedAiAnalysis={{
-          enabled: true,
-          nodeId: root.id,
-          isLoading: false,
-          error: null,
-          result: {
-            winrate: 61.4,
-            scoreLead: 3.2,
-            topMoves: [{ move: 'D4', winrate: 61.4, scoreLead: 3.2, visits: 1000, pv: ['D4', 'E5', 'F6'] }],
-          },
-        }}
+        syncedAiAnalysis={syncedResult}
       />
     );
 
@@ -193,11 +196,37 @@ describe('ReviewBoard', () => {
     expect(screen.queryByTestId('ai-toggle')).not.toBeInTheDocument();
     expect(screen.getByTestId('ai-candidate-0')).toBeInTheDocument();
 
-    fireEvent.mouseEnter(screen.getByTestId('ai-move-0'));
     expect(screen.getByTestId('pv-stone-1')).toBeInTheDocument();
     expect(screen.getByTestId('pv-stone-2')).toBeInTheDocument();
 
-    fireEvent.mouseLeave(screen.getByTestId('ai-move-0'));
+    rerender(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={false}
+        classroomRef={mockClassroomRef as never}
+        syncedAiAnalysis={{ ...syncedResult, hoveredCandidateRank: null }}
+      />
+    );
     expect(screen.queryByTestId('pv-stone-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ai-candidate-hover-0')).not.toBeInTheDocument();
+    fireEvent.mouseEnter(screen.getByTestId('ai-move-0'));
+    expect(screen.queryByTestId('pv-stone-1')).not.toBeInTheDocument();
+
+    rerender(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={false}
+        classroomRef={mockClassroomRef as never}
+        syncedAiAnalysis={{ ...syncedResult, hoveredCandidateRank: null, allowStudentInteraction: true }}
+      />
+    );
+    fireEvent.mouseEnter(screen.getByTestId('ai-move-0'));
+    expect(screen.getByTestId('pv-stone-1')).toBeInTheDocument();
   });
 });

@@ -337,8 +337,15 @@ export default function ReviewBoard({
         error: syncedAiAnalysis?.error ?? null,
       };
 
-  const hoveredCandidateIndex = displayedAi.enabled && hoveredCandidate?.nodeId === currentNode.id
+  const localHoveredCandidateIndex = hoveredCandidate?.nodeId === currentNode.id
     ? hoveredCandidate.rank
+    : null;
+  const allowStudentInteraction = !isTeacher && syncedAiAnalysis?.allowStudentInteraction === true;
+  const hoveredCandidateIndex = displayedAi.enabled
+    ? (isTeacher
+        ? localHoveredCandidateIndex
+        // 講師が手順を示している間は常に講師操作を優先する。
+        : (syncedAiAnalysis?.hoveredCandidateRank ?? (allowStudentInteraction ? localHoveredCandidateIndex : null)))
     : null;
 
   const handleCandidateHover = useCallback((rank: number | null) => {
@@ -391,6 +398,8 @@ export default function ReviewBoard({
       result: sharedAiResult,
       isLoading: aiAnalysis.settings.enabled && aiAnalysis.isLoading,
       error: aiAnalysis.settings.enabled ? aiAnalysis.error : null,
+      hoveredCandidateRank: aiAnalysis.settings.enabled ? hoveredCandidateIndex : null,
+      allowStudentInteraction: aiAnalysis.settings.allowStudentInteraction,
     };
     classroomRef.current?.broadcast({ type: 'AI_ANALYSIS_UPDATE', payload });
   }, [
@@ -399,6 +408,8 @@ export default function ReviewBoard({
     aiAnalysis.settings.enabled,
     aiAnalysis.isLoading,
     aiAnalysis.error,
+    aiAnalysis.settings.allowStudentInteraction,
+    hoveredCandidateIndex,
     sharedAiResult,
     classroomRef,
     participantCount, // 途中参加した生徒にも現在の結果を再送する
@@ -526,7 +537,7 @@ export default function ReviewBoard({
             analysisOverlay={analysisOverlay}
             pvOverlay={pvOverlay}
             hoveredCandidateIndex={hoveredCandidateIndex}
-            onCandidateHover={handleCandidateHover}
+            onCandidateHover={isTeacher || allowStudentInteraction ? handleCandidateHover : undefined}
             readOnly={!isTeacher}
             onCellClick={isTeacher ? handleCellClick : undefined}
             onCellRightClick={isTeacher ? handleCellRightClick : undefined}
@@ -763,12 +774,19 @@ export default function ReviewBoard({
             result={displayedAi.result}
             isLoading={displayedAi.isLoading}
             error={displayedAi.error}
-            settings={{ enabled: displayedAi.enabled, maxVisits: aiAnalysis.settings.maxVisits }}
+            settings={{
+              enabled: displayedAi.enabled,
+              maxVisits: aiAnalysis.settings.maxVisits,
+              allowStudentInteraction: isTeacher
+                ? aiAnalysis.settings.allowStudentInteraction
+                : allowStudentInteraction,
+            }}
             onUpdateSettings={handleUpdateAiSettings}
             boardSize={boardSize}
-            onHighlightMove={handleHighlightMove}
-            onCandidateHover={handleCandidateHover}
+            onHighlightMove={isTeacher || allowStudentInteraction ? handleHighlightMove : undefined}
+            onCandidateHover={isTeacher || allowStudentInteraction ? handleCandidateHover : undefined}
             readOnly={!isTeacher}
+            allowCandidateInteraction={allowStudentInteraction}
           />
 
           {displayedAi.enabled && winRateData.length > 0 && (

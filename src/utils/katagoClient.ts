@@ -4,6 +4,7 @@ const DEFAULT_SETTINGS: AiSettings = {
   // Pocket KataGoの1局面分析と同じ探索数
   maxVisits: 3000,
   enabled: false,
+  allowStudentInteraction: false,
 };
 
 const SETTINGS_KEY = 'go-school-ai-settings';
@@ -23,6 +24,9 @@ export function loadAiSettings(): AiSettings {
       const settings: AiSettings = {
         enabled: typeof parsed.enabled === 'boolean' ? parsed.enabled : DEFAULT_SETTINGS.enabled,
         maxVisits: parsed.version !== SETTINGS_VERSION ? 3000 : storedVisits,
+        allowStudentInteraction: typeof parsed.allowStudentInteraction === 'boolean'
+          ? parsed.allowStudentInteraction
+          : DEFAULT_SETTINGS.allowStudentInteraction,
       };
       if (parsed.version !== SETTINGS_VERSION) saveAiSettings(settings);
       return settings;
