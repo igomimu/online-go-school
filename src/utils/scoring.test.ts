@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateTerritory, formatScoringResult, formatGameResultMessage, timedOutColorFromResult, isTimeoutResult } from './scoring';
+import { calculateTerritory, formatScoringResult, formatGameResultMessage, timedOutColorFromResult, isTimeoutResult, formatResultSpeech } from './scoring';
 import type { BoardState, Stone } from '../components/GoBoard';
 
 function makeBoard(size: number, stones: { x: number; y: number; color: 'BLACK' | 'WHITE' }[]): BoardState {
@@ -137,5 +137,19 @@ describe('timedOutColorFromResult / isTimeoutResult', () => {
     expect(timedOutColorFromResult(null)).toBe(null);
     expect(isTimeoutResult('強制終局')).toBe(false);
     expect(isTimeoutResult('B+T')).toBe(true);
+  });
+});
+
+describe('formatResultSpeech（終局の読み上げ）', () => {
+  it('投了は「〇の中押し勝ちです」と読み上げる', () => {
+    expect(formatResultSpeech('B+R')).toBe('黒の中押し勝ちです');
+    expect(formatResultSpeech('W+R')).toBe('白の中押し勝ちです');
+  });
+
+  it('投了以外は読み上げない（時間切れは秒読み側が喋る）', () => {
+    expect(formatResultSpeech('B+T')).toBeNull();
+    expect(formatResultSpeech('W+12.5')).toBeNull();
+    expect(formatResultSpeech('強制終局')).toBeNull();
+    expect(formatResultSpeech(null)).toBeNull();
   });
 });

@@ -613,10 +613,26 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
         </div>
       )}
 
-      {/* 終局結果（投了は「〇が投了しました。〇の中押し勝ち」の分かりやすい文言にする） */}
+      {/* 終局結果。小さな1行だと投了直後に見落とすので、はっきり読める大きさで出す
+          （読み上げ「〇の中押し勝ちです」と対で、無言・無表示で閉じないようにする 2026-08-02）。 */}
       {(game.status === 'finished' || game.status === 'interrupted') && game.result && (
-        <div className="shrink-0 flex flex-col items-center gap-2 text-center text-sm text-white font-bold">
-          <span>{formatGameResultMessage(game.result)}</span>
+        <div
+          data-testid="game-result-banner"
+          className="shrink-0 flex flex-col items-center gap-3 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-4 text-center"
+        >
+          <span className="text-lg sm:text-2xl font-bold text-white leading-snug">
+            {formatGameResultMessage(game.result)}
+          </span>
+          <span className="text-xs text-zinc-400">{moveNumber}手で終局</span>
+          {onBack && (
+            <button
+              onClick={onBack}
+              data-testid="game-result-close"
+              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-100 rounded-lg text-sm font-bold transition-colors duration-150"
+            >
+              閉じてホームへ
+            </button>
+          )}
           {/* 回線トラブル等で不本意に切れた対局を、講師の判断でその場から再開する */}
           {isTeacher && isTimeoutResult(game.result) && (
             <button

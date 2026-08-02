@@ -189,3 +189,15 @@ export function timedOutColorFromResult(result: string | null | undefined): 'BLA
 export function isTimeoutResult(result: string | null | undefined): boolean {
   return timedOutColorFromResult(result) !== null;
 }
+
+/**
+ * 終局を読み上げる文言（無ければ null）。
+ * 投了は勝敗が一瞬で決まり碁盤もすぐ閉じるため、声でも結果を伝える（三村さん指定 2026-08-02）。
+ * 時間切れは秒読み読み上げ側が「時間切れ負けです」と言うのでここでは扱わない。
+ */
+export function formatResultSpeech(result: string | null | undefined): string | null {
+  const resign = result?.trim().match(/^([BW])\+R$/i);
+  if (!resign) return null;
+  const winner = resign[1].toUpperCase() === 'B' ? '黒' : '白';
+  return `${winner}の中押し勝ちです`;
+}

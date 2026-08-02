@@ -4,6 +4,7 @@ import { createEmptyBoard, checkCapture, boardHash, isLegalMove } from '../utils
 import { getHandicapStones } from '../utils/handicapStones';
 import { studentMatchesPlayer, isTeacherIdentity } from '../utils/identityUtils';
 import { getByoyomiAnnouncement, speakByoyomi } from '../utils/byoyomiVoice';
+import { formatResultSpeech } from '../utils/scoring';
 import { switchClock } from './useGameClock';
 import type { GameClock } from '../types/game';
 import {
@@ -626,6 +627,18 @@ export function useLiveGame(
     },
     [activeGame, myColor, isTeacher]
   );
+
+  // 終局の読み上げ。投了は結果が一瞬で決まり碁盤もすぐ閉じるので、声でも結果を伝える。
+  // 対局者・観戦者それぞれの端末で1回だけ喋る（同じ対局・同じ結果では二度言わない）。
+  const spokenResultRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeGame || activeGame.status !== 'finished' || !activeGame.result) return;
+    const key = `${activeGame.id}:${activeGame.result}`;
+    if (spokenResultRef.current === key) return;
+    spokenResultRef.current = key;
+    const phrase = formatResultSpeech(activeGame.result);
+    if (phrase) speakByoyomi(phrase);
+  }, [activeGame]);
 
   const hasLocalClock = localClock !== null;
   const activeGameStatus = activeGame?.status;

@@ -861,9 +861,10 @@ function App() {
     // 時間切れ終局は先生が「対局を再開する」を押せるよう、先生の画面は自動で閉じない
     if (role === 'TEACHER' && currentGame?.status === 'finished' && isTimeoutResult(currentGame.result)) return;
     if (currentGame && (currentGame.status === 'finished' || currentGame.status === 'interrupted')) {
+      // 終局の読み上げ（投了「〇の中押し勝ちです」）を聞き終える余裕を持たせてから閉じる
       const timer = setTimeout(() => {
         handleBackToLobby();
-      }, 3000);
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [activeGameId, games, handleBackToLobby, role]);
