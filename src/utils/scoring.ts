@@ -223,8 +223,11 @@ export function formatResultSpeech(result: string | null | undefined): string | 
   const m = result?.trim().match(/^([BW])\+(R|\d+(?:\.\d+)?)$/i);
   if (!m) return null;
   const winner = m[1].toUpperCase() === 'B' ? '黒' : '白';
-  if (m[2].toUpperCase() === 'R') return `${winner}、中押し勝ちです`;
+  // 「勝ち」は漢字だと連濁せず「かち」と読まれる。囲碁では「ちゅうおしがち」
+  // 「にもくはんがち」と濁るので、「がち」だけ かな にする
+  // （「中押し」「目半」は漢字のままで正しく読まれている）。
+  if (m[2].toUpperCase() === 'R') return `${winner}、中押しがちです`;
   const points = Number(m[2]);
   if (!Number.isFinite(points) || points <= 0) return null;
-  return `${winner}、${formatMargin(points)}勝ちです`;
+  return `${winner}、${formatMargin(points)}がちです`;
 }

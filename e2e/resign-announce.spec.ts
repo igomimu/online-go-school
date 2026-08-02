@@ -79,7 +79,7 @@ test('投了すると「〇の中押し勝ちです」と読み上げ、結果�
     const spoken = await aPage.evaluate(() => window.__spokenPhrases);
     // 読点で語を区切ってアクセントを頭に来させる（三村さん指定）
     
-    expect(spoken, `読み上げ: ${JSON.stringify(spoken)}`).toContain('黒、中押し勝ちです');
+    expect(spoken, `読み上げ: ${JSON.stringify(spoken)}`).toContain('黒、中押しがちです');
   } finally {
     for (const c of ctxs) await c.close().catch(() => {});
     await teardownSupabaseRoster(classroomId);

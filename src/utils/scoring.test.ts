@@ -142,16 +142,16 @@ describe('timedOutColorFromResult / isTimeoutResult', () => {
 
 describe('formatResultSpeech（終局の読み上げ）', () => {
   it('投了は「〇のちゅうおしがちです」と読み上げる（読点で語を区切りアクセントを頭に来させる）', () => {
-    expect(formatResultSpeech('B+R')).toBe('黒、中押し勝ちです');
-    expect(formatResultSpeech('W+R')).toBe('白、中押し勝ちです');
+    expect(formatResultSpeech('B+R')).toBe('黒、中押しがちです');
+    expect(formatResultSpeech('W+R')).toBe('白、中押しがちです');
   });
 
   it('整地は目数を囲碁の言い方で読み上げる', () => {
-    expect(formatResultSpeech('B+2.5')).toBe('黒、2目半勝ちです');
-    expect(formatResultSpeech('W+0.5')).toBe('白、半目勝ちです');
-    expect(formatResultSpeech('B+8.5')).toBe('黒、8目半勝ちです');
-    expect(formatResultSpeech('W+5')).toBe('白、5目勝ちです');
-    expect(formatResultSpeech('B+12.5')).toBe('黒、12目半勝ちです');
+    expect(formatResultSpeech('B+2.5')).toBe('黒、2目半がちです');
+    expect(formatResultSpeech('W+0.5')).toBe('白、半目がちです');
+    expect(formatResultSpeech('B+8.5')).toBe('黒、8目半がちです');
+    expect(formatResultSpeech('W+5')).toBe('白、5目がちです');
+    expect(formatResultSpeech('B+12.5')).toBe('黒、12目半がちです');
   });
 
   it('時間切れ・ジゴ・未知の表記は読み上げない（時間切れは秒読み側が喋る）', () => {
