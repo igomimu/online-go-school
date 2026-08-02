@@ -12,6 +12,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="囲碁オンライン" />
     <title>三村囲碁オンライン</title>
+    <!-- 和文=Noto Sans JP / 欧文・数字=Inter。css2 は unicode-range で分割配信されるため
+         和文フォントでも実転送量は表示に使う字形のみで済む。読み込み失敗時は system-ui へ落ちる。 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+    />
     <script>
       // PWA の Service Worker 更新時に自動でページをスーパーリロードする自己治癒スクリプト
       // 初回インストール時の claim ではリロードしない（controller が既に居た場合のみ = 更新時のみ）

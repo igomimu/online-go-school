@@ -38,8 +38,8 @@ export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnL
           onClick();
         }
       }}
-      className={`glass-panel p-2 hover:bg-white/5 transition-all ${
-        isMyTurn ? 'ring-2 ring-amber-400' : isActive ? 'ring-2 ring-blue-500' : ''
+      className={`glass-panel p-2 transition-all hover:bg-sumi-high ${
+        isMyTurn ? 'ring-2 ring-kaya' : isActive ? 'ring-2 ring-nibi' : ''
       } ${game.status === 'finished' || game.status === 'interrupted' ? 'opacity-60' : ''}`}
     >
       {/* ミニ碁盤 */}
@@ -90,8 +90,8 @@ export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnL
           <span className="w-2 h-2 rounded-full bg-white border border-white/20 inline-block" />
           <span className="truncate">{whiteName}</span>
         </div>
-        <div className="text-zinc-500 flex justify-between items-center gap-1">
-          <span>
+        <div className="flex items-center justify-between gap-1 text-nibi">
+          <span className="tabular">
             {game.status === 'playing'
               ? `${game.moveNumber}手目`
               : game.status === 'interrupted'
@@ -107,15 +107,15 @@ export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnL
                 if (isTimedOut && !confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')) return;
                 onResume!(game.id);
               }}
-              className="px-1.5 py-0.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-[10px] font-bold"
+              className="rounded bg-kaya px-1.5 py-0.5 text-[10px] font-bold text-sumi"
             >
               再開
             </button>
           )}
         </div>
         {turnLabel && (
-          <div className={`inline-flex px-1.5 py-0.5 text-[10px] font-bold ${
-            isMyTurn ? 'bg-amber-400 text-zinc-950' : 'bg-zinc-700 text-zinc-300'
+          <div className={`inline-flex rounded px-1.5 py-0.5 text-[10px] font-bold ${
+            isMyTurn ? 'bg-kaya text-sumi' : 'bg-sumi-high text-nibi'
           }`}>
             {turnLabel}
           </div>
