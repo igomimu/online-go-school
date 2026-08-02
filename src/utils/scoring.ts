@@ -198,6 +198,8 @@ export function isTimeoutResult(result: string | null | undefined): boolean {
 export function formatResultSpeech(result: string | null | undefined): string | null {
   const resign = result?.trim().match(/^([BW])\+R$/i);
   if (!resign) return null;
-  const winner = resign[1].toUpperCase() === 'B' ? '黒' : '白';
-  return `${winner}の中押し勝ちです`;
+  // 「中押し勝ち」は"ちゅうおしがち"。漢字のままだとTTSが誤読するのでかなで渡す
+  // （秒読みの「入りました」→"いりました"誤読と同じ対策）。表示は漢字のまま。
+  const winner = resign[1].toUpperCase() === 'B' ? 'くろ' : 'しろ';
+  return `${winner}のちゅうおしがちです`;
 }

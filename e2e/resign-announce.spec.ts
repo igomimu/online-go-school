@@ -77,7 +77,8 @@ test('投了すると「〇の中押し勝ちです」と読み上げ、結果�
 
     // 声でも結果を伝える
     const spoken = await aPage.evaluate(() => window.__spokenPhrases);
-    expect(spoken, `読み上げ: ${JSON.stringify(spoken)}`).toContain('黒の中押し勝ちです');
+    // 「中押し勝ち」は漢字のままだとTTSが誤読するため、発話はかな
+    expect(spoken, `読み上げ: ${JSON.stringify(spoken)}`).toContain('くろのちゅうおしがちです');
   } finally {
     for (const c of ctxs) await c.close().catch(() => {});
     await teardownSupabaseRoster(classroomId);
