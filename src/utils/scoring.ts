@@ -200,6 +200,10 @@ export function formatResultSpeech(result: string | null | undefined): string | 
   if (!resign) return null;
   // 「中押し勝ち」は"ちゅうおしがち"。漢字のままだとTTSが誤読するのでかなで渡す
   // （秒読みの「入りました」→"いりました"誤読と同じ対策）。表示は漢字のまま。
-  const winner = resign[1].toUpperCase() === 'B' ? 'くろ' : 'しろ';
+  //
+  // 一方で「黒」「白」は漢字のまま渡す。かなにすると全体が仮名の連なりになり、
+  // TTS が語の切れ目を取り違えて「くろの」のアクセントが崩れるため
+  // （2026-08-02 三村さんの指摘）。漢字仮名交じりのほうが正しく読まれる。
+  const winner = resign[1].toUpperCase() === 'B' ? '黒' : '白';
   return `${winner}のちゅうおしがちです`;
 }

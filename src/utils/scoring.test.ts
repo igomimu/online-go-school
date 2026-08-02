@@ -141,9 +141,9 @@ describe('timedOutColorFromResult / isTimeoutResult', () => {
 });
 
 describe('formatResultSpeech（終局の読み上げ）', () => {
-  it('投了は「〇のちゅうおしがちです」と読み上げる（漢字だとTTSが誤読するためかな）', () => {
-    expect(formatResultSpeech('B+R')).toBe('くろのちゅうおしがちです');
-    expect(formatResultSpeech('W+R')).toBe('しろのちゅうおしがちです');
+  it('投了は「〇のちゅうおしがちです」と読み上げる（中押し勝ちのみかな。黒白は漢字でないとアクセントが崩れる）', () => {
+    expect(formatResultSpeech('B+R')).toBe('黒のちゅうおしがちです');
+    expect(formatResultSpeech('W+R')).toBe('白のちゅうおしがちです');
   });
 
   it('投了以外は読み上げない（時間切れは秒読み側が喋る）', () => {

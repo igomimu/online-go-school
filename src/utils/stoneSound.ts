@@ -125,11 +125,19 @@ export function playStoneSound(): void {
   play(STONE_FILES[Math.floor(Math.random() * STONE_FILES.length)]);
 }
 
+/** ここから「たくさん抜いた」音に切り替える石数。 */
+export const MANY_CAPTURES = 3;
+
 /**
  * 石を取った音。着手音の直後に少し遅らせて重ねる（実際の対局でも打つ→抜くの順）。
- * @param count 取った石数（10子以上は大きい音に切り替える）
+ *
+ * 1〜2子は軽い音、3子以上は大きい音。当初は 10子以上を大きい音にしていたが、
+ * 実戦で10子以上抜く場面は稀で使い分けがほとんど起きていなかった
+ * （2026-08-02 三村さんの指摘）。
+ *
+ * @param count 取った石数
  */
 export function playCaptureSound(count: number): void {
   if (!enabled) return;
-  play(count >= 10 ? 'nuki2.ogg' : 'nuki1.ogg', 140);
+  play(count >= MANY_CAPTURES ? 'nuki2.ogg' : 'nuki1.ogg', 140);
 }
