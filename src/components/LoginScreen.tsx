@@ -431,7 +431,7 @@ function LoginLayout({ children }: { children: ReactNode }) {
         <div className="flex w-full flex-col gap-9 lg:flex-row lg:items-start lg:justify-between lg:gap-12">
           <div className="lg:flex-1 lg:pt-1">
             <h1 className="heading-hero">三村囲碁オンライン</h1>
-            <p className="mt-2 text-nibi">石を置きながら、話せる。</p>
+            <p className="mt-2 text-nibi">ログインだけで、仲間に会える。</p>
           </div>
 
           <div className="w-full lg:w-[21rem] lg:shrink-0">{children}</div>

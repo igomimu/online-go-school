@@ -130,7 +130,7 @@ export default function Lobby({
               <div>
                 <h3 className="font-semibold text-kaya">対局中</h3>
                 <p className="text-sm text-nibi">
-                  {myGame.blackPlayer} vs {myGame.whitePlayer}（<span className="tabular">{myGame.moveNumber}</span>手目）
+                  {getDisplayName(myGame.blackPlayer, students)} vs {getDisplayName(myGame.whitePlayer, students)}（<span className="tabular">{myGame.moveNumber}</span>手目）
                 </p>
               </div>
               <div className="flex gap-2">
@@ -152,7 +152,7 @@ export default function Lobby({
               <div>
                 <h3 className="font-semibold">中断された対局があります</h3>
                 <p className="text-sm text-nibi">
-                  {mySuspendedGame.blackPlayer} vs {mySuspendedGame.whitePlayer}（<span className="tabular">{mySuspendedGame.moveNumber}</span>手目）
+                  {getDisplayName(mySuspendedGame.blackPlayer, students)} vs {getDisplayName(mySuspendedGame.whitePlayer, students)}（<span className="tabular">{mySuspendedGame.moveNumber}</span>手目）
                 </p>
               </div>
               <div className="flex gap-2">
@@ -320,7 +320,7 @@ export default function Lobby({
         {role === 'TEACHER' && onSelectSavedGame && (
           <div className="glass-panel p-5 space-y-3">
             <h3 className="heading-section">保存棋譜</h3>
-            <SavedGameList onSelectGame={onSelectSavedGame} />
+            <SavedGameList onSelectGame={onSelectSavedGame} students={students} />
           </div>
         )}
 

@@ -53,20 +53,14 @@ export default function ChatPanel({
   };
 
   return (
-    <div className="flex flex-col h-full" style={{ background: '#e8e8e0', fontFamily: 'MS Gothic, monospace' }}>
+    <div className="flex h-full flex-col bg-sumi-raised">
       {/* 送信先 + トークルーム（先生のみ） */}
       {showTargetSelector && (
-        <div style={{ padding: '4px 6px', borderBottom: '1px solid #999', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="border-b border-sumi-line p-2">
           <select
             value={target}
             onChange={e => setTarget(e.target.value)}
-            style={{
-              flex: 1,
-              border: '1px solid #999',
-              background: 'white',
-              fontSize: 12,
-              padding: '2px 4px',
-            }}
+            className="w-full rounded-md border border-sumi-line bg-sumi px-2 py-1 text-[13px] text-kinari"
           >
             <option value="all">生徒全員</option>
             {remoteParticipants.map(p => (
@@ -81,61 +75,39 @@ export default function ChatPanel({
       {/* メッセージ表示 */}
       <div
         ref={scrollRef}
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          background: '#1a1a1a',
-          color: '#ccc',
-          padding: 4,
-          fontSize: 11,
-          minHeight: 0,
-        }}
+        className="min-h-0 flex-1 space-y-1 overflow-y-auto bg-sumi p-2 text-[13px] leading-relaxed"
       >
         {messages.map(msg => {
           const isMe = msg.sender === localIdentity;
           const isPrivate = msg.target !== 'all';
           return (
             <div key={msg.id}>
-              <span style={{ color: '#666' }}>[{formatTime(msg.timestamp)}]</span>
+              <span className="tabular text-nibi">{formatTime(msg.timestamp)}</span>
               {' '}
-              {isPrivate && <span style={{ color: '#88f' }}>(個別)</span>}
-              <span style={{ color: isMe ? '#8cf' : '#fc8' }}>
+              {isPrivate && <span className="text-kaya">(個別)</span>}
+              <span className={isMe ? 'font-semibold text-kinari' : 'text-kaya'}>
                 {getDisplayName(msg.sender, students)}:
               </span>
               {' '}
-              {msg.text}
+              <span className="text-kinari">{msg.text}</span>
             </div>
           );
         })}
       </div>
 
       {/* 入力 + チャットボタン */}
-      <div style={{ display: 'flex', gap: 2, padding: 4, borderTop: '1px solid #999' }}>
+      <div className="flex gap-2 border-t border-sumi-line p-2">
         <input
           type="text"
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          style={{
-            flex: 1,
-            border: '1px solid #999',
-            background: 'white',
-            fontSize: 11,
-            padding: '2px 4px',
-          }}
+          className="min-w-0 flex-1 rounded-md border border-sumi-line bg-sumi px-2 py-1 text-[13px] text-kinari placeholder:text-nibi focus:border-kaya focus:outline-none"
         />
         <button
           onClick={handleSend}
           disabled={!text.trim()}
-          style={{
-            padding: '2px 12px',
-            fontSize: 12,
-            fontWeight: 'bold',
-            border: '1px solid #999',
-            background: '#f0e0c0',
-            cursor: text.trim() ? 'pointer' : 'default',
-            opacity: text.trim() ? 1 : 0.5,
-          }}
+          className="shrink-0 rounded-md bg-kaya px-3 py-1 text-[13px] font-bold text-sumi disabled:opacity-40"
         >
           チャット
         </button>
