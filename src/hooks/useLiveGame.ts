@@ -628,7 +628,8 @@ export function useLiveGame(
     [activeGame, myColor, isTeacher]
   );
 
-  // 終局の読み上げ。投了は結果が一瞬で決まり碁盤もすぐ閉じるので、声でも結果を伝える。
+  // 終局の読み上げ（投了「黒、中押し勝ちです」／整地「黒、2目半勝ちです」）。
+  // 結果が決まると碁盤がすぐ閉じてしまうので、声でも伝える。
   // 対局者・観戦者それぞれの端末で1回だけ喋る（同じ対局・同じ結果では二度言わない）。
   const spokenResultRef = useRef<string | null>(null);
   useEffect(() => {

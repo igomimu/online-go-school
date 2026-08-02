@@ -191,22 +191,40 @@ export function isTimeoutResult(result: string | null | undefined): boolean {
 }
 
 /**
+ * 目数を囲碁の言い方にする。0.5 は「0目半」ではなく「半目」。
+ * 2.5→「2目半」 / 5→「5目」 / 0.5→「半目」
+ */
+function formatMargin(points: number): string {
+  const whole = Math.floor(points);
+  const hasHalf = points % 1 !== 0;
+  if (whole === 0) return '半目';
+  return hasHalf ? `${whole}目半` : `${whole}目`;
+}
+
+/**
  * 終局を読み上げる文言（無ければ null）。
- * 投了は勝敗が一瞬で決まり碁盤もすぐ閉じるため、声でも結果を伝える（三村さん指定 2026-08-02）。
+ * 勝敗が決まった瞬間に碁盤が閉じてしまうため、声でも結果を伝える（三村さん指定 2026-08-02）。
  * 時間切れは秒読み読み上げ側が「時間切れ負けです」と言うのでここでは扱わない。
+ *
+ * 文言の作り（すべて三村さん指定）:
+ *   投了   「黒、中押し勝ちです」
+ *   整地   「黒、2目半勝ちです」「白、半目勝ちです」
+ *
+ * 「黒」「白」は囲碁では「ク\ロ」「シ\ロ」と頭にアクセントが来るが、「黒の…」と助詞を
+ * 続けると TTS が「くろの」をひとまとまりに解析して平板に読んでしまう。読点で語を
+ * 独立させ、単語として解析されるようにする。
+ * 一度は誤読対策で「ちゅうおしがち」と かな にしたが、仮名の連なりはかえって語の
+ * 切れ目を失わせるため、読点で区切ったうえで漢字仮名交じりに戻した。
+ *
+ * ※ Web Speech API にはアクセントを直接指定する手段がない（SSML は実質未対応）ので、
+ *   渡す文字列の切り方でエンジンの解析を誘導するしかない。
  */
 export function formatResultSpeech(result: string | null | undefined): string | null {
-  const resign = result?.trim().match(/^([BW])\+R$/i);
-  if (!resign) return null;
-  // 「中押し勝ち」は"ちゅうおしがち"。漢字のままだとTTSが誤読するのでかなで渡す
-  // （秒読みの「入りました」→"いりました"誤読と同じ対策）。表示は漢字のまま。
-  //
-  // 「黒」「白」は漢字のまま、かつ助詞を続けず読点で切る。囲碁では「ク\ロ」「シ\ロ」と
-  // 頭にアクセントが来るが、「黒の…」と助詞が続くと TTS が「くろの」をひとまとまりに
-  // 解析して平板に読んでしまうため（2026-08-02 三村さんの指摘）。読点で語を独立させると
-  // 単語として解析され、頭高で読まれやすくなる。
-  // ※ Web Speech API にはアクセントを直接指定する手段がない（SSML は実質未対応）ので、
-  //   渡す文字列の切り方でエンジンの解析を誘導するしかない。
-  const winner = resign[1].toUpperCase() === 'B' ? '黒' : '白';
-  return `${winner}、ちゅうおしがちです`;
+  const m = result?.trim().match(/^([BW])\+(R|\d+(?:\.\d+)?)$/i);
+  if (!m) return null;
+  const winner = m[1].toUpperCase() === 'B' ? '黒' : '白';
+  if (m[2].toUpperCase() === 'R') return `${winner}、中押し勝ちです`;
+  const points = Number(m[2]);
+  if (!Number.isFinite(points) || points <= 0) return null;
+  return `${winner}、${formatMargin(points)}勝ちです`;
 }
