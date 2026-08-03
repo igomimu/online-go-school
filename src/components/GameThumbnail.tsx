@@ -38,8 +38,8 @@ export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnL
           onClick();
         }
       }}
-      className={`glass-panel p-2 transition-all hover:bg-sumi-high ${
-        isMyTurn ? 'ring-2 ring-kaya' : isActive ? 'ring-2 ring-nibi' : ''
+      className={`glass-panel p-2 transition-all hover:bg-raised ${
+        isMyTurn ? 'ring-2 ring-kaya' : isActive ? 'ring-2 ring-line' : ''
       } ${game.status === 'finished' || game.status === 'interrupted' ? 'opacity-60' : ''}`}
     >
       {/* ミニ碁盤 */}
@@ -83,14 +83,14 @@ export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnL
       {/* 情報 */}
       <div className="mt-2 text-xs text-left space-y-0.5">
         <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-black border border-white/20 inline-block" />
+          <span className="w-2 h-2 rounded-full bg-black border border-line inline-block" />
           <span className="truncate">{blackName}</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-white border border-white/20 inline-block" />
+          <span className="w-2 h-2 rounded-full bg-white border border-line inline-block" />
           <span className="truncate">{whiteName}</span>
         </div>
-        <div className="flex items-center justify-between gap-1 text-nibi">
+        <div className="flex items-center justify-between gap-1 text-muted">
           <span className="tabular">
             {game.status === 'playing'
               ? `${game.moveNumber}手目`
@@ -107,7 +107,7 @@ export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnL
                 if (isTimedOut && !confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')) return;
                 onResume!(game.id);
               }}
-              className="rounded bg-kaya px-1.5 py-0.5 text-[10px] font-bold text-sumi"
+              className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-ink"
             >
               再開
             </button>
@@ -115,7 +115,7 @@ export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnL
         </div>
         {turnLabel && (
           <div className={`inline-flex rounded px-1.5 py-0.5 text-[10px] font-bold ${
-            isMyTurn ? 'bg-kaya text-sumi' : 'bg-sumi-high text-nibi'
+            isMyTurn ? 'bg-accent text-accent-ink' : 'bg-raised text-muted'
           }`}>
             {turnLabel}
           </div>

@@ -507,27 +507,27 @@ export default function ReviewBoard({
             {onBack && (
               <button
                 onClick={onBack}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 rounded-lg text-sm font-semibold transition-colors duration-150"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-raised hover:bg-line border border-line text-ink rounded-lg text-sm font-semibold transition-colors duration-150"
               >
                 <X className="w-4 h-4" /> 閉じてホーム
               </button>
             )}
             <span className="font-bold text-base ml-2">検討モード</span>
-            <span className="text-sm text-zinc-400">
+            <span className="text-sm text-muted">
               {currentMoveNumber}手目
             </span>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsMaximized(!isMaximized)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white rounded-lg text-xs font-semibold transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-raised hover:bg-line border border-line text-ink hover:text-ink rounded-lg text-xs font-semibold transition-all"
             >
               {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
               {/* 生徒側はAI欄が出ないので「チャットを表示」と正しく名乗る */}
               {isMaximized ? (isTeacher ? 'AI・チャットを表示' : 'チャットを表示') : '碁盤を広げる'}
             </button>
             {isTeacher && currentNode.children.length > 1 && (
-              <div className="flex items-center gap-2 text-kaya text-sm">
+              <div className="flex items-center gap-2 text-accent-text text-sm">
                 <GitBranch className="w-4 h-4" />
                 <span>{currentNode.children.length}変化</span>
               </div>
@@ -568,40 +568,40 @@ export default function ReviewBoard({
           <div className="flex flex-col gap-3 w-full items-center">
             {/* ステップ移動 */}
             <div className="flex justify-center gap-2">
-              <button onClick={goToRoot} disabled={!currentNode.parent} className="p-3 glass-panel hover:bg-white/10 disabled:opacity-30">
+              <button onClick={goToRoot} disabled={!currentNode.parent} className="p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
                 <ChevronFirst />
               </button>
-              <button onClick={goBack} disabled={!currentNode.parent} className="p-3 glass-panel hover:bg-white/10 disabled:opacity-30">
+              <button onClick={goBack} disabled={!currentNode.parent} className="p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
                 <ChevronLeft />
               </button>
-              <button onClick={goForward} disabled={currentNode.children.length === 0} className="p-3 glass-panel hover:bg-white/10 disabled:opacity-30">
+              <button onClick={goForward} disabled={currentNode.children.length === 0} className="p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
                 <ChevronRight />
               </button>
-              <button onClick={goLast} disabled={currentNode.children.length === 0} className="p-3 glass-panel hover:bg-white/10 disabled:opacity-30">
+              <button onClick={goLast} disabled={currentNode.children.length === 0} className="p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
                 <ChevronLast />
               </button>
-              <div className="w-px h-8 bg-white/10 mx-1 self-center" />
+              <div className="w-px h-8 bg-ink/8 mx-1 self-center" />
               <button
                 onClick={handleUndo}
                 disabled={!currentNode.parent}
                 title={currentNode.fromRecord
                   ? '棋譜の手は消えません（一手戻ります）'
                   : '検討で置いた直近の一手を取り消す (Delete / Ctrl+Z)'}
-                className="p-3 glass-panel hover:bg-shu/10 hover:text-shu-light disabled:opacity-30"
+                className="p-3 glass-panel hover:bg-alert/10 hover:text-alert-text disabled:opacity-30"
               >
                 <Undo2 />
               </button>
             </div>
 
             {/* アノテーション & 描画ツールバー */}
-            <div className="flex flex-wrap justify-center items-center gap-1.5 p-2 bg-zinc-900/60 border border-zinc-800 rounded-xl max-w-full">
+            <div className="flex flex-wrap justify-center items-center gap-1.5 p-2 bg-ground/60 border border-line rounded-xl max-w-full">
               {/* 着手モード */}
               <button
                 onClick={() => { setToolMode('play'); setDrawMode('off'); }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 ${
                   toolMode === 'play' && drawMode === 'off'
-                    ? 'bg-kaya border-kaya text-sumi'
-                    : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                    ? 'bg-accent border-accent text-accent-ink'
+                    : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="通常の着手を行います (石を置く)"
               >
@@ -609,13 +609,13 @@ export default function ReviewBoard({
                 着手
               </button>
 
-              <div className="w-px h-5 bg-zinc-800 mx-1" />
+              <div className="w-px h-5 bg-raised mx-1" />
 
               {/* 記号マーク */}
               <button
                 onClick={() => { setToolMode('circle'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'circle' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'circle' ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="丸印 (CIR)"
               >
@@ -624,7 +624,7 @@ export default function ReviewBoard({
               <button
                 onClick={() => { setToolMode('triangle'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'triangle' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'triangle' ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="三角印 (TRI)"
               >
@@ -633,7 +633,7 @@ export default function ReviewBoard({
               <button
                 onClick={() => { setToolMode('square'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'square' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'square' ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="四角印 (SQR)"
               >
@@ -642,20 +642,20 @@ export default function ReviewBoard({
               <button
                 onClick={() => { setToolMode('cross'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'cross' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'cross' ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="バツ印 (X)"
               >
                 <X className="w-4 h-4" />
               </button>
 
-              <div className="w-px h-5 bg-zinc-800 mx-1" />
+              <div className="w-px h-5 bg-raised mx-1" />
 
               {/* 文字・数字マーク */}
               <button
                 onClick={() => { setToolMode('alpha'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all flex items-center gap-1 ${
-                  toolMode === 'alpha' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'alpha' ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="アルファベット順ラベル (A, B, C...)"
               >
@@ -665,7 +665,7 @@ export default function ReviewBoard({
               <button
                 onClick={() => { setToolMode('num'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all flex items-center gap-1 ${
-                  toolMode === 'num' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'num' ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="数字順ラベル (1, 2, 3...)"
               >
@@ -673,7 +673,7 @@ export default function ReviewBoard({
                 <span className="text-[10px] font-bold">1-9</span>
               </button>
 
-              <div className="w-px h-5 bg-zinc-800 mx-1" />
+              <div className="w-px h-5 bg-raised mx-1" />
 
               {/* 線・矢印 */}
               <button
@@ -682,7 +682,7 @@ export default function ReviewBoard({
                   setToolMode('play');
                 }}
                 className={`p-2 rounded-lg border transition-all ${
-                  drawMode === 'line' ? 'bg-shu/20 border-shu text-shu-light' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  drawMode === 'line' ? 'bg-alert/15 border-alert text-alert-text' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="フリーハンド直線を描く"
               >
@@ -694,20 +694,20 @@ export default function ReviewBoard({
                   setToolMode('play');
                 }}
                 className={`p-2 rounded-lg border transition-all ${
-                  drawMode === 'arrow' ? 'bg-shu/20 border-shu text-shu-light' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  drawMode === 'arrow' ? 'bg-alert/15 border-alert text-alert-text' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="矢印を描く"
               >
                 <ArrowRightIcon className="w-4 h-4" />
               </button>
 
-              <div className="w-px h-5 bg-zinc-800 mx-1" />
+              <div className="w-px h-5 bg-raised mx-1" />
 
               {/* 消去 */}
               <button
                 onClick={() => { setToolMode('eraser'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'eraser' ? 'bg-shu border-shu text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'eraser' ? 'bg-alert border-alert text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="クリックしたマークを消去"
               >
@@ -716,7 +716,7 @@ export default function ReviewBoard({
               {(drawings.length > 0 || (currentNode.markers && currentNode.markers.length > 0)) && (
                 <button
                   onClick={clearAnnotations}
-                  className="p-2 rounded-lg border border-shu/30 text-zinc-400 hover:text-shu-light hover:bg-shu/10 transition-all ml-1.5"
+                  className="p-2 rounded-lg border border-alert/35 text-muted hover:text-alert-text hover:bg-alert/10 transition-all ml-1.5"
                   title="すべてのマークと描画を消去"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -731,7 +731,7 @@ export default function ReviewBoard({
           <div className="flex justify-center items-center gap-2">
             <button
               onClick={autoReplay.toggle}
-              className={`p-2 glass-panel hover:bg-white/10 ${autoReplay.isPlaying ? 'bg-kaya/15 text-kaya' : ''}`}
+              className={`p-2 glass-panel hover:bg-ink/10 ${autoReplay.isPlaying ? 'bg-accent/15 text-accent-text' : ''}`}
               title={autoReplay.isPlaying ? '停止' : '自動再生'}
             >
               {autoReplay.isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
@@ -743,8 +743,8 @@ export default function ReviewBoard({
                   onClick={() => autoReplay.setSpeed(s.value)}
                   className={`px-2 py-1 text-xs rounded ${
                     autoReplay.speed === s.value
-                      ? 'bg-kaya/15 text-kaya'
-                      : 'bg-white/5 text-zinc-500 hover:bg-white/10'
+                      ? 'bg-accent/15 text-accent-text'
+                      : 'bg-ink/5 text-muted hover:bg-ink/10'
                   }`}
                 >
                   {s.label}
@@ -758,8 +758,8 @@ export default function ReviewBoard({
         {currentNode.comment && (
           <div className="glass-panel px-4 py-3">
             <div className="flex items-start gap-2 text-sm">
-              <MessageSquare className="w-4 h-4 text-zinc-500 mt-0.5 flex-shrink-0" />
-              <div className="text-zinc-300 whitespace-pre-wrap">{currentNode.comment}</div>
+              <MessageSquare className="w-4 h-4 text-muted mt-0.5 flex-shrink-0" />
+              <div className="text-ink whitespace-pre-wrap">{currentNode.comment}</div>
             </div>
           </div>
         )}
@@ -771,7 +771,7 @@ export default function ReviewBoard({
               <button
                 key={idx}
                 onClick={() => goForwardBranch(idx)}
-                className="px-3 py-1 bg-white/5 border border-white/10 rounded text-sm hover:bg-kaya/15"
+                className="px-3 py-1 bg-ink/5 border border-line rounded text-sm hover:bg-accent/15"
               >
                 変化{idx + 1} ({child.move ? (child.move.color === 'BLACK' ? '黒' : '白') : '?'})
               </button>
@@ -816,7 +816,7 @@ export default function ReviewBoard({
                 <button
                   onClick={selectAllStudents}
                   className={`w-full text-sm py-1 rounded-lg transition-all ${
-                    targetStudents?.length === 0 ? 'bg-kaya/15 text-kaya' : 'bg-white/5 hover:bg-white/10'
+                    targetStudents?.length === 0 ? 'bg-accent/15 text-accent-text' : 'bg-ink/5 hover:bg-ink/10'
                   }`}
                 >
                   全員に配信
@@ -829,7 +829,7 @@ export default function ReviewBoard({
                         key={s.identity}
                         onClick={() => toggleStudent(s.identity)}
                         className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
-                          isSelected ? 'bg-kaya/10 text-kaya' : 'bg-white/5 text-zinc-500'
+                          isSelected ? 'bg-accent/12 text-accent-text' : 'bg-ink/5 text-muted'
                         }`}
                       >
                         {s.name || getDisplayName(s.identity, registeredStudents ?? [])}

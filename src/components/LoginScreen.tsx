@@ -145,7 +145,7 @@ export default function LoginScreen({
       <LoginLayout>
         <div className="glass-panel p-6 sm:p-7">
           <div className="flex items-center gap-2 mb-5">
-            <Lock className="w-4 h-4 text-nibi" />
+            <Lock className="w-4 h-4 text-muted" />
             <h2 className="text-base font-semibold">先生ログイン</h2>
           </div>
 
@@ -178,7 +178,7 @@ export default function LoginScreen({
               />
             </div>
 
-            {teacherError && <p className="text-shu text-sm">{teacherError}</p>}
+            {teacherError && <p className="text-alert-text text-sm">{teacherError}</p>}
 
             <button data-testid="teacher-login-button" type="submit" disabled={submitting} className="premium-button w-full disabled:opacity-60">
               {submitting ? '確認中...' : 'ログイン'}
@@ -198,7 +198,7 @@ export default function LoginScreen({
 
           <button
             onClick={() => { setMode('student'); setTeacherError(''); setTeacherPw(''); }}
-            className="mt-5 flex items-center gap-1 text-sm text-nibi hover:text-kinari"
+            className="mt-5 flex items-center gap-1 text-sm text-muted hover:text-ink"
           >
             <ArrowLeft className="w-4 h-4" /> 戻る
           </button>
@@ -221,33 +221,33 @@ export default function LoginScreen({
               onClick={() => setShowDropdown(!showDropdown)}
               className="field-input flex items-center justify-between text-left"
             >
-              <span className={selectedAccount ? 'text-kinari' : 'text-nibi'}>
+              <span className={selectedAccount ? 'text-ink' : 'text-muted'}>
                 {selectedAccount
                   ? `${selectedAccount.studentName || selectedAccount.studentId}${selectedAccount.classroomName ? ` (${selectedAccount.classroomName})` : ''}`
                   : '保存済みアカウント'}
               </span>
-              <ChevronDown className={`w-4 h-4 text-nibi transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-muted transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
             </button>
 
             {showDropdown && (
-              <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-sumi-line bg-sumi-high">
+              <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-line bg-raised">
                 {accounts.map(a => (
                   <div
                     key={`${a.studentId}-${a.classroomId}`}
                     onClick={() => handleSelectAccount(a)}
-                    className="flex cursor-pointer items-center justify-between px-4 py-3 hover:bg-sumi-line"
+                    className="flex cursor-pointer items-center justify-between px-4 py-3 hover:bg-line"
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">
                         {a.studentName || a.studentId}
                       </p>
                       {a.classroomName && (
-                        <p className="text-xs text-nibi truncate">{a.classroomName}</p>
+                        <p className="text-xs text-muted truncate">{a.classroomName}</p>
                       )}
                     </div>
                     <button
                       onClick={(e) => handleDeleteAccount(e, a)}
-                      className="p-1 text-nibi hover:text-shu shrink-0"
+                      className="p-1 text-muted hover:text-alert-text shrink-0"
                       aria-label={`${a.studentName || a.studentId} を削除`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -256,7 +256,7 @@ export default function LoginScreen({
                 ))}
                 <div
                   onClick={handleNewAccount}
-                  className="flex cursor-pointer items-center gap-2 border-t border-sumi-line px-4 py-3 text-kaya hover:bg-sumi-line"
+                  className="flex cursor-pointer items-center gap-2 border-t border-line px-4 py-3 text-accent-text hover:bg-line"
                 >
                   <Plus className="w-4 h-4" />
                   <span className="text-sm">新しいアカウントを追加</span>
@@ -291,13 +291,13 @@ export default function LoginScreen({
               className="field-input tabular"
             />
             {selectedAccount?.classroomName && classroomId === selectedAccount.classroomId && (
-              <p className="mt-2 text-sm text-nibi">
-                接続先: <span className="font-medium text-kinari">{selectedAccount.classroomName}</span>
+              <p className="mt-2 text-sm text-muted">
+                接続先: <span className="font-medium text-ink">{selectedAccount.classroomName}</span>
               </p>
             )}
           </div>
 
-          {error && <p className="text-shu text-sm">{error}</p>}
+          {error && <p className="text-alert-text text-sm">{error}</p>}
 
           <button data-testid="student-login-button" type="submit" disabled={submitting} className="premium-button w-full disabled:opacity-60">
             {submitting ? '確認中...' : selectedAccount?.classroomName ? `${selectedAccount.classroomName} に参加` : '参加する'}
@@ -309,7 +309,7 @@ export default function LoginScreen({
         <button
           data-testid="teacher-mode-link"
           onClick={() => setMode('teacher')}
-          className="text-sm text-nibi hover:text-kinari"
+          className="text-sm text-muted hover:text-ink"
         >
           先生としてログイン →
         </button>
@@ -318,7 +318,7 @@ export default function LoginScreen({
           <button
             type="button"
             onClick={handleInstallClick}
-            className="flex items-center gap-1.5 text-sm text-nibi hover:text-kinari"
+            className="flex items-center gap-1.5 text-sm text-muted hover:text-ink"
           >
             <Download className="w-3.5 h-3.5" />
             {pwaInstall.isIos && !pwaInstall.canInstall ? 'ホーム画面に追加' : 'アプリをインストール'}
@@ -331,7 +331,7 @@ export default function LoginScreen({
         折り畳んでおく（「データインポート」が最初の画面に露出していた状態を解消）。
       */}
       <details className="mt-5">
-        <summary className="cursor-pointer list-none text-xs text-nibi hover:text-kinari [&::-webkit-details-marker]:hidden">
+        <summary className="cursor-pointer list-none text-xs text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
           うまく入れないとき
         </summary>
         <div className="mt-3 flex flex-col items-start gap-3">
@@ -356,7 +356,7 @@ export default function LoginScreen({
             };
             input.click();
           }}
-          className="text-xs text-nibi underline hover:text-kinari"
+          className="text-xs text-muted underline hover:text-ink"
         >
           データインポート（JSON）
         </button>
@@ -404,7 +404,7 @@ export default function LoginScreen({
             // 4. 強制リロード (サーバーから最新アセットを再取得)
             window.location.reload();
           }}
-          className="flex items-center gap-1.5 rounded-lg border border-sumi-line bg-sumi-high px-3 py-1.5 text-xs text-nibi transition-colors duration-150 hover:text-kinari"
+          className="flex items-center gap-1.5 rounded-lg border border-line bg-raised px-3 py-1.5 text-xs text-muted transition-colors duration-150 hover:text-ink"
         >
           <RefreshCw className="w-3.5 h-3.5" /> 接続・キャッシュをリセット
         </button>
@@ -431,7 +431,7 @@ function LoginLayout({ children }: { children: ReactNode }) {
         <div className="flex w-full flex-col gap-9 lg:flex-row lg:items-start lg:justify-between lg:gap-12">
           <div className="lg:flex-1 lg:pt-1">
             <h1 className="heading-hero">三村囲碁オンライン</h1>
-            <p className="mt-2 text-nibi">ログインだけで、仲間に会える。</p>
+            <p className="mt-2 text-muted">ログインだけで、仲間に会える。</p>
           </div>
 
           <div className="w-full lg:w-[21rem] lg:shrink-0">{children}</div>
@@ -443,7 +443,7 @@ function LoginLayout({ children }: { children: ReactNode }) {
 
 function BuildStamp() {
   return (
-    <div className="mt-6 select-none font-mono text-[10px] text-nibi/50">
+    <div className="mt-6 select-none font-mono text-[10px] text-muted/60">
       Build: {__BUILD_TIME__} ({__COMMIT_HASH__})
     </div>
   );

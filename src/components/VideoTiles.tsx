@@ -41,7 +41,7 @@ function VideoTile({
         ref={containerRef}
         className={`w-[120px] h-[90px] bg-black/30 rounded-lg overflow-hidden [&>video]:w-full [&>video]:h-full [&>video]:object-cover [&>video]:rounded-lg ${isLocal ? '[&>video]:scale-x-[-1]' : ''}`}
       />
-      <span className="text-xs text-zinc-400 truncate max-w-[120px]">
+      <span className="text-xs text-muted truncate max-w-[120px]">
         {label}{isLocal ? ' (自分)' : ''}
       </span>
     </div>

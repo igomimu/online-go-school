@@ -100,17 +100,17 @@ export default function Lobby({
         <div className="glass-panel border-l-2 border-l-kaya p-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="min-w-0">
-              <p className="text-xs tracking-widest text-nibi">入室中</p>
+              <p className="text-xs tracking-widest text-muted">入室中</p>
               <h2 className="mt-1 truncate text-2xl font-bold sm:text-3xl">
                 {currentClassroomName}
               </h2>
-              <p className="mt-2 text-sm text-nibi">
+              <p className="mt-2 text-sm text-muted">
                 先生がレッスンを始めるのを待ってください
               </p>
             </div>
             {currentStudentName && (
               <div className="shrink-0 text-right">
-                <p className="text-xs text-nibi">ようこそ</p>
+                <p className="text-xs text-muted">ようこそ</p>
                 <p className="mt-0.5 text-lg font-semibold">
                   {currentStudentName} さん
                 </p>
@@ -128,8 +128,8 @@ export default function Lobby({
           <div className="glass-panel border-l-2 border-l-kaya p-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-kaya">対局中</h3>
-                <p className="text-sm text-nibi">
+                <h3 className="font-semibold text-accent-text">対局中</h3>
+                <p className="text-sm text-muted">
                   {getDisplayName(myGame.blackPlayer, students)} vs {getDisplayName(myGame.whitePlayer, students)}（<span className="tabular">{myGame.moveNumber}</span>手目）
                 </p>
               </div>
@@ -151,7 +151,7 @@ export default function Lobby({
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold">中断された対局があります</h3>
-                <p className="text-sm text-nibi">
+                <p className="text-sm text-muted">
                   {getDisplayName(mySuspendedGame.blackPlayer, students)} vs {getDisplayName(mySuspendedGame.whitePlayer, students)}（<span className="tabular">{mySuspendedGame.moveNumber}</span>手目）
                 </p>
               </div>
@@ -230,7 +230,7 @@ export default function Lobby({
         )}
 
         {games.length === 0 && (
-          <div className="glass-panel p-8 text-nibi">
+          <div className="glass-panel p-8 text-muted">
             {role === 'TEACHER'
               ? '「対局を作成」で生徒同士の対局を組めます'
               : '先生が対局を作成するのをお待ちください'}
@@ -246,14 +246,14 @@ export default function Lobby({
             <h3 className="heading-section flex items-center gap-2">
               <Link className="w-4 h-4" /> 参加リンク
             </h3>
-            <div className="max-h-16 overflow-y-auto break-all rounded-lg bg-sumi p-2 font-mono text-xs text-nibi">
+            <div className="max-h-16 overflow-y-auto break-all rounded-lg bg-ground p-2 font-mono text-xs text-muted">
               {studentJoinInfo}
             </div>
             <button
               onClick={() => copyToClipboard(studentJoinInfo)}
               className="secondary-button w-full flex items-center justify-center gap-2 text-sm"
             >
-              {copied ? <Check className="w-4 h-4 text-kaya" /> : <Copy className="w-4 h-4" />}
+              {copied ? <Check className="w-4 h-4 text-accent-text" /> : <Copy className="w-4 h-4" />}
               {copied ? 'コピー済み' : 'リンクをコピー'}
             </button>
           </div>
@@ -293,21 +293,21 @@ export default function Lobby({
                 <div
                   key={p.identity}
                   className={`flex items-center justify-between rounded-lg border px-3 py-1.5 text-sm ${
-                    isSpeaking ? 'border-kaya/50 bg-sumi-high' : 'border-transparent bg-sumi-high'
+                    isSpeaking ? 'border-accent/45 bg-raised' : 'border-transparent bg-raised'
                   }`}
                 >
                   <div className="flex min-w-0 items-center gap-1.5">
                     <span className={`truncate ${isLocal ? 'font-semibold' : ''}`}>
                       {name}
-                      {isLocal && <span className="ml-1 text-nibi">(自分)</span>}
+                      {isLocal && <span className="ml-1 text-muted">(自分)</span>}
                     </span>
                     {registered?.rank && (
-                      <span className="tabular shrink-0 rounded border border-sumi-line px-1 py-0.5 text-xs text-nibi">
+                      <span className="tabular shrink-0 rounded border border-line px-1 py-0.5 text-xs text-muted">
                         {registered.rank}
                       </span>
                     )}
                   </div>
-                  <span className={`ml-1 shrink-0 text-xs ${inGame ? 'text-kaya' : 'text-nibi'}`}>
+                  <span className={`ml-1 shrink-0 text-xs ${inGame ? 'text-accent-text' : 'text-muted'}`}>
                     {inGame ? '対局中' : '待機中'}
                   </span>
                 </div>

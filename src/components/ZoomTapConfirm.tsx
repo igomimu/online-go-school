@@ -24,8 +24,8 @@ export default function ZoomTapConfirm({ boardState, boardSize, x, y, color, onC
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between shrink-0">
-          <span className="text-sm text-zinc-400">タップして着手を確定</span>
-          <button onClick={onCancel} className="text-zinc-500 hover:text-white">
+          <span className="text-sm text-muted">タップして着手を確定</span>
+          <button onClick={onCancel} className="text-muted hover:text-ink">
             <X className="w-5 h-5" />
           </button>
         </div>

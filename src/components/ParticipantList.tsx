@@ -23,14 +23,14 @@ export default function ParticipantList({
           <div
             key={p.identity}
             className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm ${
-              isSpeaking ? 'bg-kinari/10 border border-kinari/25' : 'bg-white/5 border border-transparent'
+              isSpeaking ? 'bg-ink/8 border border-ink/25' : 'bg-ink/5 border border-transparent'
             }`}
           >
             <span className={isLocal ? 'font-semibold' : ''}>
               {p.name || '参加者'}
-              {isLocal && <span className="text-zinc-500 ml-1">(you)</span>}
+              {isLocal && <span className="text-muted ml-1">(you)</span>}
             </span>
-            <span className={p.audioEnabled ? 'text-kinari' : 'text-zinc-600'}>
+            <span className={p.audioEnabled ? 'text-ink' : 'text-muted/75'}>
               {p.audioEnabled ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
             </span>
           </div>

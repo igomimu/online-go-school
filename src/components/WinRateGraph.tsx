@@ -45,7 +45,7 @@ export default function WinRateGraph({
 
   return (
     <div className="glass-panel p-2">
-      <div className="text-xs text-zinc-500 mb-1">勝率グラフ</div>
+      <div className="text-xs text-muted mb-1">勝率グラフ</div>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="w-full h-auto cursor-pointer"

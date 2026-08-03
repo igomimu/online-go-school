@@ -79,14 +79,14 @@ export default function ProblemImporter({ onImport }: ProblemImporterProps) {
 
   return (
     <div
-      className="border-2 border-dashed border-white/10 rounded-lg p-4 text-center hover:border-kaya/40 transition-colors cursor-pointer"
+      className="border-2 border-dashed border-line rounded-lg p-4 text-center hover:border-accent/40 transition-colors cursor-pointer"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onClick={() => fileRef.current?.click()}
     >
-      <Upload className="w-6 h-6 mx-auto mb-2 text-zinc-600" />
-      <div className="text-sm text-zinc-500">SGFファイルをドラッグ&ドロップ</div>
-      <div className="text-xs text-zinc-700 mt-1">またはクリックして選択</div>
+      <Upload className="w-6 h-6 mx-auto mb-2 text-muted/75" />
+      <div className="text-sm text-muted">SGFファイルをドラッグ&ドロップ</div>
+      <div className="text-xs text-muted/60 mt-1">またはクリックして選択</div>
       <input
         ref={fileRef}
         type="file"

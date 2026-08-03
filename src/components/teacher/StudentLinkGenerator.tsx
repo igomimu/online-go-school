@@ -54,7 +54,7 @@ export default function StudentLinkGenerator({ students, classroomId, onClose }:
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
     }}>
       <div style={{
-        background: '#201d17', border: '2px solid #302c24', padding: 16,
+        background: 'var(--color-raised)', border: '1px solid var(--color-line)', padding: 16,
         width: 700, maxHeight: '80vh', display: 'flex', flexDirection: 'column',
         fontSize: 12,
       }}>
@@ -64,8 +64,8 @@ export default function StudentLinkGenerator({ students, classroomId, onClose }:
             <button
               onClick={() => setShowMode(showMode === 'id' ? 'link' : 'id')}
               style={{
-                padding: '3px 12px', border: '1px solid #302c24',
-                background: '#e0e0d8', cursor: 'pointer', fontSize: 12,
+                padding: '3px 12px', border: '1px solid var(--color-line)',
+                background: 'var(--color-raised)', color: 'var(--color-ink)', cursor: 'pointer', fontSize: 12,
               }}
             >
               {showMode === 'id' ? 'リンク表示' : 'ID表示'}
@@ -73,8 +73,8 @@ export default function StudentLinkGenerator({ students, classroomId, onClose }:
             <button
               onClick={copyAll}
               style={{
-                padding: '3px 12px', border: '1px solid #302c24',
-                background: copiedId === '__all__' ? '#d6b279' : '#26231c',
+                padding: '3px 12px', border: '1px solid var(--color-line)',
+                background: copiedId === '__all__' ? 'var(--color-accent)' : 'var(--color-raised)',
                 cursor: 'pointer', fontSize: 12,
               }}
             >
@@ -83,8 +83,8 @@ export default function StudentLinkGenerator({ students, classroomId, onClose }:
             <button
               onClick={onClose}
               style={{
-                padding: '3px 12px', border: '1px solid #302c24',
-                background: '#26231c', cursor: 'pointer', fontSize: 12,
+                padding: '3px 12px', border: '1px solid var(--color-line)',
+                background: 'var(--color-raised)', cursor: 'pointer', fontSize: 12,
               }}
             >
               閉じる
@@ -93,7 +93,7 @@ export default function StudentLinkGenerator({ students, classroomId, onClose }:
         </div>
 
         {classroomId && (
-          <div style={{ background: '#1d1b16', padding: '4px 8px', marginBottom: 8, border: '1px solid #302c24' }}>
+          <div style={{ background: 'var(--color-surface)', padding: '4px 8px', marginBottom: 8, border: '1px solid var(--color-line)' }}>
             教室ID: <strong>{classroomId}</strong>
           </div>
         )}
@@ -101,29 +101,29 @@ export default function StudentLinkGenerator({ students, classroomId, onClose }:
         <div style={{ overflowY: 'auto', flex: 1 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: '#26231c' }}>
-                <th style={{ border: '1px solid #302c24', padding: '2px 6px', textAlign: 'left' }}>生徒名</th>
-                <th style={{ border: '1px solid #302c24', padding: '2px 6px', textAlign: 'left' }}>棋力</th>
-                <th style={{ border: '1px solid #302c24', padding: '2px 6px', textAlign: 'left' }}>
+              <tr style={{ background: 'var(--color-raised)' }}>
+                <th style={{ border: '1px solid var(--color-line)', padding: '2px 6px', textAlign: 'left' }}>生徒名</th>
+                <th style={{ border: '1px solid var(--color-line)', padding: '2px 6px', textAlign: 'left' }}>棋力</th>
+                <th style={{ border: '1px solid var(--color-line)', padding: '2px 6px', textAlign: 'left' }}>
                   {showMode === 'id' ? '生徒ID' : 'リンク'}
                 </th>
-                <th style={{ border: '1px solid #302c24', padding: '2px 6px', textAlign: 'center', width: 80 }}>操作</th>
+                <th style={{ border: '1px solid var(--color-line)', padding: '2px 6px', textAlign: 'center', width: 80 }}>操作</th>
               </tr>
             </thead>
             <tbody>
               {students.map(s => (
-                <tr key={s.id} style={{ background: copiedId === s.id ? '#2a2419' : '#15140f' }}>
-                  <td style={{ border: '1px solid #302c24', padding: '2px 6px' }}>{s.name}</td>
-                  <td style={{ border: '1px solid #302c24', padding: '2px 6px' }}>{s.rank || ''}</td>
-                  <td style={{ border: '1px solid #302c24', padding: '2px 6px', fontSize: 11, wordBreak: 'break-all' }}>
+                <tr key={s.id} style={{ background: copiedId === s.id ? 'color-mix(in oklab, var(--color-accent) 16%, var(--color-surface))' : 'var(--color-ground)' }}>
+                  <td style={{ border: '1px solid var(--color-line)', padding: '2px 6px' }}>{s.name}</td>
+                  <td style={{ border: '1px solid var(--color-line)', padding: '2px 6px' }}>{s.rank || ''}</td>
+                  <td style={{ border: '1px solid var(--color-line)', padding: '2px 6px', fontSize: 11, wordBreak: 'break-all' }}>
                     {showMode === 'id' ? s.id : makeLink(s)}
                   </td>
-                  <td style={{ border: '1px solid #302c24', padding: '2px 6px', textAlign: 'center' }}>
+                  <td style={{ border: '1px solid var(--color-line)', padding: '2px 6px', textAlign: 'center' }}>
                     <button
                       onClick={() => showMode === 'id' ? copyIdPair(s) : copyLink(s)}
                       style={{
-                        padding: '1px 8px', border: '1px solid #302c24',
-                        background: copiedId === s.id ? '#d6b279' : '#1d1b16',
+                        padding: '1px 8px', border: '1px solid var(--color-line)',
+                        background: copiedId === s.id ? 'var(--color-accent)' : 'var(--color-surface)',
                         cursor: 'pointer', fontSize: 11,
                       }}
                     >
@@ -135,7 +135,7 @@ export default function StudentLinkGenerator({ students, classroomId, onClose }:
             </tbody>
           </table>
           {students.length === 0 && (
-            <div style={{ textAlign: 'center', padding: 16, color: '#9a9285' }}>
+            <div style={{ textAlign: 'center', padding: 16, color: 'var(--color-muted)' }}>
               生徒が登録されていません
             </div>
           )}

@@ -393,7 +393,7 @@ export default function LectureBoard({
         <div className="glass-panel px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {onBack && (
-              <button onClick={onBack} className="text-zinc-500 hover:text-white text-sm">
+              <button onClick={onBack} className="text-muted hover:text-ink text-sm">
                 &larr; ロビーに戻る
               </button>
             )}
@@ -405,7 +405,7 @@ export default function LectureBoard({
         {/* 碁盤 */}
         <div className="glass-panel p-4 flex justify-center items-center shadow-2xl relative lg:flex-1 lg:min-h-0 overflow-hidden">
           {isTeacher && currentNode.children.length > 1 && (
-            <div className="absolute top-4 right-4 flex items-center gap-2 bg-kaya/15 px-3 py-1 rounded-full text-kaya text-sm">
+            <div className="absolute top-4 right-4 flex items-center gap-2 bg-accent/15 px-3 py-1 rounded-full text-accent-text text-sm">
               <GitBranch className="w-4 h-4" />
               <span>{currentNode.children.length}変化</span>
             </div>
@@ -434,40 +434,40 @@ export default function LectureBoard({
           <div className="flex flex-col gap-3 w-full items-center">
             {/* ステップ移動 */}
             <div className="flex justify-center gap-2">
-              <button onClick={goToRoot} disabled={!currentNode.parent} className="p-3 glass-panel hover:bg-white/10 disabled:opacity-30">
+              <button onClick={goToRoot} disabled={!currentNode.parent} className="p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
                 <ChevronFirst />
               </button>
-              <button onClick={goBack} disabled={!currentNode.parent} className="p-3 glass-panel hover:bg-white/10 disabled:opacity-30">
+              <button onClick={goBack} disabled={!currentNode.parent} className="p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
                 <ChevronLeft />
               </button>
-              <button onClick={goForward} disabled={currentNode.children.length === 0} className="p-3 glass-panel hover:bg-white/10 disabled:opacity-30">
+              <button onClick={goForward} disabled={currentNode.children.length === 0} className="p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
                 <ChevronRight />
               </button>
-              <button onClick={goLast} disabled={currentNode.children.length === 0} className="p-3 glass-panel hover:bg-white/10 disabled:opacity-30">
+              <button onClick={goLast} disabled={currentNode.children.length === 0} className="p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
                 <ChevronLast />
               </button>
-              <div className="w-px h-8 bg-white/10 mx-1 self-center" />
+              <div className="w-px h-8 bg-ink/8 mx-1 self-center" />
               <button
                 onClick={handleUndo}
                 disabled={!currentNode.parent}
                 title={currentNode.fromRecord
                   ? '棋譜の手は消えません（一手戻ります）'
                   : '解説で置いた直近の一手を取り消す (Delete / Ctrl+Z)'}
-                className="p-3 glass-panel hover:bg-shu/10 hover:text-shu-light disabled:opacity-30"
+                className="p-3 glass-panel hover:bg-alert/10 hover:text-alert-text disabled:opacity-30"
               >
                 <Undo2 />
               </button>
             </div>
 
             {/* アノテーション & 描画ツールバー */}
-            <div className="flex flex-wrap justify-center items-center gap-1.5 p-2 bg-zinc-900/60 border border-zinc-800 rounded-xl max-w-full">
+            <div className="flex flex-wrap justify-center items-center gap-1.5 p-2 bg-ground/60 border border-line rounded-xl max-w-full">
               {/* 着手モード */}
               <button
                 onClick={() => { setToolMode('play'); setDrawMode('off'); }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 ${
                   toolMode === 'play' && drawMode === 'off'
-                    ? 'bg-kaya border-kaya text-sumi'
-                    : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                    ? 'bg-accent border-accent text-accent-ink'
+                    : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="通常の着手を行います (石を置く)"
               >
@@ -475,13 +475,13 @@ export default function LectureBoard({
                 着手
               </button>
 
-              <div className="w-px h-5 bg-zinc-800 mx-1" />
+              <div className="w-px h-5 bg-raised mx-1" />
 
               {/* 記号マーク */}
               <button
                 onClick={() => { setToolMode('circle'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'circle' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'circle' ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="丸印 (CIR)"
               >
@@ -490,7 +490,7 @@ export default function LectureBoard({
               <button
                 onClick={() => { setToolMode('triangle'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'triangle' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'triangle' ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="三角印 (TRI)"
               >
@@ -499,7 +499,7 @@ export default function LectureBoard({
               <button
                 onClick={() => { setToolMode('square'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'square' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'square' ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="四角印 (SQR)"
               >
@@ -508,20 +508,20 @@ export default function LectureBoard({
               <button
                 onClick={() => { setToolMode('cross'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'cross' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'cross' ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="バツ印 (X)"
               >
                 <X className="w-4 h-4" />
               </button>
 
-              <div className="w-px h-5 bg-zinc-800 mx-1" />
+              <div className="w-px h-5 bg-raised mx-1" />
 
               {/* 文字・数字マーク */}
               <button
                 onClick={() => { setToolMode('alpha'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all flex items-center gap-1 ${
-                  toolMode === 'alpha' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'alpha' ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="アルファベット順ラベル (A, B, C...)"
               >
@@ -531,7 +531,7 @@ export default function LectureBoard({
               <button
                 onClick={() => { setToolMode('num'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all flex items-center gap-1 ${
-                  toolMode === 'num' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'num' ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="数字順ラベル (1, 2, 3...)"
               >
@@ -539,7 +539,7 @@ export default function LectureBoard({
                 <span className="text-[10px] font-bold">1-9</span>
               </button>
 
-              <div className="w-px h-5 bg-zinc-800 mx-1" />
+              <div className="w-px h-5 bg-raised mx-1" />
 
               {/* 線・矢印 */}
               <button
@@ -548,7 +548,7 @@ export default function LectureBoard({
                   setToolMode('play');
                 }}
                 className={`p-2 rounded-lg border transition-all ${
-                  drawMode === 'line' ? 'bg-shu/20 border-shu text-shu-light' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  drawMode === 'line' ? 'bg-alert/15 border-alert text-alert-text' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="フリーハンド直線を描く"
               >
@@ -560,20 +560,20 @@ export default function LectureBoard({
                   setToolMode('play');
                 }}
                 className={`p-2 rounded-lg border transition-all ${
-                  drawMode === 'arrow' ? 'bg-shu/20 border-shu text-shu-light' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  drawMode === 'arrow' ? 'bg-alert/15 border-alert text-alert-text' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="矢印を描く"
               >
                 <ArrowRightIcon className="w-4 h-4" />
               </button>
 
-              <div className="w-px h-5 bg-zinc-800 mx-1" />
+              <div className="w-px h-5 bg-raised mx-1" />
 
               {/* 消去 */}
               <button
                 onClick={() => { setToolMode('eraser'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'eraser' ? 'bg-shu border-shu text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  toolMode === 'eraser' ? 'bg-alert border-alert text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
                 }`}
                 title="クリックしたマークを消去"
               >
@@ -582,7 +582,7 @@ export default function LectureBoard({
               {(drawings.length > 0 || (currentNode.markers && currentNode.markers.length > 0)) && (
                 <button
                   onClick={clearAnnotations}
-                  className="p-2 rounded-lg border border-shu/30 text-zinc-400 hover:text-shu-light hover:bg-shu/10 transition-all ml-1.5"
+                  className="p-2 rounded-lg border border-alert/35 text-muted hover:text-alert-text hover:bg-alert/10 transition-all ml-1.5"
                   title="すべてのマークと描画を消去"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -596,8 +596,8 @@ export default function LectureBoard({
         {currentNode.comment && (
           <div className="glass-panel px-4 py-3">
             <div className="flex items-start gap-2 text-sm">
-              <MessageSquare className="w-4 h-4 text-zinc-500 mt-0.5 flex-shrink-0" />
-              <div className="text-zinc-300 whitespace-pre-wrap">{currentNode.comment}</div>
+              <MessageSquare className="w-4 h-4 text-muted mt-0.5 flex-shrink-0" />
+              <div className="text-ink whitespace-pre-wrap">{currentNode.comment}</div>
             </div>
           </div>
         )}
@@ -607,7 +607,7 @@ export default function LectureBoard({
           <div className="flex justify-center gap-2 overflow-x-auto p-2">
             {currentNode.children.map((child, idx) => (
               <button key={idx} onClick={() => goForwardBranch(idx)}
-                className="px-3 py-1 bg-white/5 border border-white/10 rounded text-sm hover:bg-kaya/15">
+                className="px-3 py-1 bg-ink/5 border border-line rounded text-sm hover:bg-accent/15">
                 変化{idx + 1} ({child.move ? (child.move.color === 'BLACK' ? '黒' : '白') : '?'})
               </button>
             ))}
@@ -622,7 +622,7 @@ export default function LectureBoard({
             <>
           {/* SGF読込 */}
           <div className="glass-panel p-4 space-y-3">
-            <h3 className="heading-section border-b border-white/5 pb-2">SGFライブラリ</h3>
+            <h3 className="heading-section border-b border-line pb-2">SGFライブラリ</h3>
             <input ref={fileInputRef} type="file" accept=".sgf" onChange={handleSgfLoad} className="hidden" />
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -631,20 +631,20 @@ export default function LectureBoard({
               <Upload className="w-4 h-4" /> SGFファイルを読込
             </button>
             {sgfMetadata && (
-              <div className="text-sm bg-white/5 p-3 rounded-xl space-y-1">
+              <div className="text-sm bg-ink/5 p-3 rounded-xl space-y-1">
                 {sgfMetadata.gameName && <div className="font-bold">{sgfMetadata.gameName}</div>}
                 {sgfMetadata.blackName && <div>黒: {sgfMetadata.blackName}</div>}
                 {sgfMetadata.whiteName && <div>白: {sgfMetadata.whiteName}</div>}
-                {sgfMetadata.result && <div className="text-zinc-400">結果: {sgfMetadata.result}</div>}
+                {sgfMetadata.result && <div className="text-muted">結果: {sgfMetadata.result}</div>}
               </div>
             )}
           </div>
 
           {/* 碁盤設定 */}
           <div className="glass-panel p-4 space-y-4">
-            <h3 className="heading-section border-b border-white/5 pb-2">碁盤設定</h3>
+            <h3 className="heading-section border-b border-line pb-2">碁盤設定</h3>
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-zinc-400 text-sm">
+              <div className="flex items-center gap-2 text-muted text-sm">
                 <Grid3X3 className="w-4 h-4" />
                 <span>碁盤サイズ</span>
               </div>
@@ -652,7 +652,7 @@ export default function LectureBoard({
                 {BOARD_SIZES.map((size) => (
                   <button key={size} onClick={() => changeBoardSize(size)}
                     className={`px-2 py-1 rounded-lg text-sm font-medium transition-all ${
-                      boardSize === size ? 'bg-kaya text-sumi' : 'bg-white/5 hover:bg-white/10'
+                      boardSize === size ? 'bg-accent text-accent-ink' : 'bg-ink/5 hover:bg-ink/10'
                     }`}>
                     {size}
                   </button>
@@ -661,14 +661,14 @@ export default function LectureBoard({
             </div>
 
             <div className="flex justify-between items-center text-sm">
-              <span className="text-zinc-400">次の手番</span>
-              <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-xl">
-                <div className={`w-3 h-3 rounded-full border border-white/20 ${derivedNextColor === 'BLACK' ? 'bg-black' : 'bg-white'}`} />
+              <span className="text-muted">次の手番</span>
+              <div className="flex items-center gap-2 bg-ink/5 px-3 py-1.5 rounded-xl">
+                <div className={`w-3 h-3 rounded-full border border-line ${derivedNextColor === 'BLACK' ? 'bg-black' : 'bg-white'}`} />
                 <span className="font-bold text-sm">{derivedNextColor === 'BLACK' ? '黒' : '白'}</span>
               </div>
             </div>
 
-            <button onClick={resetBoard} className="secondary-button w-full text-sm border-shu/20 hover:bg-shu/10 hover:text-shu-light">
+            <button onClick={resetBoard} className="secondary-button w-full text-sm border-alert/25 hover:bg-alert/10 hover:text-alert-text">
               碁盤をリセット
             </button>
           </div>
@@ -676,7 +676,7 @@ export default function LectureBoard({
           {/* 参加生徒リスト */}
           {participants.length > 0 && (
             <div className="glass-panel p-4 space-y-3">
-              <h3 className="heading-section border-b border-white/5 pb-2">
+              <h3 className="heading-section border-b border-line pb-2">
                 参加生徒 ({participants.filter(p => p.identity !== localIdentity).length})
               </h3>
               <div className="space-y-1 max-h-60 overflow-y-auto">
@@ -687,7 +687,7 @@ export default function LectureBoard({
                     return (
                       <div
                         key={p.identity}
-                        className="flex items-center justify-between px-2 py-1.5 rounded bg-white/5 text-sm"
+                        className="flex items-center justify-between px-2 py-1.5 rounded bg-ink/5 text-sm"
                       >
                         <span className="truncate">{name}</span>
                       </div>

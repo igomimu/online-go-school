@@ -145,7 +145,7 @@ export default function StudentManager({
         {/* ヘッダー */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold">生徒・教室管理</h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white">
+          <button onClick={onClose} className="text-muted hover:text-ink">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -157,7 +157,7 @@ export default function StudentManager({
               key={key}
               onClick={() => setTab(key)}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                tab === key ? 'bg-kaya text-sumi' : 'bg-white/5 hover:bg-white/10'
+                tab === key ? 'bg-accent text-accent-ink' : 'bg-ink/5 hover:bg-ink/10'
               }`}
             >
               {label}
@@ -172,13 +172,13 @@ export default function StudentManager({
             <div className="space-y-3">
               <div className="flex gap-2">
                 <div className="flex-1 relative">
-                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-zinc-500" />
+                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-muted" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder="検索..."
-                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-kaya"
+                    className="w-full bg-ink/5 border border-line rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-accent"
                   />
                 </div>
                 <button onClick={startAdd} className="premium-button flex items-center gap-1 text-sm">
@@ -186,35 +186,35 @@ export default function StudentManager({
                 </button>
               </div>
 
-              <div className="text-xs text-zinc-500">{filtered.length}名</div>
+              <div className="text-xs text-muted">{filtered.length}名</div>
 
               <div className="space-y-1">
                 {filtered.map(s => (
-                  <div key={s.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 text-sm">
+                  <div key={s.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-ink/5 text-sm">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-medium truncate">{s.name}</span>
-                      <span className="text-xs text-zinc-500 font-mono shrink-0">{s.studentCode || s.id}</span>
+                      <span className="text-xs text-muted font-mono shrink-0">{s.studentCode || s.id}</span>
                       {s.rank && (
-                        <span className="px-1.5 py-0.5 rounded bg-sumi-high text-nibi text-xs font-mono shrink-0">
+                        <span className="px-1.5 py-0.5 rounded bg-raised text-muted text-xs font-mono shrink-0">
                           {s.rank}
                         </span>
                       )}
                       {s.internalRating && (
-                        <span className="text-xs text-zinc-500 shrink-0">{s.internalRating}</span>
+                        <span className="text-xs text-muted shrink-0">{s.internalRating}</span>
                       )}
                       {resolveGrade(s.birthdate, s.grade) && (
-                        <span className="text-xs text-zinc-500 shrink-0">{resolveGrade(s.birthdate, s.grade)}</span>
+                        <span className="text-xs text-muted shrink-0">{resolveGrade(s.birthdate, s.grade)}</span>
                       )}
                       {s.type && (
-                        <span className="text-xs text-zinc-600 shrink-0">{s.type}</span>
+                        <span className="text-xs text-muted/75 shrink-0">{s.type}</span>
                       )}
                     </div>
                     <div className="flex gap-1 shrink-0 ml-2">
-                      <button onClick={() => startEdit(s)} className="p-1 hover:bg-white/10 rounded">
-                        <Pencil className="w-3.5 h-3.5 text-zinc-400" />
+                      <button onClick={() => startEdit(s)} className="p-1 hover:bg-ink/10 rounded">
+                        <Pencil className="w-3.5 h-3.5 text-muted" />
                       </button>
-                      <button onClick={() => handleDelete(s.id)} className="p-1 hover:bg-shu/20 rounded">
-                        <Trash2 className="w-3.5 h-3.5 text-shu-light" />
+                      <button onClick={() => handleDelete(s.id)} className="p-1 hover:bg-alert/15 rounded">
+                        <Trash2 className="w-3.5 h-3.5 text-alert-text" />
                       </button>
                     </div>
                   </div>
@@ -229,77 +229,77 @@ export default function StudentManager({
               <h3 className="font-bold">{editingStudent ? '生徒を編集' : '生徒を追加'}</h3>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">生徒ID / ログインコード *</label>
+                <label className="block text-sm text-muted mb-1">生徒ID / ログインコード *</label>
                 <input
                   type="text"
                   value={form.studentCode || form.id}
                   onChange={e => setForm(f => ({ ...f, id: e.target.value, studentCode: e.target.value }))}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
+                  className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">名前 *</label>
+                <label className="block text-sm text-muted mb-1">名前 *</label>
                 <input
                   type="text"
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
+                  className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">棋力</label>
+                  <label className="block text-sm text-muted mb-1">棋力</label>
                   <select
                     value={form.rank}
                     onChange={e => setForm(f => ({ ...f, rank: e.target.value }))}
-                    className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
+                    className="w-full bg-ink/5 text-ink border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   >
-                    <option value="" className="bg-zinc-800 text-white">未設定</option>
-                    {RANKS.map(r => <option key={r} value={r} className="bg-zinc-800 text-white">{r}</option>)}
+                    <option value="" className="bg-raised text-ink">未設定</option>
+                    {RANKS.map(r => <option key={r} value={r} className="bg-raised text-ink">{r}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">内部レーティング</label>
+                  <label className="block text-sm text-muted mb-1">内部レーティング</label>
                   <input
                     type="text"
                     value={form.internalRating}
                     onChange={e => setForm(f => ({ ...f, internalRating: e.target.value }))}
                     placeholder="R3"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
+                    className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">種別</label>
+                  <label className="block text-sm text-muted mb-1">種別</label>
                   <select
                     value={form.type}
                     onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
-                    className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
+                    className="w-full bg-ink/5 text-ink border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   >
-                    {TYPES.map(t => <option key={t} value={t} className="bg-zinc-800 text-white">{t || '未設定'}</option>)}
+                    {TYPES.map(t => <option key={t} value={t} className="bg-raised text-ink">{t || '未設定'}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">生年月日</label>
+                  <label className="block text-sm text-muted mb-1">生年月日</label>
                   <input
                     type="date"
                     value={form.birthdate || ''}
                     onChange={e => setForm(f => ({ ...f, birthdate: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
+                    className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">
+                  <label className="block text-sm text-muted mb-1">
                     学年
                     {form.birthdate && (
-                      <span className="ml-2 text-xs text-zinc-500">
+                      <span className="ml-2 text-xs text-muted">
                         （自動: {resolveGrade(form.birthdate, '')}）
                       </span>
                     )}
@@ -308,18 +308,18 @@ export default function StudentManager({
                     value={form.grade}
                     onChange={e => setForm(f => ({ ...f, grade: e.target.value }))}
                     disabled={!!form.birthdate}
-                    className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya disabled:opacity-40"
+                    className="w-full bg-ink/5 text-ink border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent disabled:opacity-40"
                   >
-                    {GRADES.map(g => <option key={g} value={g} className="bg-zinc-800 text-white">{g || '未設定'}</option>)}
+                    {GRADES.map(g => <option key={g} value={g} className="bg-raised text-ink">{g || '未設定'}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">所在地</label>
+                  <label className="block text-sm text-muted mb-1">所在地</label>
                   <input
                     type="text"
                     value={form.country}
                     onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
+                    className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
@@ -351,23 +351,23 @@ export default function StudentManager({
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="font-medium">{c.name}</span>
-                        <span className="text-xs text-zinc-500 ml-2">
+                        <span className="text-xs text-muted ml-2">
                           {memberStudents.length}/{c.maxCapacity}名
                         </span>
                       </div>
                       <button
                         onClick={() => handleDeleteClassroom(c.id)}
-                        className="p-1 hover:bg-shu/20 rounded"
+                        className="p-1 hover:bg-alert/15 rounded"
                       >
-                        <Trash2 className="w-3.5 h-3.5 text-shu-light" />
+                        <Trash2 className="w-3.5 h-3.5 text-alert-text" />
                       </button>
                     </div>
                     {memberStudents.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {memberStudents.map(s => (
-                          <span key={s.id} className="px-2 py-0.5 bg-white/5 rounded text-xs">
+                          <span key={s.id} className="px-2 py-0.5 bg-ink/5 rounded text-xs">
                             {s.name}
-                            {s.rank && <span className="ml-1 text-nibi">{s.rank}</span>}
+                            {s.rank && <span className="ml-1 text-muted">{s.rank}</span>}
                           </span>
                         ))}
                       </div>
@@ -377,7 +377,7 @@ export default function StudentManager({
               })}
 
               {classrooms.length === 0 && (
-                <p className="text-sm text-zinc-500">教室がありません。インポートまたは手動追加してください。</p>
+                <p className="text-sm text-muted">教室がありません。インポートまたは手動追加してください。</p>
               )}
             </div>
           )}
@@ -387,7 +387,7 @@ export default function StudentManager({
             <div className="space-y-4">
               <div className="glass-panel p-4 space-y-3">
                 <h3 className="font-bold text-sm">igocampus XMLインポート</h3>
-                <p className="text-xs text-zinc-400">
+                <p className="text-xs text-muted">
                   igocampusのXMLファイルから生徒・教室データをインポートします。
                   既存データは上書きされます。
                 </p>
@@ -407,15 +407,15 @@ export default function StudentManager({
                 {importResult && (
                   <div className={`text-sm px-3 py-2 rounded-lg ${
                     importResult.startsWith('エラー')
-                      ? 'bg-shu/10 text-shu-light'
-                      : 'bg-kaya/10 text-kaya'
+                      ? 'bg-alert/10 text-alert-text'
+                      : 'bg-accent/12 text-accent-text'
                   }`}>
                     {importResult}
                   </div>
                 )}
               </div>
 
-              <div className="text-xs text-zinc-500 space-y-1">
+              <div className="text-xs text-muted space-y-1">
                 <p>現在のデータ: {students.length}名の生徒、{classrooms.length}教室</p>
               </div>
             </div>

@@ -22,7 +22,7 @@ export default function SavedGameList({ onSelectGame, students = [] }: SavedGame
 
   if (games.length === 0) {
     return (
-      <div className="py-4 text-sm text-nibi">
+      <div className="py-4 text-sm text-muted">
         保存された棋譜はありません
       </div>
     );
@@ -33,30 +33,30 @@ export default function SavedGameList({ onSelectGame, students = [] }: SavedGame
       {games.map(game => (
         <div
           key={game.id}
-          className="flex items-center justify-between rounded-lg bg-sumi-high px-3 py-2 text-sm"
+          className="flex items-center justify-between rounded-lg bg-raised px-3 py-2 text-sm"
         >
           <button
             onClick={() => onSelectGame(game)}
-            className="flex-1 text-left transition-colors hover:text-kaya"
+            className="flex-1 text-left transition-colors hover:text-accent-text"
           >
             <div className="font-medium">
               {getDisplayName(game.blackPlayer, students)} vs {getDisplayName(game.whitePlayer, students)}
             </div>
-            <div className="tabular text-xs text-nibi">
+            <div className="tabular text-xs text-muted">
               {game.date} | {game.boardSize}路 | {game.result}
             </div>
           </button>
           <div className="flex items-center gap-1">
             <button
               onClick={() => onSelectGame(game)}
-              className="p-1 text-nibi hover:text-kaya"
+              className="p-1 text-muted hover:text-accent-text"
               title="検討する"
             >
               <Search className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => handleDelete(game.id)}
-              className="p-1 text-nibi hover:text-shu"
+              className="p-1 text-muted hover:text-alert-text"
               title="削除"
             >
               <Trash2 className="w-3.5 h-3.5" />

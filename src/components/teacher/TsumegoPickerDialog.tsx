@@ -56,20 +56,20 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
       >
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold">詰碁データベースから配信</h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white">
+          <button onClick={onClose} className="text-muted hover:text-ink">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div>
-          <label className="block text-sm text-zinc-400 mb-1.5">レベル</label>
+          <label className="block text-sm text-muted mb-1.5">レベル</label>
           <div className="flex flex-wrap gap-1.5">
             <button
               onClick={() => setLevel(null)}
               className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
                 level === null
-                  ? 'bg-kaya border-kaya text-sumi'
-                  : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
+                  ? 'bg-accent border-accent text-accent-ink'
+                  : 'bg-ink/5 border-line text-muted hover:text-ink'
               }`}
             >
               指定なし
@@ -80,8 +80,8 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
                 onClick={() => setLevel(l)}
                 className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
                   level === l
-                    ? 'bg-kaya border-kaya text-sumi'
-                    : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
+                    ? 'bg-accent border-accent text-accent-ink'
+                    : 'bg-ink/5 border-line text-muted hover:text-ink'
                 }`}
               >
                 {l}
@@ -91,7 +91,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
         </div>
 
         <div>
-          <label className="block text-sm text-zinc-400 mb-1.5">盤サイズ</label>
+          <label className="block text-sm text-muted mb-1.5">盤サイズ</label>
           <div className="flex gap-1.5">
             {BOARD_SIZE_OPTIONS.map((size) => (
               <button
@@ -99,8 +99,8 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
                 onClick={() => setBoardSize(size)}
                 className={`px-3 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
                   boardSize === size
-                    ? 'bg-kaya border-kaya text-sumi'
-                    : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
+                    ? 'bg-accent border-accent text-accent-ink'
+                    : 'bg-ink/5 border-line text-muted hover:text-ink'
                 }`}
               >
                 {size}路
@@ -119,7 +119,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
         </button>
 
         {error && (
-          <div className="text-sm text-shu-light bg-shu/10 border border-shu/20 rounded-lg px-4 py-3">
+          <div className="text-sm text-alert-text bg-alert/10 border border-alert/25 rounded-lg px-4 py-3">
             {error}
           </div>
         )}
@@ -127,8 +127,8 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
         {preview && (
           <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-zinc-300 font-semibold">{preview.title}</span>
-              <span className="text-zinc-500">{preview.correctColor === 'BLACK' ? '黒' : '白'}先</span>
+              <span className="text-ink font-semibold">{preview.title}</span>
+              <span className="text-muted">{preview.correctColor === 'BLACK' ? '黒' : '白'}先</span>
             </div>
             <div className="glass-panel flex justify-center items-center p-2">
               <GoBoard

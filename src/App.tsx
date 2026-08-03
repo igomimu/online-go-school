@@ -1013,27 +1013,27 @@ function App() {
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <Settings className="w-6 h-6" /> LiveKit設定
             </h2>
-            <button onClick={() => setShowSettings(false)} className="text-zinc-500 hover:text-white text-xl">&times;</button>
+            <button onClick={() => setShowSettings(false)} className="text-muted hover:text-ink text-xl">&times;</button>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-zinc-400 mb-1">LiveKitサーバーURL</label>
+              <label className="block text-sm text-muted mb-1">LiveKitサーバーURL</label>
               <input type="text" value={livekitUrl} onChange={e => setLivekitUrl(e.target.value)}
                 placeholder="wss://your-app.livekit.cloud"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-kaya" />
+                className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
             </div>
 
             <div>
-              <label className="block text-sm text-zinc-400 mb-1">ルーム名</label>
+              <label className="block text-sm text-muted mb-1">ルーム名</label>
               <input type="text" value={roomName} onChange={e => setRoomName(e.target.value)}
                 placeholder="go-classroom"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-kaya" />
+                className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
             </div>
           </div>
 
           <button onClick={saveSettings} className="premium-button w-full">設定を保存</button>
-          <p className="text-xs text-zinc-600 text-center">設定はブラウザのlocalStorageに保存されます</p>
+          <p className="text-xs text-muted/75 text-center">設定はブラウザのlocalStorageに保存されます</p>
         </div>
       </div>
     );
@@ -1071,8 +1071,8 @@ function App() {
             <div className="glass-panel p-6 w-full max-w-lg space-y-4">
               <h2 className="text-xl font-bold">LiveKit設定</h2>
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">LiveKit URL</label>
-                <input value={livekitUrl} onChange={e => setLivekitUrl(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-kaya" />
+                <label className="block text-sm text-muted mb-1">LiveKit URL</label>
+                <input value={livekitUrl} onChange={e => setLivekitUrl(e.target.value)} className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
               </div>
 
               <div className="flex gap-3">
@@ -1093,26 +1093,26 @@ function App() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-6">
         <div
-          className="glass-panel p-8 w-full max-w-lg space-y-6 border-kaya/40"
+          className="glass-panel p-8 w-full max-w-lg space-y-6 border-accent/40"
           style={{
             background: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.10))',
           }}
         >
           <div className="text-center space-y-1">
-            <p className="text-xs font-medium text-kaya uppercase tracking-wider">接続先</p>
-            <h2 className="text-2xl font-bold text-white">
+            <p className="text-xs font-medium text-accent-text uppercase tracking-wider">接続先</p>
+            <h2 className="text-2xl font-bold text-ink">
               {currentClassroomName || '教室'}
             </h2>
             {currentStudentName && (
-              <p className="text-sm text-zinc-300">{currentStudentName} さん</p>
+              <p className="text-sm text-ink">{currentStudentName} さん</p>
             )}
           </div>
 
           {connectionState === ConnectionState.Connecting ? (
-            <div className="text-center text-kaya">接続中...</div>
+            <div className="text-center text-accent-text">接続中...</div>
           ) : connectionError ? (
             <div className="space-y-4">
-              <div className="text-shu-light text-sm bg-shu/10 px-3 py-2 rounded-lg">{connectionError}</div>
+              <div className="text-alert-text text-sm bg-alert/10 px-3 py-2 rounded-lg">{connectionError}</div>
               <button
                 onClick={() => {
                   setConnectionError('');
@@ -1124,15 +1124,15 @@ function App() {
               </button>
             </div>
           ) : !hasCredentials ? (
-            <div className="text-center text-zinc-400 space-y-4">
+            <div className="text-center text-muted space-y-4">
               <p>接続情報がありません</p>
-              <p className="text-xs text-zinc-600">先生がまだ教室を開いていない可能性があります</p>
+              <p className="text-xs text-muted/75">先生がまだ教室を開いていない可能性があります</p>
             </div>
           ) : (
-            <div className="text-center text-zinc-400">準備中...</div>
+            <div className="text-center text-muted">準備中...</div>
           )}
 
-          <button onClick={handleDisconnect} className="text-zinc-600 hover:text-zinc-400 text-sm w-full text-center">
+          <button onClick={handleDisconnect} className="text-muted/75 hover:text-muted text-sm w-full text-center">
             戻る
           </button>
         </div>
@@ -1235,14 +1235,14 @@ function App() {
 
       {/* 接続エラー */}
       {!isBoardFocusMode && connectionError && (
-        <div className="bg-shu/20 border border-shu/30 text-shu-light px-4 py-2 rounded-xl text-sm">
+        <div className="bg-alert/15 border border-alert/35 text-alert-text px-4 py-2 rounded-xl text-sm">
           {connectionError}
         </div>
       )}
 
       {/* オーディオデバッグ */}
       {!isBoardFocusMode && audioDebug && (
-        <div className="bg-kaya/15 border border-kaya/30 text-kaya px-4 py-2 rounded-xl text-sm flex items-center gap-3">
+        <div className="bg-accent/15 border border-accent/35 text-accent-text px-4 py-2 rounded-xl text-sm flex items-center gap-3">
           <span className="flex-1 text-xs">
             {import.meta.env.DEV ? audioDebug : '音声が聞こえない場合は「音声を開始」を押してください'}
           </span>
@@ -1260,7 +1260,7 @@ function App() {
                 setAudioDebug(prev => prev + ` [エラー: ${e}]`);
               }
             }}
-            className="px-3 py-1 bg-kaya hover:bg-kaya/85 text-sumi font-bold rounded-lg text-xs whitespace-nowrap transition-colors duration-150"
+            className="px-3 py-1 bg-accent hover:bg-accent/85 text-accent-ink font-bold rounded-lg text-xs whitespace-nowrap transition-colors duration-150"
           >
             音声を開始
           </button>
@@ -1342,7 +1342,7 @@ function App() {
 
         {/* 対局画面 */}
         {effectiveViewMode === 'game' && activeGameId && (
-          <div className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto p-2 sm:p-4">
+          <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4">
             <GameBoard
               gameId={activeGameId}
               myIdentity={classroomRef.current?.localIdentity ?? userName}
@@ -1377,7 +1377,7 @@ function App() {
 
         {/* 検討モード */}
         {effectiveViewMode === 'review' && reviewRootNode && reviewCurrentNode && (
-          <div className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto lg:overflow-hidden p-2 sm:p-4">
+          <div className="fixed inset-0 z-50 bg-ground overflow-y-auto lg:overflow-hidden p-2 sm:p-4">
             <ReviewBoard
               rootNode={reviewRootNode}
               currentNode={reviewCurrentNode}
@@ -1400,7 +1400,7 @@ function App() {
 
         {/* 詰碁モード: 先生は一緒に解くのではなく、生徒の解答状況を見るモニター画面 */}
         {effectiveViewMode === 'problem' && activeProblem && role === 'TEACHER' && (
-          <div className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto p-2 sm:p-4">
+          <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4">
             <ProblemMonitorPanel
               problem={activeProblem}
               students={students}
@@ -1414,7 +1414,7 @@ function App() {
 
         {/* 詰碁モード（生徒） */}
         {effectiveViewMode === 'problem' && activeProblem && role === 'STUDENT' && (
-          <div className="fixed inset-0 z-50 bg-zinc-950 overflow-y-auto p-2 sm:p-4">
+          <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4">
             <ProblemBoard
               problem={activeProblem}
               onBack={() => {

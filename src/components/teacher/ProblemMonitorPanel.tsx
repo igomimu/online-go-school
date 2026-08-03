@@ -89,16 +89,16 @@ export default function ProblemMonitorPanel({
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 rounded-lg text-sm font-semibold transition-colors duration-150 shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-raised hover:bg-line border border-line text-ink rounded-lg text-sm font-semibold transition-colors duration-150 shrink-0"
           >
             <X className="w-4 h-4" /> 配信終了
           </button>
           <span className="font-bold">{problem.title || '詰碁'}</span>
           {problem.difficulty && (
-            <span className="text-xs text-zinc-500 bg-white/5 px-2 py-0.5 rounded">{problem.difficulty}</span>
+            <span className="text-xs text-muted bg-ink/5 px-2 py-0.5 rounded">{problem.difficulty}</span>
           )}
         </div>
-        <div className="text-sm text-zinc-400">
+        <div className="text-sm text-muted">
           正解 {correctCount}/{connectedCount}名
         </div>
       </div>
@@ -118,29 +118,29 @@ export default function ProblemMonitorPanel({
         {/* 生徒一覧: 解答状況 */}
         <div className="glass-panel w-72 shrink-0 overflow-y-auto p-2 space-y-1">
           {rows.length === 0 && (
-            <div className="text-sm text-zinc-500 text-center py-4">生徒がいません</div>
+            <div className="text-sm text-muted text-center py-4">生徒がいません</div>
           )}
           {rows.map(row => (
             <div
               key={row.identity}
               data-testid="problem-monitor-row"
               className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm ${
-                row.isConnected ? 'bg-white/5' : 'bg-white/[0.02] text-zinc-600'
+                row.isConnected ? 'bg-ink/5' : 'bg-ink/[0.03] text-muted/75'
               }`}
             >
               <span className="truncate">{row.displayName}</span>
               {row.result === 'correct' && (
-                <span data-testid="problem-monitor-status" className="flex items-center gap-1 text-kaya font-bold shrink-0">
+                <span data-testid="problem-monitor-status" className="flex items-center gap-1 text-accent-text font-bold shrink-0">
                   <Check className="w-4 h-4" /> {row.moveCount}手
                 </span>
               )}
               {row.result === 'incorrect' && (
-                <span data-testid="problem-monitor-status" className="flex items-center gap-1 text-shu-light font-bold shrink-0">
+                <span data-testid="problem-monitor-status" className="flex items-center gap-1 text-alert-text font-bold shrink-0">
                   <X className="w-4 h-4" /> 不正解
                 </span>
               )}
               {row.result === null && row.isConnected && (
-                <span data-testid="problem-monitor-status" className="flex items-center gap-1 text-zinc-400 shrink-0">
+                <span data-testid="problem-monitor-status" className="flex items-center gap-1 text-muted shrink-0">
                   <Clock className="w-4 h-4" /> 挑戦中
                 </span>
               )}

@@ -118,17 +118,17 @@ export default function GameCreationDialog({
       <div className="glass-panel p-6 w-full max-w-md space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">対局作成</h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white">
+          <button onClick={onClose} className="text-muted hover:text-ink">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* 黒番 */}
         <div>
-          <label className="block text-sm text-zinc-400 mb-1">
+          <label className="block text-sm text-muted mb-1">
             黒番
             {getRank(blackPlayer) && (
-              <span className="ml-2 px-1.5 py-0.5 rounded bg-sumi-high text-nibi text-xs font-mono">
+              <span className="ml-2 px-1.5 py-0.5 rounded bg-raised text-muted text-xs font-mono">
                 {getRank(blackPlayer)}
               </span>
             )}
@@ -137,12 +137,12 @@ export default function GameCreationDialog({
             data-testid="black-player-select"
             value={blackPlayer}
             onChange={e => setBlackPlayer(e.target.value)}
-            className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-kaya"
+            className="w-full bg-ink/5 text-ink border border-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
           >
             {allPlayers.map(p => {
               const rank = getRank(p);
               return (
-                <option key={p} value={p} className="bg-zinc-800 text-white">
+                <option key={p} value={p} className="bg-raised text-ink">
                   {displayName(p)}{p === teacherName ? '（先生）' : ''}{rank ? ` [${rank}]` : ''}
                 </option>
               );
@@ -152,10 +152,10 @@ export default function GameCreationDialog({
 
         {/* 白番 */}
         <div>
-          <label className="block text-sm text-zinc-400 mb-1">
+          <label className="block text-sm text-muted mb-1">
             白番
             {getRank(whitePlayer) && (
-              <span className="ml-2 px-1.5 py-0.5 rounded bg-sumi-high text-nibi text-xs font-mono">
+              <span className="ml-2 px-1.5 py-0.5 rounded bg-raised text-muted text-xs font-mono">
                 {getRank(whitePlayer)}
               </span>
             )}
@@ -164,12 +164,12 @@ export default function GameCreationDialog({
             data-testid="white-player-select"
             value={whitePlayer}
             onChange={e => setWhitePlayer(e.target.value)}
-            className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-kaya"
+            className="w-full bg-ink/5 text-ink border border-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
           >
             {allPlayers.map(p => {
               const rank = getRank(p);
               return (
-                <option key={p} value={p} className="bg-zinc-800 text-white">
+                <option key={p} value={p} className="bg-raised text-ink">
                   {displayName(p)}{p === teacherName ? '（先生）' : ''}{rank ? ` [${rank}]` : ''}
                 </option>
               );
@@ -178,12 +178,12 @@ export default function GameCreationDialog({
         </div>
 
         {blackPlayer === whitePlayer && (
-          <p className="text-shu-light text-sm">黒と白に同じプレイヤーは選べません</p>
+          <p className="text-alert-text text-sm">黒と白に同じプレイヤーは選べません</p>
         )}
 
         {/* 碁盤サイズ */}
         <div>
-          <label className="block text-sm text-zinc-400 mb-1">碁盤サイズ</label>
+          <label className="block text-sm text-muted mb-1">碁盤サイズ</label>
           <div className="flex gap-2">
             {BOARD_SIZES.map(size => (
               <button
@@ -191,8 +191,8 @@ export default function GameCreationDialog({
                 onClick={() => setBoardSize(size)}
                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                   boardSize === size
-                    ? 'bg-kaya text-sumi'
-                    : 'bg-white/5 hover:bg-white/10'
+                    ? 'bg-accent text-accent-ink'
+                    : 'bg-ink/5 hover:bg-ink/10'
                 }`}
               >
                 {size}路
@@ -203,7 +203,7 @@ export default function GameCreationDialog({
 
         {/* 置石 */}
         <div>
-          <label className="block text-sm text-zinc-400 mb-1">置石</label>
+          <label className="block text-sm text-muted mb-1">置石</label>
           <div className="flex flex-wrap gap-2">
             {HANDICAP_OPTIONS.map(h => (
               <button
@@ -215,8 +215,8 @@ export default function GameCreationDialog({
                 }}
                 className={`flex-1 min-w-[3rem] py-2 rounded-lg text-sm font-medium transition-all ${
                   handicap === h
-                    ? 'bg-kaya text-sumi'
-                    : 'bg-white/5 hover:bg-white/10'
+                    ? 'bg-accent text-accent-ink'
+                    : 'bg-ink/5 hover:bg-ink/10'
                 }`}
               >
                 {h === 0 ? '互先' : `${h}子`}
@@ -227,19 +227,19 @@ export default function GameCreationDialog({
 
         {/* コミ */}
         <div>
-          <label className="block text-sm text-zinc-400 mb-1">コミ</label>
+          <label className="block text-sm text-muted mb-1">コミ</label>
           <input
             type="number"
             value={komi}
             step={0.5}
             onChange={e => { setKomi(parseFloat(e.target.value) || 0); setHandicapTouched(true); }}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-kaya"
+            className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
           />
         </div>
 
         {/* 対局時計（持ち時間を項目ごとに自由設定） */}
         <div>
-          <label className="block text-sm text-zinc-400 mb-2">対局時計</label>
+          <label className="block text-sm text-muted mb-2">対局時計</label>
           <TimeControlPicker variant="dark" value={timeSettings} onChange={setTimeSettings} />
         </div>
 

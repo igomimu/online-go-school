@@ -40,6 +40,7 @@
   --color-accent-text: var(--ui-accent-text);
   --color-alert: var(--ui-alert);
   --color-alert-text: var(--ui-alert-text);
+  --color-alert-face: var(--ui-alert-face);
 }
 
 /*
@@ -61,6 +62,7 @@
   --ui-accent-text: #d6b279;  /* 地の上に置く榧の文字 */
   --ui-alert: #c8563c;
   --ui-alert-text: #e0745a;
+  --ui-alert-face: #b4432c; /* 朱の面に白文字を載せる用。#c8563c のままだと 3.7:1 で足りない */
 }
 
 :root[data-theme="light"] {
@@ -69,12 +71,13 @@
   --ui-raised: #e9e3d5;       /* 入力欄・副ボタンの面（紙より一段沈む） */
   --ui-line: #d8d0be;
   --ui-ink: #1f1c15;          /* 墨 */
-  --ui-muted: #6e6656;
+  --ui-muted: #635b4b;
   --ui-accent: #c69a55;       /* 榧を紙の上で締めた色 */
   --ui-accent-ink: #241a08;
   --ui-accent-text: #8a5f1f;  /* 紙の上で読める濃さまで落とした榧 */
   --ui-alert: #c8563c;
   --ui-alert-text: #a63a22;
+  --ui-alert-face: #b4432c;
 }
 
 @layer base {

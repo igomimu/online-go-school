@@ -53,14 +53,14 @@ export default function ChatPanel({
   };
 
   return (
-    <div className="flex h-full flex-col bg-sumi-raised">
+    <div className="flex h-full flex-col bg-surface">
       {/* 送信先 + トークルーム（先生のみ） */}
       {showTargetSelector && (
-        <div className="border-b border-sumi-line p-2">
+        <div className="border-b border-line p-2">
           <select
             value={target}
             onChange={e => setTarget(e.target.value)}
-            className="w-full rounded-md border border-sumi-line bg-sumi px-2 py-1 text-[13px] text-kinari"
+            className="w-full rounded-md border border-line bg-ground px-2 py-1 text-[13px] text-ink"
           >
             <option value="all">生徒全員</option>
             {remoteParticipants.map(p => (
@@ -75,39 +75,39 @@ export default function ChatPanel({
       {/* メッセージ表示 */}
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 space-y-1 overflow-y-auto bg-sumi p-2 text-[13px] leading-relaxed"
+        className="min-h-0 flex-1 space-y-1 overflow-y-auto bg-ground p-2 text-[13px] leading-relaxed"
       >
         {messages.map(msg => {
           const isMe = msg.sender === localIdentity;
           const isPrivate = msg.target !== 'all';
           return (
             <div key={msg.id}>
-              <span className="tabular text-nibi">{formatTime(msg.timestamp)}</span>
+              <span className="tabular text-muted">{formatTime(msg.timestamp)}</span>
               {' '}
-              {isPrivate && <span className="text-kaya">(個別)</span>}
-              <span className={isMe ? 'font-semibold text-kinari' : 'text-kaya'}>
+              {isPrivate && <span className="text-accent-text">(個別)</span>}
+              <span className={isMe ? 'font-semibold text-ink' : 'text-accent-text'}>
                 {getDisplayName(msg.sender, students)}:
               </span>
               {' '}
-              <span className="text-kinari">{msg.text}</span>
+              <span className="text-ink">{msg.text}</span>
             </div>
           );
         })}
       </div>
 
       {/* 入力 + チャットボタン */}
-      <div className="flex gap-2 border-t border-sumi-line p-2">
+      <div className="flex gap-2 border-t border-line p-2">
         <input
           type="text"
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="min-w-0 flex-1 rounded-md border border-sumi-line bg-sumi px-2 py-1 text-[13px] text-kinari placeholder:text-nibi focus:border-kaya focus:outline-none"
+          className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 text-[13px] text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
         <button
           onClick={handleSend}
           disabled={!text.trim()}
-          className="shrink-0 rounded-md bg-kaya px-3 py-1 text-[13px] font-bold text-sumi disabled:opacity-40"
+          className="shrink-0 rounded-md bg-accent px-3 py-1 text-[13px] font-bold text-accent-ink disabled:opacity-40"
         >
           チャット
         </button>

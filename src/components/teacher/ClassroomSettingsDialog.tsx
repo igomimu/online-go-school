@@ -83,7 +83,7 @@ export default function ClassroomSettingsDialog({
 
   const cellStyle: React.CSSProperties = {
     padding: '2px 6px',
-    border: '1px solid #302c24',
+    border: '1px solid var(--color-line)',
     fontSize: 11,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
@@ -101,14 +101,14 @@ export default function ClassroomSettingsDialog({
       zIndex: 1000,
     }}>
       <div style={{
-        background: '#1d1b16',
-        border: '2px solid #302c24',
+        background: 'var(--color-surface)',
+        border: '1px solid var(--color-line)',
         width: 800,
         maxHeight: '90vh',
         display: 'flex',
         flexDirection: 'column',
         fontSize: 12,
-        color: '#e9e4d9',
+        color: 'var(--color-ink)',
       }}>
         {/* ヘッダー */}
         <div style={{
@@ -116,14 +116,14 @@ export default function ClassroomSettingsDialog({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '6px 10px',
-          background: '#26231c',
-          borderBottom: '1px solid #302c24',
+          background: 'var(--color-raised)',
+          borderBottom: '1px solid var(--color-line)',
           fontWeight: 'bold',
           fontSize: 13,
         }}>
           教室情報設定
           <button onClick={onClose} style={{
-            background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9a9285',
+            background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-muted)',
           }}>&times;</button>
         </div>
 
@@ -137,8 +137,8 @@ export default function ClassroomSettingsDialog({
               onChange={e => setName(e.target.value)}
               style={{
                 padding: '2px 8px',
-                background: '#15140f',
-                border: '1px solid #302c24',
+                background: 'var(--color-ground)',
+                border: '1px solid var(--color-line)',
                 flex: 1,
                 fontSize: 12,
               }}
@@ -152,8 +152,8 @@ export default function ClassroomSettingsDialog({
               onChange={e => setSeatCount(Number(e.target.value))}
               style={{
                 padding: '2px 6px',
-                border: '1px solid #302c24',
-                background: '#15140f',
+                border: '1px solid var(--color-line)',
+                background: 'var(--color-ground)',
                 fontSize: 12,
               }}
             >
@@ -169,22 +169,22 @@ export default function ClassroomSettingsDialog({
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               <div style={{
                 padding: '4px 8px',
-                background: '#26231c',
-                color: '#e9e4d9',
+                background: 'var(--color-raised)',
+                color: 'var(--color-ink)',
                 fontWeight: 'bold',
                 fontSize: 12,
               }}>
                 在籍生
               </div>
               <div style={{
-                border: '1px solid #302c24',
-                background: '#15140f',
+                border: '1px solid var(--color-line)',
+                background: 'var(--color-ground)',
                 height: 320,
                 overflowY: 'auto',
               }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ background: '#26231c' }}>
+                    <tr style={{ background: 'var(--color-raised)' }}>
                       <th style={{ ...cellStyle, width: 30, textAlign: 'center' }}>NO.</th>
                       <th style={{ ...cellStyle, textAlign: 'left' }}>生徒ID</th>
                       <th style={{ ...cellStyle, textAlign: 'left' }}>姓名</th>
@@ -200,13 +200,13 @@ export default function ClassroomSettingsDialog({
                           onClick={() => { setSelectedEnrolled(s.id); setSelectedOther(null); }}
                           style={{
                             cursor: 'pointer',
-                            background: isSelected ? '#b0f0f0' : i % 2 === 0 ? '#15140f' : '#1d1b16',
+                            background: isSelected ? 'color-mix(in oklab, var(--color-accent) 18%, var(--color-surface))' : i % 2 === 0 ? 'var(--color-ground)' : 'var(--color-surface)',
                           }}
                         >
                           <td style={{ ...cellStyle, textAlign: 'center' }}>{i + 1}</td>
                           <td style={{ ...cellStyle, fontSize: 10 }}>{s.id}</td>
                           <td style={{ ...cellStyle, fontWeight: 'bold' }}>{s.name}</td>
-                          <td style={{ ...cellStyle, textAlign: 'center', color: '#d6b279' }}>{s.internalRating}</td>
+                          <td style={{ ...cellStyle, textAlign: 'center', color: 'var(--color-accent-text)' }}>{s.internalRating}</td>
                         </tr>
                       );
                     })}
@@ -235,22 +235,22 @@ export default function ClassroomSettingsDialog({
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               <div style={{
                 padding: '4px 8px',
-                background: '#606060',
-                color: '#e9e4d9',
+                background: 'var(--color-line)',
+                color: 'var(--color-ink)',
                 fontWeight: 'bold',
                 fontSize: 12,
               }}>
                 その他
               </div>
               <div style={{
-                border: '1px solid #302c24',
-                background: '#15140f',
+                border: '1px solid var(--color-line)',
+                background: 'var(--color-ground)',
                 height: 320,
                 overflowY: 'auto',
               }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ background: '#26231c' }}>
+                    <tr style={{ background: 'var(--color-raised)' }}>
                       <th style={{ ...cellStyle, textAlign: 'left' }}>生徒ID</th>
                       <th style={{ ...cellStyle, textAlign: 'left' }}>姓名</th>
                       <th style={{ ...cellStyle, width: 36, textAlign: 'center' }}>棋力</th>
@@ -265,12 +265,12 @@ export default function ClassroomSettingsDialog({
                           onClick={() => { setSelectedOther(s.id); setSelectedEnrolled(null); }}
                           style={{
                             cursor: 'pointer',
-                            background: isSelected ? '#2a2419' : i % 2 === 0 ? '#15140f' : '#1d1b16',
+                            background: isSelected ? 'color-mix(in oklab, var(--color-accent) 16%, var(--color-surface))' : i % 2 === 0 ? 'var(--color-ground)' : 'var(--color-surface)',
                           }}
                         >
                           <td style={{ ...cellStyle, fontSize: 10 }}>{s.id}</td>
                           <td style={{ ...cellStyle, fontWeight: 'bold' }}>{s.name}</td>
-                          <td style={{ ...cellStyle, textAlign: 'center', color: '#d6b279' }}>{s.internalRating}</td>
+                          <td style={{ ...cellStyle, textAlign: 'center', color: 'var(--color-accent-text)' }}>{s.internalRating}</td>
                         </tr>
                       );
                     })}
@@ -284,14 +284,14 @@ export default function ClassroomSettingsDialog({
         {/* 下部ボタン */}
         <div style={{
           padding: '8px 12px',
-          borderTop: '1px solid #302c24',
+          borderTop: '1px solid var(--color-line)',
           display: 'flex',
           justifyContent: 'center',
           gap: 12,
-          background: '#26231c',
+          background: 'var(--color-raised)',
         }}>
           {error && (
-            <div style={{ color: '#e0745a', fontWeight: 'bold', alignSelf: 'center' }}>
+            <div style={{ color: 'var(--color-alert-text)', fontWeight: 'bold', alignSelf: 'center' }}>
               {error}
             </div>
           )}
@@ -299,9 +299,9 @@ export default function ClassroomSettingsDialog({
             padding: '6px 32px',
             fontSize: 13,
             fontWeight: 'bold',
-            border: '1px solid #302c24',
-            background: '#d6b279',
-            color: '#15140f',
+            border: '1px solid var(--color-line)',
+            background: 'var(--color-accent)',
+            color: 'var(--color-ground)',
             cursor: saving ? 'default' : 'pointer',
             opacity: saving ? 0.6 : 1,
           }}>
@@ -311,8 +311,8 @@ export default function ClassroomSettingsDialog({
             padding: '6px 32px',
             fontSize: 13,
             fontWeight: 'bold',
-            border: '1px solid #302c24',
-            background: '#26231c',
+            border: '1px solid var(--color-line)',
+            background: 'var(--color-raised)',
             cursor: 'pointer',
           }}>
             取消
@@ -332,8 +332,8 @@ function IgcArrowButton({ label, onClick }: { label: string; onClick: () => void
         height: 28,
         fontSize: 16,
         fontWeight: 'bold',
-        border: '1px solid #302c24',
-        background: '#26231c',
+        border: '1px solid var(--color-line)',
+        background: 'var(--color-raised)',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',

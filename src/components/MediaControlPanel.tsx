@@ -22,7 +22,7 @@ export default function MediaControlPanel({
   const students = participants.filter(p => p.identity !== localIdentity);
 
   if (students.length === 0) {
-    return <div className="text-zinc-500 text-sm text-center py-2">生徒が接続されていません</div>;
+    return <div className="text-muted text-sm text-center py-2">生徒が接続されていません</div>;
   }
 
   return (
@@ -30,13 +30,13 @@ export default function MediaControlPanel({
       {students.map(p => {
         const perms = audioPermissions[p.identity] || { canHear: true, micAllowed: true, cameraAllowed: true };
         return (
-          <div key={p.identity} className="flex items-center justify-between bg-white/5 rounded-lg px-3 py-2 text-sm">
+          <div key={p.identity} className="flex items-center justify-between bg-ink/5 rounded-lg px-3 py-2 text-sm">
             <span className="truncate flex-1">{p.name || resolvePlayerName(p.identity, [])}</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => onToggleHear(p.identity)}
                 className={`p-1.5 rounded transition-all ${
-                  perms.canHear ? 'text-kinari hover:bg-kinari/10' : 'text-shu-light hover:bg-shu/20'
+                  perms.canHear ? 'text-ink hover:bg-ink/8' : 'text-alert-text hover:bg-alert/15'
                 }`}
                 title={perms.canHear ? '音声配信中' : '音声停止中'}
               >
@@ -45,7 +45,7 @@ export default function MediaControlPanel({
               <button
                 onClick={() => onToggleMic(p.identity)}
                 className={`p-1.5 rounded transition-all ${
-                  perms.micAllowed ? 'text-kinari hover:bg-kinari/10' : 'text-shu-light hover:bg-shu/20'
+                  perms.micAllowed ? 'text-ink hover:bg-ink/8' : 'text-alert-text hover:bg-alert/15'
                 }`}
                 title={perms.micAllowed ? 'マイク許可中' : 'マイク禁止中'}
               >

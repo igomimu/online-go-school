@@ -17,13 +17,13 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
   const set = (patch: Partial<TimeSettings>) => onChange({ ...value, ...patch });
 
   const numberInputCls = dark
-    ? 'w-20 bg-white/5 border border-white/10 rounded-md px-2 py-1 text-sm focus:outline-none focus:border-kaya'
+    ? 'w-20 bg-ink/5 border border-line rounded-md px-2 py-1 text-sm focus:outline-none focus:border-accent'
     : '';
   const numberInputStyle: React.CSSProperties = dark
     ? {}
     : { width: 64, fontSize: 12, border: '1px solid #999', padding: '2px 4px' };
 
-  const labelCls = dark ? 'text-sm text-zinc-400' : '';
+  const labelCls = dark ? 'text-sm text-muted' : '';
   const labelStyle: React.CSSProperties = dark ? {} : { fontSize: 12, color: '#333' };
 
   const segBtn = (active: boolean): React.CSSProperties =>
@@ -42,8 +42,8 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
     dark
       ? `px-3 py-1 rounded-md text-sm border transition-colors ${
           active
-            ? 'bg-kaya border-kaya text-sumi font-semibold'
-            : 'bg-white/5 border-white/10 text-zinc-300 hover:bg-white/10'
+            ? 'bg-accent border-accent text-accent-ink font-semibold'
+            : 'bg-ink/5 border-line text-ink hover:bg-ink/10'
         }`
       : '';
 
@@ -66,7 +66,7 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
           style={numberInputStyle}
         />
         {value.mainMinutes === 0 && (
-          <span className={dark ? 'text-xs text-zinc-500' : undefined} style={dark ? {} : { fontSize: 11, color: '#888' }}>
+          <span className={dark ? 'text-xs text-muted' : undefined} style={dark ? {} : { fontSize: 11, color: '#888' }}>
             （0＝持ち時間なし）
           </span>
         )}
@@ -123,7 +123,7 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
               className={numberInputCls}
               style={numberInputStyle}
             />
-            <span className={dark ? 'text-xs text-zinc-500' : undefined} style={dark ? {} : { fontSize: 12, color: '#333' }}>回</span>
+            <span className={dark ? 'text-xs text-muted' : undefined} style={dark ? {} : { fontSize: 12, color: '#333' }}>回</span>
           </div>
         </>
       )}

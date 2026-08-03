@@ -26,9 +26,9 @@ interface TeacherToolbarProps {
 
 // ボタン面の色から文字色を決める。榧の面には墨、朱の面には生成りを置く。
 function faceText(face?: string): string {
-  if (face === '#d6b279') return '#15140f';
-  if (face === '#c8563c') return '#f6ece8';
-  return '#e9e4d9';
+  if (face === 'var(--color-accent)') return 'var(--color-accent-ink)';
+  if (face === 'var(--color-alert-face)') return '#f8efec';
+  return 'var(--color-ink)';
 }
 
 /** 補助操作。主操作より一段小さく、面も持たせない */
@@ -40,9 +40,9 @@ function SmallButton({ label, onClick }: { label: string; onClick?: () => void }
         padding: '4px 10px',
         fontSize: 11.5,
         borderRadius: 6,
-        border: '1px solid #302c24',
+        border: '1px solid var(--color-line)',
         background: 'transparent',
-        color: '#9a9285',
+        color: 'var(--color-muted)',
         cursor: 'pointer',
         whiteSpace: 'nowrap',
       }}
@@ -64,8 +64,8 @@ function IgcButton({ label, color, onClick, disabled, 'data-testid': testId }: {
         fontWeight: 600,
         letterSpacing: '.02em',
         borderRadius: 6,
-        border: '1px solid #302c24',
-        background: color || '#26231c',
+        border: '1px solid var(--color-line)',
+        background: color || 'var(--color-raised)',
         color: faceText(color),
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.6 : 1,
@@ -130,9 +130,9 @@ export default function TeacherToolbar({
         flexWrap: 'wrap',
         gap: 6,
         padding: '7px 12px',
-        background: '#1d1b16',
-        borderTop: '1px solid #302c24',
-        color: '#e9e4d9',
+        background: 'var(--color-surface)',
+        borderTop: '1px solid var(--color-line)',
+        color: 'var(--color-ink)',
       }}>
         <span style={{ fontWeight: 700, fontSize: 14, letterSpacing: '.04em', marginRight: 8 }}>
           {classroomName || '三村囲碁オンライン'}
@@ -142,9 +142,9 @@ export default function TeacherToolbar({
             onClick={copyClassroomId}
             title="クリックで教室IDをコピー"
             style={{
-              background: copiedClassroomId ? '#d6b279' : '#26231c',
-              color: copiedClassroomId ? '#15140f' : '#9a9285',
-              border: '1px solid #302c24',
+              background: copiedClassroomId ? 'var(--color-accent)' : 'var(--color-raised)',
+              color: copiedClassroomId ? 'var(--color-ground)' : 'var(--color-muted)',
+              border: '1px solid var(--color-line)',
               borderRadius: 6,
               padding: '3px 10px',
               fontSize: 12,
@@ -163,9 +163,9 @@ export default function TeacherToolbar({
             onClick={copyLink}
             title="クリックでコピー"
             style={{
-              background: copied ? '#d6b279' : '#26231c',
-              color: copied ? '#15140f' : '#9a9285',
-              border: '1px solid #302c24',
+              background: copied ? 'var(--color-accent)' : 'var(--color-raised)',
+              color: copied ? 'var(--color-ground)' : 'var(--color-muted)',
+              border: '1px solid var(--color-line)',
               borderRadius: 6,
               padding: '3px 10px',
               fontSize: 11,
@@ -193,43 +193,43 @@ export default function TeacherToolbar({
         flexWrap: 'wrap',
         gap: 6,
         padding: '8px 12px',
-        background: '#1d1b16',
-        borderTop: '1px solid #302c24',
+        background: 'var(--color-surface)',
+        borderTop: '1px solid var(--color-line)',
       }}>
 
-        <IgcButton label="退室" color="#26231c" onClick={onDisconnect} />
-        <IgcButton label="共有検討" color="#26231c" onClick={onStartLecture} />
+        <IgcButton label="退室" color="var(--color-raised)" onClick={onDisconnect} />
+        <IgcButton label="共有検討" color="var(--color-raised)" onClick={onStartLecture} />
 
         <div style={{ flex: 1 }} />
 
-        <IgcButton label="対局作成" color="#26231c" onClick={onCreateGame} data-testid="create-game-toolbar-button" />
+        <IgcButton label="対局作成" color="var(--color-raised)" onClick={onCreateGame} data-testid="create-game-toolbar-button" />
         {onOpenTeacherGameWindow && (
-          <IgcButton label="対局ウィンドウ" color="#d6b279" onClick={onOpenTeacherGameWindow} data-testid="open-teacher-game-window-button" />
+          <IgcButton label="対局ウィンドウ" color="var(--color-accent)" onClick={onOpenTeacherGameWindow} data-testid="open-teacher-game-window-button" />
         )}
-        <IgcButton label="自動対局" color="#26231c" onClick={onAutoPairing} />
+        <IgcButton label="自動対局" color="var(--color-raised)" onClick={onAutoPairing} />
 
         <input ref={fileInputRef} type="file" accept=".sgf" onChange={onLoadSgf} className="hidden" />
-        <IgcButton label="SGF読込" color="#26231c" onClick={() => fileInputRef.current?.click()} />
+        <IgcButton label="SGF読込" color="var(--color-raised)" onClick={() => fileInputRef.current?.click()} />
 
         {onOpenTsumegoPicker && (
-          <IgcButton label="詰碁DB" color="#26231c" onClick={onOpenTsumegoPicker} />
+          <IgcButton label="詰碁DB" color="var(--color-raised)" onClick={onOpenTsumegoPicker} />
         )}
 
-        <IgcButton label="生徒入替" color="#26231c" onClick={onEditClassroom} />
-        <IgcButton label="生徒リンク" color="#26231c" onClick={onShowStudentLinks} />
-        <IgcButton label="生徒管理" color="#26231c" onClick={onOpenStudentManager} />
+        <IgcButton label="生徒入替" color="var(--color-raised)" onClick={onEditClassroom} />
+        <IgcButton label="生徒リンク" color="var(--color-raised)" onClick={onShowStudentLinks} />
+        <IgcButton label="生徒管理" color="var(--color-raised)" onClick={onOpenStudentManager} />
 
         {studentJoinInfo && (
           <IgcButton
             label={copied ? '✓ コピー済み' : '参加リンク'}
-            color={copied ? '#d6b279' : '#26231c'}
+            color={copied ? 'var(--color-accent)' : 'var(--color-raised)'}
             onClick={copyLink}
           />
         )}
 
         <IgcButton
           label={isReconnecting ? '復旧中...' : '回線復旧'}
-          color="#c8563c"
+          color="var(--color-alert-face)"
           onClick={onReconnect}
           disabled={isReconnecting}
         />
@@ -239,7 +239,7 @@ export default function TeacherToolbar({
           marginLeft: 8,
           fontSize: 12,
           fontWeight: 'bold',
-          color: '#e0745a',
+          color: 'var(--color-alert-text)',
           textAlign: 'right',
           lineHeight: 1.2,
         }}>

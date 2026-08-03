@@ -151,7 +151,7 @@ export default function AutoPairingDialog({
 
   const cellStyle: React.CSSProperties = {
     padding: '3px 6px',
-    border: '1px solid #302c24',
+    border: '1px solid var(--color-line)',
     fontSize: 11,
     textAlign: 'center',
   };
@@ -162,31 +162,31 @@ export default function AutoPairingDialog({
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
     }}>
       <div style={{
-        background: '#1d1b16', border: '2px solid #302c24', padding: 0,
+        background: 'var(--color-surface)', border: '1px solid var(--color-line)', padding: 0,
         width: 750, maxHeight: '85vh', display: 'flex', flexDirection: 'column',
         fontSize: 12,
       }}>
         {/* ヘッダー */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '6px 10px', background: '#26231c', color: '#e9e4d9', fontWeight: 'bold', fontSize: 13,
+          padding: '6px 10px', background: 'var(--color-raised)', color: 'var(--color-ink)', fontWeight: 'bold', fontSize: 13,
         }}>
           自動ペアリング（{studentIdentities.length}名）
           <button onClick={onClose} style={{
-            background: 'none', border: 'none', color: '#e9e4d9', fontSize: 18, cursor: 'pointer',
+            background: 'none', border: 'none', color: 'var(--color-ink)', fontSize: 18, cursor: 'pointer',
           }}>&times;</button>
         </div>
 
         {/* ペア一覧 */}
         <div style={{ padding: 10, overflowY: 'auto', flex: 1 }}>
           {pairs.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 32, color: '#9a9285' }}>
+            <div style={{ textAlign: 'center', padding: 32, color: 'var(--color-muted)' }}>
               接続中の生徒が2名以上必要です
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: '#26231c' }}>
+                <tr style={{ background: 'var(--color-raised)' }}>
                   <th style={{ ...cellStyle, width: 30 }}>No</th>
                   <th style={cellStyle}>黒番（弱い方）</th>
                   <th style={{ ...cellStyle, width: 36 }}>棋力</th>
@@ -201,18 +201,18 @@ export default function AutoPairingDialog({
               </thead>
               <tbody>
                 {pairs.map((p, i) => (
-                  <tr key={i} style={{ background: i % 2 === 0 ? '#15140f' : '#1d1b16' }}>
+                  <tr key={i} style={{ background: i % 2 === 0 ? 'var(--color-ground)' : 'var(--color-surface)' }}>
                     <td style={cellStyle}>{i + 1}</td>
                     <td style={{ ...cellStyle, textAlign: 'left', fontWeight: 'bold' }}>
                       ● {p.blackName}
                     </td>
-                    <td style={{ ...cellStyle, color: '#d6b279' }}>{p.blackRank || '?'}</td>
+                    <td style={{ ...cellStyle, color: 'var(--color-accent-text)' }}>{p.blackRank || '?'}</td>
                     <td style={cellStyle}>
                       <button
                         onClick={() => swapColors(i)}
                         title="黒白入替"
                         style={{
-                          border: '1px solid #302c24', background: '#e0e0d8',
+                          border: '1px solid var(--color-line)', background: 'var(--color-raised)',
                           cursor: 'pointer', fontSize: 11, padding: '1px 4px',
                         }}
                       >⇄</button>
@@ -220,12 +220,12 @@ export default function AutoPairingDialog({
                     <td style={{ ...cellStyle, textAlign: 'left', fontWeight: 'bold' }}>
                       ○ {p.whiteName}
                     </td>
-                    <td style={{ ...cellStyle, color: '#d6b279' }}>{p.whiteRank || '?'}</td>
+                    <td style={{ ...cellStyle, color: 'var(--color-accent-text)' }}>{p.whiteRank || '?'}</td>
                     <td style={cellStyle}>
                       <select
                         value={p.handicap}
                         onChange={e => changeHandicap(i, Number(e.target.value))}
-                        style={{ width: 32, fontSize: 11, border: '1px solid #302c24' }}
+                        style={{ width: 32, fontSize: 11, border: '1px solid var(--color-line)' }}
                       >
                         {HANDICAP_OPTIONS.map(n => (
                           <option key={n} value={n}>{n}</option>
@@ -237,7 +237,7 @@ export default function AutoPairingDialog({
                       <select
                         value={p.boardSize}
                         onChange={e => changeBoardSize(i, Number(e.target.value))}
-                        style={{ width: 36, fontSize: 11, border: '1px solid #302c24' }}
+                        style={{ width: 36, fontSize: 11, border: '1px solid var(--color-line)' }}
                       >
                         <option value={19}>19</option>
                         <option value={13}>13</option>
@@ -248,7 +248,7 @@ export default function AutoPairingDialog({
                       <button
                         onClick={() => removePair(i)}
                         style={{
-                          border: '1px solid #302c24', background: '#f0c0c0',
+                          border: '1px solid var(--color-line)', background: 'color-mix(in oklab, var(--color-alert) 18%, var(--color-surface))',
                           cursor: 'pointer', fontSize: 10, padding: '1px 6px',
                         }}
                       >削除</button>
@@ -263,8 +263,8 @@ export default function AutoPairingDialog({
           {unpairedIdentity && (
             <div style={{
               marginTop: 8, padding: '4px 8px',
-              background: '#fff8e0', border: '1px solid #cc9',
-              fontSize: 11, color: '#886600',
+              background: 'color-mix(in oklab, var(--color-accent) 12%, var(--color-surface))', border: '1px solid var(--color-line)',
+              fontSize: 11, color: 'var(--color-accent-text)',
             }}>
               ペアなし: {getDisplayName(unpairedIdentity, students)}
               （奇数のため先生と対局するか、見学になります）
@@ -274,33 +274,33 @@ export default function AutoPairingDialog({
 
         {/* 持ち時間設定（全対局共通・項目ごとに自由設定） */}
         <div style={{
-          padding: '8px 12px', borderTop: '1px solid #302c24',
-          background: '#1d1b16',
+          padding: '8px 12px', borderTop: '1px solid var(--color-line)',
+          background: 'var(--color-surface)',
         }}>
-          <div style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 4, color: '#e9e4d9' }}>対局時計（全対局共通）</div>
+          <div style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 4, color: 'var(--color-ink)' }}>対局時計（全対局共通）</div>
           <TimeControlPicker variant="light" value={timeSettings} onChange={setTimeSettings} />
         </div>
 
         {/* フッター */}
         <div style={{
-          padding: '8px 12px', borderTop: '1px solid #302c24',
-          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, background: '#26231c',
+          padding: '8px 12px', borderTop: '1px solid var(--color-line)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, background: 'var(--color-raised)',
         }}>
           <button
             onClick={handleStart}
             disabled={pairs.length === 0}
             style={{
               padding: '6px 32px', fontSize: 13, fontWeight: 'bold',
-              border: '1px solid #302c24', cursor: pairs.length > 0 ? 'pointer' : 'default',
-              background: pairs.length > 0 ? '#d6b279' : '#302c24',
-              color: pairs.length > 0 ? '#15140f' : '#9a9285',
+              border: '1px solid var(--color-line)', cursor: pairs.length > 0 ? 'pointer' : 'default',
+              background: pairs.length > 0 ? 'var(--color-accent)' : 'var(--color-line)',
+              color: pairs.length > 0 ? 'var(--color-ground)' : 'var(--color-muted)',
             }}
           >
             {pairs.length}局を一括開始
           </button>
           <button onClick={onClose} style={{
             padding: '6px 32px', fontSize: 13, fontWeight: 'bold',
-            border: '1px solid #302c24', background: '#26231c', cursor: 'pointer',
+            border: '1px solid var(--color-line)', background: 'var(--color-raised)', cursor: 'pointer',
           }}>
             取消
           </button>
