@@ -122,6 +122,61 @@ test.describe('「待った」機能（対局者どうしの同意制）', () =>
     await waitForMyTurn(studentAPage);
   });
 
+  // 2026-08-04 三村さん指摘: 申請中は双方とも打てないのに秒読みだけ進んでいた。
+  // 返答を待っている側が切れ負けしかねないので、申請中は計時を止める。
+  test('申請中は時計が止まり、解決後に再開する', async () => {
+    await loginAsTeacher(teacherPage);
+    await openClassroomAndConnect(teacherPage);
+
+    await Promise.all([
+      loginAsStudent(studentAPage, { studentCode: TEST_STUDENT_A.code, classroomId }),
+      loginAsStudent(studentBPage, { studentCode: TEST_STUDENT_B.code, classroomId }),
+    ]);
+    await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
+    await waitForStudentJoined(teacherPage, TEST_STUDENT_B.id);
+
+    // 秒読みだけだと1回きりで切れてしまうので、持ち時間を与えて減り方を観測する
+    await createGame(teacherPage, {
+      blackName: TEST_STUDENT_A.name,
+      whiteName: TEST_STUDENT_B.name,
+      boardSize: 9,
+      expectedPlayersCount: 3,
+      mainMinutes: 5,
+    });
+
+    const openBtn = getOpenStudentButton(teacherPage, TEST_STUDENT_A.id);
+    await expect(openBtn).toBeEnabled({ timeout: 10_000 });
+    await openBtn.click();
+    await waitForObserverPanel(teacherPage);
+
+    await Promise.all([
+      enterAssignedGame(studentAPage),
+      enterAssignedGame(studentBPage),
+    ]);
+
+    await waitForMyTurn(studentAPage);
+    await playMove(studentAPage, 4, 4);
+    await waitForMyTurn(studentBPage);
+
+    // 白(B)の手番で黒(A)が待ったを申請 → 動いているのは白の時計
+    studentAPage.on('dialog', (d) => d.accept());
+    await studentAPage.getByRole('button', { name: /待った/ }).click();
+    await expect(studentBPage.getByText(/待った」を申請しています/)).toBeVisible({ timeout: 10_000 });
+
+    const whiteClock = studentBPage.getByTestId('clock-white');
+    await studentBPage.waitForTimeout(1200); // バナー表示直後の1tickぶんを見送る
+    const frozen = await whiteClock.textContent();
+    await studentBPage.waitForTimeout(4000);
+    expect(await whiteClock.textContent()).toBe(frozen);
+
+    // 拒否して再開 → 再び減り始める
+    await studentBPage.getByRole('button', { name: '拒否する' }).click();
+    await expect(studentBPage.getByText(/待った」を申請しています/)).not.toBeVisible({ timeout: 10_000 });
+    await expect
+      .poll(async () => await whiteClock.textContent(), { timeout: 10_000 })
+      .not.toBe(frozen);
+  });
+
   // 2026-08-02 三村さん指定: 黒が置き間違えて白が打ち返した後に待った→承諾なら、
   // 白の応手と黒の誤着の2手をまとめて戻し、黒の手番に戻す。
   test('相手が打ち返した後に申請→承諾で2手戻り、申請者の手番に戻る', async () => {

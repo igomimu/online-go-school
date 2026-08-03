@@ -643,6 +643,19 @@ export function useLiveGame(
 
   const hasLocalClock = localClock !== null;
   const activeGameStatus = activeGame?.status;
+  // 「待った」の申請中は双方とも着手できない（submitMove も 409 で弾かれる）。
+  // 打てないのに時計だけ進むと、返答を待っている側が切れ負けしかねないので計時を止める。
+  const undoPending = !!activeGame?.undo_request;
+
+  // 申請が解けた瞬間に計時を再開する。止まっていた間の経過をそのまま請求しないよう、
+  // 基準時刻(lastTickTime)を今に戻してから動かす（戻さないと差分に停止時間が丸ごと乗る）。
+  const prevUndoPendingRef = useRef(false);
+  useEffect(() => {
+    const wasPending = prevUndoPendingRef.current;
+    prevUndoPendingRef.current = undoPending;
+    if (!wasPending || undoPending) return;
+    setLocalClock((prev) => (prev && prev.lastTickTime !== null ? { ...prev, lastTickTime: Date.now() } : prev));
+  }, [undoPending]);
 
   // 1秒ごとにローカル残り時間を減少させる。
   // ⚠️ 計算と読み上げは setState の updater に入れないこと。updater は純粋関数の前提で
@@ -652,6 +665,7 @@ export function useLiveGame(
   useEffect(() => {
     if (!localClock || activeGameStatus !== 'playing') return;
     if (localClock.lastTickTime === null) return; // 時計が動いていない（一時停止中）
+    if (undoPending) return; // 「待った」の返答待ちは計時しない
 
     const timer = setInterval(() => {
       const prev = localClockRef.current;
@@ -773,7 +787,7 @@ export function useLiveGame(
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [hasLocalClock, activeGameStatus, derived.currentColor, handleLocalTimeUp]);
+  }, [hasLocalClock, activeGameStatus, undoPending, derived.currentColor, handleLocalTimeUp]);
 
   const submitResign = useCallback(async () => {
     // 投了は手番の対局者本人のみ。観戦者・非対局者・相手番では何もしない。
