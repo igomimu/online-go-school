@@ -21,6 +21,60 @@
   --color-kaya-soft: #8a7554;   /* 榧を沈めた色: 細い罫・非強調の状態表示 */
   --color-shu: #c8563c;         /* 朱: 警告・エラー（面・罫） */
   --color-shu-light: #e0745a;   /* 淡朱: 暗い面の上に置く朱の文字（朱そのままでは 4.3:1 で読みにくい） */
+
+  /*
+   * 役割で呼ぶトークン（テーマ切替はこちらを使う）。
+   * 上の墨・生成りは「色の名前」なので、明暗を入れ替えると名前が嘘になる。
+   * 入れ替わりうるものは ground / surface / ink … と役割で持ち、
+   * 実際の値は下の :root で明暗それぞれに割り当てる。
+   * 盤（木目・那智黒・蛤）はどちらのテーマでも同じなのでここには入れない。
+   */
+  --color-ground: var(--ui-ground);
+  --color-surface: var(--ui-surface);
+  --color-raised: var(--ui-raised);
+  --color-line: var(--ui-line);
+  --color-ink: var(--ui-ink);
+  --color-muted: var(--ui-muted);
+  --color-accent: var(--ui-accent);
+  --color-accent-ink: var(--ui-accent-ink);
+  --color-accent-text: var(--ui-accent-text);
+  --color-alert: var(--ui-alert);
+  --color-alert-text: var(--ui-alert-text);
+}
+
+/*
+ * 既定は今までどおり墨（ダーク）。html[data-theme="light"] のときだけ紙に替わる。
+ * 明背景に暗い文字のほうが若年層でも高齢者でも読みの成績が良い
+ * （Piepenbrock et al., Ergonomics 2013）。加えてこのアプリは碁盤自体が明るいので、
+ * 紙の地のほうが盤との明度差が小さく、視線の往復で瞳孔が動かされにくい。
+ */
+:root,
+:root[data-theme="dark"] {
+  --ui-ground: #15140f;
+  --ui-surface: #1d1b16;
+  --ui-raised: #26231c;
+  --ui-line: #302c24;
+  --ui-ink: #e9e4d9;
+  --ui-muted: #9a9285;
+  --ui-accent: #d6b279;       /* 榧。盤と同色 */
+  --ui-accent-ink: #15140f;   /* 榧の面に載る文字 */
+  --ui-accent-text: #d6b279;  /* 地の上に置く榧の文字 */
+  --ui-alert: #c8563c;
+  --ui-alert-text: #e0745a;
+}
+
+:root[data-theme="light"] {
+  --ui-ground: #f2ede3;       /* 生成りの紙 */
+  --ui-surface: #fbf8f1;      /* 紙に載るカード */
+  --ui-raised: #e9e3d5;       /* 入力欄・副ボタンの面（紙より一段沈む） */
+  --ui-line: #d8d0be;
+  --ui-ink: #1f1c15;          /* 墨 */
+  --ui-muted: #6e6656;
+  --ui-accent: #c69a55;       /* 榧を紙の上で締めた色 */
+  --ui-accent-ink: #241a08;
+  --ui-accent-text: #8a5f1f;  /* 紙の上で読める濃さまで落とした榧 */
+  --ui-alert: #c8563c;
+  --ui-alert-text: #a63a22;
 }
 
 @layer base {
@@ -30,13 +84,17 @@
     font-weight: 400;
 
     color-scheme: dark;
-    color: var(--color-kinari);
-    background-color: var(--color-sumi);
+    color: var(--color-ink);
+    background-color: var(--color-ground);
 
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  :root[data-theme="light"] {
+    color-scheme: light;
   }
 
   body {
@@ -45,7 +103,7 @@
     place-items: center;
     min-width: 320px;
     min-height: 100vh;
-    background: var(--color-sumi);
+    background: var(--color-ground);
   }
 
   #root {
@@ -92,7 +150,7 @@
 
   /* キーボード操作の可視化（暗背景では既定のフォーカスリングが埋もれる） */
   :focus-visible {
-    outline: 2px solid var(--color-kaya);
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
 
@@ -119,7 +177,7 @@
   font-size: clamp(1.75rem, 1.2rem + 2vw, 2.5rem);
   letter-spacing: 0.06em;
   line-height: 1.3;
-  color: #f2eee5;
+  color: color-mix(in oklab, var(--color-ink) 94%, #fff);
 }
 
 /* セクション見出し（カードタイトル） */
@@ -127,7 +185,7 @@
   font-weight: 500;
   font-size: 0.9rem;
   letter-spacing: 0.04em;
-  color: var(--color-nibi);
+  color: var(--color-muted);
 }
 
 /*
@@ -135,15 +193,15 @@
  * リネームせず中身だけ差し替えている（tasks/design-refinement-20260802.md）。
  */
 .glass-panel {
-  background: var(--color-sumi-raised);
-  border: 1px solid var(--color-sumi-line);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
   border-radius: 12px;
 }
 
 /* 主アクション: 画面内で色が付く唯一の要素 */
 .premium-button {
-  background: var(--color-kaya);
-  color: #1a1509;
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
   border: 1px solid transparent;
   padding: 11px 22px;
   border-radius: 8px;
@@ -154,7 +212,7 @@
 }
 
 .premium-button:hover:not(:disabled) {
-  background: #e2c48f;
+  background: color-mix(in oklab, var(--color-accent) 88%, #fff);
 }
 
 .premium-button:disabled {
@@ -163,9 +221,9 @@
 
 /* 副アクション: 無彩色のまま */
 .secondary-button {
-  background: var(--color-sumi-high);
-  color: var(--color-kinari);
-  border: 1px solid var(--color-sumi-line);
+  background: var(--color-raised);
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
   padding: 11px 22px;
   border-radius: 8px;
   font-weight: 500;
@@ -174,33 +232,33 @@
 }
 
 .secondary-button:hover:not(:disabled) {
-  background: #302c24;
-  border-color: #3d382e;
+  background: color-mix(in oklab, var(--color-raised) 88%, var(--color-ink));
+  border-color: color-mix(in oklab, var(--color-line) 82%, var(--color-ink));
 }
 
 /* 入力欄 */
 .field-input {
   width: 100%;
-  background: var(--color-sumi);
-  border: 1px solid var(--color-sumi-line);
+  background: var(--color-ground);
+  border: 1px solid var(--color-line);
   border-radius: 8px;
   padding: 11px 14px;
-  color: var(--color-kinari);
+  color: var(--color-ink);
   transition: border-color 0.15s ease-in-out;
 }
 
 .field-input::placeholder {
-  color: #6b6559;
+  color: color-mix(in oklab, var(--color-muted) 80%, var(--color-ground));
 }
 
 .field-input:focus {
   outline: none;
-  border-color: var(--color-kaya);
+  border-color: var(--color-accent);
 }
 
 .field-label {
   display: block;
   font-size: 0.8125rem;
-  color: var(--color-nibi);
+  color: var(--color-muted);
   margin-bottom: 0.375rem;
 }

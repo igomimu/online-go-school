@@ -252,8 +252,8 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
 
   if (loading || !game) {
     return (
-      <div className="glass-panel p-8 text-center text-zinc-500">
-        {error ? <span className="text-shu-light">エラー: {error}</span> : '対局を読み込み中...'}
+      <div className="glass-panel p-8 text-center text-muted">
+        {error ? <span className="text-alert-text">エラー: {error}</span> : '対局を読み込み中...'}
       </div>
     );
   }
@@ -271,7 +271,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     const highlight = (isLow || isByoyomi) && !isTeacherSide;
     return (
       <span data-testid={isBlack ? 'clock-black' : 'clock-white'} className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
-        highlight ? 'bg-shu/20 text-shu-light animate-pulse' : 'bg-zinc-800 text-zinc-300'
+        highlight ? 'bg-alert/15 text-alert-text animate-pulse' : 'bg-raised text-ink'
       }`}>
         {isByoyomi
           ? `秒読 ${Math.ceil(timeLeft)}秒 [${isTeacherSide ? '∞' : byoyomiLeft}]`
@@ -290,30 +290,30 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
           {onBack && (
             <button
               onClick={onBack}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 rounded-lg text-sm font-semibold transition-colors duration-150 shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-raised hover:bg-line border border-line text-ink rounded-lg text-sm font-semibold transition-colors duration-150 shrink-0"
             >
               <X className="w-4 h-4" /> 閉じてホーム
             </button>
           )}
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-black border border-white/20" />
-            <span className={currentColor === 'BLACK' ? 'font-bold text-white' : 'text-zinc-400'}>
+            <span className="w-3 h-3 rounded-full bg-black border border-ink/30" />
+            <span className={currentColor === 'BLACK' ? 'font-bold text-ink' : 'text-muted'}>
               {resolvePlayerName(game.black_player, students)}
             </span>
-            <span className="text-zinc-600 text-sm">取{blackCaptures}</span>
+            <span className="text-muted/70 text-sm">取{blackCaptures}</span>
             {renderBlackClock()}
           </div>
-          <span className="text-zinc-600">vs</span>
+          <span className="text-muted/70">vs</span>
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-white border border-white/20" />
-            <span className={currentColor === 'WHITE' ? 'font-bold text-white' : 'text-zinc-400'}>
+            <span className="w-3 h-3 rounded-full bg-white border border-ink/40" />
+            <span className={currentColor === 'WHITE' ? 'font-bold text-ink' : 'text-muted'}>
               {resolvePlayerName(game.white_player, students)}
             </span>
-            <span className="text-zinc-600 text-sm">取{whiteCaptures}</span>
+            <span className="text-muted/70 text-sm">取{whiteCaptures}</span>
             {renderWhiteClock()}
           </div>
         </div>
-        <div data-testid="move-count" className="text-sm text-zinc-500 flex items-center gap-3">
+        <div data-testid="move-count" className="text-sm text-muted flex items-center gap-3">
           <span>
             {game.status === 'playing'
               ? `${moveNumber}手目`
@@ -336,8 +336,8 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
             aria-pressed={soundOn}
             className={`flex items-center gap-1 rounded border px-2 py-1 text-xs font-bold transition-colors duration-150 ${
               soundOn
-                ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-200'
-                : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-500'
+                ? 'bg-raised hover:bg-line border-line text-ink'
+                : 'bg-ground hover:bg-raised border-line text-muted'
             }`}
           >
             {soundOn ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
@@ -351,7 +351,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                 const url = `${window.location.origin}${window.location.pathname}?mode=game&gameId=${gameId}&identity=${encodeURIComponent(myIdentity)}&role=${role}`;
                 window.open(url, '_blank', 'width=700,height=800,menubar=no,toolbar=no,location=no,status=no');
               }}
-              className="text-xs bg-sumi-high hover:bg-sumi-line text-kinari font-bold border border-sumi-line rounded px-3 py-1 transition-colors duration-150"
+              className="text-xs bg-raised hover:bg-line text-ink font-bold border border-line rounded px-3 py-1 transition-colors duration-150"
             >
               別ウィンドウ ↗
             </button>
@@ -361,10 +361,10 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
 
       {/* エラー表示 */}
       {error && (
-        <div className="glass-panel px-4 py-3 text-sm text-shu-light bg-shu/10 border border-shu/20 rounded-xl flex items-center justify-between gap-4">
+        <div className="glass-panel px-4 py-3 text-sm text-alert-text bg-alert/10 border border-alert/25 rounded-xl flex items-center justify-between gap-4">
           <div className="flex-1">
             <span className="font-bold">接続エラーが発生しました:</span> {error}
-            <p className="text-zinc-500 text-xs mt-1">※もしリロードしても消えない場合は、右側のリセットボタンをお試しください。大切な教室設定は消えません。</p>
+            <p className="text-muted text-xs mt-1">※もしリロードしても消えない場合は、右側のリセットボタンをお試しください。大切な教室設定は消えません。</p>
           </div>
           <button
             onClick={async (e) => {
@@ -401,7 +401,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               // 4. 強制リロード (サーバーから最新アセットを再取得)
               window.location.reload();
             }}
-            className="flex items-center gap-1.5 shrink-0 px-3 py-1.5 text-xs bg-shu/20 hover:bg-shu/35 text-shu-light border border-shu/30 rounded-lg transition-colors duration-150 font-bold"
+            className="flex items-center gap-1.5 shrink-0 px-3 py-1.5 text-xs bg-alert/15 hover:bg-alert/30 text-alert-text border border-alert/35 rounded-lg transition-colors duration-150 font-bold"
           >
             <RefreshCw className="w-3.5 h-3.5" /> 接続・キャッシュをリセット
           </button>
@@ -466,13 +466,13 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
       {/* 描画機能は検討・解説用途。対局中は使わないため整地中のみ表示する。 */}
       {isTeacher && game.status === 'scoring' && (
         <div className="shrink-0 flex justify-center">
-          <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/60 p-2">
+          <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-xl border border-line bg-ground/60 p-2">
             <button
               onClick={() => setDrawMode(mode => mode === 'line' ? 'off' : 'line')}
               className={`p-2 rounded-lg border transition-all ${
                 drawMode === 'line'
-                  ? 'bg-shu/20 border-shu text-shu-light'
-                  : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  ? 'bg-alert/15 border-alert text-alert-text'
+                  : 'bg-raised border-line text-muted hover:text-ink'
               }`}
               title="線を描く"
               aria-label="線を描く"
@@ -483,8 +483,8 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               onClick={() => setDrawMode(mode => mode === 'arrow' ? 'off' : 'arrow')}
               className={`p-2 rounded-lg border transition-all ${
                 drawMode === 'arrow'
-                  ? 'bg-shu/20 border-shu text-shu-light'
-                  : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
+                  ? 'bg-alert/15 border-alert text-alert-text'
+                  : 'bg-raised border-line text-muted hover:text-ink'
               }`}
               title="矢印を描く"
               aria-label="矢印を描く"
@@ -494,7 +494,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
             {drawings.length > 0 && (
               <button
                 onClick={handleClearDrawings}
-                className="p-2 rounded-lg border border-shu/30 text-zinc-400 hover:text-shu-light hover:bg-shu/10 transition-all"
+                className="p-2 rounded-lg border border-alert/35 text-muted hover:text-alert-text hover:bg-alert/10 transition-all"
                 title="描画を消去"
                 aria-label="描画を消去"
               >
@@ -510,27 +510,27 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
         <div className="shrink-0 space-y-3">
           <div className="glass-panel px-4 py-3">
             {/* 指示文なので生成りで読ませ、榧は結果と「確定」に取っておく */}
-            <div className="text-center text-sm font-bold text-kinari mb-2">
+            <div className="text-center text-sm font-bold text-ink mb-2">
               整地モード {isTeacher ? '— 死石をクリックしてマークしてください' : '— 先生が整地中です'}
             </div>
             <div className="flex justify-center gap-8 text-sm">
               <div className="text-center">
-                <div className="text-zinc-400">黒</div>
-                <div className="text-white font-bold text-lg">{scoringResult.blackTotal}</div>
-                <div className="text-zinc-600 text-xs">
+                <div className="text-muted">黒</div>
+                <div className="text-ink font-bold text-lg">{scoringResult.blackTotal}</div>
+                <div className="text-muted/70 text-xs">
                   地{scoringResult.blackTerritory} + 取{blackCaptures + scoringResult.deadWhiteStones}
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-zinc-400">白</div>
-                <div className="text-white font-bold text-lg">{scoringResult.whiteTotal}</div>
-                <div className="text-zinc-600 text-xs">
+                <div className="text-muted">白</div>
+                <div className="text-ink font-bold text-lg">{scoringResult.whiteTotal}</div>
+                <div className="text-muted/70 text-xs">
                   地{scoringResult.whiteTerritory} + 取{whiteCaptures + scoringResult.deadBlackStones} + コミ{game.komi}
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-zinc-400">結果</div>
-                <div className="text-kaya font-bold text-lg">{formatScoringResultJa(scoringResult)}</div>
+                <div className="text-muted">結果</div>
+                <div className="text-accent-text font-bold text-lg">{formatScoringResultJa(scoringResult)}</div>
               </div>
             </div>
           </div>
@@ -546,8 +546,8 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
 
       {/* 「待った」申請中バナー */}
       {undoRequest && (
-        <div className="glass-panel px-4 py-3 flex items-center justify-between gap-4 border border-kaya/30 bg-kaya/10">
-          <span className="text-sm text-kinari">
+        <div className="glass-panel px-4 py-3 flex items-center justify-between gap-4 border border-accent/30 bg-accent/10">
+          <span className="text-sm text-ink">
             {isUndoRequester
               ? '「待った」を申請中です。相手の返答をお待ちください。'
               : `${resolvePlayerName(undoRequest.requested_by, students)} が「待った」を申請しています。`}
@@ -586,7 +586,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               </button>
               <button
                 onClick={handleResignClick}
-                className="secondary-button flex items-center gap-1.5 text-xs px-3 py-1.5 border-shu/20 hover:bg-shu/10 hover:text-shu-light"
+                className="secondary-button flex items-center gap-1.5 text-xs px-3 py-1.5 border-alert/25 hover:bg-alert/10 hover:text-alert-text"
               >
                 <Flag className="w-3.5 h-3.5" /> 投了
               </button>
@@ -602,9 +602,9 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               <Undo2 className="w-3.5 h-3.5" /> 待った
             </button>
           )}
-          <span data-testid="turn-indicator" className="text-xs text-zinc-500">
+          <span data-testid="turn-indicator" className="text-xs text-muted">
             {isMyTurn ? (
-              <span className="text-kaya font-bold">あなたの番です</span>
+              <span className="text-accent-text font-bold">あなたの番です</span>
             ) : isParticipant ? (
               '相手の番です'
             ) : (
@@ -619,17 +619,17 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
       {(game.status === 'finished' || game.status === 'interrupted') && game.result && (
         <div
           data-testid="game-result-banner"
-          className="shrink-0 flex flex-col items-center gap-3 rounded-xl border border-kaya/40 bg-kaya/10 px-4 py-4 text-center"
+          className="shrink-0 flex flex-col items-center gap-3 rounded-xl border border-accent/40 bg-accent/10 px-4 py-4 text-center"
         >
-          <span className="text-lg sm:text-2xl font-bold text-white leading-snug">
+          <span className="text-lg sm:text-2xl font-bold text-ink leading-snug">
             {formatGameResultMessage(game.result)}
           </span>
-          <span className="text-xs text-zinc-400">{moveNumber}手で終局</span>
+          <span className="text-xs text-muted">{moveNumber}手で終局</span>
           {onBack && (
             <button
               onClick={onBack}
               data-testid="game-result-close"
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-100 rounded-lg text-sm font-bold transition-colors duration-150"
+              className="px-4 py-2 bg-raised hover:bg-line border border-line text-ink rounded-lg text-sm font-bold transition-colors duration-150"
             >
               閉じてホームへ
             </button>
@@ -642,7 +642,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                 if (!confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')) return;
                 await resumeGame();
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-kaya/15 hover:bg-kaya/25 text-kaya border border-kaya/30 rounded-lg transition-colors duration-150 font-bold"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/15 hover:bg-accent/20 text-accent-text border border-accent/30 rounded-lg transition-colors duration-150 font-bold"
             >
               <RefreshCw className="w-3.5 h-3.5" /> 対局を再開する
             </button>
@@ -652,7 +652,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
 
       {/* 先生用管理者機能（テスト・開発時のみ。本番の対局画面には出さない） */}
       {isTeacher && import.meta.env.DEV && (
-        <div className="shrink-0 flex flex-col sm:flex-row justify-center gap-3 pt-2 border-t border-white/5">
+        <div className="shrink-0 flex flex-col sm:flex-row justify-center gap-3 pt-2 border-t border-line">
           {game.status !== 'finished' && game.status !== 'interrupted' && (
             <button
               onClick={async () => {
@@ -660,7 +660,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                   await finishWithResult('強制終局');
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-kaya/15 hover:bg-kaya/25 text-kaya border border-kaya/30 rounded-lg transition-colors duration-150 font-bold"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/15 hover:bg-accent/20 text-accent-text border border-accent/30 rounded-lg transition-colors duration-150 font-bold"
             >
               対局を強制終了する（状態の解除）
             </button>
@@ -671,7 +671,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                 await resetGame();
               }
             }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-shu/20 hover:bg-shu/35 text-shu-light border border-shu/30 rounded-lg transition-colors duration-150 font-bold"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-alert/15 hover:bg-alert/30 text-alert-text border border-alert/35 rounded-lg transition-colors duration-150 font-bold"
           >
             <RefreshCw className="w-3.5 h-3.5" /> 対局を初期状態（0手目）に戻す
           </button>

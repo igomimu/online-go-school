@@ -993,7 +993,7 @@ function App() {
   if (isDedicatedGameMode && paramGameId && paramIdentity) {
     const isTeacherRole = paramRole === 'TEACHER';
     return (
-      <div className="fixed inset-0 bg-zinc-950 text-white p-1 overflow-hidden">
+      <div className="fixed inset-0 bg-ground text-ink p-1 overflow-hidden">
         <GameBoard
           gameId={paramGameId}
           myIdentity={decodeURIComponent(paramIdentity)}

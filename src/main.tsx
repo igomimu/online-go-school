@@ -3,6 +3,10 @@ import { createRoot } from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.tsx'
+import { initTheme } from './utils/theme'
+
+// 画面が出る前にテーマを確定させる（描画後だと一瞬ちらつく）
+initTheme()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

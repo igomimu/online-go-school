@@ -101,8 +101,8 @@ export default function TeacherGameWindow({
   return (
     <div style={{
       height: '100%',
-      background: '#26231c',
-      color: '#e9e4d9',
+      background: 'var(--color-raised)',
+      color: 'var(--color-ink)',
       display: 'flex',
       flexDirection: 'column',
     }}>
@@ -114,21 +114,21 @@ export default function TeacherGameWindow({
         justifyContent: 'space-between',
         gap: 8,
         padding: '9px 12px',
-        borderBottom: '1px solid #302c24',
-        background: '#1d1b16',
+        borderBottom: '1px solid var(--color-line)',
+        background: 'var(--color-surface)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <strong style={{ fontSize: 14, letterSpacing: '.04em' }}>多面打ち</strong>
-          <span style={{ color: '#9a9285', fontSize: 12 }}>
+          <span style={{ color: 'var(--color-muted)', fontSize: 12 }}>
             {sessions.length}面（あなたの番 {waitingCount}面）
           </span>
-          {loading && <span style={{ color: '#9a9285', fontSize: 12 }}>盤面読込中...</span>}
-          {error && <span style={{ color: '#e0745a', fontSize: 12 }}>盤面エラー: {error}</span>}
+          {loading && <span style={{ color: 'var(--color-muted)', fontSize: 12 }}>盤面読込中...</span>}
+          {error && <span style={{ color: 'var(--color-alert-text)', fontSize: 12 }}>盤面エラー: {error}</span>}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => setShowList(prev => !prev)}
-            style={{ border: '1px solid #302c24', borderRadius: 6, background: showList ? '#302c24' : '#26231c', color: '#e9e4d9', padding: '5px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+            style={{ border: '1px solid var(--color-line)', borderRadius: 6, background: showList ? 'var(--color-line)' : 'var(--color-raised)', color: 'var(--color-ink)', padding: '5px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
           >
             {showList ? '盤面表示' : '一覧'}
           </button>
@@ -143,8 +143,8 @@ export default function TeacherGameWindow({
             style={{
               border: '1px solid transparent',
               borderRadius: 6,
-              background: nextGameId ? '#d6b279' : '#302c24',
-              color: nextGameId ? '#15140f' : '#9a9285',
+              background: nextGameId ? 'var(--color-accent)' : 'var(--color-line)',
+              color: nextGameId ? 'var(--color-accent-ink)' : 'var(--color-muted)',
               padding: '5px 14px',
               cursor: nextGameId ? 'pointer' : 'not-allowed',
               fontWeight: 700,
@@ -158,7 +158,7 @@ export default function TeacherGameWindow({
 
       {/* 本体コンテンツ */}
       {sessions.length === 0 ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, color: '#9a9285' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, color: 'var(--color-muted)' }}>
           対局がありません。教室ホーム画面から対局を作成してください。
         </div>
       ) : showList ? (
@@ -189,7 +189,7 @@ export default function TeacherGameWindow({
           })}
         </div>
       ) : resolvedActiveId ? (
-        <div data-testid="simul-active-board" className="flex-1 min-h-0 bg-zinc-950 p-1 text-white overflow-hidden">
+        <div data-testid="simul-active-board" className="flex-1 min-h-0 bg-ground p-1 text-ink overflow-hidden">
           <GameBoard
             key={resolvedActiveId}
             gameId={resolvedActiveId}
@@ -199,7 +199,7 @@ export default function TeacherGameWindow({
           />
         </div>
       ) : (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, color: '#9a9285' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, color: 'var(--color-muted)' }}>
           対局がありません。
         </div>
       )}
