@@ -157,7 +157,7 @@ export default function StudentManager({
               key={key}
               onClick={() => setTab(key)}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                tab === key ? 'bg-blue-500 text-white' : 'bg-white/5 hover:bg-white/10'
+                tab === key ? 'bg-kaya text-sumi' : 'bg-white/5 hover:bg-white/10'
               }`}
             >
               {label}
@@ -178,7 +178,7 @@ export default function StudentManager({
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder="検索..."
-                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-kaya"
                   />
                 </div>
                 <button onClick={startAdd} className="premium-button flex items-center gap-1 text-sm">
@@ -195,7 +195,7 @@ export default function StudentManager({
                       <span className="font-medium truncate">{s.name}</span>
                       <span className="text-xs text-zinc-500 font-mono shrink-0">{s.studentCode || s.id}</span>
                       {s.rank && (
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-xs font-mono shrink-0">
+                        <span className="px-1.5 py-0.5 rounded bg-sumi-high text-nibi text-xs font-mono shrink-0">
                           {s.rank}
                         </span>
                       )}
@@ -213,8 +213,8 @@ export default function StudentManager({
                       <button onClick={() => startEdit(s)} className="p-1 hover:bg-white/10 rounded">
                         <Pencil className="w-3.5 h-3.5 text-zinc-400" />
                       </button>
-                      <button onClick={() => handleDelete(s.id)} className="p-1 hover:bg-red-500/20 rounded">
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      <button onClick={() => handleDelete(s.id)} className="p-1 hover:bg-shu/20 rounded">
+                        <Trash2 className="w-3.5 h-3.5 text-shu-light" />
                       </button>
                     </div>
                   </div>
@@ -234,7 +234,7 @@ export default function StudentManager({
                   type="text"
                   value={form.studentCode || form.id}
                   onChange={e => setForm(f => ({ ...f, id: e.target.value, studentCode: e.target.value }))}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
                 />
               </div>
 
@@ -244,7 +244,7 @@ export default function StudentManager({
                   type="text"
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
                 />
               </div>
 
@@ -254,7 +254,7 @@ export default function StudentManager({
                   <select
                     value={form.rank}
                     onChange={e => setForm(f => ({ ...f, rank: e.target.value }))}
-                    className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
                   >
                     <option value="" className="bg-zinc-800 text-white">未設定</option>
                     {RANKS.map(r => <option key={r} value={r} className="bg-zinc-800 text-white">{r}</option>)}
@@ -267,7 +267,7 @@ export default function StudentManager({
                     value={form.internalRating}
                     onChange={e => setForm(f => ({ ...f, internalRating: e.target.value }))}
                     placeholder="R3"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
                   />
                 </div>
               </div>
@@ -278,7 +278,7 @@ export default function StudentManager({
                   <select
                     value={form.type}
                     onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
-                    className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
                   >
                     {TYPES.map(t => <option key={t} value={t} className="bg-zinc-800 text-white">{t || '未設定'}</option>)}
                   </select>
@@ -289,7 +289,7 @@ export default function StudentManager({
                     type="date"
                     value={form.birthdate || ''}
                     onChange={e => setForm(f => ({ ...f, birthdate: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
                   />
                 </div>
               </div>
@@ -308,7 +308,7 @@ export default function StudentManager({
                     value={form.grade}
                     onChange={e => setForm(f => ({ ...f, grade: e.target.value }))}
                     disabled={!!form.birthdate}
-                    className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 disabled:opacity-40"
+                    className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya disabled:opacity-40"
                   >
                     {GRADES.map(g => <option key={g} value={g} className="bg-zinc-800 text-white">{g || '未設定'}</option>)}
                   </select>
@@ -319,7 +319,7 @@ export default function StudentManager({
                     type="text"
                     value={form.country}
                     onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-kaya"
                   />
                 </div>
               </div>
@@ -357,9 +357,9 @@ export default function StudentManager({
                       </div>
                       <button
                         onClick={() => handleDeleteClassroom(c.id)}
-                        className="p-1 hover:bg-red-500/20 rounded"
+                        className="p-1 hover:bg-shu/20 rounded"
                       >
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                        <Trash2 className="w-3.5 h-3.5 text-shu-light" />
                       </button>
                     </div>
                     {memberStudents.length > 0 && (
@@ -367,7 +367,7 @@ export default function StudentManager({
                         {memberStudents.map(s => (
                           <span key={s.id} className="px-2 py-0.5 bg-white/5 rounded text-xs">
                             {s.name}
-                            {s.rank && <span className="ml-1 text-amber-400">{s.rank}</span>}
+                            {s.rank && <span className="ml-1 text-nibi">{s.rank}</span>}
                           </span>
                         ))}
                       </div>
@@ -407,8 +407,8 @@ export default function StudentManager({
                 {importResult && (
                   <div className={`text-sm px-3 py-2 rounded-lg ${
                     importResult.startsWith('エラー')
-                      ? 'bg-red-500/10 text-red-400'
-                      : 'bg-green-500/10 text-green-400'
+                      ? 'bg-shu/10 text-shu-light'
+                      : 'bg-kaya/10 text-kaya'
                   }`}>
                     {importResult}
                   </div>

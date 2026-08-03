@@ -19,7 +19,7 @@ export default function AudioControls({
         onClick={onToggleMic}
         className={`p-2 rounded-lg transition-all ${
           isMicEnabled
-            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+            ? 'bg-kinari/10 text-kinari hover:bg-kinari/15'
             : 'bg-white/5 text-zinc-500 hover:bg-white/10'
         }`}
         title={isMicEnabled ? 'Mute microphone' : 'Unmute microphone'}
@@ -30,7 +30,7 @@ export default function AudioControls({
         onClick={onToggleMute}
         className={`p-2 rounded-lg transition-all ${
           isMuted
-            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+            ? 'bg-shu/20 text-shu-light hover:bg-shu/30'
             : 'bg-white/5 text-zinc-400 hover:bg-white/10'
         }`}
         title={isMuted ? 'Unmute audio' : 'Mute audio'}

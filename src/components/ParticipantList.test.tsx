@@ -51,7 +51,8 @@ describe('ParticipantList', () => {
         activeSpeakers={['sid:taro-uuid']}
       />
     );
-    const items = container.querySelectorAll('[class*="green-500"]');
+    // 発話中は色相ではなく明度で示す（生成りの面＋罫）
+    const items = container.querySelectorAll('[class*="border-kinari"]');
     expect(items.length).toBeGreaterThanOrEqual(1);
   });
 });

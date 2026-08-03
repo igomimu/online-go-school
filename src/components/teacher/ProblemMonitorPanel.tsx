@@ -130,12 +130,12 @@ export default function ProblemMonitorPanel({
             >
               <span className="truncate">{row.displayName}</span>
               {row.result === 'correct' && (
-                <span data-testid="problem-monitor-status" className="flex items-center gap-1 text-green-400 font-bold shrink-0">
+                <span data-testid="problem-monitor-status" className="flex items-center gap-1 text-kaya font-bold shrink-0">
                   <Check className="w-4 h-4" /> {row.moveCount}手
                 </span>
               )}
               {row.result === 'incorrect' && (
-                <span data-testid="problem-monitor-status" className="flex items-center gap-1 text-red-400 font-bold shrink-0">
+                <span data-testid="problem-monitor-status" className="flex items-center gap-1 text-shu-light font-bold shrink-0">
                   <X className="w-4 h-4" /> 不正解
                 </span>
               )}

@@ -527,7 +527,7 @@ export default function ReviewBoard({
               {isMaximized ? (isTeacher ? 'AI・チャットを表示' : 'チャットを表示') : '碁盤を広げる'}
             </button>
             {isTeacher && currentNode.children.length > 1 && (
-              <div className="flex items-center gap-2 text-blue-300 text-sm">
+              <div className="flex items-center gap-2 text-kaya text-sm">
                 <GitBranch className="w-4 h-4" />
                 <span>{currentNode.children.length}変化</span>
               </div>
@@ -587,7 +587,7 @@ export default function ReviewBoard({
                 title={currentNode.fromRecord
                   ? '棋譜の手は消えません（一手戻ります）'
                   : '検討で置いた直近の一手を取り消す (Delete / Ctrl+Z)'}
-                className="p-3 glass-panel hover:bg-red-500/10 hover:text-red-400 disabled:opacity-30"
+                className="p-3 glass-panel hover:bg-shu/10 hover:text-shu-light disabled:opacity-30"
               >
                 <Undo2 />
               </button>
@@ -600,8 +600,8 @@ export default function ReviewBoard({
                 onClick={() => { setToolMode('play'); setDrawMode('off'); }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 ${
                   toolMode === 'play' && drawMode === 'off'
-                    ? 'bg-blue-600 border-blue-500 text-white'
-                    : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                    ? 'bg-kaya border-kaya text-sumi'
+                    : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
                 }`}
                 title="通常の着手を行います (石を置く)"
               >
@@ -615,7 +615,7 @@ export default function ReviewBoard({
               <button
                 onClick={() => { setToolMode('circle'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'circle' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  toolMode === 'circle' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
                 }`}
                 title="丸印 (CIR)"
               >
@@ -624,7 +624,7 @@ export default function ReviewBoard({
               <button
                 onClick={() => { setToolMode('triangle'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'triangle' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  toolMode === 'triangle' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
                 }`}
                 title="三角印 (TRI)"
               >
@@ -633,7 +633,7 @@ export default function ReviewBoard({
               <button
                 onClick={() => { setToolMode('square'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'square' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  toolMode === 'square' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
                 }`}
                 title="四角印 (SQR)"
               >
@@ -642,7 +642,7 @@ export default function ReviewBoard({
               <button
                 onClick={() => { setToolMode('cross'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'cross' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  toolMode === 'cross' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
                 }`}
                 title="バツ印 (X)"
               >
@@ -655,7 +655,7 @@ export default function ReviewBoard({
               <button
                 onClick={() => { setToolMode('alpha'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all flex items-center gap-1 ${
-                  toolMode === 'alpha' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  toolMode === 'alpha' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
                 }`}
                 title="アルファベット順ラベル (A, B, C...)"
               >
@@ -665,7 +665,7 @@ export default function ReviewBoard({
               <button
                 onClick={() => { setToolMode('num'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all flex items-center gap-1 ${
-                  toolMode === 'num' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  toolMode === 'num' ? 'bg-kaya border-kaya text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
                 }`}
                 title="数字順ラベル (1, 2, 3...)"
               >
@@ -682,7 +682,7 @@ export default function ReviewBoard({
                   setToolMode('play');
                 }}
                 className={`p-2 rounded-lg border transition-all ${
-                  drawMode === 'line' ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  drawMode === 'line' ? 'bg-shu/20 border-shu text-shu-light' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
                 }`}
                 title="フリーハンド直線を描く"
               >
@@ -694,7 +694,7 @@ export default function ReviewBoard({
                   setToolMode('play');
                 }}
                 className={`p-2 rounded-lg border transition-all ${
-                  drawMode === 'arrow' ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  drawMode === 'arrow' ? 'bg-shu/20 border-shu text-shu-light' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
                 }`}
                 title="矢印を描く"
               >
@@ -707,7 +707,7 @@ export default function ReviewBoard({
               <button
                 onClick={() => { setToolMode('eraser'); setDrawMode('off'); }}
                 className={`p-2 rounded-lg border transition-all ${
-                  toolMode === 'eraser' ? 'bg-red-600 border-red-500 text-white' : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-white'
+                  toolMode === 'eraser' ? 'bg-shu border-shu text-sumi' : 'bg-sumi-high border-sumi-line text-nibi hover:text-kinari'
                 }`}
                 title="クリックしたマークを消去"
               >
@@ -716,7 +716,7 @@ export default function ReviewBoard({
               {(drawings.length > 0 || (currentNode.markers && currentNode.markers.length > 0)) && (
                 <button
                   onClick={clearAnnotations}
-                  className="p-2 rounded-lg border border-red-500/30 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition-all ml-1.5"
+                  className="p-2 rounded-lg border border-shu/30 text-zinc-400 hover:text-shu-light hover:bg-shu/10 transition-all ml-1.5"
                   title="すべてのマークと描画を消去"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -731,7 +731,7 @@ export default function ReviewBoard({
           <div className="flex justify-center items-center gap-2">
             <button
               onClick={autoReplay.toggle}
-              className={`p-2 glass-panel hover:bg-white/10 ${autoReplay.isPlaying ? 'bg-blue-500/20 text-blue-400' : ''}`}
+              className={`p-2 glass-panel hover:bg-white/10 ${autoReplay.isPlaying ? 'bg-kaya/15 text-kaya' : ''}`}
               title={autoReplay.isPlaying ? '停止' : '自動再生'}
             >
               {autoReplay.isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
@@ -743,7 +743,7 @@ export default function ReviewBoard({
                   onClick={() => autoReplay.setSpeed(s.value)}
                   className={`px-2 py-1 text-xs rounded ${
                     autoReplay.speed === s.value
-                      ? 'bg-blue-500/20 text-blue-400'
+                      ? 'bg-kaya/15 text-kaya'
                       : 'bg-white/5 text-zinc-500 hover:bg-white/10'
                   }`}
                 >
@@ -771,7 +771,7 @@ export default function ReviewBoard({
               <button
                 key={idx}
                 onClick={() => goForwardBranch(idx)}
-                className="px-3 py-1 bg-white/5 border border-white/10 rounded text-sm hover:bg-blue-500/20"
+                className="px-3 py-1 bg-white/5 border border-white/10 rounded text-sm hover:bg-kaya/15"
               >
                 変化{idx + 1} ({child.move ? (child.move.color === 'BLACK' ? '黒' : '白') : '?'})
               </button>
@@ -816,7 +816,7 @@ export default function ReviewBoard({
                 <button
                   onClick={selectAllStudents}
                   className={`w-full text-sm py-1 rounded-lg transition-all ${
-                    targetStudents?.length === 0 ? 'bg-blue-500/20 text-blue-400' : 'bg-white/5 hover:bg-white/10'
+                    targetStudents?.length === 0 ? 'bg-kaya/15 text-kaya' : 'bg-white/5 hover:bg-white/10'
                   }`}
                 >
                   全員に配信
@@ -829,7 +829,7 @@ export default function ReviewBoard({
                         key={s.identity}
                         onClick={() => toggleStudent(s.identity)}
                         className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
-                          isSelected ? 'bg-blue-500/10 text-blue-300' : 'bg-white/5 text-zinc-500'
+                          isSelected ? 'bg-kaya/10 text-kaya' : 'bg-white/5 text-zinc-500'
                         }`}
                       >
                         {s.name || getDisplayName(s.identity, registeredStudents ?? [])}

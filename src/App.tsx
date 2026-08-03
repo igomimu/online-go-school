@@ -1021,14 +1021,14 @@ function App() {
               <label className="block text-sm text-zinc-400 mb-1">LiveKitサーバーURL</label>
               <input type="text" value={livekitUrl} onChange={e => setLivekitUrl(e.target.value)}
                 placeholder="wss://your-app.livekit.cloud"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500" />
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-kaya" />
             </div>
 
             <div>
               <label className="block text-sm text-zinc-400 mb-1">ルーム名</label>
               <input type="text" value={roomName} onChange={e => setRoomName(e.target.value)}
                 placeholder="go-classroom"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500" />
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-kaya" />
             </div>
           </div>
 
@@ -1072,7 +1072,7 @@ function App() {
               <h2 className="text-xl font-bold">LiveKit設定</h2>
               <div>
                 <label className="block text-sm text-zinc-400 mb-1">LiveKit URL</label>
-                <input value={livekitUrl} onChange={e => setLivekitUrl(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500" />
+                <input value={livekitUrl} onChange={e => setLivekitUrl(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-kaya" />
               </div>
 
               <div className="flex gap-3">
@@ -1093,13 +1093,13 @@ function App() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-6">
         <div
-          className="glass-panel p-8 w-full max-w-lg space-y-6 border-blue-400/40"
+          className="glass-panel p-8 w-full max-w-lg space-y-6 border-kaya/40"
           style={{
             background: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.10))',
           }}
         >
           <div className="text-center space-y-1">
-            <p className="text-xs font-medium text-blue-300 uppercase tracking-wider">接続先</p>
+            <p className="text-xs font-medium text-kaya uppercase tracking-wider">接続先</p>
             <h2 className="text-2xl font-bold text-white">
               {currentClassroomName || '教室'}
             </h2>
@@ -1109,10 +1109,10 @@ function App() {
           </div>
 
           {connectionState === ConnectionState.Connecting ? (
-            <div className="text-center text-blue-400">接続中...</div>
+            <div className="text-center text-kaya">接続中...</div>
           ) : connectionError ? (
             <div className="space-y-4">
-              <div className="text-red-400 text-sm bg-red-500/10 px-3 py-2 rounded-lg">{connectionError}</div>
+              <div className="text-shu-light text-sm bg-shu/10 px-3 py-2 rounded-lg">{connectionError}</div>
               <button
                 onClick={() => {
                   setConnectionError('');
@@ -1235,14 +1235,14 @@ function App() {
 
       {/* 接続エラー */}
       {!isBoardFocusMode && connectionError && (
-        <div className="bg-red-500/20 border border-red-500/30 text-red-300 px-4 py-2 rounded-xl text-sm">
+        <div className="bg-shu/20 border border-shu/30 text-shu-light px-4 py-2 rounded-xl text-sm">
           {connectionError}
         </div>
       )}
 
       {/* オーディオデバッグ */}
       {!isBoardFocusMode && audioDebug && (
-        <div className="bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 px-4 py-2 rounded-xl text-sm flex items-center gap-3">
+        <div className="bg-kaya/15 border border-kaya/30 text-kaya px-4 py-2 rounded-xl text-sm flex items-center gap-3">
           <span className="flex-1 text-xs">
             {import.meta.env.DEV ? audioDebug : '音声が聞こえない場合は「音声を開始」を押してください'}
           </span>
@@ -1260,7 +1260,7 @@ function App() {
                 setAudioDebug(prev => prev + ` [エラー: ${e}]`);
               }
             }}
-            className="px-3 py-1 bg-green-500/30 border border-green-500/50 rounded-lg text-green-300 text-xs whitespace-nowrap"
+            className="px-3 py-1 bg-kaya hover:bg-kaya/85 text-sumi font-bold rounded-lg text-xs whitespace-nowrap transition-colors duration-150"
           >
             音声を開始
           </button>

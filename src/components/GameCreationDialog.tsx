@@ -128,7 +128,7 @@ export default function GameCreationDialog({
           <label className="block text-sm text-zinc-400 mb-1">
             黒番
             {getRank(blackPlayer) && (
-              <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-xs font-mono">
+              <span className="ml-2 px-1.5 py-0.5 rounded bg-sumi-high text-nibi text-xs font-mono">
                 {getRank(blackPlayer)}
               </span>
             )}
@@ -137,7 +137,7 @@ export default function GameCreationDialog({
             data-testid="black-player-select"
             value={blackPlayer}
             onChange={e => setBlackPlayer(e.target.value)}
-            className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+            className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-kaya"
           >
             {allPlayers.map(p => {
               const rank = getRank(p);
@@ -155,7 +155,7 @@ export default function GameCreationDialog({
           <label className="block text-sm text-zinc-400 mb-1">
             白番
             {getRank(whitePlayer) && (
-              <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-xs font-mono">
+              <span className="ml-2 px-1.5 py-0.5 rounded bg-sumi-high text-nibi text-xs font-mono">
                 {getRank(whitePlayer)}
               </span>
             )}
@@ -164,7 +164,7 @@ export default function GameCreationDialog({
             data-testid="white-player-select"
             value={whitePlayer}
             onChange={e => setWhitePlayer(e.target.value)}
-            className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+            className="w-full bg-white/5 text-white border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-kaya"
           >
             {allPlayers.map(p => {
               const rank = getRank(p);
@@ -178,7 +178,7 @@ export default function GameCreationDialog({
         </div>
 
         {blackPlayer === whitePlayer && (
-          <p className="text-red-400 text-sm">黒と白に同じプレイヤーは選べません</p>
+          <p className="text-shu-light text-sm">黒と白に同じプレイヤーは選べません</p>
         )}
 
         {/* 碁盤サイズ */}
@@ -191,7 +191,7 @@ export default function GameCreationDialog({
                 onClick={() => setBoardSize(size)}
                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                   boardSize === size
-                    ? 'bg-blue-500 text-white'
+                    ? 'bg-kaya text-sumi'
                     : 'bg-white/5 hover:bg-white/10'
                 }`}
               >
@@ -215,7 +215,7 @@ export default function GameCreationDialog({
                 }}
                 className={`flex-1 min-w-[3rem] py-2 rounded-lg text-sm font-medium transition-all ${
                   handicap === h
-                    ? 'bg-blue-500 text-white'
+                    ? 'bg-kaya text-sumi'
                     : 'bg-white/5 hover:bg-white/10'
                 }`}
               >
@@ -233,7 +233,7 @@ export default function GameCreationDialog({
             value={komi}
             step={0.5}
             onChange={e => { setKomi(parseFloat(e.target.value) || 0); setHandicapTouched(true); }}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:border-kaya"
           />
         </div>
 

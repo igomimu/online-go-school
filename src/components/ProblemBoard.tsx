@@ -40,16 +40,16 @@ export default function ProblemBoard({
 
   const statusColor = {
     waiting: 'text-zinc-400',
-    solving: 'text-blue-400',
-    correct: 'text-green-400',
-    incorrect: 'text-red-400',
+    solving: 'text-kaya',
+    correct: 'text-kaya',
+    incorrect: 'text-shu-light',
   }[problemState.status];
 
   const statusIcon = {
     waiting: null,
     solving: null,
-    correct: <Check className="w-5 h-5 text-green-400" />,
-    incorrect: <X className="w-5 h-5 text-red-400" />,
+    correct: <Check className="w-5 h-5 text-kaya" />,
+    incorrect: <X className="w-5 h-5 text-shu-light" />,
   }[problemState.status];
 
   return (
@@ -72,7 +72,7 @@ export default function ProblemBoard({
               onClick={() => setShowReport(true)}
               title="この問題のまちがいを報告"
               aria-label="この問題のまちがいを報告"
-              className="text-zinc-500 hover:text-orange-400 transition-colors p-1"
+              className="text-zinc-500 hover:text-shu-light transition-colors p-1"
             >
               <Flag className="w-4 h-4" />
             </button>

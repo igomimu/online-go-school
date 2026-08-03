@@ -246,7 +246,11 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                         onMouseLeave={() => onCellMouseLeave?.()}
                         onMouseUp={onDragEnd}
                         onClick={() => { if (isGesturing()) return; onCellClick?.(x, y); }}
-                        className="cursor-pointer hover:fill-blue-500 hover:fill-opacity-10"
+                        // これから石が落ちる場所を、盤に落ちた影として示す。
+                        // （旧 hover:fill-blue-500 hover:fill-opacity-10 は Tailwind に
+                        //   fill-opacity ユーティリティが無く半透明が効かないため、
+                        //   木目の上に真っ青な四角が出ていた）
+                        className="cursor-pointer fill-transparent hover:fill-[rgba(21,20,15,0.16)]"
                     />
                 );
             }

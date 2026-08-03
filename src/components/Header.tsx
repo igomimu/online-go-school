@@ -41,10 +41,12 @@ export default function Header({
   return (
     <header className="flex justify-between items-center glass-panel px-4 py-3">
       <div className="flex items-center gap-3">
+        {/* 接続状態は色相ではなく明度で示す。繋がっていれば白石の色、
+            復旧中は鈍色で明滅、切れていれば朱。 */}
         <div className={`w-3 h-3 rounded-full ${
-          isConnected ? 'bg-green-500 animate-pulse' :
-          connectionState === ConnectionState.Reconnecting ? 'bg-yellow-500 animate-pulse' :
-          'bg-red-500'
+          isConnected ? 'bg-kinari' :
+          connectionState === ConnectionState.Reconnecting ? 'bg-nibi animate-pulse' :
+          'bg-shu'
         }`} />
         <h2 className="font-bold text-lg">
           {role === 'TEACHER' ? '先生' : '生徒'}
@@ -64,7 +66,7 @@ export default function Header({
               onClick={onToggleMic}
               className={`p-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 isMicEnabled
-                  ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                  ? 'bg-kinari/10 text-kinari hover:bg-kinari/15'
                   : 'bg-white/5 text-zinc-500 hover:bg-white/10'
               }`}
               title={isMicEnabled ? 'マイクOFF' : 'マイクON'}
@@ -80,7 +82,7 @@ export default function Header({
               onClick={onToggleMute}
               className={`p-2 rounded-lg transition-all ${
                 isMuted
-                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                  ? 'bg-shu/20 text-shu-light hover:bg-shu/30'
                   : 'bg-white/5 text-zinc-400 hover:bg-white/10'
               }`}
               title={isMuted ? '音声ON' : '音声OFF'}
@@ -92,7 +94,7 @@ export default function Header({
                 onClick={onToggleCamera}
                 className={`p-2 rounded-lg transition-all flex items-center gap-1.5 ${
                   isCameraEnabled
-                    ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                    ? 'bg-kinari/10 text-kinari hover:bg-kinari/15'
                     : 'bg-white/5 text-zinc-500 hover:bg-white/10'
                 }`}
                 title={isCameraEnabled ? 'カメラOFF' : 'カメラON'}
@@ -111,7 +113,7 @@ export default function Header({
         {pwaInstall.shouldShowInstall && (
           <button
             onClick={handleInstallClick}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-600/15 text-blue-300 border border-blue-500/30 rounded-lg hover:bg-blue-600/25 transition-colors duration-150"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-kaya/10 text-kaya border border-kaya/30 rounded-lg hover:bg-kaya/20 transition-colors duration-150"
             title={pwaInstall.isIos && !pwaInstall.canInstall ? 'ホーム画面に追加' : 'アプリをインストール'}
           >
             <Download className="w-4 h-4" />
@@ -120,7 +122,7 @@ export default function Header({
         )}
         <button
           onClick={onDisconnect}
-          className="p-2 text-zinc-500 hover:text-red-400 transition-colors"
+          className="p-2 text-zinc-500 hover:text-shu-light transition-colors"
           title="切断"
         >
           <LogOut className="w-4 h-4" />

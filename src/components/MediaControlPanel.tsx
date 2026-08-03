@@ -36,7 +36,7 @@ export default function MediaControlPanel({
               <button
                 onClick={() => onToggleHear(p.identity)}
                 className={`p-1.5 rounded transition-all ${
-                  perms.canHear ? 'text-green-400 hover:bg-green-500/20' : 'text-red-400 hover:bg-red-500/20'
+                  perms.canHear ? 'text-kinari hover:bg-kinari/10' : 'text-shu-light hover:bg-shu/20'
                 }`}
                 title={perms.canHear ? '音声配信中' : '音声停止中'}
               >
@@ -45,7 +45,7 @@ export default function MediaControlPanel({
               <button
                 onClick={() => onToggleMic(p.identity)}
                 className={`p-1.5 rounded transition-all ${
-                  perms.micAllowed ? 'text-green-400 hover:bg-green-500/20' : 'text-red-400 hover:bg-red-500/20'
+                  perms.micAllowed ? 'text-kinari hover:bg-kinari/10' : 'text-shu-light hover:bg-shu/20'
                 }`}
                 title={perms.micAllowed ? 'マイク許可中' : 'マイク禁止中'}
               >

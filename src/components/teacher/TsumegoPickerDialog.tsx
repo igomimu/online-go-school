@@ -68,7 +68,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
               onClick={() => setLevel(null)}
               className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
                 level === null
-                  ? 'bg-blue-600 border-blue-500 text-white'
+                  ? 'bg-kaya border-kaya text-sumi'
                   : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
               }`}
             >
@@ -80,7 +80,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
                 onClick={() => setLevel(l)}
                 className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
                   level === l
-                    ? 'bg-blue-600 border-blue-500 text-white'
+                    ? 'bg-kaya border-kaya text-sumi'
                     : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
                 }`}
               >
@@ -99,7 +99,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
                 onClick={() => setBoardSize(size)}
                 className={`px-3 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
                   boardSize === size
-                    ? 'bg-blue-600 border-blue-500 text-white'
+                    ? 'bg-kaya border-kaya text-sumi'
                     : 'bg-white/5 border-white/10 text-zinc-400 hover:text-white'
                 }`}
               >
@@ -119,7 +119,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
         </button>
 
         {error && (
-          <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+          <div className="text-sm text-shu-light bg-shu/10 border border-shu/20 rounded-lg px-4 py-3">
             {error}
           </div>
         )}

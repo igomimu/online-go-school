@@ -49,7 +49,7 @@ export default function ClassroomSelector({
               <button
                 onClick={() => { onSelectClassroom(null); setIsOpen(false); }}
                 className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 ${
-                  !selectedClassroomId ? 'bg-blue-500/10 text-blue-400' : ''
+                  !selectedClassroomId ? 'bg-kaya/10 text-kaya' : ''
                 }`}
               >
                 全生徒
@@ -61,7 +61,7 @@ export default function ClassroomSelector({
                     key={c.id}
                     onClick={() => { onSelectClassroom(c.id); setIsOpen(false); }}
                     className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 flex justify-between ${
-                      selectedClassroomId === c.id ? 'bg-blue-500/10 text-blue-400' : ''
+                      selectedClassroomId === c.id ? 'bg-kaya/10 text-kaya' : ''
                     }`}
                   >
                     <span>{c.name}</span>
@@ -94,7 +94,7 @@ export default function ClassroomSelector({
                 <span>{s.name}</span>
                 <div className="flex items-center gap-1">
                   {s.rank && (
-                    <span className="px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">
+                    <span className="px-1 py-0.5 rounded bg-sumi-high text-nibi font-mono">
                       {s.rank}
                     </span>
                   )}

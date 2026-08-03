@@ -15,7 +15,7 @@ export default function RecordingControls() {
       {recorder.state === 'idle' && (
         <button
           onClick={() => recorder.startRecording()}
-          className="flex items-center gap-1 px-2 py-1 text-xs bg-red-500/10 text-red-400 border border-red-500/20 rounded hover:bg-red-500/20"
+          className="flex items-center gap-1 px-2 py-1 text-xs bg-shu/10 text-shu-light border border-shu/20 rounded hover:bg-shu/20"
           title="録画開始"
         >
           <Video className="w-3 h-3" /> 録画
@@ -24,7 +24,7 @@ export default function RecordingControls() {
 
       {recorder.state === 'recording' && (
         <>
-          <span className="text-xs text-red-400 animate-pulse font-mono">
+          <span className="text-xs text-shu-light animate-pulse font-mono">
             ● {formatDuration(recorder.duration)}
           </span>
           <button
@@ -40,7 +40,7 @@ export default function RecordingControls() {
         <>
           <button
             onClick={recorder.downloadRecording}
-            className="flex items-center gap-1 px-2 py-1 text-xs bg-green-500/10 text-green-400 border border-green-500/20 rounded hover:bg-green-500/20"
+            className="flex items-center gap-1 px-2 py-1 text-xs bg-kaya/10 text-kaya border border-kaya/30 rounded hover:bg-kaya/20"
           >
             <Download className="w-3 h-3" /> 保存
           </button>

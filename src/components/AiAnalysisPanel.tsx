@@ -33,9 +33,9 @@ export default function AiAnalysisPanel({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Brain className="w-4 h-4 text-amber-400" />
+          <Brain className="w-4 h-4 text-kaya" />
           <h3 className="font-bold text-sm">AI分析</h3>
-          {settings.enabled && isLoading && <Loader2 className="w-4 h-4 animate-spin text-amber-400" aria-label="AI解析中" />}
+          {settings.enabled && isLoading && <Loader2 className="w-4 h-4 animate-spin text-kaya" aria-label="AI解析中" />}
         </div>
         <div className="flex items-center gap-2">
           {/* 生徒側にAIのON/OFF表示は出さない（操作できないものを見せない）。
@@ -48,7 +48,7 @@ export default function AiAnalysisPanel({
               onClick={() => onUpdateSettings({ enabled: !settings.enabled })}
               className={`px-3 py-1 text-xs font-bold rounded-md border transition-colors duration-150 ${
                 settings.enabled
-                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 hover:bg-amber-500/25'
+                  ? 'bg-kaya/15 border-kaya/40 text-kaya hover:bg-kaya/25'
                   : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-white'
               }`}
             >
@@ -64,7 +64,7 @@ export default function AiAnalysisPanel({
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">
+        <div className="flex items-center gap-2 text-xs text-shu-light bg-shu/10 px-2 py-1 rounded">
           <AlertCircle className="w-3 h-3 flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -79,9 +79,10 @@ export default function AiAnalysisPanel({
               <span className="font-semibold text-zinc-300">黒 {result.winrate.toFixed(1)}%</span>
               <span className="font-semibold text-zinc-300">白 {(100 - result.winrate).toFixed(1)}%</span>
             </div>
-            <div className="h-3 bg-zinc-100 rounded-full overflow-hidden border border-zinc-600">
+            {/* 勝率バーは石の色そのままで読ませる。左（黒の取り分）が墨、残りが蛤の白。 */}
+            <div className="h-3 bg-kinari rounded-full overflow-hidden border border-sumi-line">
               <div
-                className="h-full bg-blue-500 transition-all duration-300"
+                className="h-full bg-sumi transition-all duration-300"
                 style={{ width: `${result.winrate}%` }}
               />
             </div>
@@ -102,6 +103,8 @@ export default function AiAnalysisPanel({
               <div className="space-y-1">
                 {result.topMoves.slice(0, 5).map((move, i) => {
                   const coord = fromGtpCoord(move.move, boardSize);
+                  // 盤上の候補手マーカーと同じ色。Pocket KataGo と揃えてあるので
+                  // 無彩色化の対象外（1位=水色・2位=緑・3位以降=黄、GoBoard.tsx と対）。
                   const candidateColor = i === 0 ? 'bg-sky-400' : i === 1 ? 'bg-green-500' : 'bg-yellow-400';
                   return (
                     <div
@@ -159,7 +162,7 @@ export default function AiAnalysisPanel({
                 type="checkbox"
                 checked={settings.allowStudentInteraction}
                 onChange={e => onUpdateSettings({ allowStudentInteraction: e.target.checked })}
-                className="mt-0.5 accent-amber-500"
+                className="mt-0.5 accent-kaya"
               />
               <span>
                 <span className="block text-zinc-300">生徒の候補手操作を許可</span>
