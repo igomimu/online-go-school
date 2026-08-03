@@ -34,20 +34,22 @@ export default function BoardCorner({ className = '' }: { className?: string }) 
         <pattern id="board-corner-wood" patternUnits="userSpaceOnUse" width="512" height="512">
           <image href="/wood-board-texture-v2.webp" x="0" y="0" width="512" height="512" />
         </pattern>
-        {/* 盤は画面の外へ続いているように、右と下を背景色へ溶かす */}
+        {/* 盤は画面の外へ続いているように、右と下を地の色へ溶かす。
+            溶かす先を墨で決め打つと、明るい地のときに黒い矩形が浮いて見出しを潰す */}
         <linearGradient id="board-corner-fade-x" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="30%" stopColor="#15140f" stopOpacity="0" />
-          <stop offset="100%" stopColor="#15140f" stopOpacity="1" />
+          <stop offset="30%" stopColor="var(--color-ground)" stopOpacity="0" />
+          <stop offset="100%" stopColor="var(--color-ground)" stopOpacity="1" />
         </linearGradient>
         <linearGradient id="board-corner-fade-y" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="30%" stopColor="#15140f" stopOpacity="0" />
-          <stop offset="100%" stopColor="#15140f" stopOpacity="1" />
+          <stop offset="30%" stopColor="var(--color-ground)" stopOpacity="0" />
+          <stop offset="100%" stopColor="var(--color-ground)" stopOpacity="1" />
         </linearGradient>
       </defs>
 
       <rect x="0" y="0" width={SIZE} height={SIZE} fill="url(#board-corner-wood)" />
-      {/* 背景装飾なので沈める。ここが明るいとフォームより先に目に入ってしまう */}
-      <rect x="0" y="0" width={SIZE} height={SIZE} fill="#15140f" opacity="0.42" />
+      {/* 背景装飾なので地の色でかぶせて沈める。暗い地なら暗く、明るい地なら淡く木目が残る
+          （ここが強いとフォームより先に目に入ってしまう） */}
+      <rect x="0" y="0" width={SIZE} height={SIZE} fill="var(--color-ground)" opacity="0.42" />
 
       <g stroke="black" strokeWidth={1.5} strokeLinecap="square" shapeRendering="geometricPrecision">
         {Array.from({ length: LINES }, (_, i) => (

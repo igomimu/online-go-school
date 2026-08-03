@@ -1,17 +1,17 @@
 /**
- * 明暗テーマ。既定は今までどおり墨（ダーク）。
+ * 明暗テーマ。既定は紙（ライト）。
  *
  * 明背景に暗い文字のほうが、若年層でも高齢者でも読みの成績が良いことが分かっている
  * （Piepenbrock et al., Ergonomics 2013）。一方で白内障など目の中の透光体が濁って
- * いる人は暗背景のほうが読めるため、どちらかに寄せきらず選べる形にする。
+ * いる人と、暗い部屋では暗背景のほうが読みやすい。どちらかに寄せきらず、
+ * ヘッダーのボタンでいつでも切り替えられるようにしてある。
  *
- * 現時点では対局画面のみライトに対応した試作段階なので、既定は 'dark' のまま。
- * 全画面が揃ったら既定を 'light' に変える（そのとき変えるのはこの DEFAULT_THEME だけ）。
+ * 選んだテーマは端末ごとに localStorage に残す（生徒それぞれが自分の見え方を選べる）。
  */
 export type Theme = 'dark' | 'light';
 
 const STORAGE_KEY = 'go-school-theme';
-const DEFAULT_THEME: Theme = 'dark';
+const DEFAULT_THEME: Theme = 'light';
 
 function isTheme(value: string | null): value is Theme {
   return value === 'dark' || value === 'light';
@@ -48,4 +48,10 @@ export function initTheme(): Theme {
   const theme = resolveTheme();
   applyTheme(theme);
   return theme;
+}
+
+/** 現在のテーマ（html の data-theme を正とする） */
+export function currentTheme(): Theme {
+  const value = document.documentElement.dataset.theme;
+  return isTheme(value ?? null) ? value : DEFAULT_THEME;
 }

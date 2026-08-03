@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, Trash2, Plus, Lock, ArrowLeft, RefreshCw, Download } from 'lucide-react';
 import BoardCorner from './BoardCorner';
+import ThemeToggle from './ThemeToggle';
 import {
   loadAccounts,
   deleteAccount,
@@ -426,6 +427,9 @@ function LoginLayout({ children }: { children: ReactNode }) {
   return (
     <div className="relative flex min-h-screen w-full items-end overflow-hidden lg:items-center">
       <BoardCorner className="pointer-events-none absolute -left-16 -top-28 w-[112vw] max-w-[420px] sm:-left-20 lg:w-[44vw] lg:max-w-[500px]" />
+
+      {/* 打ち始める前に自分の見え方を選べるよう、ログイン画面にも置く */}
+      <ThemeToggle className="absolute right-4 top-4 z-10" />
 
       <div className="relative mx-auto w-full max-w-4xl px-6 py-10 lg:py-12">
         <div className="flex w-full flex-col gap-9 lg:flex-row lg:items-start lg:justify-between lg:gap-12">

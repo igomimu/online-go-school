@@ -2,6 +2,7 @@ import { Download, LogOut, Volume2, VolumeX, Mic, MicOff, Video, VideoOff } from
 import { ConnectionState } from 'livekit-client';
 import type { Role } from '../utils/classroomLiveKit';
 import RecordingControls from './RecordingControls';
+import ThemeToggle from './ThemeToggle';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 
 interface HeaderProps {
@@ -110,6 +111,7 @@ export default function Header({
           </>
         )}
         {role === 'TEACHER' && isConnected && <RecordingControls />}
+        <ThemeToggle />
         {pwaInstall.shouldShowInstall && (
           <button
             onClick={handleInstallClick}
