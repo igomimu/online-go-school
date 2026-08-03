@@ -20,7 +20,7 @@ function EmptyBoardSlot({ isConnected }: { isConnected: boolean }) {
 
   return (
     <div style={{ opacity: isConnected ? 1 : 0.5 }}>
-      <svg width="100%" viewBox={`0 0 ${totalSize} ${totalSize}`} style={{ border: '1px solid #999', display: 'block' }}>
+      <svg width="100%" viewBox={`0 0 ${totalSize} ${totalSize}`} style={{ border: '1px solid #302c24', display: 'block' }}>
         <rect width={totalSize} height={totalSize} fill="#DCB35C" />
         {Array.from({ length: size }).map((_, i) => (
           <g key={i}>
@@ -57,7 +57,7 @@ export default function BoardThumbnailGrid({
         gridTemplateColumns: 'repeat(5, 1fr)',
         gap: 8,
         padding: 8,
-        background: '#d0d0c8',
+        background: '#26231c',
       }}
     >
       {students.map(student => {
@@ -77,9 +77,8 @@ export default function BoardThumbnailGrid({
             <div
               style={{
                 fontSize: 12,
-                fontFamily: 'MS Gothic, monospace',
                 fontWeight: 'bold',
-                color: '#333',
+                color: '#e9e4d9',
                 marginBottom: 2,
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
@@ -102,7 +101,7 @@ export default function BoardThumbnailGrid({
       })}
 
       {students.length === 0 && (
-        <div style={{ gridColumn: 'span 5', textAlign: 'center', padding: 32, color: '#666' }}>
+        <div style={{ gridColumn: 'span 5', textAlign: 'center', padding: 32, color: '#9a9285' }}>
           教室を選択してください
         </div>
       )}

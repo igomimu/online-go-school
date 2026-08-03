@@ -230,7 +230,7 @@ export default function ClassroomManager({
 
   const cellStyle: React.CSSProperties = {
     padding: '3px 6px',
-    border: '1px solid #ccc',
+    border: '1px solid #302c24',
     fontSize: 11,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
@@ -239,9 +239,9 @@ export default function ClassroomManager({
 
   const headerCellStyle: React.CSSProperties = {
     ...cellStyle,
-    background: '#d0d0c8',
+    background: '#26231c',
     fontWeight: 'bold',
-    borderBottom: '2px solid #999',
+    borderBottom: '2px solid #302c24',
   };
 
   return (
@@ -249,15 +249,14 @@ export default function ClassroomManager({
       display: 'flex',
       flexDirection: 'column',
       height: '100vh',
-      background: '#ffff80',
-      color: '#333',
-      fontFamily: 'MS Gothic, "Noto Sans JP", monospace',
+      background: '#2a2419',
+      color: '#e9e4d9',
       fontSize: 12,
     }}>
       {/* タイトルバー */}
       <div style={{
-        background: '#3030a0',
-        color: 'white',
+        background: '#26231c',
+        color: '#e9e4d9',
         padding: '4px 10px',
         fontSize: 13,
         fontWeight: 'bold',
@@ -266,8 +265,8 @@ export default function ClassroomManager({
         gap: 8,
       }}>
         <span style={{
-          background: '#333',
-          color: 'white',
+          background: '#26231c',
+          color: '#e9e4d9',
           borderRadius: '50%',
           width: 22,
           height: 22,
@@ -280,7 +279,7 @@ export default function ClassroomManager({
       </div>
 
       {/* タブ */}
-      <div style={{ display: 'flex', gap: 0, background: '#d0d0c8', padding: '0 4px' }}>
+      <div style={{ display: 'flex', gap: 0, background: '#26231c', padding: '0 4px' }}>
         <TabButton label="教室情報" active={activeTab === 'classroom'} onClick={() => setActiveTab('classroom')} />
         <TabButton label="生徒情報" active={activeTab === 'student'} onClick={() => setActiveTab('student')} />
       </div>
@@ -291,15 +290,15 @@ export default function ClassroomManager({
         <div style={{
           width: 280,
           padding: '12px 16px',
-          borderRight: '2px solid #999',
-          background: '#ffff80',
+          borderRight: '2px solid #302c24',
+          background: '#2a2419',
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
         }}>
           <div style={{
-            background: '#e0e0d0',
-            border: '2px solid #999',
+            background: '#26231c',
+            border: '2px solid #302c24',
             padding: 10,
             fontSize: 11,
             lineHeight: 1.6,
@@ -309,22 +308,22 @@ export default function ClassroomManager({
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <label style={{ fontWeight: 'bold', width: 50 }}>姓名</label>
-            <div style={{ flex: 1, background: '#fff', border: '1px solid #999', padding: '2px 6px' }}>
+            <div style={{ flex: 1, background: '#15140f', border: '1px solid #302c24', padding: '2px 6px' }}>
               三村 智保
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <label style={{ fontWeight: 'bold', width: 50 }}>棋力</label>
-            <div style={{ flex: 1, background: '#fff', border: '1px solid #999', padding: '2px 6px' }}>
+            <div style={{ flex: 1, background: '#15140f', border: '1px solid #302c24', padding: '2px 6px' }}>
               9P
             </div>
           </div>
 
           {/* XMLインポート */}
           <div style={{
-            background: '#e0f0e0',
-            border: '2px solid #60a060',
+            background: '#232019',
+            border: '2px solid #302c24',
             padding: 10,
           }}>
             <div style={{ fontWeight: 'bold', marginBottom: 6 }}>データ登録</div>
@@ -332,25 +331,25 @@ export default function ClassroomManager({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <IgcButton
                 label={syncing ? '同期中...' : '道場アプリ連携（ネット生）'}
-                color="#ff9060"
+                color="#c8563c"
                 onClick={syncing ? undefined : handleDojoSync}
               />
-              <IgcButton label="XMLインポート" color="#90d060" onClick={() => fileInputRef.current?.click()} />
+              <IgcButton label="XMLインポート" color="#26231c" onClick={() => fileInputRef.current?.click()} />
               <IgcButton
                 label={syncing ? '処理中...' : 'ローカル名簿をサーバー移行'}
-                color="#f0d060"
+                color="#26231c"
                 onClick={syncing ? undefined : handleMigrateLocalRoster}
               />
-              <IgcButton label="教室を追加" color="#60c0f0" onClick={handleAddClassroom} />
-              <IgcButton label="生徒を追加" color="#f0c060" onClick={() => { setActiveTab('student'); startAddStudent(); }} />
+              <IgcButton label="教室を追加" color="#26231c" onClick={handleAddClassroom} />
+              <IgcButton label="生徒を追加" color="#26231c" onClick={() => { setActiveTab('student'); startAddStudent(); }} />
             </div>
             {importResult && (
               <div style={{
                 marginTop: 6,
                 padding: 4,
                 fontSize: 10,
-                background: importResult.startsWith('エラー') ? '#fdd' : '#dfd',
-                border: `1px solid ${importResult.startsWith('エラー') ? '#c00' : '#0a0'}`,
+                background: importResult.startsWith('エラー') ? '#2a1d19' : '#232019',
+                border: `1px solid ${importResult.startsWith('エラー') ? '#8a4a3a' : '#302c24'}`,
               }}>
                 {importResult}
               </div>
@@ -359,30 +358,30 @@ export default function ClassroomManager({
 
           {activeTab === 'student' && selectedStudentIds.size > 0 && (
             <div style={{
-              background: '#ffe0e0',
-              border: '2px solid #cc6060',
+              background: '#2a1d19',
+              border: '2px solid #8a4a3a',
               padding: 10,
               marginTop: 8,
             }}>
-              <div style={{ fontWeight: 'bold', marginBottom: 6, color: '#cc0000', fontSize: 11 }}>一括操作</div>
+              <div style={{ fontWeight: 'bold', marginBottom: 6, color: '#e0745a', fontSize: 11 }}>一括操作</div>
               <div style={{ fontSize: 11, marginBottom: 6 }}>{selectedStudentIds.size} 名を選択中</div>
               <IgcButton
                 label="選択した生徒を削除"
-                color="#ff6060"
+                color="#c8563c"
                 onClick={handleBulkDeleteStudents}
               />
             </div>
           )}
 
           <div style={{ marginTop: 'auto' }}>
-            <div style={{ color: '#cc0000', fontWeight: 'bold', marginBottom: 8, fontSize: 11 }}>
+            <div style={{ color: '#e0745a', fontWeight: 'bold', marginBottom: 8, fontSize: 11 }}>
               定期的に教室情報のバックアップをお願いします。
             </div>
           </div>
         </div>
 
         {/* 右: テーブルエリア */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#e8e8e0' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#1d1b16' }}>
           {activeTab === 'classroom' ? (
             /* === 教室情報タブ === */
             <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -402,12 +401,12 @@ export default function ClassroomManager({
                 <tbody>
                   {classrooms.map((cls, i) => (
                     <tr key={cls.id} style={{
-                      background: i % 2 === 0 ? '#f0f0e8' : '#e8e8e0',
+                      background: i % 2 === 0 ? '#201d17' : '#1d1b16',
                     }}>
                       <td style={{ ...cellStyle, textAlign: 'center' }}>
                         <button
                           onClick={() => handleDeleteClassroom(cls.id)}
-                          style={{ color: '#cc0000', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: 12 }}
+                          style={{ color: '#e0745a', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: 12 }}
                         >×</button>
                       </td>
                       <td style={{ ...cellStyle, textAlign: 'center' }}>
@@ -422,7 +421,7 @@ export default function ClassroomManager({
                       <td style={{
                         ...cellStyle,
                         fontWeight: 'bold',
-                        background: '#b0f0b0',
+                        background: '#232019',
                       }}>
                         {cls.name}
                       </td>
@@ -439,12 +438,12 @@ export default function ClassroomManager({
                   {classrooms.length === 0 && (
                     <tr>
                       <td colSpan={8} style={{ padding: 30, textAlign: 'center' }}>
-                        <div style={{ color: '#999', marginBottom: 12 }}>
+                        <div style={{ color: '#6b6559', marginBottom: 12 }}>
                           教室がありません
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
-                          <IgcButton label="XMLインポート" color="#90d060" onClick={() => fileInputRef.current?.click()} />
-                          <IgcButton label="教室を手動追加" color="#60c0f0" onClick={handleAddClassroom} />
+                          <IgcButton label="XMLインポート" color="#26231c" onClick={() => fileInputRef.current?.click()} />
+                          <IgcButton label="教室を手動追加" color="#26231c" onClick={handleAddClassroom} />
                         </div>
                       </td>
                     </tr>
@@ -458,8 +457,8 @@ export default function ClassroomManager({
               {/* 生徒追加/編集フォーム */}
               {isAddingStudent && (
                 <div style={{
-                  background: '#fffff0',
-                  border: '2px solid #999',
+                  background: '#1d1b16',
+                  border: '2px solid #302c24',
                   padding: 12,
                   margin: 8,
                 }}>
@@ -517,7 +516,7 @@ export default function ClassroomManager({
                     </FormField>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <IgcButton label={editingStudent ? '更新' : '追加'} color="#60a060" onClick={handleSaveStudent} />
+                    <IgcButton label={editingStudent ? '更新' : '追加'} color="#26231c" onClick={handleSaveStudent} />
                     <IgcButton label="キャンセル" onClick={() => setIsAddingStudent(false)} />
                   </div>
                 </div>
@@ -548,7 +547,7 @@ export default function ClassroomManager({
                 <tbody>
                   {students.map((s, i) => (
                     <tr key={s.id} style={{
-                      background: i % 2 === 0 ? '#f0f0e8' : '#e8e8e0',
+                      background: i % 2 === 0 ? '#201d17' : '#1d1b16',
                     }}>
                       <td style={{ ...cellStyle, textAlign: 'center' }}>
                         <input
@@ -561,7 +560,7 @@ export default function ClassroomManager({
                       <td style={{ ...cellStyle, textAlign: 'center' }}>
                         <button
                           onClick={() => handleDeleteStudent(s.id)}
-                          style={{ color: '#cc0000', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: 12 }}
+                          style={{ color: '#e0745a', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: 12 }}
                         >×</button>
                       </td>
                       <td style={{ ...cellStyle, textAlign: 'center' }}>
@@ -571,12 +570,12 @@ export default function ClassroomManager({
                       <td style={{
                         ...cellStyle,
                         fontWeight: 'bold',
-                        background: '#ffe0b0',
+                        background: '#2a2419',
                       }}>
                         {s.name}
                       </td>
                       <td style={{ ...cellStyle, textAlign: 'center' }}>{s.rank}</td>
-                      <td style={{ ...cellStyle, textAlign: 'center', color: '#cc6600' }}>{s.internalRating}</td>
+                      <td style={{ ...cellStyle, textAlign: 'center', color: '#d6b279' }}>{s.internalRating}</td>
                       <td style={cellStyle}>{s.type}</td>
                       <td style={{ ...cellStyle, textAlign: 'center' }}>{resolveGrade(s.birthdate, s.grade)}</td>
                       <td style={cellStyle}>{s.country}</td>
@@ -586,12 +585,12 @@ export default function ClassroomManager({
                   {students.length === 0 && (
                     <tr>
                       <td colSpan={10} style={{ padding: 30, textAlign: 'center' }}>
-                        <div style={{ color: '#999', marginBottom: 12 }}>
+                        <div style={{ color: '#6b6559', marginBottom: 12 }}>
                           生徒がいません
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
-                          <IgcButton label="XMLインポート" color="#90d060" onClick={() => fileInputRef.current?.click()} />
-                          <IgcButton label="生徒を手動追加" color="#f0c060" onClick={startAddStudent} />
+                          <IgcButton label="XMLインポート" color="#26231c" onClick={() => fileInputRef.current?.click()} />
+                          <IgcButton label="生徒を手動追加" color="#26231c" onClick={startAddStudent} />
                         </div>
                       </td>
                     </tr>
@@ -606,8 +605,8 @@ export default function ClassroomManager({
       {/* 下部ツールバー */}
       <div style={{
         padding: '4px 8px',
-        borderTop: '2px solid #999',
-        background: '#c0c0b8',
+        borderTop: '2px solid #302c24',
+        background: '#1d1b16',
         display: 'flex',
         alignItems: 'center',
         gap: 6,
@@ -615,12 +614,12 @@ export default function ClassroomManager({
         <IgcButton label="閉じる" onClick={onBack} />
         <div style={{ flex: 1 }} />
         {pwaInstall.shouldShowInstall && (
-          <IgcButton label="⬇ アプリをインストール" color="#6090f0" onClick={() => { void pwaInstall.install(); }} />
+          <IgcButton label="⬇ アプリをインストール" color="#26231c" onClick={() => { void pwaInstall.install(); }} />
         )}
-        <IgcButton label="教室追加" color="#60c0f0" onClick={handleAddClassroom} />
-        <IgcButton label="生徒追加" color="#f0c060" onClick={() => { setActiveTab('student'); startAddStudent(); }} />
-        <IgcButton label="XMLインポート" color="#90d060" onClick={() => fileInputRef.current?.click()} />
-        <IgcButton label="LiveKit設定" color="#d0d0c8" onClick={onOpenSettings} />
+        <IgcButton label="教室追加" color="#26231c" onClick={handleAddClassroom} />
+        <IgcButton label="生徒追加" color="#26231c" onClick={() => { setActiveTab('student'); startAddStudent(); }} />
+        <IgcButton label="XMLインポート" color="#26231c" onClick={() => fileInputRef.current?.click()} />
+        <IgcButton label="LiveKit設定" color="#26231c" onClick={onOpenSettings} />
         <DateTimeDisplay />
       </div>
 
@@ -644,10 +643,17 @@ const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '2px 4px',
   fontSize: 11,
-  border: '1px solid #999',
-  background: '#fff',
-  fontFamily: 'MS Gothic, monospace',
-};
+  border: '1px solid #302c24',
+  background: '#15140f',
+  };
+
+
+// ボタン面の色から文字色を決める。榧の面には墨、朱の面には生成りを置く。
+function faceText(face?: string): string {
+  if (face === '#d6b279') return '#15140f';
+  if (face === '#c8563c') return '#f6ece8';
+  return '#e9e4d9';
+}
 
 function FormField({ label, width, children }: { label: string; width: number; children: React.ReactNode }) {
   return (
@@ -666,13 +672,13 @@ function TabButton({ label, active, onClick }: { label: string; active: boolean;
         padding: '6px 24px',
         fontSize: 13,
         fontWeight: 'bold',
-        border: '1px solid #999',
-        borderBottom: active ? '1px solid #e8e8e0' : '1px solid #999',
-        background: active ? '#e8e8e0' : '#d0d0c8',
+        border: '1px solid #302c24',
+        borderBottom: active ? '1px solid #1d1b16' : '1px solid #302c24',
+        background: active ? '#1d1b16' : '#26231c',
         cursor: 'pointer',
         borderRadius: '4px 4px 0 0',
         marginBottom: -1,
-        color: '#333',
+        color: '#e9e4d9',
       }}
     >
       {label}
@@ -688,11 +694,11 @@ function RowButton({ label, onClick, bold }: { label: string; onClick: () => voi
         padding: '1px 6px',
         fontSize: 10,
         fontWeight: bold ? 'bold' : 'normal',
-        border: '1px solid #666',
-        background: '#d8d0c0',
+        border: '1px solid #302c24',
+        background: '#26231c',
+        color: '#e9e4d9',
         cursor: 'pointer',
-        fontFamily: 'MS Gothic, monospace',
-      }}
+        }}
     >
       {label}
     </button>
@@ -707,9 +713,9 @@ function IgcButton({ label, color, onClick }: { label: string; color?: string; o
         padding: '4px 12px',
         fontSize: 11,
         fontWeight: 'bold',
-        fontFamily: 'MS Gothic, monospace',
-        border: '1px solid #666',
-        background: color || '#d0d0c8',
+        border: '1px solid #302c24',
+        background: color || '#26231c',
+        color: faceText(color),
         cursor: onClick ? 'pointer' : 'default',
         whiteSpace: 'nowrap',
         opacity: onClick ? 1 : 0.5,
@@ -730,11 +736,10 @@ function DateTimeDisplay() {
       marginLeft: 8,
       fontSize: 12,
       fontWeight: 'bold',
-      color: '#cc0000',
+      color: '#e0745a',
       textAlign: 'right',
       lineHeight: 1.2,
-      fontFamily: 'MS Gothic, monospace',
-    }}>
+      }}>
       <div>{dateStr}（{dayStr}曜日）</div>
       <div style={{ fontSize: 14 }}>{now.toLocaleTimeString('ja-JP')}</div>
     </div>

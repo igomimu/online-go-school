@@ -83,7 +83,7 @@ export default function ClassroomSettingsDialog({
 
   const cellStyle: React.CSSProperties = {
     padding: '2px 6px',
-    border: '1px solid #ccc',
+    border: '1px solid #302c24',
     fontSize: 11,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
@@ -101,15 +101,14 @@ export default function ClassroomSettingsDialog({
       zIndex: 1000,
     }}>
       <div style={{
-        background: '#e8e8e0',
-        border: '2px solid #666',
+        background: '#1d1b16',
+        border: '2px solid #302c24',
         width: 800,
         maxHeight: '90vh',
         display: 'flex',
         flexDirection: 'column',
-        fontFamily: 'MS Gothic, "Noto Sans JP", monospace',
         fontSize: 12,
-        color: '#333',
+        color: '#e9e4d9',
       }}>
         {/* ヘッダー */}
         <div style={{
@@ -117,14 +116,14 @@ export default function ClassroomSettingsDialog({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '6px 10px',
-          background: '#d0d0c8',
-          borderBottom: '1px solid #999',
+          background: '#26231c',
+          borderBottom: '1px solid #302c24',
           fontWeight: 'bold',
           fontSize: 13,
         }}>
           教室情報設定
           <button onClick={onClose} style={{
-            background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#666',
+            background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9a9285',
           }}>&times;</button>
         </div>
 
@@ -138,8 +137,8 @@ export default function ClassroomSettingsDialog({
               onChange={e => setName(e.target.value)}
               style={{
                 padding: '2px 8px',
-                background: '#fff',
-                border: '1px solid #999',
+                background: '#15140f',
+                border: '1px solid #302c24',
                 flex: 1,
                 fontSize: 12,
               }}
@@ -153,8 +152,8 @@ export default function ClassroomSettingsDialog({
               onChange={e => setSeatCount(Number(e.target.value))}
               style={{
                 padding: '2px 6px',
-                border: '1px solid #999',
-                background: '#fff',
+                border: '1px solid #302c24',
+                background: '#15140f',
                 fontSize: 12,
               }}
             >
@@ -170,22 +169,22 @@ export default function ClassroomSettingsDialog({
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
               <div style={{
                 padding: '4px 8px',
-                background: '#3030a0',
-                color: 'white',
+                background: '#26231c',
+                color: '#e9e4d9',
                 fontWeight: 'bold',
                 fontSize: 12,
               }}>
                 在籍生
               </div>
               <div style={{
-                border: '1px solid #999',
-                background: '#fff',
+                border: '1px solid #302c24',
+                background: '#15140f',
                 height: 320,
                 overflowY: 'auto',
               }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ background: '#d0d0c8' }}>
+                    <tr style={{ background: '#26231c' }}>
                       <th style={{ ...cellStyle, width: 30, textAlign: 'center' }}>NO.</th>
                       <th style={{ ...cellStyle, textAlign: 'left' }}>生徒ID</th>
                       <th style={{ ...cellStyle, textAlign: 'left' }}>姓名</th>
@@ -201,13 +200,13 @@ export default function ClassroomSettingsDialog({
                           onClick={() => { setSelectedEnrolled(s.id); setSelectedOther(null); }}
                           style={{
                             cursor: 'pointer',
-                            background: isSelected ? '#b0f0f0' : i % 2 === 0 ? '#fff' : '#f8f8f0',
+                            background: isSelected ? '#b0f0f0' : i % 2 === 0 ? '#15140f' : '#1d1b16',
                           }}
                         >
                           <td style={{ ...cellStyle, textAlign: 'center' }}>{i + 1}</td>
                           <td style={{ ...cellStyle, fontSize: 10 }}>{s.id}</td>
                           <td style={{ ...cellStyle, fontWeight: 'bold' }}>{s.name}</td>
-                          <td style={{ ...cellStyle, textAlign: 'center', color: '#cc6600' }}>{s.internalRating}</td>
+                          <td style={{ ...cellStyle, textAlign: 'center', color: '#d6b279' }}>{s.internalRating}</td>
                         </tr>
                       );
                     })}
@@ -237,21 +236,21 @@ export default function ClassroomSettingsDialog({
               <div style={{
                 padding: '4px 8px',
                 background: '#606060',
-                color: 'white',
+                color: '#e9e4d9',
                 fontWeight: 'bold',
                 fontSize: 12,
               }}>
                 その他
               </div>
               <div style={{
-                border: '1px solid #999',
-                background: '#fff',
+                border: '1px solid #302c24',
+                background: '#15140f',
                 height: 320,
                 overflowY: 'auto',
               }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ background: '#d0d0c8' }}>
+                    <tr style={{ background: '#26231c' }}>
                       <th style={{ ...cellStyle, textAlign: 'left' }}>生徒ID</th>
                       <th style={{ ...cellStyle, textAlign: 'left' }}>姓名</th>
                       <th style={{ ...cellStyle, width: 36, textAlign: 'center' }}>棋力</th>
@@ -266,12 +265,12 @@ export default function ClassroomSettingsDialog({
                           onClick={() => { setSelectedOther(s.id); setSelectedEnrolled(null); }}
                           style={{
                             cursor: 'pointer',
-                            background: isSelected ? '#ffe0b0' : i % 2 === 0 ? '#fff' : '#f8f8f0',
+                            background: isSelected ? '#2a2419' : i % 2 === 0 ? '#15140f' : '#1d1b16',
                           }}
                         >
                           <td style={{ ...cellStyle, fontSize: 10 }}>{s.id}</td>
                           <td style={{ ...cellStyle, fontWeight: 'bold' }}>{s.name}</td>
-                          <td style={{ ...cellStyle, textAlign: 'center', color: '#cc6600' }}>{s.internalRating}</td>
+                          <td style={{ ...cellStyle, textAlign: 'center', color: '#d6b279' }}>{s.internalRating}</td>
                         </tr>
                       );
                     })}
@@ -285,14 +284,14 @@ export default function ClassroomSettingsDialog({
         {/* 下部ボタン */}
         <div style={{
           padding: '8px 12px',
-          borderTop: '1px solid #999',
+          borderTop: '1px solid #302c24',
           display: 'flex',
           justifyContent: 'center',
           gap: 12,
-          background: '#d0d0c8',
+          background: '#26231c',
         }}>
           {error && (
-            <div style={{ color: '#cc0000', fontWeight: 'bold', alignSelf: 'center' }}>
+            <div style={{ color: '#e0745a', fontWeight: 'bold', alignSelf: 'center' }}>
               {error}
             </div>
           )}
@@ -300,9 +299,9 @@ export default function ClassroomSettingsDialog({
             padding: '6px 32px',
             fontSize: 13,
             fontWeight: 'bold',
-            border: '1px solid #333',
-            background: '#60a060',
-            color: 'white',
+            border: '1px solid #302c24',
+            background: '#d6b279',
+            color: '#15140f',
             cursor: saving ? 'default' : 'pointer',
             opacity: saving ? 0.6 : 1,
           }}>
@@ -312,8 +311,8 @@ export default function ClassroomSettingsDialog({
             padding: '6px 32px',
             fontSize: 13,
             fontWeight: 'bold',
-            border: '1px solid #666',
-            background: '#d0d0c8',
+            border: '1px solid #302c24',
+            background: '#26231c',
             cursor: 'pointer',
           }}>
             取消
@@ -333,8 +332,8 @@ function IgcArrowButton({ label, onClick }: { label: string; onClick: () => void
         height: 28,
         fontSize: 16,
         fontWeight: 'bold',
-        border: '1px solid #666',
-        background: '#d8d0c0',
+        border: '1px solid #302c24',
+        background: '#26231c',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',

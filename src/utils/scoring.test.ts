@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateTerritory, formatScoringResult, formatGameResultMessage, timedOutColorFromResult, isTimeoutResult, formatResultSpeech } from './scoring';
+import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, timedOutColorFromResult, isTimeoutResult, formatResultSpeech } from './scoring';
 import type { BoardState, Stone } from '../components/GoBoard';
 
 function makeBoard(size: number, stones: { x: number; y: number; color: 'BLACK' | 'WHITE' }[]): BoardState {
@@ -98,6 +98,25 @@ describe('formatScoringResult', () => {
   });
 });
 
+describe('formatScoringResultJa（整地中の画面表示）', () => {
+  const scoring = (blackTotal: number, whiteTotal: number) => ({
+    territoryMap: [], blackTerritory: 0, whiteTerritory: 0,
+    deadBlackStones: 0, deadWhiteStones: 0, blackTotal, whiteTotal,
+  });
+
+  it('符号ではなく囲碁の言い方で出す', () => {
+    expect(formatScoringResultJa(scoring(26, 32.5))).toBe('白6目半勝ち');
+    expect(formatScoringResultJa(scoring(35, 26.5))).toBe('黒8目半勝ち');
+    expect(formatScoringResultJa(scoring(30, 25))).toBe('黒5目勝ち');
+    expect(formatScoringResultJa(scoring(30, 30.5))).toBe('白半目勝ち');
+    expect(formatScoringResultJa(scoring(30, 30))).toBe('ジゴ');
+  });
+
+  it('保存される結果コードは従来のまま（SGFのRE[]とDBが読む）', () => {
+    expect(formatScoringResult(scoring(26, 32.5))).toBe('W+6.5');
+  });
+});
+
 describe('formatGameResultMessage', () => {
   it('白の投了（黒の中押し勝ち）', () => {
     expect(formatGameResultMessage('B+R')).toBe('白が投了しました。黒の中押し勝ち');
@@ -108,11 +127,15 @@ describe('formatGameResultMessage', () => {
   });
 
   it('黒の目数勝ち', () => {
-    expect(formatGameResultMessage('B+8.5')).toBe('黒の8.5目勝ち');
+    expect(formatGameResultMessage('B+8.5')).toBe('黒の8目半勝ち');
   });
 
   it('白の目数勝ち（整数目数）', () => {
     expect(formatGameResultMessage('W+5')).toBe('白の5目勝ち');
+  });
+
+  it('半目勝ちは「0.5目」と言わない', () => {
+    expect(formatGameResultMessage('W+0.5')).toBe('白の半目勝ち');
   });
 
   it('時間切れは日本語で表示する', () => {

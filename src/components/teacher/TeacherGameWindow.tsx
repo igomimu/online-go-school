@@ -101,9 +101,8 @@ export default function TeacherGameWindow({
   return (
     <div style={{
       height: '100%',
-      background: '#d0d0c8',
-      color: '#333',
-      fontFamily: 'MS Gothic, "Noto Sans JP", monospace',
+      background: '#26231c',
+      color: '#e9e4d9',
       display: 'flex',
       flexDirection: 'column',
     }}>
@@ -114,22 +113,22 @@ export default function TeacherGameWindow({
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 8,
-        padding: '4px 8px',
-        borderBottom: '2px solid #999',
-        background: '#e8e8e0',
+        padding: '9px 12px',
+        borderBottom: '1px solid #302c24',
+        background: '#1d1b16',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <strong style={{ fontSize: 14 }}>多面打ち</strong>
-          <span style={{ color: '#666', fontSize: 12 }}>
+          <strong style={{ fontSize: 14, letterSpacing: '.04em' }}>多面打ち</strong>
+          <span style={{ color: '#9a9285', fontSize: 12 }}>
             {sessions.length}面（あなたの番 {waitingCount}面）
           </span>
-          {loading && <span style={{ color: '#666', fontSize: 12 }}>盤面読込中...</span>}
-          {error && <span style={{ color: '#b91c1c', fontSize: 12 }}>盤面エラー: {error}</span>}
+          {loading && <span style={{ color: '#9a9285', fontSize: 12 }}>盤面読込中...</span>}
+          {error && <span style={{ color: '#e0745a', fontSize: 12 }}>盤面エラー: {error}</span>}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => setShowList(prev => !prev)}
-            style={{ border: '1px solid #999', background: showList ? '#ccc' : '#fff', padding: '3px 10px', cursor: 'pointer', fontSize: 12 }}
+            style={{ border: '1px solid #302c24', borderRadius: 6, background: showList ? '#302c24' : '#26231c', color: '#e9e4d9', padding: '5px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
           >
             {showList ? '盤面表示' : '一覧'}
           </button>
@@ -142,12 +141,13 @@ export default function TeacherGameWindow({
             }}
             disabled={!nextGameId}
             style={{
-              border: '1px solid #b45309',
-              background: nextGameId ? '#f59e0b' : '#bbb',
-              color: nextGameId ? '#111' : '#666',
-              padding: '3px 12px',
+              border: '1px solid transparent',
+              borderRadius: 6,
+              background: nextGameId ? '#d6b279' : '#302c24',
+              color: nextGameId ? '#15140f' : '#9a9285',
+              padding: '5px 14px',
               cursor: nextGameId ? 'pointer' : 'not-allowed',
-              fontWeight: 'bold',
+              fontWeight: 700,
               fontSize: 12,
             }}
           >
@@ -158,7 +158,7 @@ export default function TeacherGameWindow({
 
       {/* 本体コンテンツ */}
       {sessions.length === 0 ? (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, color: '#666' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, color: '#9a9285' }}>
           対局がありません。教室ホーム画面から対局を作成してください。
         </div>
       ) : showList ? (
@@ -199,7 +199,7 @@ export default function TeacherGameWindow({
           />
         </div>
       ) : (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, color: '#666' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, color: '#9a9285' }}>
           対局がありません。
         </div>
       )}

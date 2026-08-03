@@ -275,25 +275,26 @@ export default function TeacherDashboard({
       flexDirection: 'column',
       height: '100%',
       minHeight: 0,
-      background: '#d0d0c8',
-      color: '#333',
-      fontFamily: 'MS Gothic, "Noto Sans JP", monospace',
+      background: '#26231c',
+      color: '#e9e4d9',
       fontSize: 12,
     }}>
-      {/* タイトルバー（IGC風） */}
+      {/* タイトルバー */}
       <div style={{
-        background: '#3030a0',
-        color: 'white',
-        padding: '4px 10px',
-        fontSize: 13,
-        fontWeight: 'bold',
+        background: '#1d1b16',
+        color: '#e9e4d9',
+        padding: '10px 14px',
+        borderBottom: '1px solid #302c24',
+        fontSize: 14,
+        fontWeight: 700,
+        letterSpacing: '.04em',
         display: 'flex',
         alignItems: 'center',
         gap: 8,
       }}>
         <span style={{
-          background: '#333',
-          color: 'white',
+          background: '#26231c',
+          color: '#e9e4d9',
           borderRadius: '50%',
           width: 22,
           height: 22,
@@ -307,7 +308,7 @@ export default function TeacherDashboard({
       </div>
 
       {/* 生徒一覧テーブル */}
-      <div style={{ maxHeight: '35vh', overflowY: 'auto', borderBottom: '2px solid #999' }}>
+      <div style={{ maxHeight: '35vh', overflowY: 'auto', borderBottom: '2px solid #302c24' }}>
         <StudentTable
           participants={filteredParticipants}
           students={filteredStudents}
@@ -346,10 +347,9 @@ export default function TeacherDashboard({
             <div style={{
               margin: 8,
               padding: 8,
-              background: '#fff4d6',
-              border: '2px solid #d97706',
-              color: '#4a2a00',
-              fontFamily: 'MS Gothic, "Noto Sans JP", monospace',
+              background: '#2a2419',
+              border: '2px solid #d6b279',
+              color: '#e9e4d9',
               fontSize: 12,
             }}>
               <div style={{ fontWeight: 'bold', marginBottom: 6 }}>
@@ -369,14 +369,14 @@ export default function TeacherDashboard({
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           gap: 8,
-                          background: '#fff',
-                          border: '1px solid #e0b55d',
+                          background: '#15140f',
+                          border: '1px solid #8a7554',
                           padding: '5px 8px',
                         }}
                       >
                         <span>
                           {resolvePlayerName(game.blackPlayer, allStudents)} (黒) vs {resolvePlayerName(game.whitePlayer, allStudents)} (白)
-                          <span style={{ marginLeft: 8, color: '#8a5a00' }}>
+                          <span style={{ marginLeft: 8, color: '#d6b279' }}>
                             {row.status === 'interrupted' ? '中断' : row.status === 'scoring' ? '整地中' : '対局中'}
                           </span>
                         </span>
@@ -384,9 +384,9 @@ export default function TeacherDashboard({
                           onClick={() => clearOrphanGame(row.id)}
                           disabled={clearingGameId === row.id}
                           style={{
-                            border: '1px solid #b45309',
-                            background: clearingGameId === row.id ? '#ddd' : '#f59e0b',
-                            color: '#111',
+                            border: '1px solid #8a7554',
+                            background: clearingGameId === row.id ? '#302c24' : '#d6b279',
+                            color: '#15140f',
                             padding: '2px 10px',
                             cursor: clearingGameId === row.id ? 'not-allowed' : 'pointer',
                             fontWeight: 'bold',
@@ -430,17 +430,17 @@ export default function TeacherDashboard({
         {/* 右サイドバー */}
         <div style={{
           width: 280,
-          borderLeft: '2px solid #999',
+          borderLeft: '2px solid #302c24',
           display: 'flex',
           flexDirection: 'column',
           minHeight: 0,
-          background: '#e8e8e0',
+          background: '#1d1b16',
         }}>
           {/* 右上: ビデオ映像エリア（黒背景） */}
           <div style={{
             background: '#000',
             minHeight: 180,
-            borderBottom: '1px solid #999',
+            borderBottom: '1px solid #302c24',
             position: 'relative',
           }}>
             {videoElements.size > 0 ? (
@@ -458,7 +458,7 @@ export default function TeacherDashboard({
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: '100%',
-                color: '#555',
+                color: '#9a9285',
                 fontSize: 11,
               }}>
                 カメラ映像
@@ -565,15 +565,14 @@ export default function TeacherDashboard({
           zIndex: 1000,
         }}>
           <div style={{
-            background: '#e8e8e0',
-            border: '2px solid #666',
+            background: '#1d1b16',
+            border: '2px solid #302c24',
             width: 600,
             maxHeight: '80vh',
             display: 'flex',
             flexDirection: 'column',
-            fontFamily: 'MS Gothic, "Noto Sans JP", monospace',
             fontSize: 12,
-            color: '#333',
+            color: '#e9e4d9',
             boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
           }}>
             {/* ヘッダー */}
@@ -582,22 +581,22 @@ export default function TeacherDashboard({
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '6px 10px',
-              background: '#d0d0c8',
-              borderBottom: '1px solid #999',
+              background: '#26231c',
+              borderBottom: '1px solid #302c24',
               fontWeight: 'bold',
               fontSize: 13,
             }}>
               <span>棋譜履歴 - {historyStudent.name} さん</span>
               <button onClick={() => setHistoryStudent(null)} style={{
-                background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#666',
+                background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#9a9285',
               }}>&times;</button>
             </div>
 
             <div style={{ padding: 12, overflowY: 'auto', flex: 1 }}>
               {loadingHistory ? (
-                <div style={{ textAlign: 'center', padding: '20px 0', color: '#666' }}>棋譜履歴を読み込み中...</div>
+                <div style={{ textAlign: 'center', padding: '20px 0', color: '#9a9285' }}>棋譜履歴を読み込み中...</div>
               ) : historyGames.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px 0', color: '#666' }}>保存された棋譜履歴はありません。</div>
+                <div style={{ textAlign: 'center', padding: '20px 0', color: '#9a9285' }}>保存された棋譜履歴はありません。</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {historyGames.map(game => {
@@ -625,8 +624,8 @@ export default function TeacherDashboard({
                     const outcome = studentColor && winner
                       ? (studentColor === winner ? 'win' : 'loss')
                       : null;
-                    // 勝ちは青字、負けは赤字
-                    const playerColor = outcome === 'win' ? '#0055cc' : outcome === 'loss' ? '#cc0000' : '#333';
+                    // 勝ちは生成りで強く、負けは朱、それ以外は鈍色
+                    const playerColor = outcome === 'win' ? '#e9e4d9' : outcome === 'loss' ? '#e0745a' : '#9a9285';
                     return (
                       <div
                         key={game.id}
@@ -635,16 +634,16 @@ export default function TeacherDashboard({
                           setHistoryStudent(null);
                         }}
                         style={{
-                          background: '#fff',
-                          border: '1px solid #ccc',
+                          background: '#15140f',
+                          border: '1px solid #302c24',
                           padding: '8px 10px',
                           cursor: 'pointer',
                           display: 'flex',
                           flexDirection: 'column',
                           gap: 4,
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = '#f0f0e8'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = '#fff'; }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#221f19'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#15140f'; }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', gap: 8 }}>
                           <span style={{ color: playerColor }}>
@@ -662,9 +661,9 @@ export default function TeacherDashboard({
                                 setHistoryStudent(null);
                               }}
                               style={{
-                                background: '#f59e0b',
-                                border: '1px solid #b45309',
-                                color: '#fff',
+                                background: '#d6b279',
+                                border: '1px solid #8a7554',
+                                color: '#15140f',
                                 fontSize: 11,
                                 fontWeight: 'bold',
                                 padding: '1px 8px',
@@ -674,10 +673,10 @@ export default function TeacherDashboard({
                               再開
                             </button>
                           ) : (
-                            <span style={{ color: '#0066cc', fontSize: 11 }}>検討を開始する</span>
+                            <span style={{ color: '#d6b279', fontSize: 11 }}>検討を開始する</span>
                           )}
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666', fontSize: 11 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9a9285', fontSize: 11 }}>
                           <span>対局日: {game.date}</span>
                           <span>{game.boardSize}路盤 | コミ: {game.komi} | 結果: {game.result || '不明'}</span>
                         </div>
@@ -693,15 +692,15 @@ export default function TeacherDashboard({
               display: 'flex',
               justifyContent: 'flex-end',
               padding: '6px 10px',
-              background: '#d0d0c8',
-              borderTop: '1px solid #999',
+              background: '#26231c',
+              borderTop: '1px solid #302c24',
             }}>
               <button
                 onClick={() => setHistoryStudent(null)}
                 style={{
                   padding: '2px 10px',
-                  background: '#fff',
-                  border: '1px solid #999',
+                  background: '#15140f',
+                  border: '1px solid #302c24',
                   cursor: 'pointer',
                   fontSize: 12,
                 }}

@@ -3,7 +3,7 @@ import GoBoard from './GoBoard';
 import ZoomTapConfirm from './ZoomTapConfirm';
 import type { Drawing } from './GoBoard';
 import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX } from 'lucide-react';
-import { calculateTerritory, formatScoringResult, formatGameResultMessage, isTimeoutResult } from '../utils/scoring';
+import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, isTimeoutResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
 import { useLiveGame } from '../hooks/useLiveGame';
@@ -530,7 +530,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               </div>
               <div className="text-center">
                 <div className="text-zinc-400">結果</div>
-                <div className="text-kaya font-bold text-lg">{formatScoringResult(scoringResult)}</div>
+                <div className="text-kaya font-bold text-lg">{formatScoringResultJa(scoringResult)}</div>
               </div>
             </div>
           </div>

@@ -150,8 +150,8 @@ test.describe('先生1+生徒2 対局フルシナリオ', () => {
 
     // === 終局結果の確認 ===
     // 生徒双方の画面で結果が表示されることを確認（先生はダッシュボードに戻るためアサート対象外）
-    // 整地結果は「黒/白の◯目勝ち」の日本語文言で表示される（formatGameResultMessage参照）。
-    await expect(studentAPage.locator('text=目勝ち')).toBeVisible({ timeout: 15_000 });
-    await expect(studentBPage.locator('text=目勝ち')).toBeVisible({ timeout: 15_000 });
+    // 整地結果は「黒/白の◯目勝ち」「◯目半勝ち」の日本語文言で表示される（formatGameResultMessage参照）。
+    await expect(studentAPage.getByText(/[目半]勝ち/)).toBeVisible({ timeout: 15_000 });
+    await expect(studentBPage.getByText(/[目半]勝ち/)).toBeVisible({ timeout: 15_000 });
   });
 });

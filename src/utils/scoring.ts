@@ -150,6 +150,18 @@ export function formatScoringResult(scoring: ScoringResult): string {
 }
 
 /**
+ * 整地中の画面に出す結果（三村さん指定 2026-08-04）。
+ * "W+6.5" のような符号ではなく「白6目半勝ち」と囲碁の言い方で見せる。
+ * 保存される結果コードは formatScoringResult のまま（SGF の RE[] と DB がこれを読む）。
+ */
+export function formatScoringResultJa(scoring: ScoringResult): string {
+  const diff = scoring.blackTotal - scoring.whiteTotal;
+  if (diff === 0) return 'ジゴ';
+  const winner = diff > 0 ? '黒' : '白';
+  return `${winner}${formatMargin(Math.abs(diff))}勝ち`;
+}
+
+/**
  * 終局結果の文字列（例: "B+R", "W+12.5"）を対局者向けの分かりやすい日本語文言に変換する。
  * 投了（+R）のみ「〇が投了しました。〇の中押し勝ち」の専用文言にし、
  * それ以外（目数勝ち・時間切れ等）は簡潔な結果表記のまま返す。
@@ -164,7 +176,7 @@ export function formatGameResultMessage(result: string): string {
   const territoryMatch = result.match(/^([BW])\+(\d+(?:\.\d+)?)$/);
   if (territoryMatch) {
     const winnerColor = territoryMatch[1] === 'B' ? '黒' : '白';
-    return `${winnerColor}の${territoryMatch[2]}目勝ち`;
+    return `${winnerColor}の${formatMargin(Number(territoryMatch[2]))}勝ち`;
   }
   const timedOut = timedOutColorFromResult(result);
   if (timedOut) {
