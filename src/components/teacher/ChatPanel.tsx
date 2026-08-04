@@ -102,14 +102,14 @@ export default function ChatPanel({
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 text-[13px] text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+          className="min-w-0 flex-1 rounded-md border border-field-line bg-ground px-2 py-1 text-[13px] text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
         <button
           onClick={handleSend}
           disabled={!text.trim()}
           className="shrink-0 rounded-md bg-accent px-3 py-1 text-[13px] font-bold text-accent-ink disabled:opacity-40"
         >
-          チャット
+          送信
         </button>
       </div>
     </div>

@@ -1034,14 +1034,14 @@ function App() {
               <label className="block text-sm text-muted mb-1">LiveKitサーバーURL</label>
               <input type="text" value={livekitUrl} onChange={e => setLivekitUrl(e.target.value)}
                 placeholder="wss://your-app.livekit.cloud"
-                className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
+                className="w-full bg-ink/5 border border-field-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
             </div>
 
             <div>
               <label className="block text-sm text-muted mb-1">ルーム名</label>
               <input type="text" value={roomName} onChange={e => setRoomName(e.target.value)}
                 placeholder="go-classroom"
-                className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
+                className="w-full bg-ink/5 border border-field-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
             </div>
           </div>
 
@@ -1085,7 +1085,7 @@ function App() {
               <h2 className="text-xl font-bold">LiveKit設定</h2>
               <div>
                 <label className="block text-sm text-muted mb-1">LiveKit URL</label>
-                <input value={livekitUrl} onChange={e => setLivekitUrl(e.target.value)} className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
+                <input value={livekitUrl} onChange={e => setLivekitUrl(e.target.value)} className="w-full bg-ink/5 border border-field-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent" />
               </div>
 
               <div className="flex gap-3">

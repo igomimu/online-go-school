@@ -137,7 +137,7 @@ export default function GameCreationDialog({
             data-testid="black-player-select"
             value={blackPlayer}
             onChange={e => setBlackPlayer(e.target.value)}
-            className="w-full bg-ink/5 text-ink border border-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
+            className="w-full bg-ink/5 text-ink border border-field-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
           >
             {allPlayers.map(p => {
               const rank = getRank(p);
@@ -164,7 +164,7 @@ export default function GameCreationDialog({
             data-testid="white-player-select"
             value={whitePlayer}
             onChange={e => setWhitePlayer(e.target.value)}
-            className="w-full bg-ink/5 text-ink border border-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
+            className="w-full bg-ink/5 text-ink border border-field-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
           >
             {allPlayers.map(p => {
               const rank = getRank(p);
@@ -233,7 +233,7 @@ export default function GameCreationDialog({
             value={komi}
             step={0.5}
             onChange={e => { setKomi(parseFloat(e.target.value) || 0); setHandicapTouched(true); }}
-            className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
+            className="w-full bg-ink/5 border border-field-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
           />
         </div>
 

@@ -9,7 +9,7 @@ import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';
 import { fromGtpCoord } from '../utils/katagoClient';
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2 } from 'lucide-react';
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2, Eye, EyeOff } from 'lucide-react';
 import { checkCapture } from '../utils/gameLogic';
 import { getDisplayName } from '../utils/identityUtils';
 import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
@@ -111,6 +111,7 @@ export default function ReviewBoard({
   const [drawMode, setDrawMode] = useState<'off' | 'line' | 'arrow'>('off');
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const drawLastCell = useRef<{ x: number; y: number } | null>(null);
+  const [showCandidates, setShowCandidates] = useState(true);
   const [toolMode, setToolMode] = useState<'play' | 'circle' | 'triangle' | 'square' | 'cross' | 'alpha' | 'num' | 'eraser'>('play');
   const [hoveredCandidate, setHoveredCandidate] = useState<{ nodeId: string; rank: number } | null>(null);
 
@@ -173,6 +174,7 @@ export default function ReviewBoard({
       else if (e.key === 'End') { e.preventDefault(); goLast(); }
       else if (e.key === 'Delete') { e.preventDefault(); handleUndo(); }
       else if (ctrl && e.key === 'z') { e.preventDefault(); handleUndo(); }
+      else if (!ctrl && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setShowCandidates(prev => !prev); }
       else if (e.key === 'Escape') { setToolMode('play'); setDrawMode('off'); }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -341,6 +343,9 @@ export default function ReviewBoard({
     ? hoveredCandidate.rank
     : null;
   const allowStudentInteraction = !isTeacher && syncedAiAnalysis?.allowStudentInteraction === true;
+  // AIは動かしたまま、盤の上の候補手だけ消せるようにする（Pocket KataGo と同じ F キー）。
+  // 候補手を見せて説明する場面と、見せずに読ませる場面を切り替えるため。
+  const candidatesOnBoard = isTeacher ? showCandidates : (syncedAiAnalysis?.showCandidates ?? true);
   const hoveredCandidateIndex = displayedAi.enabled
     ? (isTeacher
         ? localHoveredCandidateIndex
@@ -422,6 +427,7 @@ export default function ReviewBoard({
       error: aiAnalysis.settings.enabled ? aiAnalysis.error : null,
       hoveredCandidateRank: aiAnalysis.settings.enabled ? hoveredCandidateIndex : null,
       allowStudentInteraction: aiAnalysis.settings.allowStudentInteraction,
+      showCandidates,
     };
     classroomRef.current?.broadcast({ type: 'AI_ANALYSIS_UPDATE', payload });
   }, [
@@ -432,21 +438,23 @@ export default function ReviewBoard({
     aiAnalysis.error,
     aiAnalysis.settings.allowStudentInteraction,
     hoveredCandidateIndex,
+    showCandidates,
     sharedAiResult,
     classroomRef,
     participantCount, // 途中参加した生徒にも現在の結果を再送する
   ]);
 
   const analysisOverlay = useMemo<AnalysisOverlay[]>(() => {
-    if (!displayedAi.enabled || !displayedAi.result) return [];
+    if (!candidatesOnBoard || !displayedAi.enabled || !displayedAi.result) return [];
     return displayedAi.result.topMoves.slice(0, 5).flatMap((move, rank) => {
       const coord = fromGtpCoord(move.move, boardSize);
       return coord ? [{ ...coord, rank, winrate: move.winrate, scoreLead: move.scoreLead, visits: move.visits }] : [];
     });
-  }, [displayedAi.enabled, displayedAi.result, boardSize]);
+  }, [candidatesOnBoard, displayedAi.enabled, displayedAi.result, boardSize]);
 
   const currentMoveColor = currentNode.move?.color;
   const pvOverlay = useMemo<PvStone[] | undefined>(() => {
+    if (!candidatesOnBoard) return undefined;
     if (hoveredCandidateIndex === null || !displayedAi.enabled || !displayedAi.result) return undefined;
     const candidate = displayedAi.result.topMoves[hoveredCandidateIndex];
     if (!candidate?.pv?.length) return undefined;
@@ -465,7 +473,7 @@ export default function ReviewBoard({
       color = color === 'B' ? 'W' : 'B';
     });
     return stones.length > 0 ? stones : undefined;
-  }, [hoveredCandidateIndex, displayedAi.enabled, displayedAi.result, currentMoveColor, currentNode.activeColor, boardSize]);
+  }, [candidatesOnBoard, hoveredCandidateIndex, displayedAi.enabled, displayedAi.result, currentMoveColor, currentNode.activeColor, boardSize]);
 
   // Build win rate graph data from main path
   const winRateData = useMemo(() => {
@@ -740,6 +748,23 @@ export default function ReviewBoard({
                   <Trash2 className="w-4 h-4" />
                 </button>
               )}
+
+              <div className="w-px h-5 bg-raised mx-1" />
+
+              {/* 盤上の候補手だけを消す（AIは動かしたまま）。Pocket KataGo と同じく F キーでも切り替わる。
+                  候補手を見せて説明する場面と、見せずに読ませる場面を行き来するためのもの。 */}
+              <button
+                data-testid="toggle-candidates"
+                onClick={() => setShowCandidates(prev => !prev)}
+                aria-pressed={showCandidates}
+                className={`flex items-center gap-1 rounded-lg border px-2 py-2 text-xs font-bold transition-all ${
+                  showCandidates ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
+                }`}
+                title={showCandidates ? 'AIの候補手を盤から消す (F)' : 'AIの候補手を盤に出す (F)'}
+              >
+                {showCandidates ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                候補手
+              </button>
             </div>
           </div>
         )}

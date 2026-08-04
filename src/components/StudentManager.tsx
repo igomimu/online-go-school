@@ -178,7 +178,7 @@ export default function StudentManager({
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder="検索..."
-                    className="w-full bg-ink/5 border border-line rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-accent"
+                    className="w-full bg-ink/5 border border-field-line rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-accent"
                   />
                 </div>
                 <button onClick={startAdd} className="premium-button flex items-center gap-1 text-sm">
@@ -234,7 +234,7 @@ export default function StudentManager({
                   type="text"
                   value={form.studentCode || form.id}
                   onChange={e => setForm(f => ({ ...f, id: e.target.value, studentCode: e.target.value }))}
-                  className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                  className="w-full bg-ink/5 border border-field-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                 />
               </div>
 
@@ -244,7 +244,7 @@ export default function StudentManager({
                   type="text"
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                  className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                  className="w-full bg-ink/5 border border-field-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                 />
               </div>
 
@@ -254,7 +254,7 @@ export default function StudentManager({
                   <select
                     value={form.rank}
                     onChange={e => setForm(f => ({ ...f, rank: e.target.value }))}
-                    className="w-full bg-ink/5 text-ink border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                    className="w-full bg-ink/5 text-ink border border-field-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   >
                     <option value="" className="bg-raised text-ink">未設定</option>
                     {RANKS.map(r => <option key={r} value={r} className="bg-raised text-ink">{r}</option>)}
@@ -267,7 +267,7 @@ export default function StudentManager({
                     value={form.internalRating}
                     onChange={e => setForm(f => ({ ...f, internalRating: e.target.value }))}
                     placeholder="R3"
-                    className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                    className="w-full bg-ink/5 border border-field-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
@@ -278,7 +278,7 @@ export default function StudentManager({
                   <select
                     value={form.type}
                     onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
-                    className="w-full bg-ink/5 text-ink border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                    className="w-full bg-ink/5 text-ink border border-field-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   >
                     {TYPES.map(t => <option key={t} value={t} className="bg-raised text-ink">{t || '未設定'}</option>)}
                   </select>
@@ -289,7 +289,7 @@ export default function StudentManager({
                     type="date"
                     value={form.birthdate || ''}
                     onChange={e => setForm(f => ({ ...f, birthdate: e.target.value }))}
-                    className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                    className="w-full bg-ink/5 border border-field-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
@@ -308,7 +308,7 @@ export default function StudentManager({
                     value={form.grade}
                     onChange={e => setForm(f => ({ ...f, grade: e.target.value }))}
                     disabled={!!form.birthdate}
-                    className="w-full bg-ink/5 text-ink border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent disabled:opacity-40"
+                    className="w-full bg-ink/5 text-ink border border-field-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent disabled:opacity-40"
                   >
                     {GRADES.map(g => <option key={g} value={g} className="bg-raised text-ink">{g || '未設定'}</option>)}
                   </select>
@@ -319,7 +319,7 @@ export default function StudentManager({
                     type="text"
                     value={form.country}
                     onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
-                    className="w-full bg-ink/5 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                    className="w-full bg-ink/5 border border-field-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>

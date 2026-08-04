@@ -33,6 +33,9 @@ export interface AiAnalysisSyncPayload {
   // 講師がマウスを置いている候補順位。生徒盤へ同じPVを表示する。
   hoveredCandidateRank: number | null;
   allowStudentInteraction: boolean;
+  // 盤上に候補手を出すかどうか（AIは動かしたまま、盤の表示だけ消せる）。
+  // 講師が消したら生徒の盤からも消える。未指定は表示（古い端末との互換）。
+  showCandidates?: boolean;
 }
 
 export interface AiAnalysisRequest {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import ReviewBoard from './ReviewBoard';
 import { createNode, addMove } from '../utils/treeUtilsV2';
 import { createEmptyBoard } from '../utils/gameLogic';
@@ -230,4 +230,75 @@ describe('ReviewBoard', () => {
     fireEvent.mouseEnter(screen.getByTestId('ai-move-0'));
     expect(screen.getByTestId('pv-stone-1')).toBeInTheDocument();
   });
+
+  // 2026-08-04 三村さん指定: AIは動かしたまま、盤の候補手だけ消せるようにする
+  // （候補手を見せて説明する場面と、見せずに読ませる場面を切り替えるため）。
+  // Pocket KataGo に合わせてボタンと F キーの両方で切り替わる。
+  it('講師は盤上の候補手だけをボタンとFキーで消せる（AIは止めない）', () => {
+    const { root } = makeTree();
+    const synced = {
+      enabled: true,
+      nodeId: root.id,
+      isLoading: false,
+      error: null,
+      hoveredCandidateRank: null,
+      allowStudentInteraction: false,
+      result: {
+        winrate: 61.4,
+        scoreLead: 3.2,
+        topMoves: [{ move: 'D4', winrate: 61.4, scoreLead: 3.2, visits: 1000, pv: ['D4', 'E5'] }],
+      },
+    };
+    // 講師側の盤に候補手が出ている状態を、同期データ経由で作る
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={false}
+        classroomRef={mockClassroomRef as never}
+        syncedAiAnalysis={synced}
+      />
+    );
+    expect(screen.getByTestId('ai-candidate-0')).toBeInTheDocument();
+    cleanup();
+
+    // 講師が消したら、生徒の盤からも消える
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={false}
+        classroomRef={mockClassroomRef as never}
+        syncedAiAnalysis={{ ...synced, showCandidates: false }}
+      />
+    );
+    expect(screen.queryByTestId('ai-candidate-0')).not.toBeInTheDocument();
+    // AI そのものは動いたままなので、解析結果の欄は残る
+    expect(screen.getByText('61.4%')).toBeInTheDocument();
+  });
+
+  it('候補手ボタンは押すたびに状態が入れ替わる', () => {
+    const { root } = makeTree();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+    const button = screen.getByTestId('toggle-candidates');
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(button);
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.keyDown(window, { key: 'f' });
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+  });
 });
+

@@ -41,6 +41,7 @@
   --color-alert: var(--ui-alert);
   --color-alert-text: var(--ui-alert-text);
   --color-alert-face: var(--ui-alert-face);
+  --color-field-line: var(--ui-field-line);
 }
 
 /*
@@ -66,6 +67,9 @@
   --ui-alert: #c8563c;
   --ui-alert-text: #e0745a;
   --ui-alert-face: #b4432c; /* 朱の面に白文字を載せる用。#c8563c のままだと 3.7:1 で足りない */
+  /* 入力欄の枠。飾りの罫(--ui-line)のままだと面との差が 1.25:1 しかなく、
+     どこに書けるのか分からない。UI部品の輪郭に要る 3:1 を満たす濃さにする */
+  --ui-field-line: #736a56;
 }
 
 :root,
@@ -82,6 +86,7 @@
   --ui-alert: #c8563c;
   --ui-alert-text: #a63a22;
   --ui-alert-face: #b4432c;
+  --ui-field-line: #9c8e70; /* 紙の面に対して 3.03:1 */
 }
 
 @layer base {
@@ -247,7 +252,7 @@
 .field-input {
   width: 100%;
   background: var(--color-ground);
-  border: 1px solid var(--color-line);
+  border: 1px solid var(--color-field-line);
   border-radius: 8px;
   padding: 11px 14px;
   color: var(--color-ink);
