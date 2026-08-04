@@ -178,6 +178,8 @@ export function formatGameResultMessage(result: string): string {
     const winnerColor = territoryMatch[1] === 'B' ? '黒' : '白';
     return `${winnerColor}の${formatMargin(Number(territoryMatch[2]))}勝ち`;
   }
+  // 設定間違いで始めた対局を講師が取り消したもの（勝敗ではない）
+  if (result === '取消') return 'この対局は取り消されました';
   const timedOut = timedOutColorFromResult(result);
   if (timedOut) {
     const loserColor = timedOut === 'BLACK' ? '黒' : '白';
@@ -214,6 +216,17 @@ function formatMargin(points: number): string {
 }
 
 /**
+ * コミの表示（三村さん指定 2026-08-04）「コミ◯目半 ／ 逆コミ◯目半」。
+ * 「6.5」と数字で出しても、囲碁の言い方になっていない。
+ * コミは白に加算される値なので、負なら白が黒に出す＝逆コミ。
+ */
+export function formatKomiLabel(komi: number): string {
+  if (komi > 0) return `コミ${formatMargin(komi)}`;
+  if (komi < 0) return `逆コミ${formatMargin(-komi)}`;
+  return 'コミなし';
+}
+
+/**
  * 終局を読み上げる文言（無ければ null）。
  * 勝敗が決まった瞬間に碁盤が閉じてしまうため、声でも結果を伝える（三村さん指定 2026-08-02）。
  * 時間切れは秒読み読み上げ側が「時間切れ負けです」と言うのでここでは扱わない。
@@ -225,8 +238,8 @@ function formatMargin(points: number): string {
  * 「黒」「白」は囲碁では「ク\ロ」「シ\ロ」と頭にアクセントが来るが、「黒の…」と助詞を
  * 続けると TTS が「くろの」をひとまとまりに解析して平板に読んでしまう。読点で語を
  * 独立させ、単語として解析されるようにする。
- * 一度は誤読対策で「ちゅうおしがち」と かな にしたが、仮名の連なりはかえって語の
- * 切れ目を失わせるため、読点で区切ったうえで漢字仮名交じりに戻した。
+ * 「中押し」を漢字で渡すと「なかおし」と読まれるので、そこは かな のままにする
+ * （読点で色名を独立させてあるので、後ろが かな 続きでも語の切れ目は失われない）。
  *
  * ※ Web Speech API にはアクセントを直接指定する手段がない（SSML は実質未対応）ので、
  *   渡す文字列の切り方でエンジンの解析を誘導するしかない。
@@ -235,10 +248,11 @@ export function formatResultSpeech(result: string | null | undefined): string | 
   const m = result?.trim().match(/^([BW])\+(R|\d+(?:\.\d+)?)$/i);
   if (!m) return null;
   const winner = m[1].toUpperCase() === 'B' ? '黒' : '白';
-  // 「勝ち」は漢字だと連濁せず「かち」と読まれる。囲碁では「ちゅうおしがち」
-  // 「にもくはんがち」と濁るので、「がち」だけ かな にする
-  // （「中押し」「目半」は漢字のままで正しく読まれている）。
-  if (m[2].toUpperCase() === 'R') return `${winner}、中押しがちです`;
+  // 「勝ち」は漢字だと連濁せず「かち」と読まれるので、「がち」だけ かな にする。
+  // 「中押し」も漢字のままだと「なかおし」と読まれる（2026-08-04 実機で確認）。
+  // 7b60dd2 で黒白を漢字に戻したとき、ここも巻き添えで漢字に戻してしまっていた。
+  // 読点で「白」を独立させてあるので、後ろが かな 続きでも語の切れ目は失われない。
+  if (m[2].toUpperCase() === 'R') return `${winner}、ちゅうおしがちです`;
   const points = Number(m[2]);
   if (!Number.isFinite(points) || points <= 0) return null;
   return `${winner}、${formatMargin(points)}がちです`;

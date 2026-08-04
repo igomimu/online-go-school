@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, timedOutColorFromResult, isTimeoutResult, formatResultSpeech } from './scoring';
+import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, formatKomiLabel, timedOutColorFromResult, isTimeoutResult, formatResultSpeech } from './scoring';
 import type { BoardState, Stone } from '../components/GoBoard';
 
 function makeBoard(size: number, stones: { x: number; y: number; color: 'BLACK' | 'WHITE' }[]): BoardState {
@@ -117,6 +117,23 @@ describe('formatScoringResultJa（整地中の画面表示）', () => {
   });
 });
 
+describe('formatKomiLabel（対局中のヘッダー表示）', () => {
+  it('コミは囲碁の言い方で出す', () => {
+    expect(formatKomiLabel(6.5)).toBe('コミ6目半');
+    expect(formatKomiLabel(0.5)).toBe('コミ半目');
+    expect(formatKomiLabel(7)).toBe('コミ7目');
+  });
+
+  it('マイナスは逆コミ（白が黒に出す）', () => {
+    expect(formatKomiLabel(-5.5)).toBe('逆コミ5目半');
+    expect(formatKomiLabel(-0.5)).toBe('逆コミ半目');
+  });
+
+  it('0 はコミなし', () => {
+    expect(formatKomiLabel(0)).toBe('コミなし');
+  });
+});
+
 describe('formatGameResultMessage', () => {
   it('白の投了（黒の中押し勝ち）', () => {
     expect(formatGameResultMessage('B+R')).toBe('白が投了しました。黒の中押し勝ち');
@@ -143,6 +160,10 @@ describe('formatGameResultMessage', () => {
     expect(formatGameResultMessage('B+T')).toBe('白の時間切れ。黒の勝ち');
   });
 
+  it('講師が取り消した対局は勝敗として出さない', () => {
+    expect(formatGameResultMessage('取消')).toBe('この対局は取り消されました');
+  });
+
   it('未知の結果表記はそのままラベル付きで表示', () => {
     expect(formatGameResultMessage('強制終局')).toBe('結果: 強制終局');
   });
@@ -164,9 +185,9 @@ describe('timedOutColorFromResult / isTimeoutResult', () => {
 });
 
 describe('formatResultSpeech（終局の読み上げ）', () => {
-  it('投了は「〇のちゅうおしがちです」と読み上げる（読点で語を区切りアクセントを頭に来させる）', () => {
-    expect(formatResultSpeech('B+R')).toBe('黒、中押しがちです');
-    expect(formatResultSpeech('W+R')).toBe('白、中押しがちです');
+  it('投了は「〇、ちゅうおしがちです」と読み上げる（漢字だと「なかおし」と読まれる）', () => {
+    expect(formatResultSpeech('B+R')).toBe('黒、ちゅうおしがちです');
+    expect(formatResultSpeech('W+R')).toBe('白、ちゅうおしがちです');
   });
 
   it('整地は目数を囲碁の言い方で読み上げる', () => {

@@ -109,8 +109,10 @@ describe('GameBoard', () => {
         myIdentity="たろう"
       />
     );
-    expect(screen.getByText('たろう')).toBeInTheDocument();
-    expect(screen.getByText('はなこ')).toBeInTheDocument();
+    // 三村さん指定の並び「黒：〇〇　白：〇〇　コミ◯目半」（2026-08-04）
+    expect(screen.getByText('黒：たろう')).toBeInTheDocument();
+    expect(screen.getByText('白：はなこ')).toBeInTheDocument();
+    expect(screen.getByTestId('komi-label')).toHaveTextContent('コミ6目半');
     expect(screen.getByText('0手目')).toBeInTheDocument();
   });
 
@@ -137,8 +139,8 @@ describe('GameBoard', () => {
       />,
     );
 
-    expect(screen.getByText('太郎')).toBeInTheDocument();
-    expect(screen.getByText('三村九段')).toBeInTheDocument();
+    expect(screen.getByText('黒：太郎')).toBeInTheDocument();
+    expect(screen.getByText('白：三村九段')).toBeInTheDocument();
     expect(screen.queryByText('sid:1002')).not.toBeInTheDocument();
     expect(screen.queryByText('teacher')).not.toBeInTheDocument();
   });

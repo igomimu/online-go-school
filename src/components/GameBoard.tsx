@@ -2,8 +2,8 @@ import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import GoBoard from './GoBoard';
 import ZoomTapConfirm from './ZoomTapConfirm';
 import type { Drawing } from './GoBoard';
-import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX } from 'lucide-react';
-import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, isTimeoutResult } from '../utils/scoring';
+import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban } from 'lucide-react';
+import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, formatKomiLabel, isTimeoutResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
 import { useLiveGame } from '../hooks/useLiveGame';
@@ -302,20 +302,28 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-black border border-ink/30" />
             <span className={currentColor === 'BLACK' ? 'font-bold text-ink' : 'text-muted'}>
-              {resolvePlayerName(game.black_player, students)}
+              黒：{resolvePlayerName(game.black_player, students)}
             </span>
             <span className="text-muted/70 text-sm">取{blackCaptures}</span>
             {renderBlackClock()}
           </div>
-          <span className="text-muted/70">vs</span>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-white border border-ink/40" />
             <span className={currentColor === 'WHITE' ? 'font-bold text-ink' : 'text-muted'}>
-              {resolvePlayerName(game.white_player, students)}
+              白：{resolvePlayerName(game.white_player, students)}
             </span>
             <span className="text-muted/70 text-sm">取{whiteCaptures}</span>
             {renderWhiteClock()}
           </div>
+          {/* 置石とコミ。整地に入るまで見えないと、対局中に形勢を数えられない */}
+          {game.handicap >= 2 && (
+            <span data-testid="handicap-label" className="tabular shrink-0 text-sm text-muted whitespace-nowrap">
+              {game.handicap}子
+            </span>
+          )}
+          <span data-testid="komi-label" className="tabular shrink-0 text-sm text-muted whitespace-nowrap">
+            {formatKomiLabel(game.komi)}
+          </span>
         </div>
         <div data-testid="move-count" className="text-sm text-muted flex items-center gap-3">
           <span>
@@ -347,6 +355,23 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
             {soundOn ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
             <span className="hidden sm:inline">石音</span>
           </button>
+          {/* 設定を間違えて始めた対局を、その場で取り消す（講師のみ）。
+              中断ではなく終了にする。中断だと生徒側に「再開」が出てしまい、
+              間違えた設定のまま再開できてしまうため。 */}
+          {isTeacher && (game.status === 'playing' || game.status === 'scoring') && (
+            <button
+              data-testid="cancel-game"
+              onClick={async () => {
+                if (!confirm('この対局を取り消します。棋譜は残りません。よろしいですか？')) return;
+                await finishWithResult('取消');
+              }}
+              title="設定を間違えたときに、この対局を取り消す"
+              className="flex items-center gap-1 rounded border border-alert/35 px-2 py-1 text-xs font-bold text-muted hover:bg-alert/10 hover:text-alert-text transition-colors duration-150"
+            >
+              <Ban className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">対局を取り消す</span>
+            </button>
+          )}
           {/* スマホでは別ウィンドウを開いても見づらいだけなので、タッチデバイスでは非表示にする */}
           {!isTouch && !isDedicatedWindow && (
             <button
