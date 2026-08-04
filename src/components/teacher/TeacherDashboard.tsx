@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import type { GameSession, AudioPermissions, SavedGame } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom } from '../../types/classroom';
@@ -12,6 +12,8 @@ import StudentTable from './StudentTable';
 import BoardThumbnailGrid from './BoardThumbnailGrid';
 import ChatPanel from './ChatPanel';
 import MediaDeviceSettings from '../MediaDeviceSettings';
+import VerticalResizer from './VerticalResizer';
+import { useStoredHeight } from './useStoredHeight';
 import type { ClassroomLiveKit } from '../../utils/classroomLiveKit';
 import TeacherToolbar from './TeacherToolbar';
 import VideoTiles from '../VideoTiles';
@@ -271,6 +273,12 @@ export default function TeacherDashboard({
     }
   }, []);
 
+  // 生徒一覧とカメラの高さは、つまんで変えられる（残りはチャットが受け取る）
+  const roster = useStoredHeight('roster', 72, 640);
+  const video = useStoredHeight('video', 56, 480);
+  const rosterRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLDivElement>(null);
+
   // タイトルバーのクラス名
   const classroomName = selectedClassroom?.name || '三村囲碁オンライン';
 
@@ -313,7 +321,16 @@ export default function TeacherDashboard({
       </div>
 
       {/* 生徒一覧テーブル */}
-      <div style={{ maxHeight: '35vh', overflowY: 'auto', borderBottom: '1px solid var(--color-line)' }}>
+      {/* 生徒一覧。高さは下の取っ手で変えられる。詰めたぶんは中央と右のチャットに回る */}
+      <div
+        ref={rosterRef}
+        style={{
+          height: roster.height ?? undefined,
+          maxHeight: roster.height === null ? 'min(35vh, 260px)' : undefined,
+          overflowY: 'auto',
+          flexShrink: 0,
+        }}
+      >
         <StudentTable
           participants={filteredParticipants}
           students={filteredStudents}
@@ -343,6 +360,12 @@ export default function TeacherDashboard({
           }}
         />
       </div>
+      <VerticalResizer
+        label="生徒一覧の高さ"
+        targetRef={rosterRef}
+        onResize={roster.commit}
+        onCommit={roster.save}
+      />
 
       {/* 中央: 碁盤グリッド/観戦 + 右サイドバー（ビデオ+チャット） */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
@@ -441,14 +464,17 @@ export default function TeacherDashboard({
           minHeight: 0,
           background: 'var(--color-surface)',
         }}>
-          {/* 右上: ビデオ映像エリア（黒背景） */}
-          <div style={{
-            background: '#000',
-            minHeight: 180,
-            borderBottom: '1px solid var(--color-line)',
-            position: 'relative',
-          }}>
-            {videoElements.size > 0 ? (
+          {/* 右上: カメラ映像。高さは下の取っ手で変えられ、詰めたぶんは会話が受け取る。
+              以前は下限 180px で固定していたため、窓を小さくすると入力欄が押し出されて
+              見えなくなっていた（三村さん報告 2026-08-04、800×600 で下端より 63px 下）。 */}
+          {videoElements.size > 0 ? (
+            <div ref={videoRef} style={{
+              background: '#000',
+              height: video.height ?? 180,
+              flexShrink: 0,
+              overflow: 'hidden',
+              position: 'relative',
+            }}>
               <div style={{ padding: 4 }}>
                 <VideoTiles
                   videoElements={videoElements}
@@ -457,28 +483,37 @@ export default function TeacherDashboard({
                   students={allStudents}
                 />
               </div>
-            ) : (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                // 映像枠は明暗どちらでも黒なので、地ではなく黒に対して読める色を置く
-                color: '#8a8579',
-                fontSize: 11,
-              }}>
-                カメラ映像
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            // 誰も映像を出していないときに黒枠が居座ると、そのぶん会話が読めなくなる。
+            // 何も映っていないことだけ伝えて、高さはチャットに渡す。
+            <div style={{
+              flexShrink: 0,
+              padding: '4px 8px',
+              borderBottom: '1px solid var(--color-line)',
+              color: 'var(--color-muted)',
+              fontSize: 11,
+            }}>
+              カメラ映像なし
+            </div>
+          )}
+
+          {videoElements.size > 0 && (
+            <VerticalResizer
+              label="カメラの高さ"
+              targetRef={videoRef}
+              onResize={video.commit}
+              onCommit={video.save}
+            />
+          )}
 
           {/* 音声・映像の設定。自分の入出力に関わるものをチャットの並びにまとめる */}
-          <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--color-line)' }}>
+          <div style={{ flexShrink: 0, padding: '6px 8px', borderBottom: '1px solid var(--color-line)' }}>
             <MediaDeviceSettings classroom={classroom ?? null} />
           </div>
 
-          {/* チャット */}
-          <div style={{ flex: 1, minHeight: 0 }}>
+          {/* チャット。上の2つを詰めたぶんがここに来る */}
+          <div style={{ flex: '1 1 auto', minHeight: 92 }}>
             <ChatPanel
               messages={chatMessages}
               participants={participants}
