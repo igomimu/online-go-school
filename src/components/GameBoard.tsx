@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import GoBoard from './GoBoard';
 import ZoomTapConfirm from './ZoomTapConfirm';
 import type { Drawing, Marker } from './GoBoard';
-import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban, Triangle } from 'lucide-react';
+import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban, Triangle, MousePointerClick } from 'lucide-react';
 import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, formatKomiLabel, isTimeoutResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
@@ -13,7 +13,8 @@ import { getSupabase } from '../utils/liveGameApi';
 import { resolvePlayerName } from '../utils/identityUtils';
 import { ClassroomLiveKit } from '../utils/classroomLiveKit';
 import { isStoneSoundEnabled, setStoneSoundEnabled, playStoneSound, playCaptureSound, unlockStoneSound, shouldPlayMoveSound } from '../utils/stoneSound';
-import { isLastMoveMarkerEnabled, setLastMoveMarkerEnabled } from '../utils/boardPrefs';
+import { isLastMoveMarkerEnabled, setLastMoveMarkerEnabled, isTapConfirmEnabled, setTapConfirmEnabled } from '../utils/boardPrefs';
+import { useLastPointerType } from '../hooks/useLastPointerType';
 import type { Student } from '../types/classroom';
 
 interface GameBoardProps {
@@ -62,6 +63,8 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
   const [pendingTap, setPendingTap] = useState<{ x: number; y: number } | null>(null);
   const isTouch = useIsTouchDevice();
+  const getLastPointerType = useLastPointerType();
+  const [tapConfirmOn, setTapConfirmOn] = useState(isTapConfirmEnabled);
   const isPinchZoomed = useIsPinchZoomed();
   // GoBoard内蔵のピンチズーム(useViewBox由来)の現在倍率。ズーム済みならZoomTapConfirmを
   // 二重に出さない（useIsPinchZoomedはブラウザネイティブズームの検知、こちらはアプリ内ズーム）。
@@ -179,13 +182,19 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   const handleBoardCellClick = useCallback(
     (x: number, y: number) => {
       const alreadyZoomed = isPinchZoomed || boardZoom > BOARD_ZOOM_CONFIRM_SKIP;
-      if (isTouch && !alreadyZoomed && game?.status === 'playing' && !isScoring && isMyTurn) {
+      // 実際に触れた入力装置で判断する。タブレットPCをマウスやペンで操作している
+      // ときまで2回タップを求めない（pointer:coarse だけで決めると、Surface が
+      // 一律スマホ扱いになる）。まだ何も触れていない間は従来どおりの判定に従う。
+      const pointerType = getLastPointerType();
+      const byFinger = pointerType === null ? isTouch : pointerType === 'touch';
+      const wantsConfirm = tapConfirmOn && byFinger;
+      if (wantsConfirm && !alreadyZoomed && game?.status === 'playing' && !isScoring && isMyTurn) {
         setPendingTap({ x, y });
         return;
       }
       handleCellClick(x, y);
     },
-    [isTouch, isPinchZoomed, boardZoom, game?.status, isScoring, isMyTurn, handleCellClick],
+    [isTouch, tapConfirmOn, getLastPointerType, isPinchZoomed, boardZoom, game?.status, isScoring, isMyTurn, handleCellClick],
   );
 
   const handlePassClick = useCallback(async () => {
@@ -385,6 +394,28 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
             <Triangle className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">最終手</span>
           </button>
+          {/* 指で打つときの確認タップ。マウス・ペンのときは自動で1回になるので、
+              指を使う端末でだけ意味がある */}
+          {isTouch && (
+            <button
+              data-testid="tap-confirm-toggle"
+              onClick={() => {
+                const next = !tapConfirmOn;
+                setTapConfirmEnabled(next);
+                setTapConfirmOn(next);
+              }}
+              title={tapConfirmOn ? '1回のタップで打つ（確認をやめる）' : '打つ前に確認を挟む'}
+              aria-pressed={tapConfirmOn}
+              className={`flex items-center gap-1 rounded border px-2 py-1 text-xs font-bold transition-colors duration-150 ${
+                tapConfirmOn
+                  ? 'bg-raised hover:bg-line border-line text-ink'
+                  : 'bg-ground hover:bg-raised border-line text-muted'
+              }`}
+            >
+              <MousePointerClick className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{tapConfirmOn ? '確認あり' : '1タップ'}</span>
+            </button>
+          )}
           {/* 設定を間違えて始めた対局を、その場で取り消す（講師のみ）。
               中断ではなく終了にする。中断だと生徒側に「再開」が出てしまい、
               間違えた設定のまま再開できてしまうため。 */}

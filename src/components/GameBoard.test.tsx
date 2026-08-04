@@ -399,5 +399,55 @@ describe('GameBoard', () => {
       expect(screen.queryByTestId('marker-TRI-0-0')).not.toBeInTheDocument();
     });
   });
+
+  // 2026-08-04 三村さん報告: Surface（タブレットPC）が pointer:coarse で
+  // 一律スマホ扱いになり、マウスで打っても2回タップを求められていた
+  describe('着手の確認タップ', () => {
+    function tapCell(pointerType: 'mouse' | 'pen' | 'touch') {
+      // 実際に触れた入力装置を記録させてからクリックする
+      window.dispatchEvent(new PointerEvent('pointerdown', { pointerType, bubbles: true }));
+      fireEvent.click(screen.getByTestId('go-board').querySelector('[data-cell="4-4"]')!);
+    }
+
+    beforeEach(() => {
+      localStorage.clear();
+      // タッチ端末として認識させる（Surface と同じ状況）
+      window.matchMedia = ((q: string) => ({
+        matches: q.includes('coarse'),
+        media: q,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })) as unknown as typeof window.matchMedia;
+    });
+
+    it('マウスで触れたときは確認を挟まずそのまま打つ', () => {
+      setupMock({});
+      render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+      tapCell('mouse');
+      expect(mockSubmitMove).toHaveBeenCalledWith(4, 4);
+    });
+
+    it('ペンでも1回で打てる', () => {
+      setupMock({});
+      render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+      tapCell('pen');
+      expect(mockSubmitMove).toHaveBeenCalledWith(4, 4);
+    });
+
+    it('指のときは従来どおり確認を挟む', () => {
+      setupMock({});
+      render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+      tapCell('touch');
+      expect(mockSubmitMove).not.toHaveBeenCalled();
+    });
+
+    it('設定を切れば指でも1回で打てる', () => {
+      localStorage.setItem('ogs.tapConfirm', 'off');
+      setupMock({});
+      render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+      tapCell('touch');
+      expect(mockSubmitMove).toHaveBeenCalledWith(4, 4);
+    });
+  });
 });
 

@@ -23,3 +23,29 @@ export function setLastMoveMarkerEnabled(value: boolean): void {
     // 保存できなくても、今開いている画面には効いている
   }
 }
+
+const TAP_CONFIRM_KEY = 'ogs.tapConfirm';
+
+/**
+ * 指で打つときに、1回目のタップで拡大確認を挟むか。
+ *
+ * スマホの誤タップ対策として入れたものだが、Surface のようなタブレットPCでも
+ * 「タッチ端末」と見なされて2回タップを求められていた（三村さん報告 2026-08-04）。
+ * マウス・ペンで触っているときは自動で1回になるので、この設定は
+ * 「指で打つときも1回で確定したい」人のためのもの。
+ */
+export function isTapConfirmEnabled(): boolean {
+  try {
+    return localStorage.getItem(TAP_CONFIRM_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+export function setTapConfirmEnabled(value: boolean): void {
+  try {
+    localStorage.setItem(TAP_CONFIRM_KEY, value ? 'on' : 'off');
+  } catch {
+    // 保存できなくても、今開いている画面には効いている
+  }
+}
