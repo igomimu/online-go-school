@@ -11,6 +11,8 @@ import { isTimeoutResult } from '../../utils/scoring';
 import StudentTable from './StudentTable';
 import BoardThumbnailGrid from './BoardThumbnailGrid';
 import ChatPanel from './ChatPanel';
+import MediaDeviceSettings from '../MediaDeviceSettings';
+import type { ClassroomLiveKit } from '../../utils/classroomLiveKit';
 import TeacherToolbar from './TeacherToolbar';
 import VideoTiles from '../VideoTiles';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
@@ -36,6 +38,8 @@ interface TeacherDashboardProps {
   onToggleMic: (identity: string) => void;
   chatMessages: ChatMessage[];
   onChatSend: (text: string, target: 'all' | string) => void;
+  /** 使用マイク・カメラの切り替えに使う */
+  classroom?: ClassroomLiveKit | null;
   videoElements: Map<string, HTMLVideoElement>;
   studentJoinInfo: string;
   onCreateGame: () => void;
@@ -72,6 +76,7 @@ export default function TeacherDashboard({
   onToggleMic,
   chatMessages,
   onChatSend,
+  classroom,
   videoElements,
   studentJoinInfo,
   onCreateGame,
@@ -465,6 +470,11 @@ export default function TeacherDashboard({
                 カメラ映像
               </div>
             )}
+          </div>
+
+          {/* 音声・映像の設定。自分の入出力に関わるものをチャットの並びにまとめる */}
+          <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--color-line)' }}>
+            <MediaDeviceSettings classroom={classroom ?? null} />
           </div>
 
           {/* チャット */}

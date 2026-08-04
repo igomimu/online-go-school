@@ -11,6 +11,7 @@ import {
 } from 'livekit-client';
 import type { BoardState, StoneColor, Marker } from '../components/GoBoard';
 import type { GameMessageType } from '../types/game';
+import { getSavedDeviceId } from './mediaDevices';
 
 export type Role = 'TEACHER' | 'STUDENT';
 
@@ -224,6 +225,8 @@ export class ClassroomLiveKit {
   async connect(url: string, token: string): Promise<void> {
     await this.room.connect(url, token);
     await this.room.startAudio();
+    // 「回線復旧」で Room を作り直しても、選んだマイク・カメラを使い続ける
+    await this.applySavedDevices();
     // 接続時点で既に room に存在する remote participants は
     // ParticipantConnected イベントを発火させないため、明示的に初回同期を発火する。
     // （後から参加する client 側で初期 participants が React state に反映されない問題の対策）
@@ -309,6 +312,28 @@ export class ClassroomLiveKit {
         topic: msg.type,
         destinationIdentities: identities,
       });
+    }
+  }
+
+  /**
+   * 使用する機器を切り替える。まだ配信していない種類でも、次に ON にしたとき
+   * この選択が使われる（LiveKit が Room の既定機器として覚える）。
+   */
+  async switchDevice(kind: 'audioinput' | 'videoinput', deviceId: string): Promise<void> {
+    await this.room.switchActiveDevice(kind, deviceId);
+  }
+
+  /** 保存してある選択を今の Room に当てる。回線復旧で Room を作り直したあとにも呼ぶ */
+  async applySavedDevices(): Promise<void> {
+    for (const kind of ['audioinput', 'videoinput'] as const) {
+      const saved = getSavedDeviceId(kind);
+      if (!saved) continue;
+      try {
+        await this.room.switchActiveDevice(kind, saved);
+      } catch (err) {
+        // 前に選んだ機器が外れていることがある。既定のまま続ける
+        console.warn(`[media] 保存された${kind}を使えませんでした`, err);
+      }
     }
   }
 

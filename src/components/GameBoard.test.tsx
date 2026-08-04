@@ -109,7 +109,7 @@ describe('GameBoard', () => {
         myIdentity="たろう"
       />
     );
-    // 三村さん指定の並び「黒：〇〇　白：〇〇　コミ◯目半」（2026-08-04）
+    // 三村さん指定の並び「黒：〇〇 / 白：〇〇 / コミ◯目半」（2026-08-04）
     expect(screen.getByText('黒：たろう')).toBeInTheDocument();
     expect(screen.getByText('白：はなこ')).toBeInTheDocument();
     expect(screen.getByTestId('komi-label')).toHaveTextContent('コミ6目半');

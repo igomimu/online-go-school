@@ -1223,6 +1223,7 @@ function App() {
       {!isBoardFocusMode && (
         <Header
           role={role}
+          classroom={classroomRef.current}
           userName={role === 'TEACHER' ? getTeacherDisplayName() : userName}
           connectionState={connectionState}
           remoteCount={classroomRef.current?.remoteParticipantCount ?? 0}
@@ -1286,6 +1287,7 @@ function App() {
         {effectiveViewMode === 'lobby' && role === 'TEACHER' && (
           <TeacherDashboard
             participants={participants}
+            classroom={classroomRef.current}
             localIdentity={classroomRef.current?.localIdentity ?? ''}
             students={students}
             classrooms={classrooms}

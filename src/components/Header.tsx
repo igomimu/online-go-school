@@ -3,6 +3,8 @@ import { ConnectionState } from 'livekit-client';
 import type { Role } from '../utils/classroomLiveKit';
 import RecordingControls from './RecordingControls';
 import ThemeToggle from './ThemeToggle';
+import MediaDeviceSettings from './MediaDeviceSettings';
+import type { ClassroomLiveKit } from '../utils/classroomLiveKit';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 
 interface HeaderProps {
@@ -17,6 +19,8 @@ interface HeaderProps {
   isCameraEnabled?: boolean;
   onToggleCamera?: () => void;
   onDisconnect: () => void;
+  /** 使用マイク・カメラの切り替えに使う */
+  classroom?: ClassroomLiveKit | null;
 }
 
 export default function Header({
@@ -31,6 +35,7 @@ export default function Header({
   isCameraEnabled,
   onToggleCamera,
   onDisconnect,
+  classroom,
 }: HeaderProps) {
   const isConnected = connectionState === ConnectionState.Connected;
   const pwaInstall = usePwaInstall();
@@ -110,6 +115,7 @@ export default function Header({
             )}
           </>
         )}
+        {isConnected && <MediaDeviceSettings classroom={classroom ?? null} iconOnly />}
         {role === 'TEACHER' && isConnected && <RecordingControls />}
         <ThemeToggle />
         {pwaInstall.shouldShowInstall && (
