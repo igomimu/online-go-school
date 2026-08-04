@@ -52,6 +52,7 @@ export function initTheme(): Theme {
 
 /** 現在のテーマ（html の data-theme を正とする） */
 export function currentTheme(): Theme {
-  const value = document.documentElement.dataset.theme;
-  return isTheme(value ?? null) ? value : DEFAULT_THEME;
+  // isTheme が絞り込むのは渡した式ではなく変数そのものなので、?? は呼び出しの外で済ませる
+  const value = document.documentElement.dataset.theme ?? null;
+  return isTheme(value) ? value : DEFAULT_THEME;
 }
