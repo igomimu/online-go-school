@@ -23,6 +23,7 @@ import { fetchRoster, loadStudents, loadClassrooms } from './utils/classroomStor
 import { saveAccount, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } from './utils/authStore';
 
 import Header from './components/Header';
+import ErrorBoundary from './components/ErrorBoundary';
 import LoginScreen from './components/LoginScreen';
 import Lobby from './components/Lobby';
 import GameBoard from './components/GameBoard';
@@ -439,6 +440,11 @@ function App() {
     } catch (err) {
       setConnectionError(err instanceof Error ? err.message : '接続に失敗しました');
     }
+    // chat / notificationSound は中身が ref と updater で書かれていて、古い closure を
+    // 掴んでも取りこぼさない（useChat.handleChatMessage は依存 [] ＋ setMessages(prev=>…)、
+    // notificationSound.play は ref 経由）。依存に入れると毎レンダー作り直しになり、
+    // かえって接続処理が張り直される。rawStudentCode は studentId と同時に更新される。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName, livekitUrl, studentId, studentClassroomId, selectedClassroomId, userName]);
 
   // URL params for student auto-join
@@ -507,6 +513,9 @@ function App() {
     if (urlClassroomId || urlLkUrl || urlToken) {
       window.history.replaceState({}, '', window.location.pathname);
     }
+    // 読み込み時に一度だけ走らせる（URL の教室ID・トークンからの自動参加）。
+    // connectLiveKit を依存に入れると、接続状態が変わるたび再入して二重接続になる。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -980,11 +989,13 @@ function App() {
   if (isDedicatedGameMode && paramRole === 'TEACHER' && paramClassroomId && paramIdentity) {
     return (
       <div className="fixed inset-0 overflow-hidden">
+        <ErrorBoundary label="対局ウィンドウ">
         <TeacherGameWindow
           classroomId={paramClassroomId}
           teacherIdentity={decodeURIComponent(paramIdentity)}
           students={students}
         />
+        </ErrorBoundary>
       </div>
     );
   }
@@ -994,12 +1005,14 @@ function App() {
     const isTeacherRole = paramRole === 'TEACHER';
     return (
       <div className="fixed inset-0 bg-ground text-ink p-1 overflow-hidden">
-        <GameBoard
-          gameId={paramGameId}
-          myIdentity={decodeURIComponent(paramIdentity)}
-          isTeacher={isTeacherRole}
-          students={students}
-        />
+        <ErrorBoundary label="対局盤">
+          <GameBoard
+            gameId={paramGameId}
+            myIdentity={decodeURIComponent(paramIdentity)}
+            isTeacher={isTeacherRole}
+            students={students}
+          />
+        </ErrorBoundary>
       </div>
     );
   }
@@ -1342,7 +1355,7 @@ function App() {
 
         {/* 対局画面 */}
         {effectiveViewMode === 'game' && activeGameId && (
-          <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4">
+          <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4"><ErrorBoundary label="この画面">
             <GameBoard
               gameId={activeGameId}
               myIdentity={classroomRef.current?.localIdentity ?? userName}
@@ -1353,6 +1366,7 @@ function App() {
               students={students}
               syncedDrawings={syncedDrawings}
             />
+          </ErrorBoundary>
           </div>
         )}
 
@@ -1380,7 +1394,7 @@ function App() {
           <div
             className="fixed inset-0 z-50 bg-ground overflow-y-auto lg:overflow-hidden p-2 sm:p-4"
             style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
-          >
+          ><ErrorBoundary label="検討画面">
             <ReviewBoard
               rootNode={reviewRootNode}
               currentNode={reviewCurrentNode}
@@ -1398,12 +1412,12 @@ function App() {
               onChatSend={chat.sendMessage}
               syncedAiAnalysis={syncedAiAnalysis}
             />
-          </div>
+          </ErrorBoundary></div>
         )}
 
         {/* 詰碁モード: 先生は一緒に解くのではなく、生徒の解答状況を見るモニター画面 */}
         {effectiveViewMode === 'problem' && activeProblem && role === 'TEACHER' && (
-          <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4">
+          <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4"><ErrorBoundary label="この画面">
             <ProblemMonitorPanel
               problem={activeProblem}
               students={students}
@@ -1412,12 +1426,13 @@ function App() {
               localIdentity={classroomRef.current?.localIdentity ?? TEACHER_IDENTITY}
               onBack={handleProblemMonitorBack}
             />
+          </ErrorBoundary>
           </div>
         )}
 
         {/* 詰碁モード（生徒） */}
         {effectiveViewMode === 'problem' && activeProblem && role === 'STUDENT' && (
-          <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4">
+          <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4"><ErrorBoundary label="この画面">
             <ProblemBoard
               problem={activeProblem}
               onBack={() => {
@@ -1435,6 +1450,7 @@ function App() {
                 });
               }}
             />
+          </ErrorBoundary>
           </div>
         )}
       </div>

@@ -129,9 +129,11 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     const CELL_SIZE = 40;
     const MARGIN = 40;
 
-    const effectiveViewRange = viewRange || {
+    // useMemo の依存に出せるよう、毎レンダー新しい物体を作らない
+    // （素の派生値のままだと viewBox の memo が毎回作り直しになる）
+    const effectiveViewRange = useMemo(() => viewRange || {
         minX: 1, maxX: boardSize, minY: 1, maxY: boardSize
-    };
+    }, [viewRange, boardSize]);
 
     const LINE_WIDTH = 1;
     const BORDER_WIDTH = 2;
@@ -175,7 +177,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         }
 
         return { x: finalX, y: finalY, w: finalW, h: finalH, str: `${finalX} ${finalY} ${finalW} ${finalH}` };
-    }, [viewRange, showCoordinates, boardSize]);
+    }, [effectiveViewRange, showCoordinates, boardSize]);
 
     // タッチのピンチズーム/パン（pokekata由来）。マウス/ペン入力は素通りするため
     // 既存のマウス操作・描画ドラッグには影響しない。

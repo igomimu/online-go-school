@@ -787,6 +787,9 @@ export function useLiveGame(
     }, 1000);
 
     return () => clearInterval(timer);
+    // localClock は依存に入れない。入れると1秒ごとに interval を張り直すことになり、
+    // 読み上げの重複防止も壊れる。現在値は localClockRef から読んでいる。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasLocalClock, activeGameStatus, undoPending, derived.currentColor, handleLocalTimeUp]);
 
   const submitResign = useCallback(async () => {

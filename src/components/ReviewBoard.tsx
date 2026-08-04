@@ -368,14 +368,24 @@ export default function ReviewBoard({
 
   // 別の棋譜を読み込んで検討を始め直したら、AIは必ずオフから始める。
   // （前の検討でONのままだと、開いた瞬間に新しい局面の解析がKataGoへ飛ぶ）
+  // ref の書き換えはレンダー中に行わない。StrictMode の二重レンダーで
+  // 書き込みが二度走る形になり、React の想定から外れる。
   const updateAiSettingsRef = useRef(updateAiSettings);
-  updateAiSettingsRef.current = updateAiSettings;
   useEffect(() => {
-    updateAiSettingsRef.current({ enabled: false });
+    updateAiSettingsRef.current = updateAiSettings;
+  }, [updateAiSettings]);
+
+  // 棋譜が変わったときの畳み込みは、effect ではなくレンダー中に行う
+  // （effect 内の同期 setState は余分な再描画を呼ぶため error 扱い）。
+  const [seenRootId, setSeenRootId] = useState(rootNode.id);
+  if (seenRootId !== rootNode.id) {
+    setSeenRootId(rootNode.id);
     setHoveredCandidate(null);
     setAiHighlight(null);
-    // rootNode（＝読み込んだ棋譜）が変わった時だけ走らせる
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }
+  // AI を切るのは外側への副作用なので、こちらは effect のまま。
+  useEffect(() => {
+    updateAiSettingsRef.current({ enabled: false });
   }, [rootNode.id]);
 
   const handleUpdateAiSettings = useCallback((newSettings: Partial<AiSettings>) => {

@@ -88,10 +88,10 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   const isDrawing = !!isTeacher && drawMode !== 'off';
   const effectiveDrawings = isTeacher ? drawings : syncedDrawings;
 
-  // 相手の着手等で手番が失われたら、拡大確認オーバーレイを開いたままにしない
-  useEffect(() => {
-    if (pendingTap && !canPlay) setPendingTap(null);
-  }, [canPlay, pendingTap]);
+  // 相手の着手等で手番が失われたら、拡大確認オーバーレイを開いたままにしない。
+  // effect ではなくレンダー中に整えるのが、このリポジトリでの流儀
+  // （effect 内の同期 setState は eslint が error 扱い。多面打ちの盤選択も同じ書き方）。
+  if (pendingTap && !canPlay) setPendingTap(null);
 
   // ── 着手音・石を取る音 ──────────────────────────────────────────
   const [soundOn, setSoundOn] = useState(isStoneSoundEnabled);
@@ -248,6 +248,10 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
       }, 3000);
       return () => clearTimeout(timer);
     }
+    // game 全体を依存に入れると、時計の書き込みなど関係のない更新でも 3 秒の
+    // タイマーが張り直され、終局結果が消えないまま残る（2026-07-15 の修正が退行する）。
+    // 見ているのは status と result だけなので、この2つで十分。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.status, game?.result, onBack]);
 
   if (loading || !game) {
