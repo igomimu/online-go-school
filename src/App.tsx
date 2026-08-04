@@ -1377,7 +1377,10 @@ function App() {
 
         {/* 検討モード */}
         {effectiveViewMode === 'review' && reviewRootNode && reviewCurrentNode && (
-          <div className="fixed inset-0 z-50 bg-ground overflow-y-auto lg:overflow-hidden p-2 sm:p-4">
+          <div
+            className="fixed inset-0 z-50 bg-ground overflow-y-auto lg:overflow-hidden p-2 sm:p-4"
+            style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+          >
             <ReviewBoard
               rootNode={reviewRootNode}
               currentNode={reviewCurrentNode}

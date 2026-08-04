@@ -500,34 +500,42 @@ export default function ReviewBoard({
 
   return (
     <div className="flex flex-col lg:flex-row gap-4 w-full lg:h-full lg:min-h-0" data-testid="review-workspace">
-      <div className={`${isMaximized ? 'w-full' : 'w-full lg:flex-1 lg:basis-0'} space-y-4 lg:min-h-0 lg:flex lg:flex-col lg:overflow-hidden`} data-testid="review-board-column">
-        {/* 検討/授業ヘッダー */}
-        <div className="glass-panel px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <div className={`${isMaximized ? 'w-full' : 'w-full lg:flex-1 lg:basis-0'} space-y-2 sm:space-y-4 lg:min-h-0 lg:flex lg:flex-col lg:overflow-hidden`} data-testid="review-board-column">
+        {/* 検討/授業ヘッダー。
+            狭い画面ではボタンの語を落として必ず1行に収める。2行に膨らむと、その分
+            下の操作列が画面の外へ押し出される（390×667 実測 2026-08-04）。
+            語の途中で折れる（「検討モ／ード」）のを防ぐため、ラベルは折り返さない。 */}
+        <div className="glass-panel px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             {onBack && (
               <button
                 onClick={onBack}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-raised hover:bg-line border border-line text-ink rounded-lg text-sm font-semibold transition-colors duration-150"
+                className="flex shrink-0 items-center gap-1.5 px-2.5 py-1.5 sm:px-3 bg-raised hover:bg-line border border-line text-ink rounded-lg text-sm font-semibold whitespace-nowrap transition-colors duration-150"
               >
-                <X className="w-4 h-4" /> 閉じてホーム
+                <X className="w-4 h-4" />
+                <span className="hidden sm:inline">閉じてホーム</span>
+                <span className="sm:hidden">閉じる</span>
               </button>
             )}
-            <span className="font-bold text-base ml-2">検討モード</span>
-            <span className="text-sm text-muted">
+            <span className="font-bold text-sm sm:text-base sm:ml-2 whitespace-nowrap">検討モード</span>
+            <span className="text-sm text-muted whitespace-nowrap">
               {currentMoveNumber}手目
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
               onClick={() => setIsMaximized(!isMaximized)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-raised hover:bg-line border border-line text-ink hover:text-ink rounded-lg text-xs font-semibold transition-all"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 bg-raised hover:bg-line border border-line text-ink hover:text-ink rounded-lg text-xs font-semibold whitespace-nowrap transition-all"
             >
               {isMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-              {/* 生徒側はAI欄が出ないので「チャットを表示」と正しく名乗る */}
-              {isMaximized ? (isTeacher ? 'AI・チャットを表示' : 'チャットを表示') : '碁盤を広げる'}
+              {/* 生徒側はAI欄が出ないので「チャットを表示」と正しく名乗る。
+                  狭い画面ではアイコンだけにする（語を出すと1行に収まらない） */}
+              <span className="hidden sm:inline">
+                {isMaximized ? (isTeacher ? 'AI・チャットを表示' : 'チャットを表示') : '碁盤を広げる'}
+              </span>
             </button>
             {isTeacher && currentNode.children.length > 1 && (
-              <div className="flex items-center gap-2 text-accent-text text-sm">
+              <div className="flex items-center gap-1.5 text-accent-text text-sm whitespace-nowrap">
                 <GitBranch className="w-4 h-4" />
                 <span>{currentNode.children.length}変化</span>
               </div>
@@ -565,19 +573,19 @@ export default function ReviewBoard({
 
         {/* ナビゲーション */}
         {isTeacher && (
-          <div className="flex flex-col gap-3 w-full items-center">
+          <div className="flex flex-col gap-2 sm:gap-3 w-full items-center">
             {/* ステップ移動 */}
             <div className="flex justify-center gap-2">
-              <button onClick={goToRoot} disabled={!currentNode.parent} className="p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
+              <button onClick={goToRoot} disabled={!currentNode.parent} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
                 <ChevronFirst />
               </button>
-              <button onClick={goBack} disabled={!currentNode.parent} className="p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
+              <button onClick={goBack} disabled={!currentNode.parent} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
                 <ChevronLeft />
               </button>
-              <button onClick={goForward} disabled={currentNode.children.length === 0} className="p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
+              <button onClick={goForward} disabled={currentNode.children.length === 0} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
                 <ChevronRight />
               </button>
-              <button onClick={goLast} disabled={currentNode.children.length === 0} className="p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
+              <button onClick={goLast} disabled={currentNode.children.length === 0} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
                 <ChevronLast />
               </button>
               <div className="w-px h-8 bg-ink/8 mx-1 self-center" />
@@ -587,7 +595,7 @@ export default function ReviewBoard({
                 title={currentNode.fromRecord
                   ? '棋譜の手は消えません（一手戻ります）'
                   : '検討で置いた直近の一手を取り消す (Delete / Ctrl+Z)'}
-                className="p-3 glass-panel hover:bg-alert/10 hover:text-alert-text disabled:opacity-30"
+                className="p-2.5 sm:p-3 glass-panel hover:bg-alert/10 hover:text-alert-text disabled:opacity-30"
               >
                 <Undo2 />
               </button>

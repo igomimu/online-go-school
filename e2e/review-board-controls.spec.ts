@@ -99,3 +99,56 @@ test.describe('検討モードの碁盤操作(pokekata踏襲)', () => {
     }
   });
 });
+
+// 回帰テスト: 390×667（iPhone の URL バー表示中に相当）で、検討画面の操作列が
+// 画面の外へ出ないこと。以前はヘッダーが2行に膨らみ、その分だけ最下段の
+// 自動再生の列が 664–702px と画面（667px）からはみ出していた（2026-08-04）。
+test.describe('検討モードの狭い画面', () => {
+  let ctx: BrowserContext;
+  let page: Page;
+  let classroomId: string;
+
+  test.beforeEach(async ({ browser }) => {
+    classroomId = generateClassroomId('review-narrow');
+    ctx = await browser.newContext({ viewport: { width: 390, height: 667 }, hasTouch: true, isMobile: true });
+    page = await ctx.newPage();
+    await page.goto('/');
+    await clearAllData(page);
+    await setupTeacherPassword(page, TEST_TEACHER_PASSWORD);
+    await setupClassroomData(page, classroomId);
+    await page.reload();
+  });
+
+  test.afterEach(async () => {
+    await ctx?.close();
+    if (classroomId) await teardownSupabaseRoster(classroomId);
+  });
+
+  test('390×667 で操作列が画面内に収まり、見出しが語の途中で折れない', async () => {
+    await loginAsTeacher(page);
+    await openClassroomAndConnect(page);
+    await loadSgfForReview(page, '(;FF[4]GM[1]SZ[9])');
+    await page.getByTestId('go-board').waitFor({ timeout: 15_000 });
+    await page.waitForTimeout(600);
+
+    const m = await page.evaluate(() => {
+      const col = document.querySelector('[data-testid="review-board-column"]')!;
+      const last = col.children[col.children.length - 1].getBoundingClientRect();
+      const heading = Array.from(document.querySelectorAll('span'))
+        .find((s) => s.textContent?.trim() === '検討モード')!;
+      const hr = heading.getBoundingClientRect();
+      const lineHeight = parseFloat(getComputedStyle(heading).lineHeight || '20');
+      return {
+        lastBottom: last.bottom,
+        viewportH: window.innerHeight,
+        headingLines: Math.round(hr.height / lineHeight),
+        docWidth: document.documentElement.scrollWidth,
+        viewportW: window.innerWidth,
+      };
+    });
+
+    expect(m.lastBottom).toBeLessThanOrEqual(m.viewportH);
+    expect(m.headingLines).toBe(1);           // 「検討モ／ード」と折れない
+    expect(m.docWidth).toBeLessThanOrEqual(m.viewportW); // 横にもはみ出さない
+  });
+});
