@@ -143,11 +143,18 @@ export async function waitForSimulBoard(page: Page, timeout = 10_000): Promise<v
  * 検討モードに突入するため、SGF読込ボタン経由で隠しfile inputにSGF文字列を流し込む。
  * 9路 + 1手だけの最小SGFをデフォルトで使う。
  */
+/**
+ * SGF を読み込んで検討を開始し、**検討画面が描かれているページ**を返す。
+ *
+ * 先生の検討は別ウィンドウに出る（2026-08-05）。ポップアップが開けなかった場合は
+ * 元のページに全面表示されるので、その場合は同じページを返す。
+ */
 export async function loadSgfForReview(
   page: Page,
   sgf: string = '(;FF[4]GM[1]SZ[9];B[ee])',
-): Promise<void> {
+): Promise<Page> {
   const fileChooserPromise = page.waitForEvent('filechooser');
+  const popupPromise = page.waitForEvent('popup', { timeout: 10_000 }).catch(() => null);
   await page.getByRole('button', { name: 'SGF読込', exact: true }).click();
   const chooser = await fileChooserPromise;
   await chooser.setFiles({
@@ -155,6 +162,13 @@ export async function loadSgfForReview(
     mimeType: 'application/x-go-sgf',
     buffer: Buffer.from(sgf, 'utf-8'),
   });
+  const popup = await popupPromise;
+  if (!popup) return page;
+  await popup.waitForLoadState('domcontentloaded');
+  if (!popup.isClosed()) return popup;
+  // 掴んだウィンドウが閉じていたら、開き直された方を拾う
+  const alive = page.context().pages().filter(p => p !== page && !p.isClosed());
+  return alive.length > 0 ? alive[alive.length - 1] : page;
 }
 
 /**

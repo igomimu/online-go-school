@@ -79,6 +79,8 @@ export type GameMessageType =
   | 'PROBLEM_RESULT'
   | 'REVIEW_START'
   | 'REVIEW_END'
+  | 'REVIEW_PERMISSIONS'
+  | 'REVIEW_STUDENT_MOVE'
   | 'AUDIO_CONTROL'
   | 'MEDIA_CONTROL'
   | 'CHAT_MESSAGE'
@@ -87,6 +89,17 @@ export type GameMessageType =
 
 export interface GameCreatedPayload {
   game: GameSession;
+}
+
+/** 検討中に盤へ打てる生徒（先生が生徒ごとに許可する。既定は誰も打てない） */
+export interface ReviewPermissionsPayload {
+  allowed: string[];
+}
+
+/** 許可された生徒の着手。実際に打つのは先生側で、生徒は自分の盤に置かない */
+export interface ReviewStudentMovePayload {
+  x: number;
+  y: number;
 }
 
 export interface GameMovePayload {

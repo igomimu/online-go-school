@@ -63,12 +63,12 @@ test.describe('検討モード AI先生→生徒同期', () => {
     await loginAsStudent(studentPage, { studentCode: TEST_STUDENT_A.code, classroomId });
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
 
-    await loadSgfForReview(teacherPage, '(;FF[4]GM[1]SZ[9];B[ee])');
+    const review = await loadSgfForReview(teacherPage, '(;FF[4]GM[1]SZ[9];B[ee])');
 
     await expect(studentPage.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
     // 検討開始時はAIオフ。講師がONにして初めて生徒へ解析が配信される
-    await expect(teacherPage.getByRole('heading', { name: 'AI分析' })).toBeVisible({ timeout: 15_000 });
-    await teacherPage.getByTestId('ai-toggle').click();
+    await expect(review.getByRole('heading', { name: 'AI分析' })).toBeVisible({ timeout: 15_000 });
+    await review.getByTestId('ai-toggle').click();
     // 生徒側にAIのON/OFFボタン・表示は出さない（講師が入切し、生徒には結果だけ届く）
     await expect(studentPage.getByTestId('ai-state')).toHaveCount(0);
     await expect(studentPage.getByTestId('ai-toggle')).toHaveCount(0);
@@ -77,12 +77,12 @@ test.describe('検討モード AI先生→生徒同期', () => {
     await expect(studentPage.getByTestId('ai-move-0')).toContainText('63.7%');
 
     // 講師が候補手へマウスを置くと、生徒は操作しなくても同じPVが出る。
-    await teacherPage.getByTestId('ai-move-0').hover();
+    await review.getByTestId('ai-move-0').hover();
     await expect(studentPage.getByTestId('pv-stone-1')).toBeVisible();
     await expect(studentPage.getByTestId('pv-stone-2')).toBeVisible();
     await expect(studentPage.getByTestId('pv-stone-3')).toBeVisible();
 
-    await teacherPage.getByText('目数差').hover();
+    await review.getByText('目数差').hover();
     await expect(studentPage.getByTestId('pv-stone-1')).not.toBeVisible();
   });
 });

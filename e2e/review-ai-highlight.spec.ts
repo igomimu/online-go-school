@@ -86,38 +86,38 @@ test.describe('検討モード AI候補手クリック', () => {
     await openClassroomAndConnect(teacherPage);
 
     // SGF を流し込んで検討モードに遷移（9路、黒1手）
-    await loadSgfForReview(teacherPage, '(;FF[4]GM[1]SZ[9];B[ee])');
+    const review = await loadSgfForReview(teacherPage, '(;FF[4]GM[1]SZ[9];B[ee])');
 
     // PCでは碁盤とAI情報を最初から半分ずつ表示する。
-    await expect(teacherPage.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
-    await expect(teacherPage.getByRole('heading', { name: 'AI分析' })).toBeVisible({ timeout: 15_000 });
+    await expect(review.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
+    await expect(review.getByRole('heading', { name: 'AI分析' })).toBeVisible({ timeout: 15_000 });
     // 検討開始時はAIオフなので、講師がONにしてから解析結果を待つ
-    await teacherPage.getByTestId('ai-toggle').click();
+    await review.getByTestId('ai-toggle').click();
 
-    const boardColumn = teacherPage.getByTestId('review-board-column');
-    const infoColumn = teacherPage.getByTestId('review-info-column');
+    const boardColumn = review.getByTestId('review-board-column');
+    const infoColumn = review.getByTestId('review-info-column');
     const [boardBox, infoBox] = await Promise.all([boardColumn.boundingBox(), infoColumn.boundingBox()]);
     expect(boardBox).not.toBeNull();
     expect(infoBox).not.toBeNull();
     expect(Math.abs((boardBox?.width ?? 0) - (infoBox?.width ?? 0))).toBeLessThan(24);
-    expect((infoBox?.x ?? 0) + (infoBox?.width ?? 0)).toBeLessThanOrEqual(teacherPage.viewportSize()?.width ?? 1440);
+    expect((infoBox?.x ?? 0) + (infoBox?.width ?? 0)).toBeLessThanOrEqual(review.viewportSize()?.width ?? 1440);
 
     // モック応答後、候補手リストに 'D4' / 'G5' が出る
-    const moveD4 = teacherPage.locator('text=D4').first();
+    const moveD4 = review.locator('text=D4').first();
     await expect(moveD4).toBeVisible({ timeout: 10_000 });
-    await expect(teacherPage.getByTestId('ai-candidate-0')).toBeVisible();
+    await expect(review.getByTestId('ai-candidate-0')).toBeVisible();
 
     // Pocket KataGoと同じく、候補手へホバーするとPVが番号付きで盤上に出る。
-    const candidateRow = teacherPage.getByTestId('ai-move-0');
+    const candidateRow = review.getByTestId('ai-move-0');
     await candidateRow.hover();
-    await expect(teacherPage.getByTestId('pv-stone-1')).toBeVisible();
+    await expect(review.getByTestId('pv-stone-1')).toBeVisible();
 
     // クリック前: 盤面上に SQR マーカーは無い
     // GoBoard が SQR を `<rect fill="none" stroke=...>` で描画する (GoBoard.tsx:272)
     // 他の rect は背景=fill="#DCB35C" / click=fill="transparent" / 死石マーク=fill="none" stroke="red"
     // 死石マークは scoring モード限定で、検討モードでは出ない → fill="none" で SQR を一意に特定できる
     // testid="go-board" は SVG 自身に付いているので直接そこから rect を数える
-    const boardSvg = teacherPage.getByTestId('go-board');
+    const boardSvg = review.getByTestId('go-board');
     const rectCountBefore = await boardSvg.locator('rect[fill="none"]').count();
 
     // 候補手 D4 の行をクリック

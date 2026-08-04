@@ -3,6 +3,7 @@ import type { Drawing } from './components/GoBoard';
 import type { GameNode } from './utils/treeUtilsV2';
 import { convertSgfToGameTree } from './utils/treeUtilsV2';
 import { parseSGFTree } from './utils/sgfUtils';
+import { playReviewMove } from './utils/reviewMove';
 import { ClassroomLiveKit } from './utils/classroomLiveKit';
 import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './utils/classroomLiveKit';
 import type { ViewMode, AudioPermissions, SavedGame } from './types/game';
@@ -24,6 +25,7 @@ import { saveAccount, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } 
 
 import Header from './components/Header';
 import ErrorBoundary from './components/ErrorBoundary';
+import PopupPortal from './components/PopupPortal';
 import LoginScreen from './components/LoginScreen';
 import Lobby from './components/Lobby';
 import GameBoard from './components/GameBoard';
@@ -48,6 +50,8 @@ import { Settings } from 'lucide-react';
 
 // 講師専用の対局別ウィンドウの固定名。同名指定によりwindow.openが既存ウィンドウを再利用・前面化する。
 const TEACHER_GAME_WINDOW_NAME = 'teacher-game-window';
+// 講師専用の検討別ウィンドウ。中身は本体からポータルで描く（PopupPortal 参照）。
+const TEACHER_REVIEW_WINDOW_NAME = 'teacher-review-window';
 
 function App() {
   const [role, setRole] = useState<Role | null>(null);
@@ -107,6 +111,14 @@ function App() {
   const [reviewCurrentNode, setReviewCurrentNode] = useState<GameNode | null>(null);
   const [reviewBoardSize, setReviewBoardSize] = useState(19);
   const [reviewTargetStudents, setReviewTargetStudents] = useState<string[]>([]);
+  // 検討中に盤へ打てる生徒（先生が保持する正本）。既定は誰も打てない
+  const [reviewMovePermissions, setReviewMovePermissions] = useState<string[]>([]);
+  // LiveKitのメッセージ処理は接続時に作った関数の中で走るため、最新の許可をrefで見る
+  const reviewMovePermissionsRef = useRef<string[]>([]);
+  // 生徒側: 自分が今この検討盤に打てるか
+  const [reviewCanPlay, setReviewCanPlay] = useState(false);
+  // ポップアップを塞がれていて検討の別ウィンドウを開けなかった（全面表示に落とす）
+  const [reviewWindowBlocked, setReviewWindowBlocked] = useState(false);
 
   // 詰碁モード用
   const [activeProblem, setActiveProblem] = useState<import('./types/problem').Problem | null>(null);
@@ -317,6 +329,8 @@ function App() {
           setReviewCurrentNode(root);
           setReviewBoardSize(p.boardSize);
           setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null, hoveredCandidateRank: null, allowStudentInteraction: false });
+          // 新しい検討が始まったら前回の許可は引き継がない（先生が改めて許可する）
+          setReviewCanPlay(false);
           setViewMode('review');
         }
         // 詰碁配信（生徒用）
@@ -332,11 +346,31 @@ function App() {
           setProblemResults(prev => ({ ...prev, [sender]: { result: p.result, moveCount: p.moveCount } }));
         }
 
+        // 着手権限の配布（生徒用）。自分が入っていれば打てる
+        if (msg.type === 'REVIEW_PERMISSIONS' && connectRole === 'STUDENT' && msg.payload) {
+          const p = msg.payload as import('./types/game').ReviewPermissionsPayload;
+          const me = classroomRef.current?.localIdentity;
+          setReviewCanPlay(Array.isArray(p.allowed) && !!me && p.allowed.includes(me));
+        }
+
+        // 許可した生徒の着手（先生用）。打てるかどうかの判定はここが正本
+        if (msg.type === 'REVIEW_STUDENT_MOVE' && connectRole === 'TEACHER' && msg.payload && sender) {
+          const p = msg.payload as import('./types/game').ReviewStudentMovePayload;
+          if (
+            reviewMovePermissionsRef.current.includes(sender) &&
+            typeof p.x === 'number' && typeof p.y === 'number'
+          ) {
+            // 打った結果は通常のBOARD_UPDATE（reviewCurrentNodeのeffect）で全員へ返る
+            setReviewCurrentNode(prev => (prev ? playReviewMove(prev, p.x, p.y) ?? prev : prev));
+          }
+        }
+
         if (msg.type === 'REVIEW_END' && connectRole === 'STUDENT') {
           // 先生がロビーに戻った: 検討/授業/詰碁の全セッション状態をクリア
           setViewMode('lobby');
           setReviewRootNode(null);
           setReviewCurrentNode(null);
+          setReviewCanPlay(false);
           setSyncedNode(null);
           setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null, hoveredCandidateRank: null, allowStudentInteraction: false });
           setActiveProblem(null);
@@ -538,25 +572,9 @@ function App() {
     }
   }, [role, connectionState, studentId, livekitUrl, roomName, connectLiveKit]);
 
-  // キーボードナビゲーション（レビューモード用）
-  useEffect(() => {
-    if (viewMode !== 'review' || !reviewCurrentNode || role !== 'TEACHER') return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      switch (e.key) {
-        case 'ArrowLeft':
-          e.preventDefault();
-          if (reviewCurrentNode.parent) setReviewCurrentNode(reviewCurrentNode.parent);
-          break;
-        case 'ArrowRight':
-          e.preventDefault();
-          if (reviewCurrentNode.children.length > 0) setReviewCurrentNode(reviewCurrentNode.children[0]);
-          break;
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, reviewCurrentNode, role]);
+  // 検討の矢印キーは ReviewBoard 側が扱う（Home/End/Delete も含めて一式そこにある）。
+  // ここにも同じ処理があったが、検討を別ウィンドウに出すと本体（教室ホーム）で矢印を
+  // 押しただけで手順が動いてしまうため、重複していたこちらを外した（2026-08-05）。
 
   // 検討モード: currentNode変更時に碁盤同期
   useEffect(() => {
@@ -578,6 +596,30 @@ function App() {
       },
     }, reviewTargetStudents);
   }, [reviewCurrentNode, role, viewMode, reviewBoardSize, reviewTargetStudents]);
+
+  // 検討モード: 着手権限を生徒へ配る。
+  // 許可を外された生徒にも届く必要があるので、配信先の絞り込みとは別に必ず全員へ送る。
+  useEffect(() => {
+    reviewMovePermissionsRef.current = reviewMovePermissions;
+    if (role !== 'TEACHER' || viewMode !== 'review') return;
+    if (!classroomRef.current?.isConnected) return;
+    void classroomRef.current.broadcast({
+      type: 'REVIEW_PERMISSIONS',
+      payload: { allowed: reviewMovePermissions },
+    });
+    // participants: 途中から入ってきた生徒にも現在の許可が届くように送り直す
+  }, [reviewMovePermissions, role, viewMode, participants]);
+
+  // 生徒が検討盤に打ったとき。自分では置かず先生へ送り、先生の盤経由で返るのを待つ
+  const handleStudentReviewMove = useCallback((x: number, y: number) => {
+    void classroomRef.current?.sendTo({ type: 'REVIEW_STUDENT_MOVE', payload: { x, y } }, [TEACHER_IDENTITY]);
+  }, []);
+
+  const toggleReviewMovePermission = useCallback((identity: string) => {
+    setReviewMovePermissions(prev => (
+      prev.includes(identity) ? prev.filter(id => id !== identity) : [...prev, identity]
+    ));
+  }, []);
 
   // 音声操作
   // getUserMedia系の失敗をユーザーに分かる日本語にする（本番はaudioDebugが非表示のため、無言で失敗させない）
@@ -723,8 +765,20 @@ function App() {
     setShowSettings(false);
   };
 
+  // 検討を別ウィンドウに出している間も本体（教室ホーム）は操作できる。
+  // そこから授業・詰碁・対局へ移るときは、検討を畳んで生徒にも終了を伝える
+  // （伝えないと生徒だけ検討画面に取り残される。全面表示だった頃は起こり得なかった経路）。
+  const endReviewIfOpen = useCallback(() => {
+    if (role !== 'TEACHER' || viewMode !== 'review') return;
+    classroomRef.current?.broadcast({ type: 'REVIEW_END', payload: {} });
+    setReviewRootNode(null);
+    setReviewCurrentNode(null);
+    setReviewMovePermissions([]);
+  }, [role, viewMode]);
+
   // 対局選択
   const handleSelectGame = (gameId: string) => {
+    endReviewIfOpen();
     setSyncedDrawings([]);
     setActiveGameId(gameId);
     setViewMode('game');
@@ -763,6 +817,7 @@ function App() {
   // 詰碁: 配信
   const handleProblemAssign = (problem: import('./types/problem').Problem) => {
     if (role !== 'TEACHER') return;
+    endReviewIfOpen();
     setActiveProblem(problem);
     setProblemResults({});
     setViewMode('problem');
@@ -792,6 +847,8 @@ function App() {
       setReviewRootNode(root);
       setReviewCurrentNode(root);
       setReviewBoardSize(parsed.size);
+      // 検討を開き直したら着手の許可は持ち越さない
+      setReviewMovePermissions([]);
       setViewMode('review');
 
       // 生徒にも通知
@@ -812,6 +869,8 @@ function App() {
       setReviewRootNode(root);
       setReviewCurrentNode(root);
       setReviewBoardSize(parsed.size);
+      // 検討を開き直したら着手の許可は持ち越さない
+      setReviewMovePermissions([]);
       setViewMode('review');
 
       // 生徒にも通知
@@ -826,6 +885,7 @@ function App() {
 
   // 授業モード開始
   const handleStartLecture = () => {
+    endReviewIfOpen();
     setViewMode('lecture');
   };
 
@@ -839,6 +899,7 @@ function App() {
     }
     setViewMode('lobby');
     setActiveGameId(null);
+    setReviewMovePermissions([]);
   }, [role, viewMode]);
 
   // 対局の再開処理
@@ -1213,10 +1274,19 @@ function App() {
 
   // 生徒の自動ビュー判定
   const effectiveViewMode = resolveEffectiveViewMode(role, viewMode, !!syncedNode);
+
+  // 先生の検討は別ウィンドウに出す。IGC と同じく、検討中も教室ホームで生徒の
+  // マイク入切・参加者の追加ができるようにするため（2026-08-04 三村さんの選択）。
+  // ポップアップを塞がれている場合だけ、従来どおり全面オーバーレイに落とす。
+  const reviewInWindow =
+    role === 'TEACHER' && effectiveViewMode === 'review' && !reviewWindowBlocked;
+  // 別ウィンドウに出ている間、本体は教室ホームを表示する
+  const mainViewMode: typeof effectiveViewMode = reviewInWindow ? 'lobby' : effectiveViewMode;
+
   const isBoardFocusMode =
-    effectiveViewMode === 'game' ||
-    effectiveViewMode === 'review' ||
-    effectiveViewMode === 'problem';
+    mainViewMode === 'game' ||
+    mainViewMode === 'review' ||
+    mainViewMode === 'problem';
 
   return (
     <div className="flex flex-col gap-4 w-full h-screen overflow-hidden">
@@ -1239,7 +1309,7 @@ function App() {
       )}
 
       {/* ビデオタイル（教師ロビー時はTeacherDashboard内に表示） */}
-      {!isBoardFocusMode && videoElements.size > 0 && !(role === 'TEACHER' && effectiveViewMode === 'lobby') && (
+      {!isBoardFocusMode && videoElements.size > 0 && !(role === 'TEACHER' && mainViewMode === 'lobby') && (
         <VideoTiles
           videoElements={videoElements}
           localIdentity={classroomRef.current?.localIdentity ?? ''}
@@ -1285,7 +1355,7 @@ function App() {
       {/* メインコンテンツ */}
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
         {/* ロビー: 教師はTeacherDashboard、生徒はLobby */}
-        {effectiveViewMode === 'lobby' && role === 'TEACHER' && (
+        {mainViewMode === 'lobby' && role === 'TEACHER' && (
           <TeacherDashboard
             participants={participants}
             classroom={classroomRef.current}
@@ -1334,7 +1404,7 @@ function App() {
           />
         )}
 
-        {effectiveViewMode === 'lobby' && role === 'STUDENT' && (
+        {mainViewMode === 'lobby' && role === 'STUDENT' && (
           <Lobby
             role={role}
             participants={participants}
@@ -1357,7 +1427,7 @@ function App() {
         )}
 
         {/* 対局画面 */}
-        {effectiveViewMode === 'game' && activeGameId && (
+        {mainViewMode === 'game' && activeGameId && (
           <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4"><ErrorBoundary label="この画面">
             <GameBoard
               gameId={activeGameId}
@@ -1374,7 +1444,7 @@ function App() {
         )}
 
         {/* 授業モード */}
-        {effectiveViewMode === 'lecture' && (
+        {mainViewMode === 'lecture' && (
           <LectureBoard
             isTeacher={role === 'TEACHER'}
             classroomRef={classroomRef}
@@ -1392,34 +1462,55 @@ function App() {
           />
         )}
 
-        {/* 検討モード */}
-        {effectiveViewMode === 'review' && reviewRootNode && reviewCurrentNode && (
-          <div
-            className="fixed inset-0 z-50 bg-ground overflow-y-auto lg:overflow-hidden p-2 sm:p-4"
-            style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
-          ><ErrorBoundary label="検討画面">
-            <ReviewBoard
-              rootNode={reviewRootNode}
-              currentNode={reviewCurrentNode}
-              boardSize={reviewBoardSize}
-              onSetCurrentNode={setReviewCurrentNode}
-              isTeacher={role === 'TEACHER'}
-              classroomRef={classroomRef}
-              participants={participants}
-              localIdentity={classroomRef.current?.localIdentity ?? ''}
-              targetStudents={reviewTargetStudents}
-              onSetTargetStudents={setReviewTargetStudents}
-              onBack={handleBackToLobby}
-              registeredStudents={students}
-              chatMessages={chat.messages}
-              onChatSend={chat.sendMessage}
-              syncedAiAnalysis={syncedAiAnalysis}
-            />
-          </ErrorBoundary></div>
-        )}
+        {/* 検討モード。先生は別ウィンドウ、生徒とポップアップを塞がれている場合は全面表示 */}
+        {effectiveViewMode === 'review' && reviewRootNode && reviewCurrentNode && (() => {
+          const reviewBoard = (
+            <ErrorBoundary label="検討画面">
+              <ReviewBoard
+                rootNode={reviewRootNode}
+                currentNode={reviewCurrentNode}
+                boardSize={reviewBoardSize}
+                onSetCurrentNode={setReviewCurrentNode}
+                isTeacher={role === 'TEACHER'}
+                classroomRef={classroomRef}
+                participants={participants}
+                localIdentity={classroomRef.current?.localIdentity ?? ''}
+                targetStudents={reviewTargetStudents}
+                onSetTargetStudents={setReviewTargetStudents}
+                onBack={handleBackToLobby}
+                movePermissions={reviewMovePermissions}
+                onToggleMovePermission={role === 'TEACHER' ? toggleReviewMovePermission : undefined}
+                canPlay={role === 'STUDENT' && reviewCanPlay}
+                onStudentMove={handleStudentReviewMove}
+                registeredStudents={students}
+                chatMessages={chat.messages}
+                onChatSend={chat.sendMessage}
+                syncedAiAnalysis={syncedAiAnalysis}
+              />
+            </ErrorBoundary>
+          );
+          return reviewInWindow ? (
+            <PopupPortal
+              name={TEACHER_REVIEW_WINDOW_NAME}
+              title="検討 — 三村囲碁オンライン"
+              className="w-full h-screen overflow-y-auto lg:overflow-hidden bg-ground p-2 sm:p-4"
+              onClose={handleBackToLobby}
+              onBlocked={() => setReviewWindowBlocked(true)}
+            >
+              {reviewBoard}
+            </PopupPortal>
+          ) : (
+            <div
+              className="fixed inset-0 z-50 bg-ground overflow-y-auto lg:overflow-hidden p-2 sm:p-4"
+              style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+            >
+              {reviewBoard}
+            </div>
+          );
+        })()}
 
         {/* 詰碁モード: 先生は一緒に解くのではなく、生徒の解答状況を見るモニター画面 */}
-        {effectiveViewMode === 'problem' && activeProblem && role === 'TEACHER' && (
+        {mainViewMode === 'problem' && activeProblem && role === 'TEACHER' && (
           <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4"><ErrorBoundary label="この画面">
             <ProblemMonitorPanel
               problem={activeProblem}
@@ -1434,7 +1525,7 @@ function App() {
         )}
 
         {/* 詰碁モード（生徒） */}
-        {effectiveViewMode === 'problem' && activeProblem && role === 'STUDENT' && (
+        {mainViewMode === 'problem' && activeProblem && role === 'STUDENT' && (
           <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4"><ErrorBoundary label="この画面">
             <ProblemBoard
               problem={activeProblem}

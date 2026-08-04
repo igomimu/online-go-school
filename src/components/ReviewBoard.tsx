@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import GoBoard from './GoBoard';
-import type { AnalysisOverlay, Drawing, Marker, PvStone, StoneColor } from './GoBoard';
+import type { AnalysisOverlay, Drawing, Marker, PvStone } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
-import { getMainPath, addMove, removeNode } from '../utils/treeUtilsV2';
+import { getMainPath, removeNode } from '../utils/treeUtilsV2';
+import { playReviewMove } from '../utils/reviewMove';
 import { findNearestDrawingIndex } from '../utils/drawingUtils';
 import type { ParticipantInfo, ClassroomLiveKit, ClassroomMessage } from '../utils/classroomLiveKit';
 import type { Student } from '../types/classroom';
@@ -10,13 +11,13 @@ import type { ChatMessage } from '../types/chat';
 import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';
 import { fromGtpCoord } from '../utils/katagoClient';
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2, Eye, EyeOff } from 'lucide-react';
-import { checkCapture } from '../utils/gameLogic';
 import { getDisplayName } from '../utils/identityUtils';
 import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
 import { useAiAnalysis } from '../hooks/useAiAnalysis';
 import AiAnalysisPanel from './AiAnalysisPanel';
 import WinRateGraph from './WinRateGraph';
 import ChatPanel from './teacher/ChatPanel';
+import { useHostWindow } from '../hooks/useHostWindow';
 
 interface ReviewBoardProps {
   rootNode: GameNode;
@@ -32,6 +33,12 @@ interface ReviewBoardProps {
   targetStudents?: string[];
   onSetTargetStudents?: (students: string[]) => void;
   onBack?: () => void;
+
+  // 着手権限（先生: 生徒ごとの許可 / 生徒: 自分が許可されているか）
+  movePermissions?: string[];
+  onToggleMovePermission?: (identity: string) => void;
+  canPlay?: boolean;
+  onStudentMove?: (x: number, y: number) => void;
 
   // チャット
   registeredStudents?: Student[];
@@ -96,11 +103,17 @@ export default function ReviewBoard({
   targetStudents,
   onSetTargetStudents,
   onBack,
+  movePermissions,
+  onToggleMovePermission,
+  canPlay,
+  onStudentMove,
   registeredStudents,
   chatMessages,
   onChatSend,
   syncedAiAnalysis,
 }: ReviewBoardProps) {
+  // 別ウィンドウに描かれているときは、キー操作の宛先がそのウィンドウになる
+  const hostWindow = useHostWindow();
   // PCは最初から碁盤と情報パネルを半々、スマホは碁盤優先で開始する。
   const [isMaximized, setIsMaximized] = useState(() => (
     typeof window !== 'undefined' && typeof window.matchMedia === 'function'
@@ -183,9 +196,10 @@ export default function ReviewBoard({
       else if (!ctrl && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setShowCandidates(prev => !prev); }
       else if (e.key === 'Escape') { setToolMode('play'); setDrawMode('off'); }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isTeacher, handleUndo, goBack, goForward, goToRoot, goLast]);
+    // 別ウィンドウに描かれているときは、そのウィンドウに張らないとキーが効かない
+    hostWindow.addEventListener('keydown', handleKeyDown);
+    return () => hostWindow.removeEventListener('keydown', handleKeyDown);
+  }, [isTeacher, handleUndo, goBack, goForward, goToRoot, goLast, hostWindow]);
 
   // 描画ハンドラ
   const handleDrawDragStart = useCallback((x: number, y: number) => {
@@ -233,24 +247,8 @@ export default function ReviewBoard({
     if (drawMode !== 'off') return;
 
     if (toolMode === 'play') {
-      if (boardState[y - 1]?.[x - 1]) return;
-
-      const newBoard = boardState.map(row => row.map(cell => cell ? { ...cell } : null));
-      const derivedNextColor: StoneColor = currentNode.move
-        ? (currentNode.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
-        : 'BLACK';
-
-      newBoard[y - 1][x - 1] = { color: derivedNextColor, number: currentNode.nextNumber };
-
-      const { board: capturedBoard } = checkCapture(newBoard, x, y, derivedNextColor, boardSize);
-
-      const realNewNode = addMove(
-        currentNode, capturedBoard, currentNode.nextNumber + 1,
-        derivedNextColor, boardSize,
-        { x, y, color: derivedNextColor }
-      );
-
-      onSetCurrentNode(realNewNode);
+      const played = playReviewMove(currentNode, x, y, boardSize);
+      if (played) onSetCurrentNode(played);
     } else if (toolMode === 'eraser') {
       const updatedMarkers = (currentNode.markers || []).filter(m => m.x !== x || m.y !== y);
       onSetCurrentNode({ ...currentNode, markers: updatedMarkers });
@@ -282,7 +280,6 @@ export default function ReviewBoard({
       onSetCurrentNode({ ...currentNode, markers: updatedMarkers });
     }
   }, [
-    boardState,
     isTeacher,
     boardSize,
     currentNode,
@@ -290,6 +287,14 @@ export default function ReviewBoard({
     toolMode,
     onSetCurrentNode,
   ]);
+
+  // 許可された生徒の着手。自分の盤には置かず先生へ送り、先生の盤経由で返ってくるのを待つ
+  // （打てるかどうかの判定は先生側が正本）。
+  const handleStudentCellClick = useCallback((x: number, y: number) => {
+    if (isTeacher || !canPlay || !onStudentMove) return;
+    if (boardState[y - 1]?.[x - 1]) return;
+    onStudentMove(x, y);
+  }, [isTeacher, canPlay, onStudentMove, boardState]);
 
   // カーソル共有
   const handleCellMouseEnter = useCallback((x: number, y: number) => {
@@ -545,6 +550,11 @@ export default function ReviewBoard({
             <span className="text-sm text-muted whitespace-nowrap">
               {currentMoveNumber}手目
             </span>
+            {!isTeacher && canPlay && (
+              <span className="truncate rounded-lg bg-accent/15 px-2 py-1 text-xs text-accent-text">
+                打てます
+              </span>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
@@ -583,8 +593,8 @@ export default function ReviewBoard({
             pvOverlay={pvOverlay}
             hoveredCandidateIndex={hoveredCandidateIndex}
             onCandidateHover={isTeacher || allowStudentInteraction ? handleCandidateHover : undefined}
-            readOnly={!isTeacher}
-            onCellClick={isTeacher ? handleCellClick : undefined}
+            readOnly={!isTeacher && !canPlay}
+            onCellClick={isTeacher ? handleCellClick : (canPlay ? handleStudentCellClick : undefined)}
             onCellRightClick={isTeacher ? handleCellRightClick : undefined}
             onBoardWheel={isTeacher ? handleBoardWheel : undefined}
             onCellMouseEnter={handleCellMouseEnter}
@@ -873,19 +883,41 @@ export default function ReviewBoard({
                 <div className="space-y-1">
                   {studentParticipants.map(s => {
                     const isSelected = !targetStudents || targetStudents.length === 0 || targetStudents.includes(s.identity);
+                    const canStudentPlay = movePermissions?.includes(s.identity) ?? false;
                     return (
-                      <button
-                        key={s.identity}
-                        onClick={() => toggleStudent(s.identity)}
-                        className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-all ${
-                          isSelected ? 'bg-accent/12 text-accent-text' : 'bg-ink/5 text-muted'
-                        }`}
-                      >
-                        {s.name || getDisplayName(s.identity, registeredStudents ?? [])}
-                      </button>
+                      <div key={s.identity} className="flex items-center gap-1">
+                        <button
+                          onClick={() => toggleStudent(s.identity)}
+                          className={`flex-1 min-w-0 text-left px-3 py-1.5 rounded-lg text-sm truncate transition-all ${
+                            isSelected ? 'bg-accent/12 text-accent-text' : 'bg-ink/5 text-muted'
+                          }`}
+                        >
+                          {s.name || getDisplayName(s.identity, registeredStudents ?? [])}
+                        </button>
+                        {onToggleMovePermission && (
+                          <button
+                            data-testid={`review-permission-${s.identity}`}
+                            onClick={() => onToggleMovePermission(s.identity)}
+                            title={canStudentPlay ? 'この生徒は盤に打てます（押すと戻す）' : '押すとこの生徒が盤に打てるようになります'}
+                            aria-pressed={canStudentPlay}
+                            className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${
+                              canStudentPlay
+                                ? 'bg-accent text-accent-ink font-bold'
+                                : 'bg-ink/5 text-muted hover:bg-ink/10'
+                            }`}
+                          >
+                            {canStudentPlay ? '打てる' : '打たせる'}
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
+                {onToggleMovePermission && (
+                  <p className="text-xs text-muted leading-relaxed">
+                    「打たせる」を押した生徒は、この検討盤に打てます。打たれた手は先生の盤にも入ります。
+                  </p>
+                )}
               </div>
             )}
 

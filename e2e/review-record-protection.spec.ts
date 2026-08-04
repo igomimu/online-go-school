@@ -52,45 +52,45 @@ test.describe('検討モード: 元手順の保護', () => {
   });
 
   test('棋譜にない手を置いても、戻って再生すると元手順が出る', async () => {
-    await loadSgfForReview(page, SGF_5MOVES);
-    await expect(page.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
+    const review = await loadSgfForReview(page, SGF_5MOVES);
+    await expect(review.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
 
     // 3手目まで進めて、棋譜にない手を置く
-    for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight');
-    await expect(page.getByText('3手目')).toBeVisible();
-    await page.getByTestId('go-board').locator('[data-cell="1-1"]').click({ timeout: 15_000 });
-    await expect(page.getByText('4手目')).toBeVisible();
-    expect(await stones(page)).toContain('1-1');
+    for (let i = 0; i < 3; i++) await review.keyboard.press('ArrowRight');
+    await expect(review.getByText('3手目')).toBeVisible();
+    await review.getByTestId('go-board').locator('[data-cell="1-1"]').click({ timeout: 15_000 });
+    await expect(review.getByText('4手目')).toBeVisible();
+    expect(await stones(review)).toContain('1-1');
 
     // 戻って進むと、置いた手ではなく棋譜の4手目(3-7)が出る
-    await page.keyboard.press('ArrowLeft');
-    await page.keyboard.press('ArrowRight');
-    const after = await stones(page);
+    await review.keyboard.press('ArrowLeft');
+    await review.keyboard.press('ArrowRight');
+    const after = await stones(review);
     expect(after).toContain('3-7');
     expect(after).not.toContain('1-1');
 
     // 最後まで再生すると棋譜の5手が揃う
-    await page.keyboard.press('ArrowRight');
-    expect(await stones(page)).toEqual(RECORD_STONES);
+    await review.keyboard.press('ArrowRight');
+    expect(await stones(review)).toEqual(RECORD_STONES);
   });
 
   test('取り消しを押しすぎても棋譜の手は消えない', async () => {
-    await loadSgfForReview(page, SGF_5MOVES);
-    await expect(page.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
+    const review = await loadSgfForReview(page, SGF_5MOVES);
+    await expect(review.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
 
     // 3手目まで進めて検討の手を2つ置く
-    for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight');
-    await page.getByTestId('go-board').locator('[data-cell="1-1"]').click({ timeout: 15_000 });
-    await page.getByTestId('go-board').locator('[data-cell="2-1"]').click({ timeout: 15_000 });
-    await expect(page.getByText('5手目')).toBeVisible();
+    for (let i = 0; i < 3; i++) await review.keyboard.press('ArrowRight');
+    await review.getByTestId('go-board').locator('[data-cell="1-1"]').click({ timeout: 15_000 });
+    await review.getByTestId('go-board').locator('[data-cell="2-1"]').click({ timeout: 15_000 });
+    await expect(review.getByText('5手目')).toBeVisible();
 
     // 置いたのは2手だが取り消しを5回押す（余分な3回で棋譜を食べていた）
-    for (let i = 0; i < 5; i++) await page.keyboard.press('Delete');
+    for (let i = 0; i < 5; i++) await review.keyboard.press('Delete');
 
     // 棋譜は無傷: 最初から再生して5手すべて並ぶ
-    await page.keyboard.press('Home');
-    for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowRight');
-    await expect(page.getByText('5手目')).toBeVisible();
-    expect(await stones(page)).toEqual(RECORD_STONES);
+    await review.keyboard.press('Home');
+    for (let i = 0; i < 5; i++) await review.keyboard.press('ArrowRight');
+    await expect(review.getByText('5手目')).toBeVisible();
+    expect(await stones(review)).toEqual(RECORD_STONES);
   });
 });
