@@ -566,7 +566,8 @@ function App() {
     const nextColor = node.move
       ? (node.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
       : 'BLACK';
-    classroomRef.current.broadcast({
+    // 「配信先の生徒」で絞れるようにする。空なら全員（以前は常に全員へ送っていた）
+    void classroomRef.current.sendToOrAll({
       type: 'BOARD_UPDATE',
       payload: {
         boardState: node.board,
@@ -575,8 +576,8 @@ function App() {
         markers: node.markers,
         moveNumber: node.move ? node.nextNumber - 1 : 0,
       },
-    });
-  }, [reviewCurrentNode, role, viewMode, reviewBoardSize]);
+    }, reviewTargetStudents);
+  }, [reviewCurrentNode, role, viewMode, reviewBoardSize, reviewTargetStudents]);
 
   // 音声操作
   // getUserMedia系の失敗をユーザーに分かる日本語にする（本番はaudioDebugが非表示のため、無言で失敗させない）

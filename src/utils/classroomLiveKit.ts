@@ -298,6 +298,19 @@ export class ClassroomLiveKit {
   }
 
   // 特定の参加者にメッセージ送信
+  /**
+   * 宛先を絞って送る。空配列や未指定なら全員へ。
+   * 検討の「配信先の生徒」はこれを通す（以前は broadcast を呼んでおり、
+   * 選んでも全員に配信されていた 2026-08-04）。
+   */
+  async sendToOrAll(msg: ClassroomMessage, identities?: string[] | null): Promise<void> {
+    if (!identities || identities.length === 0) {
+      await this.broadcast(msg);
+      return;
+    }
+    await this.sendTo(msg, identities);
+  }
+
   async sendTo(msg: ClassroomMessage, identities: string[]): Promise<void> {
     const data = encoder.encode(JSON.stringify(msg));
     const destinations: RemoteParticipant[] = [];

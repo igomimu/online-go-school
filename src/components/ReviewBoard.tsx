@@ -4,7 +4,7 @@ import type { AnalysisOverlay, Drawing, Marker, PvStone, StoneColor } from './Go
 import type { GameNode } from '../utils/treeUtilsV2';
 import { getMainPath, addMove, removeNode } from '../utils/treeUtilsV2';
 import { findNearestDrawingIndex } from '../utils/drawingUtils';
-import type { ParticipantInfo, ClassroomLiveKit } from '../utils/classroomLiveKit';
+import type { ParticipantInfo, ClassroomLiveKit, ClassroomMessage } from '../utils/classroomLiveKit';
 import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';
@@ -121,6 +121,12 @@ export default function ReviewBoard({
   // AI候補手のハイライト座標（1-indexed）。対象nodeが変わったら表示しない
   const [aiHighlight, setAiHighlight] = useState<{ nodeId: string; x: number; y: number } | null>(null);
 
+  // 検討の配信はすべてここを通す。「配信先の生徒」で選んでいれば、その生徒にだけ送る
+  // （以前は broadcast を直に呼んでおり、選んでも全員へ届いていた 2026-08-04）。
+  const sendToTargets = useCallback((message: ClassroomMessage) => {
+    void classroomRef.current?.sendToOrAll(message, targetStudents);
+  }, [classroomRef, targetStudents]);
+
   const goToRoot = useCallback(() => onSetCurrentNode(rootNode), [rootNode, onSetCurrentNode]);
   const goBack = useCallback(() => {
     if (currentNode.parent) onSetCurrentNode(currentNode.parent);
@@ -158,8 +164,8 @@ export default function ReviewBoard({
     if (idx < 0) return;
     const updated = drawings.filter((_, i) => i !== idx);
     setDrawings(updated);
-    classroomRef.current?.broadcast({ type: 'DRAW_UPDATE', payload: updated });
-  }, [isTeacher, drawings, classroomRef]);
+    sendToTargets({ type: 'DRAW_UPDATE', payload: updated });
+  }, [isTeacher, drawings, sendToTargets]);
 
   // キーボードショートカット（pokekata踏襲）。チャット等の入力中は無効化する。
   useEffect(() => {
@@ -206,20 +212,20 @@ export default function ReviewBoard({
         };
         const updated = [...drawings, newDrawing];
         setDrawings(updated);
-        classroomRef.current?.broadcast({ type: 'DRAW_UPDATE', payload: updated });
+        sendToTargets({ type: 'DRAW_UPDATE', payload: updated });
       }
       setDrawStart(null);
       drawLastCell.current = null;
     }
-  }, [isTeacher, drawMode, drawStart, drawings, classroomRef]);
+  }, [isTeacher, drawMode, drawStart, drawings, sendToTargets]);
 
   const clearAnnotations = useCallback(() => {
     setDrawings([]);
-    classroomRef.current?.broadcast({ type: 'DRAW_CLEAR', payload: null });
+    sendToTargets({ type: 'DRAW_CLEAR', payload: null });
     if (currentNode.markers && currentNode.markers.length > 0) {
       onSetCurrentNode({ ...currentNode, markers: [] });
     }
-  }, [currentNode, classroomRef, onSetCurrentNode]);
+  }, [currentNode, sendToTargets, onSetCurrentNode]);
 
   // Click handler for board (making moves or annotations)
   const handleCellClick = useCallback((x: number, y: number) => {
@@ -288,15 +294,15 @@ export default function ReviewBoard({
   // カーソル共有
   const handleCellMouseEnter = useCallback((x: number, y: number) => {
     if (isTeacher) {
-      classroomRef.current?.broadcast({ type: 'CURSOR_MOVE', payload: { x, y } });
+      sendToTargets({ type: 'CURSOR_MOVE', payload: { x, y } });
     }
-  }, [isTeacher, classroomRef]);
+  }, [isTeacher, sendToTargets]);
 
   const handleCellMouseLeave = useCallback(() => {
     if (isTeacher) {
-      classroomRef.current?.broadcast({ type: 'CURSOR_CLEAR', payload: null });
+      sendToTargets({ type: 'CURSOR_CLEAR', payload: null });
     }
-  }, [isTeacher, classroomRef]);
+  }, [isTeacher, sendToTargets]);
 
   const currentMoveNumber = currentNode.move ? currentNode.nextNumber - 1 : 0;
 
@@ -429,7 +435,7 @@ export default function ReviewBoard({
       allowStudentInteraction: aiAnalysis.settings.allowStudentInteraction,
       showCandidates,
     };
-    classroomRef.current?.broadcast({ type: 'AI_ANALYSIS_UPDATE', payload });
+    sendToTargets({ type: 'AI_ANALYSIS_UPDATE', payload });
   }, [
     isTeacher,
     currentNode.id,
@@ -440,7 +446,7 @@ export default function ReviewBoard({
     hoveredCandidateIndex,
     showCandidates,
     sharedAiResult,
-    classroomRef,
+    sendToTargets,
     participantCount, // 途中参加した生徒にも現在の結果を再送する
   ]);
 
