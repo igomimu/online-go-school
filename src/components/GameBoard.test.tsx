@@ -373,4 +373,31 @@ describe('GameBoard', () => {
     expect(screen.getByTestId('clock-white')).toHaveTextContent('秒読 12秒 [∞]');
     expect(screen.getByTestId('clock-black')).toHaveTextContent('秒読 25秒 [1]');
   });
+
+  // 2026-08-04 三村さん指定: 直前に打たれた石に▲。今どこに打たれたかがひと目で分かる
+  describe('最終手の▲', () => {
+    it('直前の一手に▲を出し、ボタンで消せる', () => {
+      const game = createMockGame({ moveNumber: 1 });
+      setupMock({
+        game,
+        lastMove: { move_number: 1, x: 4, y: 4, color: 'BLACK' },
+      });
+      render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+
+      expect(screen.getByTestId('marker-TRI-4-4')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('last-move-marker-toggle'));
+      expect(screen.queryByTestId('marker-TRI-4-4')).not.toBeInTheDocument();
+    });
+
+    it('パス（0,0で記録される）には▲を付けない', () => {
+      const game = createMockGame({ moveNumber: 1 });
+      setupMock({
+        game,
+        lastMove: { move_number: 1, x: 0, y: 0, color: 'BLACK' },
+      });
+      render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+      expect(screen.queryByTestId('marker-TRI-0-0')).not.toBeInTheDocument();
+    });
+  });
 });
+

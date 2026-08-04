@@ -83,11 +83,39 @@ function getRosterSeedEnv(): { url: string; serviceRoleKey: string } {
   return { url, serviceRoleKey };
 }
 
+/**
+ * テスト生徒に紐づく進行中の対局を消す。
+ *
+ * 各 spec は finally で teardown するが、実行を強制終了すると片付けが走らない。
+ * 残った「対局中」の行は次の実行に影響し、対局を作っても講師の一覧に現れなくなる
+ * （2026-08-04、8/1 の byoyomi-voice の残骸 6 件で simul-game が落ちた）。
+ * 前の実行がどう終わっていても揃った状態から始められるよう、seed のたびに掃除する。
+ */
+async function clearStaleTestGames(
+  supabase: ReturnType<typeof createClient>,
+): Promise<void> {
+  const identities = [
+    TEST_STUDENT_A.code, TEST_STUDENT_B.code,
+    `sid:${TEST_STUDENT_A.code}`, `sid:${TEST_STUDENT_B.code}`,
+  ];
+  const filter = identities
+    .flatMap((id) => [`black_player.eq.${id}`, `white_player.eq.${id}`])
+    .join(',');
+  const { error } = await supabase
+    .from('go_school_live_games')
+    .delete()
+    .in('status', ['playing', 'scoring'])
+    .or(filter);
+  if (error) throw new Error(`Failed to clear stale test games: ${error.message}`);
+}
+
 async function seedSupabaseRoster(classroomId: string, classroomName: string): Promise<void> {
   const { url, serviceRoleKey } = getRosterSeedEnv();
   const supabase = createClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  await clearStaleTestGames(supabase);
 
   const { error: classroomError } = await supabase
     .from('go_school_classrooms')

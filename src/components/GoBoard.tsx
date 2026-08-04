@@ -323,6 +323,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                     const h = r * Math.sqrt(3) / 2;
                     markerElements.push(
                         <polygon key={k}
+                            data-testid={`marker-TRI-${marker.x}-${marker.y}`}
                             points={`${mx},${my - r} ${mx + h},${my + r / 2} ${mx - h},${my + r / 2}`}
                             fill="none" stroke={color} strokeWidth={2} className="pointer-events-none"
                         />

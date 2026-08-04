@@ -8,6 +8,7 @@ function simulTile(page: Page, studentName: string) {
   return page.getByRole('button', { name: new RegExp(`${studentName}.*\\d+手目`) });
 }
 
+// 対局盤のヘッダーは「黒：〇〇 / 白：〇〇」表記になったため、名前は部分一致で拾う（2026-08-04）
 test.describe('多面打ちv2: 単一盤ローテーション', () => {
   let teacherContext: BrowserContext;
   let studentAContext: BrowserContext;
@@ -75,7 +76,7 @@ test.describe('多面打ちv2: 単一盤ローテーション', () => {
     // -> 別ウィンドウにAの盤が1面表示される（まだ黒番=A考慮中）
     const activeBoard = gameWindow.getByTestId('simul-active-board');
     await expect(activeBoard).toBeVisible({ timeout: 10_000 });
-    await expect(activeBoard.getByText(TEST_STUDENT_A.name)).toBeVisible();
+    await expect(activeBoard.getByText(new RegExp(TEST_STUDENT_A.name))).toBeVisible();
     await expect(activeBoard.getByText('相手の番です')).toBeVisible(); // 黒考慮中
     await expect(gameWindow.getByRole('button', { name: '閉じてホーム' })).toHaveCount(0); // 全画面盤に閉じ込めない
     // 教室ホーム画面は対局作成後もダッシュボードのまま（埋め込み表示に切り替わらない）
@@ -92,7 +93,7 @@ test.describe('多面打ちv2: 単一盤ローテーション', () => {
 
     // -> 別ウィンドウの表示は1盤のまま（Aの盤）、上部バーが「2面（あなたの番 0面）」になる
     await expect(activeBoard).toBeVisible();
-    await expect(activeBoard.getByText(TEST_STUDENT_A.name)).toBeVisible();
+    await expect(activeBoard.getByText(new RegExp(TEST_STUDENT_A.name))).toBeVisible();
     await expect(gameWindow.getByText('2面（あなたの番 0面）')).toBeVisible({ timeout: 10_000 });
 
     // 生徒A・Bが対局に入る
@@ -109,7 +110,7 @@ test.describe('多面打ちv2: 単一盤ローテーション', () => {
     // 先生の盤が「あなたの番です」に更新される（A盤表示のまま）
     await expect(activeBoard.getByText('あなたの番です')).toBeVisible({ timeout: 10_000 });
     await expect(activeBoard.locator('[data-stone="4-4"]')).toBeVisible();
-    await expect(activeBoard.getByText(TEST_STUDENT_A.name)).toBeVisible();
+    await expect(activeBoard.getByText(new RegExp(TEST_STUDENT_A.name))).toBeVisible();
 
     // 4. Bが初手
     await waitForMyTurn(studentBPage);
@@ -120,7 +121,7 @@ test.describe('多面打ちv2: 単一盤ローテーション', () => {
     await playMove(gameWindow, 5, 5);
 
     // 自動でB盤に切り替わる（B名表示、B初手の3-3あり、先生の手番）
-    await expect(activeBoard.getByText(TEST_STUDENT_B.name)).toBeVisible({ timeout: 10_000 });
+    await expect(activeBoard.getByText(new RegExp(TEST_STUDENT_B.name))).toBeVisible({ timeout: 10_000 });
     await expect(activeBoard.locator('[data-stone="3-3"]')).toBeVisible();
     await expect(activeBoard.getByText('あなたの番です')).toBeVisible();
 
@@ -128,7 +129,7 @@ test.describe('多面打ちv2: 単一盤ローテーション', () => {
     await playMove(gameWindow, 6, 6);
 
     // 相手考慮中になり、B盤のまま留まる（上部バー「2面（あなたの番 0面）」）
-    await expect(activeBoard.getByText(TEST_STUDENT_B.name)).toBeVisible();
+    await expect(activeBoard.getByText(new RegExp(TEST_STUDENT_B.name))).toBeVisible();
     await expect(activeBoard.getByText('相手の番です')).toBeVisible({ timeout: 10_000 });
     await expect(gameWindow.getByText('2面（あなたの番 0面）')).toBeVisible();
 
@@ -138,7 +139,7 @@ test.describe('多面打ちv2: 単一盤ローテーション', () => {
     await expect(studentAPage.locator('[data-stone="2-2"]')).toBeVisible({ timeout: 10_000 });
 
     // 自動でA盤へ切り替わる
-    await expect(activeBoard.getByText(TEST_STUDENT_A.name)).toBeVisible({ timeout: 10_000 });
+    await expect(activeBoard.getByText(new RegExp(TEST_STUDENT_A.name))).toBeVisible({ timeout: 10_000 });
     await expect(activeBoard.locator('[data-stone="2-2"]')).toBeVisible();
     await expect(activeBoard.getByText('あなたの番です')).toBeVisible();
 
@@ -152,7 +153,7 @@ test.describe('多面打ちv2: 単一盤ローテーション', () => {
 
     // B盤の単一表示に戻る
     await expect(activeBoard).toBeVisible({ timeout: 10_000 });
-    await expect(activeBoard.getByText(TEST_STUDENT_B.name)).toBeVisible();
+    await expect(activeBoard.getByText(new RegExp(TEST_STUDENT_B.name))).toBeVisible();
 
     // 8. この間、生徒A/Bの盤が勝手に閉じたりリロードされたりしないこと
     await expect(studentAPage.getByTestId('go-board')).toBeVisible();

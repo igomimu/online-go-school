@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import GoBoard from './GoBoard';
 import ZoomTapConfirm from './ZoomTapConfirm';
-import type { Drawing } from './GoBoard';
-import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban } from 'lucide-react';
+import type { Drawing, Marker } from './GoBoard';
+import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban, Triangle } from 'lucide-react';
 import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, formatKomiLabel, isTimeoutResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
@@ -13,6 +13,7 @@ import { getSupabase } from '../utils/liveGameApi';
 import { resolvePlayerName } from '../utils/identityUtils';
 import { ClassroomLiveKit } from '../utils/classroomLiveKit';
 import { isStoneSoundEnabled, setStoneSoundEnabled, playStoneSound, playCaptureSound, unlockStoneSound, shouldPlayMoveSound } from '../utils/stoneSound';
+import { isLastMoveMarkerEnabled, setLastMoveMarkerEnabled } from '../utils/boardPrefs';
 import type { Student } from '../types/classroom';
 
 interface GameBoardProps {
@@ -95,6 +96,8 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
 
   // ── 着手音・石を取る音 ──────────────────────────────────────────
   const [soundOn, setSoundOn] = useState(isStoneSoundEnabled);
+  // 直前に打たれた石へ▲を付ける。今どこに打たれたかがひと目で分かるようにするため
+  const [lastMoveMarkerOn, setLastMoveMarkerOn] = useState(isLastMoveMarkerEnabled);
   // ブラウザの自動再生ポリシー対策: 最初のユーザー操作で AudioContext を起こす
   useEffect(() => {
     window.addEventListener('pointerdown', unlockStoneSound, { once: true });
@@ -115,6 +118,14 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     playStoneSound();
     if (totalCaptures > prevCaptures) playCaptureSound(totalCaptures - prevCaptures);
   }, [moveNumber, lastMove, blackCaptures, whiteCaptures]);
+
+  // 直前の一手に▲。パスには座標が無いので付かない。整地中は死石の判断が主なので出さない。
+  const lastMoveMarkers = useMemo<Marker[] | undefined>(() => {
+    if (!lastMoveMarkerOn || isScoring) return undefined;
+    // パスは (0,0) で記録される（盤上の座標ではない）ので▲を付けない
+    if (!lastMove || (lastMove.x === 0 && lastMove.y === 0)) return undefined;
+    return [{ x: lastMove.x, y: lastMove.y, type: 'SYMBOL', value: 'TRI' }];
+  }, [lastMoveMarkerOn, isScoring, lastMove]);
 
   const deadStonesSet = useMemo(
     () => new Set(game?.scoring_dead_stones ?? []),
@@ -355,6 +366,25 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
             {soundOn ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
             <span className="hidden sm:inline">石音</span>
           </button>
+          {/* 最終手の▲。端末ごとにlocalStorageへ保存される */}
+          <button
+            data-testid="last-move-marker-toggle"
+            onClick={() => {
+              const next = !lastMoveMarkerOn;
+              setLastMoveMarkerEnabled(next);
+              setLastMoveMarkerOn(next);
+            }}
+            title={lastMoveMarkerOn ? '最終手の▲を消す' : '最終手に▲を付ける'}
+            aria-pressed={lastMoveMarkerOn}
+            className={`flex items-center gap-1 rounded border px-2 py-1 text-xs font-bold transition-colors duration-150 ${
+              lastMoveMarkerOn
+                ? 'bg-raised hover:bg-line border-line text-ink'
+                : 'bg-ground hover:bg-raised border-line text-muted'
+            }`}
+          >
+            <Triangle className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">最終手</span>
+          </button>
           {/* 設定を間違えて始めた対局を、その場で取り消す（講師のみ）。
               中断ではなく終了にする。中断だと生徒側に「再開」が出てしまい、
               間違えた設定のまま再開できてしまうため。 */}
@@ -473,6 +503,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
           drawings={effectiveDrawings}
           ghostPosition={canPlay && !isDrawing ? ghostPos : null}
           ghostColor={canPlay && !isDrawing ? currentColor : undefined}
+          markers={lastMoveMarkers}
           territoryMap={scoringResult?.territoryMap}
           deadStones={deadStonesSet.size > 0 ? deadStonesSet : undefined}
         />
