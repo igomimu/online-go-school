@@ -102,12 +102,14 @@ export default function ChatPanel({
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="min-w-0 flex-1 rounded-md border border-field-line bg-ground px-2 py-1 text-[13px] text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+          placeholder="メッセージを入力"
+          aria-label="チャットのメッセージ"
+          className="min-w-0 flex-1 rounded-md border border-field-line bg-ground px-2 py-1.5 text-[13px] text-ink placeholder:text-muted focus:border-accent focus:outline-none"
         />
         <button
           onClick={handleSend}
           disabled={!text.trim()}
-          className="shrink-0 rounded-md bg-accent px-3 py-1 text-[13px] font-bold text-accent-ink disabled:opacity-40"
+          className="shrink-0 rounded-md bg-accent px-3 py-1.5 text-[13px] font-bold text-accent-ink transition-colors duration-150 disabled:bg-raised disabled:text-muted"
         >
           送信
         </button>
