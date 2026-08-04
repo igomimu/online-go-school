@@ -1,5 +1,9 @@
 import type { Student, Classroom } from '../types/classroom';
 import { getSupabase } from './liveGameApi';
+import { isGuestTeacher } from './authStore';
+
+// ゲスト先生を閉じ込めるデモ教室。Edge Function validate_teacher_session と同じ値。
+export const DEMO_CLASSROOM_ID = 'DEMO01';
 
 const STUDENTS_KEY = 'go-school-students';
 const CLASSROOMS_KEY = 'go-school-classrooms';
@@ -126,8 +130,20 @@ function e2eAllowedClassroomId(): string | null {
 }
 
 function buildRoster(studentRows: GoSchoolStudentRow[], classroomRows: GoSchoolClassroomRow[]): ClassroomRoster {
+  // ゲスト（デモ見学）先生にはデモ教室とその所属生徒だけを見せる。
+  // 名簿・教室セレクタ・生徒一覧はすべてこの roster 由来なので、ここで絞れば実データは出ない。
+  if (isGuestTeacher()) {
+    studentRows = studentRows.filter(row => row.classroom_id === DEMO_CLASSROOM_ID);
+    classroomRows = classroomRows.filter(row => row.id === DEMO_CLASSROOM_ID);
+    return buildRosterRows(studentRows, classroomRows);
+  }
+
   const allowedId = e2eAllowedClassroomId();
   classroomRows = classroomRows.filter(row => (allowedId !== null && row.id === allowedId) || !isTestClassroom(row.id, row.name));
+  return buildRosterRows(studentRows, classroomRows);
+}
+
+function buildRosterRows(studentRows: GoSchoolStudentRow[], classroomRows: GoSchoolClassroomRow[]): ClassroomRoster {
   const students = studentRows
     .map(toStudent)
     .sort((a, b) => a.name.localeCompare(b.name, 'ja'));

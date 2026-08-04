@@ -3,6 +3,9 @@ import { getSupabase, functionsBaseUrl } from './liveGameApi';
 
 const ACCOUNTS_KEY = 'go-school-accounts';
 const TEACHER_PW_KEY = 'go-school-teacher-pw';
+// ゲスト（デモ見学）用パスワードでログインした先生かどうか。
+// validate_teacher_session が返す is_guest をそのまま保持する。
+const GUEST_TEACHER_KEY = 'go-school-guest-teacher';
 
 export interface SavedAccount {
   studentId: string;
@@ -88,6 +91,28 @@ export function resetTeacherPassword(): void {
   localStorage.removeItem(TEACHER_PW_KEY);
 }
 
+// === ゲスト先生フラグ ===
+
+export function isGuestTeacher(): boolean {
+  try {
+    return localStorage.getItem(GUEST_TEACHER_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function setGuestTeacher(isGuest: boolean): void {
+  try {
+    if (isGuest) {
+      localStorage.setItem(GUEST_TEACHER_KEY, '1');
+    } else {
+      localStorage.removeItem(GUEST_TEACHER_KEY);
+    }
+  } catch {
+    // localStorage が使えない環境では素通り（サーバー側の classroom_id 固定が本体）
+  }
+}
+
 // === Supabase Session 連携（Phase 0 Stage 2〜）===
 //
 // ログイン時に Anonymous Sign-In → validate_*_session → refreshSession の
@@ -143,7 +168,8 @@ export async function supabaseSignInStudent(
     }
     
     const result = await res.json();
-    
+    setGuestTeacher(false); // 生徒ログインに前の先生セッションのフラグを持ち越さない
+
     // 3. セッションを更新して新しい JWT を取得 (メタデータ反映)
     const { error: refreshError } = await supabase.auth.refreshSession();
     if (refreshError) {
@@ -192,6 +218,7 @@ export async function supabaseSignInTeacher(
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
       console.error('[Supabase Auth] Teacher validation failed:', errBody.error || res.status);
+      setGuestTeacher(false);
       await supabase.auth.signOut().catch(() => {});
       return {
         ok: false,
@@ -200,7 +227,10 @@ export async function supabaseSignInTeacher(
           : `先生認証に失敗しました（${errBody.error || res.status}）`,
       };
     }
-    
+
+    const teacherResult = await res.json().catch(() => ({} as { is_guest?: boolean }));
+    setGuestTeacher(teacherResult.is_guest === true);
+
     // 3. セッションを更新して新しい JWT を取得 (メタデータ反映)
     const { error: refreshError } = await supabase.auth.refreshSession();
     if (refreshError) {
@@ -220,6 +250,7 @@ export async function supabaseSignInTeacher(
 
 
 export async function supabaseSignOut(): Promise<void> {
+  setGuestTeacher(false);
   try {
     const supabase = getSupabase();
     await supabase.auth.signOut();

@@ -58,6 +58,11 @@ Deno.serve(async (req) => {
     return json({ error: 'Forbidden: Only teachers can fetch student list' }, 403)
   }
 
+  // ゲスト（デモ見学）先生には道場アプリの実生徒を渡さない
+  if (meta.is_guest === true) {
+    return json({ error: 'Forbidden: Guest teachers cannot fetch student list' }, 403)
+  }
+
   // service_role で dojo-app students を取得
   const admin = createClient(supabaseUrl, serviceRoleKey)
   const { data: students, error: lookupErr } = await admin

@@ -26,6 +26,9 @@ interface ValidateRequest {
   classroomId?: string
 }
 
+// ゲスト先生を閉じ込めるデモ教室。フロント側 classroomStore.ts と同じ値。
+const DEMO_CLASSROOM_ID = 'DEMO01'
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -73,6 +76,8 @@ Deno.serve(async (req) => {
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   const expectedHash = Deno.env.get('TEACHER_PASSWORD_HASH')
+  // ゲスト（デモ見学）用パスワード。未設定なら従来通りゲストログイン自体が存在しない。
+  const guestHash = Deno.env.get('GUEST_TEACHER_PASSWORD_HASH')
 
   if (!supabaseUrl || !anonKey || !serviceRoleKey || !expectedHash) {
     return json({ error: 'Server misconfigured' }, 500)
@@ -89,9 +94,10 @@ Deno.serve(async (req) => {
     return json({ error: 'Only anonymous sessions can be validated' }, 403)
   }
 
-  // パスワード照合
+  // パスワード照合。ゲストPWで入った先生はデモ教室に固定し、実データを見せない。
   const hashedInput = await sha256(body.password)
-  if (hashedInput !== expectedHash) {
+  const isGuest = hashedInput !== expectedHash && !!guestHash && hashedInput === guestHash
+  if (hashedInput !== expectedHash && !isGuest) {
     return json({ error: 'Invalid teacher password' }, 403)
   }
 
@@ -100,8 +106,9 @@ Deno.serve(async (req) => {
   const { error: updateErr } = await admin.auth.admin.updateUserById(user.id, {
     user_metadata: {
       teacher_id: user.id, // teacher_id として自身の UUID をセット
-      classroom_id: body.classroomId ?? 'global',
+      classroom_id: isGuest ? DEMO_CLASSROOM_ID : (body.classroomId ?? 'global'),
       app_role: 'teacher',
+      is_guest: isGuest,
     },
   })
   if (updateErr) {
@@ -112,5 +119,6 @@ Deno.serve(async (req) => {
     ok: true,
     teacher_id: user.id,
     app_role: 'teacher',
+    is_guest: isGuest,
   })
 })
