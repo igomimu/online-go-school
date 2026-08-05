@@ -9,7 +9,7 @@ import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './
 import type { ViewMode, AudioPermissions, SavedGame } from './types/game';
 import type { Student, Classroom } from './types/classroom';
 import { fetchToken } from './utils/livekitToken';
-import { getTeacherDisplayName, identityMatchesPlayer, makeStudentIdentity, TEACHER_IDENTITY } from './utils/identityUtils';
+import { getDisplayName, getTeacherDisplayName, identityMatchesPlayer, makeStudentIdentity, TEACHER_IDENTITY } from './utils/identityUtils';
 import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession, interruptAllGames, interruptGame, resumeLiveGame } from './utils/liveGameApi';
@@ -26,6 +26,7 @@ import { saveAccount, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } 
 import Header from './components/Header';
 import ErrorBoundary from './components/ErrorBoundary';
 import PopupPortal from './components/PopupPortal';
+import NigiriAnnouncement from './components/NigiriAnnouncement';
 import LoginScreen from './components/LoginScreen';
 import Lobby from './components/Lobby';
 import GameBoard from './components/GameBoard';
@@ -117,6 +118,8 @@ function App() {
   const reviewMovePermissionsRef = useRef<string[]>([]);
   // 生徒側: 自分が今この検討盤に打てるか
   const [reviewCanPlay, setReviewCanPlay] = useState(false);
+  // 対局者に見せるニギリ（先生が押すたびに届く。drawIdで引き直しも作り直す）
+  const [nigiriDraw, setNigiriDraw] = useState<{ iAmBlack: boolean; opponent: string; drawId: number } | null>(null);
   // ポップアップを塞がれていて検討の別ウィンドウを開けなかった（全面表示に落とす）
   const [reviewWindowBlocked, setReviewWindowBlocked] = useState(false);
 
@@ -318,6 +321,19 @@ function App() {
         }
         if (msg.type === 'DRAW_CLEAR' && connectRole === 'STUDENT') {
           setSyncedDrawings([]);
+        }
+
+        // ニギリ（対局者用）。自分が絡む抽選だけ出す
+        if (msg.type === 'NIGIRI_DRAW' && connectRole === 'STUDENT' && msg.payload) {
+          const p = msg.payload as import('./types/game').NigiriDrawPayload;
+          const me = classroomRef.current?.localIdentity;
+          if (me && (p.blackPlayer === me || p.whitePlayer === me)) {
+            setNigiriDraw({
+              iAmBlack: p.blackPlayer === me,
+              opponent: p.blackPlayer === me ? p.whitePlayer : p.blackPlayer,
+              drawId: Date.now(),
+            });
+          }
         }
 
         // 検討モード開始（生徒用）
@@ -790,6 +806,18 @@ function App() {
     const url = `${window.location.origin}${window.location.pathname}?mode=game&role=TEACHER&teacherClassroomId=${encodeURIComponent(classroomId)}&identity=${encodeURIComponent(identity)}`;
     const win = window.open(url, TEACHER_GAME_WINDOW_NAME, 'width=700,height=800,menubar=no,toolbar=no,location=no,status=no');
     win?.focus();
+  }, []);
+
+  // ニギリを対局者の画面にも出す。視覚効果は本来この人たちのためのもの（2026-08-05 三村さん）。
+  // 押した時点で結果ごと送り、向こうでも同じ間合いで石が止まる。
+  const handleNigiriDraw = useCallback((black: string, white: string) => {
+    const me = classroomRef.current?.localIdentity;
+    const targets = [black, white].filter(id => id !== me);
+    if (targets.length === 0) return;
+    void classroomRef.current?.sendTo(
+      { type: 'NIGIRI_DRAW', payload: { blackPlayer: black, whitePlayer: white } },
+      targets,
+    );
   }, []);
 
   // 対局作成（Supabase insert、Realtime経由で全員に配信）
@@ -1572,6 +1600,17 @@ function App() {
           onCreate={handleCreateGame}
           registeredStudents={students}
           initialBlackPlayer={gameCreationBlack ?? undefined}
+          onNigiriDraw={handleNigiriDraw}
+        />
+      )}
+
+      {/* ニギリ（対局者の画面）。先生が引き直すたびに作り直す */}
+      {nigiriDraw && (
+        <NigiriAnnouncement
+          key={nigiriDraw.drawId}
+          iAmBlack={nigiriDraw.iAmBlack}
+          opponentName={getDisplayName(nigiriDraw.opponent, students)}
+          onDone={() => setNigiriDraw(null)}
         />
       )}
 

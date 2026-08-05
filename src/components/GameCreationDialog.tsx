@@ -23,6 +23,8 @@ interface GameCreationDialogProps {
   }) => void | Promise<void>;
   registeredStudents?: Student[];  // 登録済み生徒データ（棋力表示用）
   initialBlackPlayer?: string;     // 生徒一覧から「対局」を押した生徒を黒番に初期選択
+  /** ニギリを引いた（対局者の画面にも同じ抽選を出すため、押した時点で呼ばれる） */
+  onNigiriDraw?: (blackPlayer: string, whitePlayer: string) => void;
 }
 
 const BOARD_SIZES = [19, 13, 9];
@@ -53,6 +55,7 @@ export default function GameCreationDialog({
   onCreate,
   registeredStudents = [],
   initialBlackPlayer,
+  onNigiriDraw,
 }: GameCreationDialogProps) {
   // 「先生」も含めたプレイヤー候補
   const allPlayers = [teacherName, ...students];
@@ -272,6 +275,7 @@ export default function GameCreationDialog({
             key={[blackPlayer, whitePlayer].slice().sort().join('|')}
             candidates={[blackPlayer, whitePlayer]}
             displayName={displayName}
+            onDrawStart={onNigiriDraw}
             onDecided={applyNigiriResult}
           />
         )}

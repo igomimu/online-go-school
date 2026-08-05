@@ -79,6 +79,7 @@ export type GameMessageType =
   | 'PROBLEM_RESULT'
   | 'REVIEW_START'
   | 'REVIEW_END'
+  | 'NIGIRI_DRAW'
   | 'REVIEW_PERMISSIONS'
   | 'REVIEW_STUDENT_MOVE'
   | 'AUDIO_CONTROL'
@@ -89,6 +90,12 @@ export type GameMessageType =
 
 export interface GameCreatedPayload {
   game: GameSession;
+}
+
+/** ニギリ（黒白決め）。押した時点で結果ごと対局者へ送り、向こうでも同じ間合いで止める */
+export interface NigiriDrawPayload {
+  blackPlayer: string;
+  whitePlayer: string;
 }
 
 /** 検討中に盤へ打てる生徒（先生が生徒ごとに許可する。既定は誰も打てない） */
