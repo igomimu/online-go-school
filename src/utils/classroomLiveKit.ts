@@ -300,15 +300,19 @@ export class ClassroomLiveKit {
 
   // 特定の参加者にメッセージ送信
   /**
-   * 宛先を絞って送る。空配列や未指定なら全員へ。
+   * 宛先を絞って送る。`null`/未指定なら全員へ、**空配列なら誰にも送らない**。
    * 検討の「配信先の生徒」はこれを通す（以前は broadcast を呼んでおり、
    * 選んでも全員に配信されていた 2026-08-04）。
+   *
+   * 空配列を「全員」の意味にすると、生徒を一人ずつ配信先から外していって
+   * 最後の一人を外した瞬間に全員へ配信される、という逆の挙動になる（2026-08-05）。
    */
   async sendToOrAll(msg: ClassroomMessage, identities?: string[] | null): Promise<void> {
-    if (!identities || identities.length === 0) {
+    if (identities === null || identities === undefined) {
       await this.broadcast(msg);
       return;
     }
+    if (identities.length === 0) return;
     await this.sendTo(msg, identities);
   }
 

@@ -4,6 +4,7 @@ import type { AnalysisOverlay, Drawing, Marker, PvStone } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
 import { getMainPath, removeNode } from '../utils/treeUtilsV2';
 import { playReviewMove } from '../utils/reviewMove';
+import { isSharingTarget, toggleSharingTarget, type SharingTargets } from '../utils/sharingTargets';
 import { findNearestDrawingIndex } from '../utils/drawingUtils';
 import type { ParticipantInfo, ClassroomLiveKit, ClassroomMessage } from '../utils/classroomLiveKit';
 import type { Student } from '../types/classroom';
@@ -30,8 +31,9 @@ interface ReviewBoardProps {
   // 先生用
   participants?: ParticipantInfo[];
   localIdentity?: string;
-  targetStudents?: string[];
-  onSetTargetStudents?: (students: string[]) => void;
+  /** 検討の参加者（null=全員 / 空配列=誰にも配信しない） */
+  targetStudents?: SharingTargets;
+  onSetTargetStudents?: (students: SharingTargets) => void;
   onBack?: () => void;
 
   // 着手権限（先生: 生徒ごとの許可 / 生徒: 自分が許可されているか）
@@ -510,21 +512,16 @@ export default function ReviewBoard({
     return participants.filter(p => p.identity !== localIdentity);
   }, [participants, localIdentity]);
 
+  // 参加者の選び方は教室ホームの「共有」列と同じ規則（utils/sharingTargets）
   const toggleStudent = (identity: string) => {
-    if (!targetStudents || !onSetTargetStudents) return;
-    if (targetStudents.length === 0) {
-      // 全員選択状態から1人外す
-      const allNames = studentParticipants.map(s => s.identity).filter(n => n !== identity);
-      onSetTargetStudents(allNames);
-    } else if (targetStudents.includes(identity)) {
-      onSetTargetStudents(targetStudents.filter(n => n !== identity));
-    } else {
-      onSetTargetStudents([...targetStudents, identity]);
-    }
+    if (targetStudents === undefined || !onSetTargetStudents) return;
+    onSetTargetStudents(
+      toggleSharingTarget(targetStudents, identity, studentParticipants.map(s => s.identity)),
+    );
   };
 
   const selectAllStudents = () => {
-    onSetTargetStudents?.([]);
+    onSetTargetStudents?.(null);
   };
 
   return (
@@ -871,18 +868,18 @@ export default function ReviewBoard({
           <div className={`grid gap-4 ${isTeacher && studentParticipants.length > 0 && chatMessages && onChatSend ? 'xl:grid-cols-2' : 'grid-cols-1'}`}>
             {isTeacher && studentParticipants.length > 0 && (
               <div className="glass-panel p-4 space-y-3">
-                <h3 className="font-bold text-sm">配信先の生徒</h3>
+                <h3 className="font-bold text-sm">検討の参加者</h3>
                 <button
                   onClick={selectAllStudents}
                   className={`w-full text-sm py-1 rounded-lg transition-all ${
-                    targetStudents?.length === 0 ? 'bg-accent/15 text-accent-text' : 'bg-ink/5 hover:bg-ink/10'
+                    targetStudents === null ? 'bg-accent/15 text-accent-text' : 'bg-ink/5 hover:bg-ink/10'
                   }`}
                 >
                   全員に配信
                 </button>
                 <div className="space-y-1">
                   {studentParticipants.map(s => {
-                    const isSelected = !targetStudents || targetStudents.length === 0 || targetStudents.includes(s.identity);
+                    const isSelected = isSharingTarget(targetStudents ?? null, s.identity);
                     const canStudentPlay = movePermissions?.includes(s.identity) ?? false;
                     return (
                       <div key={s.identity} className="flex items-center gap-1">

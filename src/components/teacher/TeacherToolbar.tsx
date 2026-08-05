@@ -183,7 +183,7 @@ export default function TeacherToolbar({
         <div style={{ flex: 1 }} />
         <SmallButton label="音声Mをクリア" onClick={onClearAudioM} />
         <SmallButton label="音声Sをクリア" onClick={onClearAudioS} />
-        <SmallButton label="共有をクリア" onClick={onClearSharing} />
+        <SmallButton label="共有を全員に" onClick={onClearSharing} />
       </div>
 
       {/* 下段: アクションボタン群 */}

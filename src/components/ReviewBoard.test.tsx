@@ -140,11 +140,11 @@ describe('ReviewBoard', () => {
         classroomRef={mockClassroomRef as never}
         participants={participants}
         localIdentity="三村先生"
-        targetStudents={[]}
+        targetStudents={null}
         onSetTargetStudents={vi.fn()}
       />
     );
-    expect(screen.getByText('配信先の生徒')).toBeInTheDocument();
+    expect(screen.getByText('検討の参加者')).toBeInTheDocument();
     expect(screen.getByText('全員に配信')).toBeInTheDocument();
     expect(screen.getByText('たろう')).toBeInTheDocument();
   });

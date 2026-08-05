@@ -58,6 +58,9 @@ interface TeacherDashboardProps {
   onClearAudioM?: () => void;
   onClearAudioS?: () => void;
   onClearSharing?: () => void;
+  /** 検討の参加者（null=全員）と、その切替 */
+  sharingTargets?: import('../../utils/sharingTargets').SharingTargets;
+  onToggleSharing?: (identity: string) => void;
   onSelectSavedGame?: (game: SavedGame) => void;
   onResumeGame?: (gameId: string) => void;
   /** 講師専用の対局別ウィンドウを開く/前面化する（対局は常にこの別ウィンドウで行う） */
@@ -95,6 +98,8 @@ export default function TeacherDashboard({
   onClearAudioM,
   onClearAudioS,
   onClearSharing,
+  sharingTargets,
+  onToggleSharing,
   onSelectSavedGame,
   onResumeGame,
   onOpenTeacherGameWindow,
@@ -339,6 +344,8 @@ export default function TeacherDashboard({
           localIdentity={localIdentity}
           onToggleHear={onToggleHear}
           onToggleMic={onToggleMic}
+          sharingTargets={sharingTargets}
+          onToggleSharing={onToggleSharing}
           onOpenHistory={handleOpenHistory}
           onStartGame={onStartGameWithStudent}
           onEditStudent={setEditingStudentInfo}

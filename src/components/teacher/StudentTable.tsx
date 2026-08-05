@@ -3,6 +3,7 @@ import type { Student } from '../../types/classroom';
 import type { GameSession, AudioPermissions } from '../../types/game';
 import { resolveGrade } from '../../utils/gradeCalc';
 import { anyIdentityMatchesPlayer, identityMatchesPlayer, studentIdentityCandidates } from '../../utils/identityUtils';
+import { isSharingTarget, type SharingTargets } from '../../utils/sharingTargets';
 
 interface StudentTableProps {
   participants: ParticipantInfo[];
@@ -12,6 +13,9 @@ interface StudentTableProps {
   localIdentity: string;
   onToggleHear: (identity: string) => void;
   onToggleMic: (identity: string) => void;
+  /** 検討の参加者（null=全員）。対局中の生徒を外せるようにするためのもの */
+  sharingTargets?: SharingTargets;
+  onToggleSharing?: (identity: string) => void;
   onSelectStudent?: (identity: string) => void;
   onOpenStudent?: (studentIdentity: string) => void;
   onOpenHistory?: (student: Student) => void;
@@ -28,6 +32,8 @@ export default function StudentTable({
   localIdentity,
   onToggleHear,
   onToggleMic,
+  sharingTargets = null,
+  onToggleSharing,
   onSelectStudent,
   onOpenStudent,
   onOpenHistory,
@@ -118,11 +124,24 @@ export default function StudentTable({
                   ) : null}
                 </td>
 
-                {/* 共有 */}
+                {/* 共有（＝検討の参加者）。対局中の生徒に検討を見せると邪魔になるので外せる。
+                    以前はチェック済みで固定の飾りだった（IGCの画面を再現したときの残り 2026-08-05） */}
                 <td className="px-2 py-1.5 border-b border-line text-center font-medium">
-                  {row.isConnected && (
+                  {row.isConnected && row.identity !== localIdentity && onToggleSharing ? (
+                    <input
+                      type="checkbox"
+                      data-testid={`share-${row.identity}`}
+                      title={isSharingTarget(sharingTargets, row.identity)
+                        ? '検討を見せています（外すと見せません）'
+                        : '検討を見せていません'}
+                      checked={isSharingTarget(sharingTargets, row.identity)}
+                      onChange={() => onToggleSharing(row.identity)}
+                      onClick={e => e.stopPropagation()}
+                      className="w-3 h-3"
+                    />
+                  ) : row.isConnected ? (
                     <input type="checkbox" checked readOnly className="w-3 h-3" />
-                  )}
+                  ) : null}
                 </td>
 
                 {/* 対局（進行中は状態表示、対局していない接続中の生徒は新規対局開始ボタン） */}

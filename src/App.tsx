@@ -4,6 +4,7 @@ import type { GameNode } from './utils/treeUtilsV2';
 import { convertSgfToGameTree } from './utils/treeUtilsV2';
 import { parseSGFTree } from './utils/sgfUtils';
 import { playReviewMove } from './utils/reviewMove';
+import { toggleSharingTarget, type SharingTargets } from './utils/sharingTargets';
 import { ClassroomLiveKit } from './utils/classroomLiveKit';
 import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './utils/classroomLiveKit';
 import type { ViewMode, AudioPermissions, SavedGame } from './types/game';
@@ -113,7 +114,14 @@ function App() {
   const [reviewRootNode, setReviewRootNode] = useState<GameNode | null>(null);
   const [reviewCurrentNode, setReviewCurrentNode] = useState<GameNode | null>(null);
   const [reviewBoardSize, setReviewBoardSize] = useState(19);
-  const [reviewTargetStudents, setReviewTargetStudents] = useState<string[]>([]);
+  // 検討の参加者。null=全員 / 配列=その生徒だけ / 空配列=誰にも配信しない
+  const [reviewTargetStudents, setReviewTargetStudents] = useState<SharingTargets>(null);
+  // 検討開始（棋譜を開いた瞬間）は useCallback の中から送るので、最新の参加者を ref で読む
+  const reviewTargetStudentsRef = useRef<SharingTargets>(null);
+  useEffect(() => { reviewTargetStudentsRef.current = reviewTargetStudents; }, [reviewTargetStudents]);
+  // 生徒が自分の対局を持っているか。LiveKitのメッセージ処理は接続時に作った関数の中で
+  // 走るので、そこから最新の状態を見るために ref に写す
+  const myLiveGameIdRef = useRef<string | null>(null);
   // 検討中に盤へ打てる生徒（先生が保持する正本）。既定は誰も打てない
   const [reviewMovePermissions, setReviewMovePermissions] = useState<string[]>([]);
   // LiveKitのメッセージ処理は接続時に作った関数の中で走るため、最新の許可をrefで見る
@@ -199,6 +207,20 @@ function App() {
   const effectiveClassroomId =
     role === 'TEACHER' ? selectedClassroomId : studentClassroomId;
   const liveGameList = useLiveGameList(effectiveClassroomId);
+
+  // 自分（生徒）の進行中の対局。上の ref に写して、メッセージ処理から見られるようにする
+  useEffect(() => {
+    if (role !== 'STUDENT') {
+      myLiveGameIdRef.current = null;
+      return;
+    }
+    const me = classroomRef.current?.localIdentity ?? userName;
+    const mine = liveGameList.games.find(g =>
+      (g.status === 'playing' || g.status === 'scoring') &&
+      (identityMatchesPlayer(me, g.black_player) || identityMatchesPlayer(me, g.white_player)),
+    );
+    myLiveGameIdRef.current = mine?.id ?? null;
+  }, [liveGameList.games, role, userName]);
 
   // 旧GameSession形に変換（ロビー/サムネイル等の既存コンポーネント互換）
   // 注意: boardState/moveNumber はプレースホルダ。実盤面は useLiveGame 経由で取得
@@ -407,8 +429,15 @@ function App() {
         }
 
         if (msg.type === 'REVIEW_END' && connectRole === 'STUDENT') {
-          // 先生がロビーに戻った: 検討/授業/詰碁の全セッション状態をクリア
-          setViewMode('lobby');
+          // 先生がロビーに戻った: 検討/授業/詰碁の全セッション状態をクリア。
+          // ただし自分が対局中なら自分の盤へ戻す。ロビーに落とすと対局から締め出され、
+          // 自分で入り直すまで打てなくなる（自動で開き直す仕組みは初回しか働かない）。
+          if (myLiveGameIdRef.current) {
+            setActiveGameId(myLiveGameIdRef.current);
+            setViewMode('game');
+          } else {
+            setViewMode('lobby');
+          }
           setReviewRootNode(null);
           setReviewCurrentNode(null);
           setReviewCanPlay(false);
@@ -659,6 +688,14 @@ function App() {
     void classroomRef.current?.sendTo({ type: 'REVIEW_STUDENT_MOVE', payload: { x, y } }, [TEACHER_IDENTITY]);
   }, []);
 
+  // 生徒一覧の「共有」列。対局中の生徒を検討から外せるようにするためのもの
+  const toggleSharingStudent = useCallback((identity: string) => {
+    const all = (classroomRef.current?.participants ?? [])
+      .map(p => p.identity)
+      .filter(id => id !== classroomRef.current?.localIdentity);
+    setReviewTargetStudents(prev => toggleSharingTarget(prev, identity, all));
+  }, []);
+
   const toggleReviewMovePermission = useCallback((identity: string) => {
     setReviewMovePermissions(prev => (
       prev.includes(identity) ? prev.filter(id => id !== identity) : [...prev, identity]
@@ -907,11 +944,13 @@ function App() {
       setReviewMovePermissions([]);
       setViewMode('review');
 
-      // 生徒にも通知
-      classroomRef.current?.broadcast({
+      // 参加者に選ばれている生徒にだけ知らせる。
+      // ここを broadcast にしていたため、講師が参加者を選んでも全員の画面が
+      // 検討に切り替わっていた（対局中の生徒は対局から引き剥がされる 2026-08-05）。
+      void classroomRef.current?.sendToOrAll({
         type: 'REVIEW_START',
         payload: { sgf: content, boardSize: parsed.size },
-      });
+      }, reviewTargetStudentsRef.current);
     };
     reader.readAsText(file);
     event.target.value = '';
@@ -929,11 +968,11 @@ function App() {
       setReviewMovePermissions([]);
       setViewMode('review');
 
-      // 生徒にも通知
-      classroomRef.current?.broadcast({
+      // 参加者に選ばれている生徒にだけ知らせる（上と同じ理由）
+      void classroomRef.current?.sendToOrAll({
         type: 'REVIEW_START',
         payload: { sgf: game.sgf, boardSize: parsed.size },
-      });
+      }, reviewTargetStudentsRef.current);
     } catch {
       alert('棋譜の読み込みに失敗しました');
     }
@@ -1488,7 +1527,9 @@ function App() {
             onProblemAssign={handleProblemAssign}
             onClearAudioM={handleClearAudioM}
             onClearAudioS={handleClearAudioS}
-            onClearSharing={() => setReviewTargetStudents([])}
+            onClearSharing={() => setReviewTargetStudents(null)}
+            sharingTargets={reviewTargetStudents}
+            onToggleSharing={toggleSharingStudent}
             onSelectSavedGame={handleSelectSavedGame}
             onResumeGame={handleResumeGame}
             onOpenTeacherGameWindow={() => selectedClassroomId && openTeacherGameWindow(selectedClassroomId)}
