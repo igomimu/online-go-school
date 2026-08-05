@@ -3,6 +3,7 @@ import { TEST_STUDENT_A, TEST_TEACHER_PASSWORD, generateClassroomId } from './he
 import { clearAllData, setupTeacherPassword, setupClassroomData, teardownSupabaseRoster } from './helpers/setup';
 import { loginAsTeacher, openClassroomAndConnect, waitForStudentJoined, waitForTeacherGameWindow } from './helpers/teacher-actions';
 import { loginAsStudent, enterAssignedGame, waitForMyTurn, playMove } from './helpers/student-actions';
+import { recordNotificationSounds, playedSounds } from './helpers/audio';
 
 // 回線トラブルで生徒が時間切れ負けになった対局を、講師がその場から再開できること（2026-08-01）。
 // 再開時は切れた側の時計（秒読み回数）が戻り、そのまま打ち続けられる必要がある。
@@ -21,6 +22,7 @@ test('時間切れで終わった対局を講師が再開でき、切れた側�
   const studentAPage = await newPage();
 
   try {
+    await recordNotificationSounds(teacherPage);
     await teacherPage.goto('/');
     await clearAllData(teacherPage);
     await setupTeacherPassword(teacherPage, TEST_TEACHER_PASSWORD);
@@ -67,8 +69,21 @@ test('時間切れで終わった対局を講師が再開でき、切れた側�
     // 生徒Aは以降着手しないので 10秒×1 で時間切れ負け（W+T）
     await expect(teacherGameWindow.getByText('黒の時間切れ。白の勝ち')).toBeVisible({ timeout: 45_000 });
 
-    // 講師が対局を再開する
-    await teacherGameWindow.getByTestId('resume-timeout-game').click();
+    // 教室ホームにも「誰の時間が切れたか」が出る（音と一緒。気づかないと対局が止まる 2026-08-05）
+    const timeoutAlert = teacherPage.getByTestId('classroom-alert-timeout');
+    await expect(timeoutAlert).toBeVisible({ timeout: 20_000 });
+    await expect(timeoutAlert).toContainText(TEST_STUDENT_A.name);
+    // 時間切れの音（高い3音の1音目 1046Hz）。接続切れ（440Hz）とは違う音にしてある
+    await expect.poll(async () => (await playedSounds(teacherPage)).includes(1046), {
+      timeout: 10_000,
+    }).toBe(true);
+    // 対局ウィンドウ側の再開ボタンも従来どおり出ている
+    await expect(teacherGameWindow.getByTestId('resume-timeout-game')).toBeVisible();
+
+    // 講師がその知らせから対局を再開する
+    await timeoutAlert.getByRole('button', { name: '対局を再開する' }).click();
+    // 再開したら知らせは消える
+    await expect(teacherPage.getByTestId('classroom-alert-timeout')).toHaveCount(0, { timeout: 20_000 });
 
     // 生徒側の盤が対局中に戻り、切れていた黒の秒読みが規定回数（1回）復元されている
     await expect(studentAPage.getByTestId('clock-black')).toContainText('秒読 10秒 [1]', { timeout: 30_000 });

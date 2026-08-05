@@ -13,7 +13,7 @@ import { getDisplayName, getTeacherDisplayName, identityMatchesPlayer, makeStude
 import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession, interruptAllGames, interruptGame, resumeLiveGame } from './utils/liveGameApi';
-import { isTimeoutResult } from './utils/scoring';
+import { isTimeoutResult, timedOutColorFromResult } from './utils/scoring';
 import {
   clearPendingResumeGameId,
   getPendingResumeGameId,
@@ -27,6 +27,7 @@ import Header from './components/Header';
 import ErrorBoundary from './components/ErrorBoundary';
 import PopupPortal from './components/PopupPortal';
 import NigiriAnnouncement from './components/NigiriAnnouncement';
+import ClassroomAlerts, { type ClassroomAlert, type NewClassroomAlert } from './components/teacher/ClassroomAlerts';
 import LoginScreen from './components/LoginScreen';
 import Lobby from './components/Lobby';
 import GameBoard from './components/GameBoard';
@@ -118,6 +119,26 @@ function App() {
   const reviewMovePermissionsRef = useRef<string[]>([]);
   // 生徒側: 自分が今この検討盤に打てるか
   const [reviewCanPlay, setReviewCanPlay] = useState(false);
+  // 講師への即時通知（接続切れ・時間切れ）。音だけだと何が起きたか分からないので一緒に出す
+  const [alerts, setAlerts] = useState<ClassroomAlert[]>([]);
+  const dismissAlert = useCallback((id: number) => {
+    setAlerts(prev => prev.filter(a => a.id !== id));
+  }, []);
+  const alertSeqRef = useRef(0);
+  /** 同じ相手の同じ知らせは重ねない。時間切れは操作が要るので自分では消えない */
+  const pushAlert = useCallback((alert: NewClassroomAlert) => {
+    const id = ++alertSeqRef.current;
+    setAlerts(prev => [
+      ...prev.filter(a => !(a.kind === alert.kind && a.identity === alert.identity)),
+      { ...alert, id } as ClassroomAlert,
+    ]);
+    if (alert.kind !== 'timeout') {
+      window.setTimeout(() => {
+        setAlerts(prev => prev.filter(a => a.id !== id));
+      }, 12_000);
+    }
+  }, []);
+
   // 対局者に見せるニギリ（先生が押すたびに届く。drawIdで引き直しも作り直す）
   const [nigiriDraw, setNigiriDraw] = useState<{ iAmBlack: boolean; opponent: string; drawId: number } | null>(null);
   // ポップアップを塞がれていて検討の別ウィンドウを開けなかった（全面表示に落とす）
@@ -431,11 +452,14 @@ function App() {
           notificationSound.play('gameEnd');
         }
       },
-      onParticipantJoined: () => {
+      onParticipantJoined: (identity: string) => {
         notificationSound.play('connect');
+        // 戻ってきたことも講師には見せる（切れたきり戻らないのか、復旧したのかが分かる）
+        if (connectRole === 'TEACHER') pushAlert({ kind: 'rejoin', identity });
       },
-      onParticipantLeft: () => {
+      onParticipantLeft: (identity: string) => {
         notificationSound.play('disconnect');
+        if (connectRole === 'TEACHER') pushAlert({ kind: 'disconnect', identity });
       },
       onParticipantsChanged: (p: ParticipantInfo[]) => {
         setParticipants(p);
@@ -952,6 +976,41 @@ function App() {
       alert(`対局の再開に失敗しました: ${e}`);
     }
   }, [liveGameList.games, role, userName, selectedClassroomId, openTeacherGameWindow]);
+
+  // 時間切れを講師に即時知らせる。
+  // 時間切れで勝負を付けたくない＝基本は講師が再開する運用なので（2026-08-05 三村さん）、
+  // 気づかないと対局が止まったままになる。音と、誰が切れたか＋再開ボタンを出す。
+  // 画面を開いた時点で既に終わっている分（時間切れ対局は3時間だけ一覧に残る）は鳴らさない。
+  const seenTimeoutGamesRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (role !== 'TEACHER') return;
+    const timedOut = liveGameList.games.filter(
+      g => g.status === 'finished' && isTimeoutResult(g.result),
+    );
+    if (seenTimeoutGamesRef.current === null) {
+      seenTimeoutGamesRef.current = new Set(timedOut.map(g => g.id));
+      return;
+    }
+    const seen = seenTimeoutGamesRef.current;
+    for (const g of timedOut) {
+      if (seen.has(g.id)) continue;
+      seen.add(g.id);
+      const color = timedOutColorFromResult(g.result);
+      const identity = color === 'BLACK' ? g.black_player : g.white_player;
+      notificationSound.play('timeout');
+      pushAlert({ kind: 'timeout', identity, gameId: g.id });
+    }
+
+    // 再開したら（どこから再開しても）その知らせは役目を終える
+    const stillTimedOut = new Set(timedOut.map(g => g.id));
+    for (const g of liveGameList.games) {
+      if (g.status !== 'finished') seen.delete(g.id);
+    }
+    setAlerts(prev => {
+      const next = prev.filter(a => a.kind !== 'timeout' || stillTimedOut.has(a.gameId));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [liveGameList.games, role, pushAlert, notificationSound]);
 
   // 対局終了/中断時に自動的に閉じる（ロビーに戻る）
   useEffect(() => {
@@ -1601,6 +1660,16 @@ function App() {
           registeredStudents={students}
           initialBlackPlayer={gameCreationBlack ?? undefined}
           onNigiriDraw={handleNigiriDraw}
+        />
+      )}
+
+      {/* 講師への即時通知（接続切れ・時間切れ） */}
+      {role === 'TEACHER' && (
+        <ClassroomAlerts
+          alerts={alerts}
+          students={students}
+          onDismiss={dismissAlert}
+          onResumeGame={handleResumeGame}
         />
       )}
 
