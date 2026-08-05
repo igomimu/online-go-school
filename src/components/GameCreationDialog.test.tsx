@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import GameCreationDialog from './GameCreationDialog';
 
 describe('GameCreationDialog', () => {
@@ -88,5 +88,75 @@ describe('GameCreationDialog', () => {
     fireEvent.change(selects[1], { target: { value: 'たろう' } });
     const startBtn = screen.getByText('対局開始');
     expect((startBtn as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('手合割は互先→定先→2子→…9子の順に並ぶ', () => {
+    render(<GameCreationDialog {...defaultProps} />);
+    const labels = ['互先', '定先', '2子', '3子', '9子'];
+    labels.forEach(l => expect(screen.getByText(l)).toBeTruthy());
+    // 1子は無い
+    expect(screen.queryByText('1子')).toBeNull();
+  });
+
+  it('定先を選ぶとコミが0.5になる', async () => {
+    const onCreate = vi.fn();
+    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
+    fireEvent.click(screen.getByTestId('handicap-sen'));
+    fireEvent.click(screen.getByText('対局開始'));
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ handicap: 0, komi: 0.5 }),
+    ));
+  });
+
+  it('互先はコミ6.5、置石は0のまま', async () => {
+    const onCreate = vi.fn();
+    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
+    fireEvent.click(screen.getByTestId('handicap-sen'));
+    fireEvent.click(screen.getByTestId('handicap-even'));
+    fireEvent.click(screen.getByText('対局開始'));
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ handicap: 0, komi: 6.5 }),
+    ));
+  });
+
+  it('置石を選ぶとコミは0.5', async () => {
+    const onCreate = vi.fn();
+    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
+    fireEvent.click(screen.getByTestId('handicap-3'));
+    fireEvent.click(screen.getByText('対局開始'));
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ handicap: 3, komi: 0.5 }),
+    ));
+  });
+
+  it('ニギリは互先のときだけ出る', () => {
+    render(<GameCreationDialog {...defaultProps} />);
+    expect(screen.getByTestId('nigiri-button')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('handicap-3'));
+    expect(screen.queryByTestId('nigiri-button')).toBeNull();
+  });
+
+  it('ニギリを押すと黒番が決まり、片方は必ず黒になる', async () => {
+    vi.useFakeTimers();
+    try {
+      render(<GameCreationDialog {...defaultProps} students={['たろう', 'はなこ']} />);
+      const before = {
+        black: (screen.getByTestId('black-player-select') as HTMLSelectElement).value,
+        white: (screen.getByTestId('white-player-select') as HTMLSelectElement).value,
+      };
+      fireEvent.click(screen.getByTestId('nigiri-button'));
+      await act(async () => { vi.advanceTimersByTime(3000); });
+
+      const result = screen.getByTestId('nigiri-result').textContent ?? '';
+      const black = (screen.getByTestId('black-player-select') as HTMLSelectElement).value;
+      const white = (screen.getByTestId('white-player-select') as HTMLSelectElement).value;
+      // 決まった側が黒番の選択に入り、二人の顔ぶれは変わらない
+      expect(result).toContain('の黒番');
+      expect([before.black, before.white]).toContain(black);
+      expect([before.black, before.white]).toContain(white);
+      expect(black).not.toBe(white);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

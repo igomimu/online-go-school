@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { X } from 'lucide-react';
 import type { Student } from '../types/classroom';
 import { suggestHandicap } from '../types/classroom';
@@ -7,6 +7,7 @@ import type { GameClock } from '../types/game';
 import type { TimeSettings } from '../hooks/useGameClock';
 import { DEFAULT_TIME_SETTINGS, timeSettingsToClock } from '../hooks/useGameClock';
 import TimeControlPicker from './TimeControlPicker';
+import NigiriDraw from './NigiriDraw';
 
 interface GameCreationDialogProps {
   students: string[];  // 利用可能な生徒名一覧（LiveKit identity）
@@ -25,8 +26,25 @@ interface GameCreationDialogProps {
 }
 
 const BOARD_SIZES = [19, 13, 9];
-// 置石は0(互先)+2〜9子。1子は意味をなさないため選択肢から除く。
-const HANDICAP_OPTIONS = [0, 2, 3, 4, 5, 6, 7, 8, 9];
+
+/**
+ * 手合割。互先 → 定先 → 2子 → 3子 … の順に重くなる（2026-08-05 三村さん指定）。
+ * 定先は置石ゼロでコミだけ落とす手合なので、置石の数だけでは表せない。
+ * コミは互先6目半／定先・置碁は半目（`suggestHandicap` の規則に合わせている）。
+ */
+type HandicapChoice = { key: string; label: string; handicap: number; komi: number };
+const HANDICAP_CHOICES: HandicapChoice[] = [
+  { key: 'even', label: '互先', handicap: 0, komi: 6.5 },
+  { key: 'sen', label: '定先', handicap: 0, komi: 0.5 },
+  // 1子は意味をなさないため選択肢から除く
+  ...[2, 3, 4, 5, 6, 7, 8, 9].map(h => ({ key: String(h), label: `${h}子`, handicap: h, komi: 0.5 })),
+];
+
+/** 今の置石・コミがどの手合割にあたるか（コミを手で書き換えても破綻しないよう毎回導く） */
+function currentHandicapKey(handicap: number, komi: number): string {
+  if (handicap > 0) return String(handicap);
+  return komi >= 1 ? 'even' : 'sen';
+}
 
 export default function GameCreationDialog({
   students,
@@ -50,6 +68,8 @@ export default function GameCreationDialog({
   const [komi, setKomi] = useState(6.5);
   const [timeSettings, setTimeSettings] = useState<TimeSettings>(DEFAULT_TIME_SETTINGS);
   const [submitting, setSubmitting] = useState(false);
+  // ニギリで黒白を入れ替えたことを示す（下の自動提案を1回だけ見送るため）
+  const nigiriSwapRef = useRef(false);
 
   useEffect(() => {
     if (!initialBlackPlayer) return;
@@ -86,6 +106,11 @@ export default function GameCreationDialog({
   const [handicapTouched, setHandicapTouched] = useState(false);
 
   useEffect(() => {
+    // ニギリでの入れ替えは「対局者を選び直した」わけではないので、提案をやり直さない
+    if (nigiriSwapRef.current) {
+      nigiriSwapRef.current = false;
+      return;
+    }
     setHandicapTouched(false);
   }, [blackPlayer, whitePlayer]);
 
@@ -101,6 +126,18 @@ export default function GameCreationDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blackPlayer, whitePlayer, registeredStudents, handicapTouched]);
 
+  const selectedHandicapKey = currentHandicapKey(handicap, komi);
+
+  // ニギリで黒番が決まったら、その通りに黒白を入れ替える。
+  // 入れ替えで棋力差の自動提案が走ると、せっかく選んだ互先が上書きされるので止める。
+  const applyNigiriResult = useCallback((black: string) => {
+    const white = black === blackPlayer ? whitePlayer : blackPlayer;
+    if (black !== blackPlayer) nigiriSwapRef.current = true;
+    setBlackPlayer(black);
+    setWhitePlayer(white);
+    setHandicapTouched(true);
+  }, [blackPlayer, whitePlayer]);
+
   const handleSubmit = async () => {
     if (submitting || blackPlayer === whitePlayer) return;
     setSubmitting(true);
@@ -115,7 +152,9 @@ export default function GameCreationDialog({
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="glass-panel p-6 w-full max-w-md space-y-5">
+      {/* 縦が足りない画面（ノートPCの1366×768など）で「対局開始」が画面の外に出ないよう、
+          パネル自体を収めて中でスクロールさせる。手合割にニギリが加わって背が伸びた 2026-08-05 */}
+      <div className="glass-panel p-6 w-full max-w-md space-y-5 max-h-[92dvh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">対局作成</h2>
           <button onClick={onClose} className="text-muted hover:text-ink">
@@ -201,29 +240,41 @@ export default function GameCreationDialog({
           </div>
         </div>
 
-        {/* 置石 */}
+        {/* 手合割 */}
         <div>
-          <label className="block text-sm text-muted mb-1">置石</label>
-          <div className="flex flex-wrap gap-2">
-            {HANDICAP_OPTIONS.map(h => (
+          <label className="block text-sm text-muted mb-1">手合割</label>
+          {/* 10個あるので5列×2段。flex-wrap だと2段目だけ間延びして見える */}
+          <div className="grid grid-cols-5 gap-2">
+            {HANDICAP_CHOICES.map(choice => (
               <button
-                key={h}
+                key={choice.key}
+                data-testid={`handicap-${choice.key}`}
                 onClick={() => {
-                  setHandicap(h);
+                  setHandicap(choice.handicap);
+                  setKomi(choice.komi);
                   setHandicapTouched(true);
-                  setKomi(h >= 2 ? 0.5 : 6.5);
                 }}
-                className={`flex-1 min-w-[3rem] py-2 rounded-lg text-sm font-medium transition-all ${
-                  handicap === h
+                className={`py-2 rounded-lg text-sm font-medium transition-all ${
+                  selectedHandicapKey === choice.key
                     ? 'bg-accent text-accent-ink'
                     : 'bg-ink/5 hover:bg-ink/10'
                 }`}
               >
-                {h === 0 ? '互先' : `${h}子`}
+                {choice.label}
               </button>
             ))}
           </div>
         </div>
+
+        {/* ニギリ（互先のときだけ）。押すと黒番をその場で決める */}
+        {selectedHandicapKey === 'even' && blackPlayer !== whitePlayer && (
+          <NigiriDraw
+            key={[blackPlayer, whitePlayer].slice().sort().join('|')}
+            candidates={[blackPlayer, whitePlayer]}
+            displayName={displayName}
+            onDecided={applyNigiriResult}
+          />
+        )}
 
         {/* コミ */}
         <div>

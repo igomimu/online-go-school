@@ -7,8 +7,23 @@ import { DEFAULT_TIME_SETTINGS, timeSettingsToClock } from '../../hooks/useGameC
 import { findStudentByIdentity, getDisplayName } from '../../utils/identityUtils';
 import TimeControlPicker from '../TimeControlPicker';
 
-// 置石は0(互先)+2〜9子。1子は意味をなさないため選択肢から除く。
-const HANDICAP_OPTIONS = [0, 2, 3, 4, 5, 6, 7, 8, 9];
+/**
+ * 手合割。互先 → 定先 → 2子 … の順（対局作成ダイアログと同じ並び 2026-08-05）。
+ * 定先は置石ゼロ・コミ半目なので、置石の数だけでは互先と区別できない。
+ * 表の枠が狭いので、ラベルは「互」「先」と数字だけにしている。
+ */
+const HANDICAP_CHOICES: { key: string; label: string; handicap: number; komi: number }[] = [
+  { key: 'even', label: '互', handicap: 0, komi: 6.5 },
+  { key: 'sen', label: '先', handicap: 0, komi: 0.5 },
+  // 1子は意味をなさないため選択肢から除く
+  ...[2, 3, 4, 5, 6, 7, 8, 9].map(h => ({ key: String(h), label: String(h), handicap: h, komi: 0.5 })),
+];
+
+/** 今の置石・コミがどの手合割にあたるか */
+function handicapKeyOf(handicap: number, komi: number): string {
+  if (handicap > 0) return String(handicap);
+  return komi >= 1 ? 'even' : 'sen';
+}
 
 interface PairingPair {
   blackIdentity: string;
@@ -121,12 +136,14 @@ export default function AutoPairingDialog({
     setPairs(prev => prev.map((p, i) => i === index ? { ...p, boardSize: size } : p));
   };
 
-  // 置き石手動変更
-  const changeHandicap = (index: number, handicap: number) => {
+  // 手合割の手動変更（コミも一緒に決まる）
+  const changeHandicap = (index: number, key: string) => {
+    const choice = HANDICAP_CHOICES.find(c => c.key === key);
+    if (!choice) return;
     setPairs(prev => prev.map((p, i) => i === index ? {
       ...p,
-      handicap,
-      komi: handicap >= 2 ? 0.5 : 6.5,
+      handicap: choice.handicap,
+      komi: choice.komi,
     } : p));
   };
 
@@ -193,7 +210,7 @@ export default function AutoPairingDialog({
                   <th style={{ ...cellStyle, width: 30 }}></th>
                   <th style={cellStyle}>白番（強い方）</th>
                   <th style={{ ...cellStyle, width: 36 }}>棋力</th>
-                  <th style={{ ...cellStyle, width: 36 }}>置石</th>
+                  <th style={{ ...cellStyle, width: 40 }}>手合</th>
                   <th style={{ ...cellStyle, width: 42 }}>コミ</th>
                   <th style={{ ...cellStyle, width: 40 }}>盤</th>
                   <th style={{ ...cellStyle, width: 60 }}>操作</th>
@@ -223,12 +240,12 @@ export default function AutoPairingDialog({
                     <td style={{ ...cellStyle, color: 'var(--color-accent-text)' }}>{p.whiteRank || '?'}</td>
                     <td style={cellStyle}>
                       <select
-                        value={p.handicap}
-                        onChange={e => changeHandicap(i, Number(e.target.value))}
-                        style={{ width: 32, fontSize: 11, border: '1px solid var(--color-line)' }}
+                        value={handicapKeyOf(p.handicap, p.komi)}
+                        onChange={e => changeHandicap(i, e.target.value)}
+                        style={{ width: 36, fontSize: 11, border: '1px solid var(--color-line)' }}
                       >
-                        {HANDICAP_OPTIONS.map(n => (
-                          <option key={n} value={n}>{n}</option>
+                        {HANDICAP_CHOICES.map(c => (
+                          <option key={c.key} value={c.key}>{c.label}</option>
                         ))}
                       </select>
                     </td>
