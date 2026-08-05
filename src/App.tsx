@@ -28,6 +28,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import PopupPortal from './components/PopupPortal';
 import NigiriAnnouncement from './components/NigiriAnnouncement';
 import ClassroomAlerts, { type ClassroomAlert, type NewClassroomAlert } from './components/teacher/ClassroomAlerts';
+import { postTeacherAlert } from './utils/teacherAlertChannel';
 import LoginScreen from './components/LoginScreen';
 import Lobby from './components/Lobby';
 import GameBoard from './components/GameBoard';
@@ -128,10 +129,13 @@ function App() {
   /** 同じ相手の同じ知らせは重ねない。時間切れは操作が要るので自分では消えない */
   const pushAlert = useCallback((alert: NewClassroomAlert) => {
     const id = ++alertSeqRef.current;
+    const withId = { ...alert, id } as ClassroomAlert;
     setAlerts(prev => [
       ...prev.filter(a => !(a.kind === alert.kind && a.identity === alert.identity)),
-      { ...alert, id } as ClassroomAlert,
+      withId,
     ]);
+    // 対局ウィンドウを前面にしていても気づけるよう、同じ知らせをあちらにも渡す
+    postTeacherAlert(withId);
     if (alert.kind !== 'timeout') {
       window.setTimeout(() => {
         setAlerts(prev => prev.filter(a => a.id !== id));

@@ -42,11 +42,16 @@ const SOUND_MAP: Record<SoundType, () => void> = {
   chat: () => playTone(600, 0.1, 'sine', 0.15),                  // 軽いポップ音
   timeWarning: () => playTone(1000, 0.12, 'square', 0.2),        // 短い高音ビープ
   // 時間切れ。基本は講師が再開するので、切れたことに気づけないと対局が止まったままになる。
-  // 接続切れ（低い2音）と取り違えないよう、高→高→低の3音にして目立たせる。
+  // 接続切れ（低い2音）と取り違えないよう、高→高→低の3音。
+  // 打っている最中でも聞き逃さないよう、ひと組を2回繰り返す（2026-08-05 三村さん指定）。
   timeout: () => {
-    playTone(1046, 0.16, 'square', 0.22);
-    setTimeout(() => playTone(1046, 0.16, 'square', 0.22), 200);
-    setTimeout(() => playTone(784, 0.34, 'square', 0.22), 400);
+    const phrase = (offset: number) => {
+      setTimeout(() => playTone(1046, 0.16, 'square', 0.22), offset);
+      setTimeout(() => playTone(1046, 0.16, 'square', 0.22), offset + 200);
+      setTimeout(() => playTone(784, 0.34, 'square', 0.22), offset + 400);
+    };
+    phrase(0);
+    phrase(900);
   },
 };
 

@@ -79,11 +79,16 @@ test('時間切れで終わった対局を講師が再開でき、切れた側�
     }).toBe(true);
     // 対局ウィンドウ側の再開ボタンも従来どおり出ている
     await expect(teacherGameWindow.getByTestId('resume-timeout-game')).toBeVisible();
+    // 打っている最中でも気づけるよう、対局ウィンドウにも同じ知らせが出る
+    const windowAlert = teacherGameWindow.getByTestId('classroom-alert-timeout');
+    await expect(windowAlert).toBeVisible({ timeout: 15_000 });
+    await expect(windowAlert).toContainText(TEST_STUDENT_A.name);
 
     // 講師がその知らせから対局を再開する
     await timeoutAlert.getByRole('button', { name: '対局を再開する' }).click();
-    // 再開したら知らせは消える
+    // 再開したら知らせは両方から消える
     await expect(teacherPage.getByTestId('classroom-alert-timeout')).toHaveCount(0, { timeout: 20_000 });
+    await expect(teacherGameWindow.getByTestId('classroom-alert-timeout')).toHaveCount(0, { timeout: 20_000 });
 
     // 生徒側の盤が対局中に戻り、切れていた黒の秒読みが規定回数（1回）復元されている
     await expect(studentAPage.getByTestId('clock-black')).toContainText('秒読 10秒 [1]', { timeout: 30_000 });

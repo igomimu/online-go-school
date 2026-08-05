@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Student } from '../../types/classroom';
 import { liveRowToSession } from '../../utils/liveGameApi';
 import { deriveLiveBoardSnapshots, useLiveBoards } from '../../hooks/useLiveBoards';
@@ -6,6 +6,9 @@ import { useLiveGameList } from '../../hooks/useLiveGameList';
 import GameThumbnail from '../GameThumbnail';
 import GameBoard from '../GameBoard';
 import { getNextTeacherTurnGameId, isTeacherParticipant, isTeacherTurn } from './simulRotation';
+import ClassroomAlerts, { type ClassroomAlert } from './ClassroomAlerts';
+import { subscribeTeacherAlerts } from '../../utils/teacherAlertChannel';
+import { resumeLiveGame } from '../../utils/liveGameApi';
 
 interface TeacherGameWindowProps {
   classroomId: string;
@@ -27,6 +30,28 @@ export default function TeacherGameWindow({
   const { games } = useLiveGameList(classroomId);
   const [activeSimulGameId, setActiveSimulGameId] = useState<string | null>(null);
   const [showList, setShowList] = useState(false);
+
+  // 教室ホームで見つけた知らせ（時間切れ・接続切れ）をこちらにも出す。
+  // このウィンドウを前面にしていると、あちらの表示は背面に隠れてしまうため。
+  // 見つけるのも音を鳴らすのも教室ホームの役目なので、ここは受け取って出すだけ。
+  const [alerts, setAlerts] = useState<ClassroomAlert[]>([]);
+  useEffect(() => subscribeTeacherAlerts(alert => {
+    setAlerts(prev => [
+      ...prev.filter(a => !(a.kind === alert.kind && a.identity === alert.identity)),
+      alert,
+    ]);
+    if (alert.kind !== 'timeout') {
+      window.setTimeout(() => setAlerts(prev => prev.filter(a => a.id !== alert.id)), 12_000);
+    }
+  }), []);
+
+  // 再開されたら（どこから再開しても）その知らせは役目を終える。
+  // 状態を消しに行かず、出すときに絞る（対局一覧が真実）。
+  const finishedGameIds = useMemo(
+    () => new Set(games.filter(g => g.status === 'finished').map(g => g.id)),
+    [games],
+  );
+  const visibleAlerts = alerts.filter(a => a.kind !== 'timeout' || finishedGameIds.has(a.gameId));
 
   const simulGames = useMemo(
     () => games.filter((game) => isTeacherParticipant(game, teacherIdentity)),
@@ -204,6 +229,12 @@ export default function TeacherGameWindow({
         </div>
       )}
 
+      <ClassroomAlerts
+        alerts={visibleAlerts}
+        students={students}
+        onDismiss={id => setAlerts(prev => prev.filter(a => a.id !== id))}
+        onResumeGame={gameId => { void resumeLiveGame(gameId); }}
+      />
     </div>
   );
 }
