@@ -611,7 +611,7 @@ export default function ClassroomManager({
         alignItems: 'center',
         gap: 6,
       }}>
-        <IgcButton label="閉じる" onClick={onBack} />
+        <IgcButton label="ログアウト" onClick={onBack} />
         <div style={{ flex: 1 }} />
         {pwaInstall.shouldShowInstall && (
           <IgcButton label="⬇ アプリをインストール" color="var(--color-raised)" onClick={() => { void pwaInstall.install(); }} />
