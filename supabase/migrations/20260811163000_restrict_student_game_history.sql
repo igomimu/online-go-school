@@ -29,3 +29,4 @@ CREATE INDEX IF NOT EXISTS go_school_games_black_player_idx
 
 CREATE INDEX IF NOT EXISTS go_school_games_white_player_idx
     ON public.go_school_games (white_player);
+
