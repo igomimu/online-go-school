@@ -13,10 +13,16 @@ export default function StudentLinkGenerator({ students, classroomId, onClose }:
 
   const baseUrl = `${window.location.origin}${window.location.pathname}`;
 
+  // 生徒が何も入力せずに教室へ入れるリンク。
+  // App.tsx の自動参加は `role=STUDENT` かつ `room` が揃って初めて studentId を読むので、
+  // classroomId と studentId だけでは生徒ID欄が空のままログイン画面で止まる。
   const makeLink = (student: Student): string => {
     const params = new URLSearchParams({
+      role: 'STUDENT',
+      room: `go-${classroomId || ''}`,
       classroomId: classroomId || '',
       studentId: student.id,
+      studentName: student.name,
     });
     return `${baseUrl}?${params.toString()}`;
   };

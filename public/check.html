@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>接続の確認 — 三村囲碁オンライン</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+  /*
+   * 教室に入る前の事前確認ページ。
+   * 本体アプリとは独立させてある（バンドルも Service Worker も通らないので、
+   * アプリ側が壊れていても必ず開く）。デザイントークンは src/index.css と同じ値を
+   * 直に持つ。増やさない・凝らないこと。
+   */
+  :root {
+    --ground: #f2ede3;
+    --raised: #e9e3d5;
+    --line: #d8d0be;
+    --ink: #1f1c15;
+    --muted: #635b4b;
+    --accent: #c69a55;
+    --accent-ink: #241a08;
+    --accent-text: #8a5f1f;
+    --ok: #3f7d4e;
+    --ng: #b1432c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #15140f;
+      --raised: #26231c;
+      --line: #302c24;
+      --ink: #e9e4d9;
+      --muted: #9a9285;
+      --accent: #d6b279;
+      --accent-ink: #15140f;
+      --accent-text: #d6b279;
+      --ok: #7fb98c;
+      --ng: #e0745a;
+    }
+  }
+
+  html:lang(ja) {
+    line-break: strict;
+    word-break: normal;
+    overflow-wrap: anywhere;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 20px 64px;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: 'Inter', 'Noto Sans JP', system-ui, sans-serif;
+    font-size: 17px;
+    line-height: 1.8;
+  }
+  main { max-width: 34em; margin: 0 auto; }
+  h1 { font-size: 1.5rem; line-height: 1.35; margin: 0 0 4px; word-break: auto-phrase; }
+  .lead { color: var(--muted); margin: 0 0 28px; }
+
+  button {
+    font: inherit;
+    font-weight: 600;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: none;
+    border-radius: 6px;
+    padding: 12px 24px;
+    cursor: pointer;
+  }
+  button:hover { filter: brightness(1.06); }
+  button:disabled { opacity: .5; cursor: default; filter: none; }
+  button.sub {
+    background: var(--raised);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    font-weight: 500;
+    padding: 8px 16px;
+    font-size: .9rem;
+  }
+
+  ul { list-style: none; margin: 28px 0 0; padding: 0; }
+  li {
+    display: grid;
+    grid-template-columns: 1.7em 1fr;
+    gap: 0 10px;
+    padding: 14px 0;
+    border-top: 1px solid var(--line);
+  }
+  li:last-child { border-bottom: 1px solid var(--line); }
+  .mark { font-size: 1.15rem; line-height: 1.6; text-align: center; color: var(--muted); }
+  .mark.ok { color: var(--ok); }
+  .mark.ng { color: var(--ng); }
+  .mark.run { color: var(--accent-text); }
+  .label { font-weight: 600; }
+  .note { grid-column: 2; color: var(--muted); font-size: .92rem; line-height: 1.75; }
+  .note.bad { color: var(--ng); }
+
+  #verdict {
+    margin-top: 28px;
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--raised);
+    display: none;
+  }
+  #verdict.shown { display: block; }
+  #verdict h2 { font-size: 1.1rem; margin: 0 0 6px; }
+  #verdict p { margin: 0; color: var(--muted); font-size: .95rem; }
+  #verdict .accent { color: var(--accent-text); font-weight: 600; }
+
+  .tail { margin-top: 32px; display: flex; gap: 10px; flex-wrap: wrap; }
+  video {
+    display: none;
+    width: 100%;
+    max-width: 260px;
+    margin-top: 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: #000;
+  }
+  video.shown { display: block; }
+  .meter {
+    display: none;
+    height: 6px;
+    margin-top: 12px;
+    max-width: 260px;
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .meter.shown { display: block; }
+  .meter > i { display: block; height: 100%; width: 0; background: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>接続の確認</h1>
+  <p class="lead">教室に入る前に、お使いの機械で映像と音声が使えるかを確かめます。1分ほどで終わります。</p>
+
+  <button id="start">確認を始める</button>
+
+  <ul id="list">
+    <li data-key="browser"><span class="mark">−</span><span class="label">ブラウザ</span><span class="note">未確認</span></li>
+    <li data-key="net"><span class="mark">−</span><span class="label">インターネット</span><span class="note">未確認</span></li>
+    <li data-key="camera"><span class="mark">−</span><span class="label">カメラ</span><span class="note">未確認</span>
+      <video id="preview" playsinline muted></video>
+    </li>
+    <li data-key="mic"><span class="mark">−</span><span class="label">マイク</span><span class="note">未確認</span>
+      <div class="meter" id="meter"><i></i></div>
+    </li>
+    <li data-key="popup"><span class="mark">−</span><span class="label">別ウィンドウ</span><span class="note">未確認</span></li>
+    <li data-key="screen"><span class="mark">−</span><span class="label">画面の大きさ</span><span class="note">未確認</span></li>
+  </ul>
+
+  <div id="verdict"><h2></h2><p></p></div>
+
+  <div class="tail">
+    <button class="sub" id="copy">確認の結果をコピー</button>
+  </div>
+</main>
+
+<script>
+(function () {
+  var rows = {};
+  document.querySelectorAll('#list li').forEach(function (li) {
+    rows[li.dataset.key] = { mark: li.querySelector('.mark'), note: li.querySelector('.note') };
+  });
+  var results = {};
+
+  function set(key, state, note) {
+    var r = rows[key];
+    if (!r) return;
+    r.mark.className = 'mark' + (state === 'ok' ? ' ok' : state === 'ng' ? ' ng' : state === 'run' ? ' run' : '');
+    r.mark.textContent = state === 'ok' ? '✓' : state === 'ng' ? '✕' : state === 'run' ? '…' : '−';
+    r.note.className = 'note' + (state === 'ng' ? ' bad' : '');
+    r.note.textContent = note;
+    results[key] = { state: state, note: note };
+  }
+
+  function checkBrowser() {
+    var ua = navigator.userAgent;
+    var name = /Edg\//.test(ua) ? 'Microsoft Edge'
+      : /Chrome\//.test(ua) && !/Edg\//.test(ua) ? 'Google Chrome'
+      : /Firefox\//.test(ua) ? 'Firefox'
+      : /Safari\//.test(ua) ? 'Safari' : 'ご利用のブラウザ';
+    var hasWebRTC = typeof RTCPeerConnection === 'function';
+    var hasMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    if (hasWebRTC && hasMedia) {
+      set('browser', 'ok', name + ' — 対応しています');
+    } else {
+      set('browser', 'ng', name + ' は対応していません。Google Chrome または Microsoft Edge をお使いください。');
+    }
+  }
+
+  function checkScreen() {
+    var w = window.screen.availWidth;
+    if (w >= 1024) {
+      set('screen', 'ok', '横 ' + w + ' — 十分な広さです');
+    } else {
+      set('screen', 'ng', '横 ' + w + ' — 碁盤と先生の映像を並べるには狭いので、'
+        + 'パソコンかタブレットを横向きにしてお使いください。');
+    }
+  }
+
+  function checkNet() {
+    set('net', 'run', '確かめています…');
+    var started = Date.now();
+    return fetch('/version.json?t=' + started, { cache: 'no-store' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        set('net', 'ok', '教室のサーバーにつながりました（' + (Date.now() - started) + 'ミリ秒）');
+      })
+      .catch(function () {
+        set('net', 'ng', 'サーバーにつながりません。インターネットの接続をお確かめください。');
+      });
+  }
+
+  function checkCamera() {
+    set('camera', 'run', '許可を確かめています…');
+    return navigator.mediaDevices.getUserMedia({ video: true })
+      .then(function (stream) {
+        var track = stream.getVideoTracks()[0];
+        var v = document.getElementById('preview');
+        v.srcObject = stream;
+        v.classList.add('shown');
+        v.play().catch(function () {});
+        set('camera', 'ok', (track && track.label ? track.label : 'カメラ') + ' — 映っていれば大丈夫です');
+        setTimeout(function () {
+          stream.getTracks().forEach(function (t) { t.stop(); });
+          v.classList.remove('shown');
+        }, 8000);
+      })
+      .catch(function (e) {
+        set('camera', 'ng', e && e.name === 'NotAllowedError'
+          ? 'カメラが許可されていません。画面の上のほうに出る確認で「許可」を押してください。'
+          : 'カメラが見つかりません。つながっているかお確かめください。');
+      });
+  }
+
+  function checkMic() {
+    set('mic', 'run', '許可を確かめています…');
+    return navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(function (stream) {
+        var track = stream.getAudioTracks()[0];
+        set('mic', 'ok', (track && track.label ? track.label : 'マイク') + ' — 声を出すと下の線が動きます');
+        showLevel(stream);
+      })
+      .catch(function (e) {
+        set('mic', 'ng', e && e.name === 'NotAllowedError'
+          ? 'マイクが許可されていません。画面の上のほうに出る確認で「許可」を押してください。'
+          : 'マイクが見つかりません。つながっているかお確かめください。');
+      });
+  }
+
+  function showLevel(stream) {
+    var meter = document.getElementById('meter');
+    var bar = meter.querySelector('i');
+    meter.classList.add('shown');
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    var ctx = new Ctx();
+    var src = ctx.createMediaStreamSource(stream);
+    var an = ctx.createAnalyser();
+    an.fftSize = 512;
+    src.connect(an);
+    var buf = new Uint8Array(an.frequencyBinCount);
+    var until = Date.now() + 8000;
+    (function loop() {
+      an.getByteFrequencyData(buf);
+      var sum = 0;
+      for (var i = 0; i < buf.length; i++) sum += buf[i];
+      bar.style.width = Math.min(100, (sum / buf.length) * 2.2) + '%';
+      if (Date.now() < until) {
+        requestAnimationFrame(loop);
+      } else {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        ctx.close();
+        meter.classList.remove('shown');
+      }
+    })();
+  }
+
+  function checkPopup() {
+    // 教室では「検討」を別ウィンドウで開く。ここはボタン押下の流れの中なので
+    // 実際の教室と同じ条件で試せる。
+    var w = window.open('', '_blank', 'width=200,height=140');
+    if (!w || w.closed || typeof w.closed === 'undefined') {
+      set('popup', 'ng', '別ウィンドウが開けませんでした。アドレス欄の右に出る '
+        + '「ポップアップがブロックされました」から、このサイトを許可してください。');
+      return;
+    }
+    try {
+      w.document.write('<p style="font:14px sans-serif;padding:12px">確認できました。閉じます。</p>');
+    } catch (e) { /* 書けなくても開いた事実は変わらない */ }
+    setTimeout(function () { w.close(); }, 700);
+    set('popup', 'ok', '開けました — 解説のときにこの窓を使います');
+  }
+
+  function verdict() {
+    var box = document.getElementById('verdict');
+    var bad = Object.keys(results).filter(function (k) { return results[k].state === 'ng'; });
+    box.classList.add('shown');
+    if (bad.length === 0) {
+      box.querySelector('h2').innerHTML = '<span class="accent">準備ができています</span>';
+      box.querySelector('p').textContent = '教室の時間になったら、お送りしたリンクを押してお入りください。';
+    } else {
+      box.querySelector('h2').textContent = '直していただきたいところが ' + bad.length + ' つあります';
+      box.querySelector('p').textContent = '上の ✕ が付いた項目の説明をご覧ください。'
+        + 'わからないときは、この画面のまま道場までご連絡ください。';
+    }
+  }
+
+  document.getElementById('start').addEventListener('click', function () {
+    var btn = this;
+    btn.disabled = true;
+    btn.textContent = '確認しています…';
+    checkBrowser();
+    checkScreen();
+    checkPopup();
+    checkNet()
+      .then(checkCamera)
+      .then(checkMic)
+      .then(function () {
+        verdict();
+        btn.disabled = false;
+        btn.textContent = 'もう一度確認する';
+      });
+  });
+
+  document.getElementById('copy').addEventListener('click', function () {
+    var lines = ['三村囲碁オンライン 接続の確認'];
+    lines.push(new Date().toLocaleString('ja-JP'));
+    Object.keys(rows).forEach(function (k) {
+      var r = results[k];
+      lines.push('・' + rows[k].label + (r ? (r.state === 'ok' ? ' ○ ' : r.state === 'ng' ? ' × ' : ' - ') + r.note : ' 未確認'));
+    });
+    lines.push(navigator.userAgent);
+    var text = lines.join('\n');
+    var btn = this;
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+      .then(function () { btn.textContent = 'コピーしました'; })
+      .catch(function () { window.prompt('この文字をコピーして道場へお送りください', text); })
+      .then(function () {
+        setTimeout(function () { btn.textContent = '確認の結果をコピー'; }, 2500);
+      });
+  });
+
+  // ラベルは結果コピーでも使うので拾っておく
+  document.querySelectorAll('#list li').forEach(function (li) {
+    rows[li.dataset.key].label = li.querySelector('.label').textContent;
+  });
+})();
+</script>
+</body>
+</html>

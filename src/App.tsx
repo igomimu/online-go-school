@@ -574,7 +574,9 @@ function App() {
       const urlStudentName = params.get('studentName');
       if (urlStudentId) {
         setStudentId(urlStudentId);
-        if (urlStudentName) setUserName(decodeURIComponent(urlStudentName));
+        // params.get は復号済みの値を返す。ここで decodeURIComponent を重ねると
+        // 名前に % が入っていたとき URIError で画面ごと落ちる。
+        if (urlStudentName) setUserName(urlStudentName);
       }
       if (urlClassroomId) setStudentClassroomId(urlClassroomId);
       setRole('STUDENT');
