@@ -9,6 +9,7 @@ import GameThumbnail from './GameThumbnail';
 import SavedGameList from './SavedGameList';
 import ClassroomSelector from './ClassroomSelector';
 import ChatPanel from './teacher/ChatPanel';
+import StudentGameHistory from './StudentGameHistory';
 
 interface LobbyProps {
   role: 'TEACHER' | 'STUDENT';
@@ -322,6 +323,16 @@ export default function Lobby({
             <h3 className="heading-section">保存棋譜</h3>
             <SavedGameList onSelectGame={onSelectSavedGame} students={students} />
           </div>
+        )}
+
+        {role === 'STUDENT' && onSelectSavedGame && myIdentity && (
+          <StudentGameHistory
+            key={myIdentity}
+            studentId={myIdentity}
+            studentName={currentStudentName || myIdentity}
+            students={students}
+            onSelectGame={onSelectSavedGame}
+          />
         )}
 
         {/* チャット（生徒のみ。先生は TeacherDashboard 内で表示） */}

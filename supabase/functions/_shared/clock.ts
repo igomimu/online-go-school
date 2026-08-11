@@ -49,3 +49,11 @@ export function restoreClockForTimeout(
     ? { ...clock, blackTimeLeft: timeLeft, blackByoyomiLeft: byoyomiLeft, blackInByoyomi: useByoyomi }
     : { ...clock, whiteTimeLeft: timeLeft, whiteByoyomiLeft: byoyomiLeft, whiteInByoyomi: useByoyomi }
 }
+
+/** 一時停止していた時計を、再開操作の瞬間から進める。 */
+export function startClock(
+  clock: StoredClock | null | undefined,
+  startedAt = Date.now(),
+): StoredClock | null {
+  return clock ? { ...clock, lastTickTime: startedAt } : null
+}

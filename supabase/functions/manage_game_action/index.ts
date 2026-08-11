@@ -1,7 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { studentMatchesPlayer, toStudentIdentity, playersMatchPair, resolvePlayerColor, stripSid, TEACHER_IDENTITY } from '../_shared/identity.ts'
 import { exportLiveGameToSgf, formatTokyoSgfDate } from '../_shared/sgf.ts'
-import { restoreClockForTimeout, timedOutColorFromResult } from '../_shared/clock.ts'
+import { restoreClockForTimeout, startClock, timedOutColorFromResult } from '../_shared/clock.ts'
 import { versionResponse } from '../_shared/version.ts'
 
 const corsHeaders = {
@@ -526,7 +526,9 @@ Deno.serve(async (req) => {
       // 時間切れ（"B+T"/"W+T"）で終わった対局は、切れた側の時計を戻さないと
       // 再開直後にまた切れてしまう。秒読みがあれば規定回数ぶん復活させ、
       // 秒読みなしの設定なら持ち時間を戻す。
-      const clock = restoreClockForTimeout(pauseClock(gameToResume.clock), gameToResume.result)
+      const clock = startClock(
+        restoreClockForTimeout(pauseClock(gameToResume.clock), gameToResume.result),
+      )
 
       const { error } = await supabase
         .from('go_school_live_games')

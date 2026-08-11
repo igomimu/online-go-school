@@ -970,15 +970,18 @@ function App() {
       setReviewMovePermissions([]);
       setViewMode('review');
 
-      // 参加者に選ばれている生徒にだけ知らせる（上と同じ理由）
-      void classroomRef.current?.sendToOrAll({
-        type: 'REVIEW_START',
-        payload: { sgf: game.sgf, boardSize: parsed.size },
-      }, reviewTargetStudentsRef.current);
+      // 先生が開いた棋譜だけ、選択中の参加者へ共有する。
+      // 生徒が自分の履歴を開いた場合は本人の端末内だけで検討する。
+      if (role === 'TEACHER') {
+        void classroomRef.current?.sendToOrAll({
+          type: 'REVIEW_START',
+          payload: { sgf: game.sgf, boardSize: parsed.size },
+        }, reviewTargetStudentsRef.current);
+      }
     } catch {
       alert('棋譜の読み込みに失敗しました');
     }
-  }, []);
+  }, [role]);
 
   // 授業モード開始
   const handleStartLecture = () => {
@@ -1557,6 +1560,7 @@ function App() {
             chatMessages={chat.messages}
             onChatSend={chat.sendMessage}
             onResumeGame={handleResumeGame}
+            onSelectSavedGame={handleSelectSavedGame}
           />
         )}
 

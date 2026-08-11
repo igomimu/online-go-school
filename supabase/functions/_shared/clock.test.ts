@@ -1,6 +1,6 @@
 import { describe, it } from "https://deno.land/std@0.224.0/testing/bdd.ts";
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { restoreClockForTimeout, timedOutColorFromResult, type StoredClock } from './clock.ts';
+import { restoreClockForTimeout, startClock, timedOutColorFromResult, type StoredClock } from './clock.ts';
 
 const expect = (actual: any) => ({
   toBe: (expected: any) => assertEquals(actual, expected),
@@ -74,5 +74,15 @@ describe('restoreClockForTimeout', () => {
 
   it('時間無制限（clockなし）でも壊れない', () => {
     expect(restoreClockForTimeout(null, 'B+T')).toBe(null);
+  });
+});
+
+describe('startClock', () => {
+  it('再開操作の時刻を lastTickTime に設定して直ちに時計を動かす', () => {
+    expect(startClock(baseClock(), 1_786_430_000_000)?.lastTickTime).toBe(1_786_430_000_000);
+  });
+
+  it('時間無制限（clockなし）でも壊れない', () => {
+    expect(startClock(null, 1_786_430_000_000)).toBe(null);
   });
 });
