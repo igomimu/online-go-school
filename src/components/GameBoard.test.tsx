@@ -238,7 +238,7 @@ describe('GameBoard', () => {
     expect(onBack).toHaveBeenCalled();
   });
 
-  it('取り石数を表示する', () => {
+  it('アゲハマを表示する', () => {
     const game = createMockGame({ blackCaptures: 3, whiteCaptures: 5 });
     setupMock({ game });
     render(
@@ -247,8 +247,8 @@ describe('GameBoard', () => {
         myIdentity="たろう"
       />
     );
-    expect(screen.getByText('取3')).toBeInTheDocument();
-    expect(screen.getByText('取5')).toBeInTheDocument();
+    expect(screen.getByText('アゲハマ 3')).toBeInTheDocument();
+    expect(screen.getByText('アゲハマ 5')).toBeInTheDocument();
   });
 
   it('観戦者には操作ボタンが表示されない', () => {
@@ -356,7 +356,7 @@ describe('GameBoard', () => {
     expect(screen.queryByTestId('resume-timeout-game')).not.toBeInTheDocument();
   });
 
-  it('講師側の秒読み回数は[∞]と表示する（切れ負けにならないため）', () => {
+  it('講師側の秒読み回数は「残∞」と表示する（切れ負けにならないため）', () => {
     const game = createMockGame({ blackPlayer: 'たろう', whitePlayer: 'teacher' });
     setupMock({
       game,
@@ -370,8 +370,8 @@ describe('GameBoard', () => {
       },
     });
     render(<GameBoard gameId="game-1" myIdentity="たろう" />);
-    expect(screen.getByTestId('clock-white')).toHaveTextContent('秒読 12秒 [∞]');
-    expect(screen.getByTestId('clock-black')).toHaveTextContent('秒読 25秒 [1]');
+    expect(screen.getByTestId('clock-white')).toHaveTextContent('12秒秒読み 残∞');
+    expect(screen.getByTestId('clock-black')).toHaveTextContent('25秒秒読み 残1');
   });
 
   // 2026-08-04 三村さん指定: 直前に打たれた石に▲。今どこに打たれたかがひと目で分かる

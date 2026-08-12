@@ -44,97 +44,134 @@ export default function Header({
     await pwaInstall.install();
   };
 
+  // 生徒のメディアボタンは3つを等分に並べる。以前は説明文をそのままラベルにしていたため、
+  // スマホ幅で名前や「1人接続中」が1文字ずつ縦積みになり、カメラのボタンは画面外に切れて
+  // 押せなかった。押せることを優先し、説明は title に残す。
+  const studentMediaButton = (active: boolean) =>
+    `flex h-[46px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors duration-150 ${
+      active
+        ? 'border-accent/35 bg-accent/12 text-accent-text'
+        : 'border-line bg-raised text-muted hover:bg-line'
+    }`;
+
   return (
-    <header className="flex justify-between items-center glass-panel px-4 py-3">
-      <div className="flex items-center gap-3">
+    <header className="glass-panel flex flex-col gap-2 overflow-x-hidden px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3">
+      {/* 1段目: 状態。テキストは潰さない（nowrap / truncate）。 */}
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         {/* 接続状態は色相ではなく明度で示す。繋がっていれば地に対してはっきりと、
             復旧中は鈍色で明滅、切れていれば朱。 */}
-        <div className={`w-3 h-3 rounded-full ${
+        <div className={`h-3 w-3 shrink-0 rounded-full ${
           isConnected ? 'bg-ink' :
           connectionState === ConnectionState.Reconnecting ? 'bg-muted animate-pulse' :
           'bg-alert'
         }`} />
-        <h2 className="font-bold text-lg">
+        <h2 className="shrink-0 whitespace-nowrap text-base font-bold sm:text-lg">
           {role === 'TEACHER' ? '先生' : '生徒'}
         </h2>
-        <span className="text-muted text-sm">{userName}</span>
+        <span className="truncate text-sm text-muted">{userName}</span>
         {isConnected && (
-          <span className="text-xs text-muted/75">
+          <span className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted/75 sm:ml-0">
             {remoteCount}人接続中
           </span>
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        {isConnected && (
+      {/* 2段目: 操作 */}
+      <div className="flex min-w-0 items-center gap-2">
+        {isConnected && role === 'STUDENT' && (
+          <div className="flex min-w-0 flex-1 items-stretch gap-2">
+            <button
+              onClick={onToggleMic}
+              className={studentMediaButton(isMicEnabled)}
+              aria-pressed={isMicEnabled}
+              title={isMicEnabled ? '自分の声を送っています（押すと止める）' : '自分の声を送る'}
+            >
+              {isMicEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+              <span className="text-[10px] font-bold leading-none">マイク</span>
+            </button>
+            <button
+              onClick={onToggleMute}
+              className={studentMediaButton(!isMuted)}
+              aria-pressed={!isMuted}
+              title={isMuted ? '相手の声が切れています（押すと聞こえる）' : '相手の声が聞こえています（押すと止める）'}
+            >
+              {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+              <span className="text-[10px] font-bold leading-none">スピーカー</span>
+            </button>
+            {onToggleCamera && (
+              <button
+                onClick={onToggleCamera}
+                className={studentMediaButton(!!isCameraEnabled)}
+                aria-pressed={!!isCameraEnabled}
+                title={isCameraEnabled ? '自分の顔を送っています（押すと止める）' : '自分の映像を送る'}
+              >
+                {isCameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                <span className="text-[10px] font-bold leading-none">カメラ</span>
+              </button>
+            )}
+          </div>
+        )}
+        {isConnected && role === 'TEACHER' && (
           <>
             <button
               onClick={onToggleMic}
-              className={`p-2 rounded-lg transition-all flex items-center gap-1.5 ${
+              className={`shrink-0 rounded-lg p-2 transition-all ${
                 isMicEnabled
                   ? 'bg-ink/8 text-ink hover:bg-ink/10'
                   : 'bg-ink/5 text-muted hover:bg-ink/10'
               }`}
               title={isMicEnabled ? 'マイクOFF' : 'マイクON'}
             >
-              {isMicEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-              {role === 'STUDENT' && (
-                <span className="text-xs font-bold whitespace-nowrap">
-                  {isMicEnabled ? 'マイク中（自分の声を送っています）' : '自分の声を送る（マイク）'}
-                </span>
-              )}
+              {isMicEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
             </button>
             <button
               onClick={onToggleMute}
-              className={`p-2 rounded-lg transition-all ${
+              className={`shrink-0 rounded-lg p-2 transition-all ${
                 isMuted
                   ? 'bg-alert/15 text-alert-text hover:bg-alert/25'
                   : 'bg-ink/5 text-muted hover:bg-ink/10'
               }`}
               title={isMuted ? '音声ON' : '音声OFF'}
             >
-              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
             </button>
             {onToggleCamera && (
               <button
                 onClick={onToggleCamera}
-                className={`p-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                className={`shrink-0 rounded-lg p-2 transition-all ${
                   isCameraEnabled
                     ? 'bg-ink/8 text-ink hover:bg-ink/10'
                     : 'bg-ink/5 text-muted hover:bg-ink/10'
                 }`}
                 title={isCameraEnabled ? 'カメラOFF' : 'カメラON'}
               >
-                {isCameraEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-                {role === 'STUDENT' && (
-                  <span className="text-xs font-bold whitespace-nowrap">
-                    {isCameraEnabled ? '映像送信中（自分の顔を送っています）' : '自分の映像を送る（カメラ）'}
-                  </span>
-                )}
+                {isCameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
               </button>
             )}
           </>
         )}
-        {isConnected && <MediaDeviceSettings classroom={classroom ?? null} iconOnly />}
-        {role === 'TEACHER' && isConnected && <RecordingControls />}
-        <ThemeToggle />
-        {pwaInstall.shouldShowInstall && (
+        <div className="flex shrink-0 items-center gap-1">
+          {isConnected && <MediaDeviceSettings classroom={classroom ?? null} iconOnly />}
+          {role === 'TEACHER' && isConnected && <RecordingControls />}
+          <ThemeToggle />
+          {pwaInstall.shouldShowInstall && (
+            <button
+              onClick={handleInstallClick}
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-accent/35 bg-accent/12 px-3 py-1.5 text-xs text-accent-text transition-colors duration-150 hover:bg-accent/18"
+              title={pwaInstall.isIos && !pwaInstall.canInstall ? 'ホーム画面に追加' : 'アプリをインストール'}
+            >
+              <Download className="h-4 w-4" />
+              インストール
+            </button>
+          )}
           <button
-            onClick={handleInstallClick}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/12 text-accent-text border border-accent/35 rounded-lg hover:bg-accent/18 transition-colors duration-150"
-            title={pwaInstall.isIos && !pwaInstall.canInstall ? 'ホーム画面に追加' : 'アプリをインストール'}
+            onClick={onDisconnect}
+            className="shrink-0 p-2 text-muted transition-colors hover:text-alert-text"
+            title="切断"
           >
-            <Download className="w-4 h-4" />
-            インストール
+            <LogOut className="h-4 w-4" />
           </button>
-        )}
-        <button
-          onClick={onDisconnect}
-          className="p-2 text-muted hover:text-alert-text transition-colors"
-          title="切断"
-        >
-          <LogOut className="w-4 h-4" />
-        </button>
+        </div>
       </div>
     </header>
   );

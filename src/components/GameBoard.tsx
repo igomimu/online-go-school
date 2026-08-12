@@ -285,8 +285,9 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     );
   }
 
-  // 残り時間表示。講師側は時間切れ負けにならないので、秒読み回数は [∞] と出して
+  // 残り時間表示。講師側は時間切れ負けにならないので、秒読み回数は「残∞」と出して
   // 切迫した赤表示にもしない（切れてもそのまま打ち続けられることを見た目でも示す）。
+  // 数字は tabular-nums。桁が変わるたびに幅が動くと、対局中ずっと視界の端が揺れる。
   const renderClock = (color: 'BLACK' | 'WHITE') => {
     if (!clock) return null;
     const isBlack = color === 'BLACK';
@@ -297,27 +298,73 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     const isLow = timeLeft <= 10 && timeLeft > 0;
     const highlight = (isLow || isByoyomi) && !isTeacherSide;
     return (
-      <span data-testid={isBlack ? 'clock-black' : 'clock-white'} className={`ml-2 px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
-        highlight ? 'bg-alert/15 text-alert-text animate-pulse' : 'bg-raised text-ink'
-      }`}>
-        {isByoyomi
-          ? `秒読 ${Math.ceil(timeLeft)}秒 [${isTeacherSide ? '∞' : byoyomiLeft}]`
-          : formatTime(timeLeft)}
+      <span
+        data-testid={isBlack ? 'clock-black' : 'clock-white'}
+        className={`shrink-0 whitespace-nowrap rounded-md px-2 py-1 text-right leading-tight ${
+          highlight
+            ? 'border border-alert/45 bg-alert/10 text-alert-text animate-pulse'
+            : 'border border-line bg-surface text-ink'
+        }`}
+      >
+        <span className="tabular block text-sm font-bold">
+          {isByoyomi ? `${Math.ceil(timeLeft)}秒` : formatTime(timeLeft)}
+        </span>
+        {isByoyomi && (
+          <span className="block text-[10px] font-normal">
+            秒読み 残{isTeacherSide ? '∞' : byoyomiLeft}
+          </span>
+        )}
       </span>
     );
   };
-  const renderBlackClock = () => renderClock('BLACK');
-  const renderWhiteClock = () => renderClock('WHITE');
+
+  // 対局者ブロック。狭い対局ウィンドウでも潰れないよう、名前は1行で省略し、
+  // 手番側にだけ面を敷く（「黒／白」の文字だけでは、どちらの番か一瞬で分からない）。
+  const renderPlayer = (color: 'BLACK' | 'WHITE') => {
+    const isBlack = color === 'BLACK';
+    const isTurn = game.status === 'playing' && currentColor === color;
+    const name = resolvePlayerName(isBlack ? game.black_player : game.white_player, students);
+    const captures = isBlack ? blackCaptures : whiteCaptures;
+    return (
+      <div
+        className={`flex min-w-0 flex-1 items-center gap-2.5 ${
+          isDedicatedWindow ? 'px-3 py-2' : 'px-3 py-2.5 sm:px-4'
+        } ${isTurn ? 'bg-raised' : ''}`}
+      >
+        <span
+          className={`h-3.5 w-3.5 shrink-0 rounded-full ${
+            isBlack ? 'border border-ink/30 bg-black' : 'border-[1.5px] border-ink/40 bg-white'
+          }`}
+        />
+        <div className="min-w-0 flex-1">
+          <div className={`truncate text-base font-bold leading-tight ${isTurn ? 'text-ink' : 'text-muted'}`}>
+            {`${isBlack ? '黒' : '白'}：${name}`}
+          </div>
+          <div className="tabular truncate text-xs text-muted">アゲハマ {captures}</div>
+        </div>
+        {renderClock(color)}
+      </div>
+    );
+  };
 
   return (
     <div className={`flex h-full flex-col ${isDedicatedWindow ? 'gap-1.5' : 'gap-3'}`}>
-      {/* 対局情報ヘッダー */}
-      <div className={`glass-panel shrink-0 flex items-center justify-between gap-3 ${isDedicatedWindow ? 'px-3 py-1' : 'px-3 py-2 sm:px-4 sm:py-3'} ${isSpectating ? 'border-l-2 border-l-nibi bg-nibi/10' : ''}`}>
-        <div className="flex min-w-0 items-center gap-3 sm:gap-4 overflow-x-auto">
+      {/* 対局情報ヘッダー。1行に詰めると、幅の足りない対局ウィンドウ(560px)や
+          スマホで各要素が最小幅まで圧縮され、日本語が1文字ずつ縦積みになる。
+          対局中いちばん見る情報なので、対局者と条件・操作の2段に分けて潰れなくする。 */}
+      <div className={`glass-panel shrink-0 overflow-hidden ${isSpectating ? 'border-l-2 border-l-nibi bg-nibi/10' : ''}`}>
+        {/* 1段目: 対局者。左右に等分し、手番側に面を敷く */}
+        <div className="flex items-stretch">
+          {renderPlayer('BLACK')}
+          <div className="w-px shrink-0 bg-line" />
+          {renderPlayer('WHITE')}
+        </div>
+        {/* 2段目: 対局条件と操作。幅が足りなければ折り返す（横スクロールにはしない） */}
+        <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line ${isDedicatedWindow ? 'px-3 py-1.5' : 'px-3 py-2 sm:px-4'}`}>
           {onBack && (
             <button
               onClick={onBack}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-raised hover:bg-line border border-line text-ink rounded-lg text-sm font-semibold transition-colors duration-150 shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-raised hover:bg-line border border-line text-ink rounded-lg text-sm font-semibold transition-colors duration-150 shrink-0 whitespace-nowrap"
             >
               <X className="w-4 h-4" /> {isSpectating ? '観戦をやめる' : '閉じてホーム'}
             </button>
@@ -325,27 +372,11 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
           {isSpectating && (
             <span
               data-testid="spectating-badge"
-              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-nibi/45 px-2.5 py-1 text-sm font-semibold text-muted"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-nibi/45 px-2.5 py-1 text-sm font-semibold text-muted"
             >
               <Eye className="w-4 h-4" /> 観戦中
             </span>
           )}
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-black border border-ink/30" />
-            <span className={currentColor === 'BLACK' ? 'font-bold text-ink' : 'text-muted'}>
-              黒：{resolvePlayerName(game.black_player, students)}
-            </span>
-            <span className="text-muted/70 text-sm">取{blackCaptures}</span>
-            {renderBlackClock()}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-white border border-ink/40" />
-            <span className={currentColor === 'WHITE' ? 'font-bold text-ink' : 'text-muted'}>
-              白：{resolvePlayerName(game.white_player, students)}
-            </span>
-            <span className="text-muted/70 text-sm">取{whiteCaptures}</span>
-            {renderWhiteClock()}
-          </div>
           {/* 置石とコミ。整地に入るまで見えないと、対局中に形勢を数えられない */}
           {game.handicap >= 2 && (
             <span data-testid="handicap-label" className="tabular shrink-0 text-sm text-muted whitespace-nowrap">
@@ -355,9 +386,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
           <span data-testid="komi-label" className="tabular shrink-0 text-sm text-muted whitespace-nowrap">
             {formatKomiLabel(game.komi)}
           </span>
-        </div>
-        <div data-testid="move-count" className="text-sm text-muted flex items-center gap-3">
-          <span>
+          <span data-testid="move-count" className="tabular shrink-0 text-sm text-muted whitespace-nowrap">
             {game.status === 'playing'
               ? `${moveNumber}手目`
               : game.status === 'scoring'
@@ -366,6 +395,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                   ? '中断'
                   : `終局: ${game.result ?? ''}`}
           </span>
+        <div className="ml-auto flex shrink-0 items-center gap-2 text-sm text-muted">
           {/* 石音（着手音・石を取る音）のON/OFF。端末ごとにlocalStorageへ保存される */}
           <button
             data-testid="stone-sound-toggle"
@@ -457,6 +487,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               別ウィンドウ ↗
             </button>
           )}
+          </div>
         </div>
       </div>
 
