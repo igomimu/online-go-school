@@ -64,7 +64,7 @@ describe('ReviewBoard', () => {
       />
     );
     // 先生用の描画ツール（Pen等）がない
-    expect(container.querySelector('[title="線を描く"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[title="フリーハンド直線を描く"]')).not.toBeInTheDocument();
   });
 
   it('「閉じてホーム」ボタン', () => {
@@ -300,5 +300,80 @@ describe('ReviewBoard', () => {
     fireEvent.keyDown(window, { key: 'f' });
     expect(button).toHaveAttribute('aria-pressed', 'true');
   });
-});
+  // 生徒が自分の棋譜履歴から開いた検討は、先生と同じ操作ができる（AIだけ付けない）。
+  // 以前は進む・戻るのボタンもキーも isTeacher の内側にあり、生徒は並べられなかった
+  // （三村さん 2026-08-13「操作キーが何も無い」）。
+  describe('生徒が自分の棋譜を開いた検討', () => {
+    function renderSelfReview(onSetCurrentNode = vi.fn()) {
+      const { root, child } = makeTree();
+      render(
+        <ReviewBoard
+          rootNode={root}
+          currentNode={child}
+          boardSize={9}
+          onSetCurrentNode={onSetCurrentNode}
+          isTeacher={false}
+          selfReview
+          classroomRef={mockClassroomRef as never}
+        />
+      );
+      return { root, child, onSetCurrentNode };
+    }
 
+    it('進む・戻るのボタンが出る', () => {
+      renderSelfReview();
+      expect(screen.getAllByRole('button').length).toBeGreaterThanOrEqual(4);
+    });
+
+    it('キーボードでも手順を戻せる', () => {
+      const onSetCurrentNode = vi.fn();
+      const { root } = renderSelfReview(onSetCurrentNode);
+      fireEvent.keyDown(window, { key: 'ArrowLeft' });
+      expect(onSetCurrentNode).toHaveBeenCalledWith(root);
+    });
+
+    it('先生と同じ描画ツールが使える', () => {
+      renderSelfReview();
+      expect(document.body.querySelector('[title="フリーハンド直線を描く"]')).toBeInTheDocument();
+    });
+
+    it('AIは付けない（分析パネルを出さない）', () => {
+      renderSelfReview();
+      expect(screen.queryByTestId('toggle-candidates')).not.toBeInTheDocument();
+    });
+
+    it('盤を誰にも配信しない', () => {
+      const sendToOrAll = vi.fn();
+      const { root, child } = makeTree();
+      const ref = { current: { sendToOrAll, isConnected: true } };
+      render(
+        <ReviewBoard
+          rootNode={root}
+          currentNode={child}
+          boardSize={9}
+          onSetCurrentNode={vi.fn()}
+          isTeacher={false}
+          selfReview
+          classroomRef={ref as never}
+        />
+      );
+      fireEvent.keyDown(window, { key: 'ArrowLeft' });
+      expect(sendToOrAll).not.toHaveBeenCalled();
+    });
+
+    it('先生が配信した検討では操作できないまま', () => {
+      const { root, child } = makeTree();
+      const { container } = render(
+        <ReviewBoard
+          rootNode={root}
+          currentNode={child}
+          boardSize={9}
+          onSetCurrentNode={vi.fn()}
+          isTeacher={false}
+          classroomRef={mockClassroomRef as never}
+        />
+      );
+      expect(container.querySelector('[title="フリーハンド直線を描く"]')).not.toBeInTheDocument();
+    });
+  });
+});

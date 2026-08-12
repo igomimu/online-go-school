@@ -41,6 +41,12 @@ interface ReviewBoardProps {
   onToggleMovePermission?: (identity: string) => void;
   canPlay?: boolean;
   onStudentMove?: (x: number, y: number) => void;
+  /**
+   * 生徒が自分の棋譜履歴から開いた、自分だけの検討。
+   * 先生の検討盤と同じ操作（並べ替え・着手・記号・描画・自動再生）ができる。
+   * AI は付けない（三村さんの指示 2026-08-13）。盤は誰にも配信しない。
+   */
+  selfReview?: boolean;
 
   // チャット
   registeredStudents?: Student[];
@@ -109,6 +115,7 @@ export default function ReviewBoard({
   onToggleMovePermission,
   canPlay,
   onStudentMove,
+  selfReview = false,
   registeredStudents,
   chatMessages,
   onChatSend,
@@ -139,8 +146,14 @@ export default function ReviewBoard({
   // 検討の配信はすべてここを通す。「配信先の生徒」で選んでいれば、その生徒にだけ送る
   // （以前は broadcast を直に呼んでおり、選んでも全員へ届いていた 2026-08-04）。
   const sendToTargets = useCallback((message: ClassroomMessage) => {
+    // 生徒が自分の棋譜を並べているだけのときは、盤を誰にも配信しない。
+    // 操作は先生と同じでも、配信は先生の検討だけの役目。
+    if (!isTeacher) return;
     void classroomRef.current?.sendToOrAll(message, targetStudents);
-  }, [classroomRef, targetStudents]);
+  }, [classroomRef, targetStudents, isTeacher]);
+
+  // 盤を操作できるか。先生と、自分の棋譜を開いた生徒。
+  const canEdit = isTeacher || selfReview;
 
   const goToRoot = useCallback(() => onSetCurrentNode(rootNode), [rootNode, onSetCurrentNode]);
   const goBack = useCallback(() => {
@@ -167,24 +180,24 @@ export default function ReviewBoard({
 
   // マウスホイールで手順送り/戻り（pokekata踏襲）
   const handleBoardWheel = useCallback((delta: number) => {
-    if (!isTeacher) return;
+    if (!canEdit) return;
     if (delta > 0) goForward();
     else if (delta < 0) goBack();
-  }, [isTeacher, goForward, goBack]);
+  }, [canEdit, goForward, goBack]);
 
   // 右クリックで、クリック位置に最も近い描画(線・矢印)を1つ消す（pokekata踏襲、石は対象外）
   const handleCellRightClick = useCallback((x: number, y: number) => {
-    if (!isTeacher || drawings.length === 0) return;
+    if (!canEdit || drawings.length === 0) return;
     const idx = findNearestDrawingIndex(drawings, x, y);
     if (idx < 0) return;
     const updated = drawings.filter((_, i) => i !== idx);
     setDrawings(updated);
     sendToTargets({ type: 'DRAW_UPDATE', payload: updated });
-  }, [isTeacher, drawings, sendToTargets]);
+  }, [canEdit, drawings, sendToTargets]);
 
   // キーボードショートカット（pokekata踏襲）。チャット等の入力中は無効化する。
   useEffect(() => {
-    if (!isTeacher) return;
+    if (!canEdit) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
@@ -195,30 +208,31 @@ export default function ReviewBoard({
       else if (e.key === 'End') { e.preventDefault(); goLast(); }
       else if (e.key === 'Delete') { e.preventDefault(); handleUndo(); }
       else if (ctrl && e.key === 'z') { e.preventDefault(); handleUndo(); }
-      else if (!ctrl && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setShowCandidates(prev => !prev); }
+      // 候補手の表示切替はAIの機能なので先生だけ
+      else if (isTeacher && !ctrl && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setShowCandidates(prev => !prev); }
       else if (e.key === 'Escape') { setToolMode('play'); setDrawMode('off'); }
     };
     // 別ウィンドウに描かれているときは、そのウィンドウに張らないとキーが効かない
     hostWindow.addEventListener('keydown', handleKeyDown);
     return () => hostWindow.removeEventListener('keydown', handleKeyDown);
-  }, [isTeacher, handleUndo, goBack, goForward, goToRoot, goLast, hostWindow]);
+  }, [canEdit, isTeacher, handleUndo, goBack, goForward, goToRoot, goLast, hostWindow]);
 
   // 描画ハンドラ
   const handleDrawDragStart = useCallback((x: number, y: number) => {
-    if (isTeacher && drawMode !== 'off') {
+    if (canEdit && drawMode !== 'off') {
       setDrawStart({ x, y });
       drawLastCell.current = { x, y };
     }
-  }, [isTeacher, drawMode]);
+  }, [canEdit, drawMode]);
 
   const handleDrawDragMove = useCallback((x: number, y: number) => {
-    if (isTeacher && drawMode !== 'off') {
+    if (canEdit && drawMode !== 'off') {
       drawLastCell.current = { x, y };
     }
-  }, [isTeacher, drawMode]);
+  }, [canEdit, drawMode]);
 
   const handleDrawDragEnd = useCallback(() => {
-    if (isTeacher && drawMode !== 'off' && drawStart && drawLastCell.current) {
+    if (canEdit && drawMode !== 'off' && drawStart && drawLastCell.current) {
       const end = drawLastCell.current;
       if (drawStart.x !== end.x || drawStart.y !== end.y) {
         const newDrawing: Drawing = {
@@ -233,7 +247,7 @@ export default function ReviewBoard({
       setDrawStart(null);
       drawLastCell.current = null;
     }
-  }, [isTeacher, drawMode, drawStart, drawings, sendToTargets]);
+  }, [canEdit, drawMode, drawStart, drawings, sendToTargets]);
 
   const clearAnnotations = useCallback(() => {
     setDrawings([]);
@@ -245,7 +259,7 @@ export default function ReviewBoard({
 
   // Click handler for board (making moves or annotations)
   const handleCellClick = useCallback((x: number, y: number) => {
-    if (!isTeacher) return;
+    if (!canEdit) return;
     if (drawMode !== 'off') return;
 
     if (toolMode === 'play') {
@@ -282,7 +296,7 @@ export default function ReviewBoard({
       onSetCurrentNode({ ...currentNode, markers: updatedMarkers });
     }
   }, [
-    isTeacher,
+    canEdit,
     boardSize,
     currentNode,
     drawMode,
@@ -293,10 +307,10 @@ export default function ReviewBoard({
   // 許可された生徒の着手。自分の盤には置かず先生へ送り、先生の盤経由で返ってくるのを待つ
   // （打てるかどうかの判定は先生側が正本）。
   const handleStudentCellClick = useCallback((x: number, y: number) => {
-    if (isTeacher || !canPlay || !onStudentMove) return;
+    if (canEdit || !canPlay || !onStudentMove) return;
     if (boardState[y - 1]?.[x - 1]) return;
     onStudentMove(x, y);
-  }, [isTeacher, canPlay, onStudentMove, boardState]);
+  }, [canEdit, canPlay, onStudentMove, boardState]);
 
   // カーソル共有
   const handleCellMouseEnter = useCallback((x: number, y: number) => {
@@ -547,7 +561,7 @@ export default function ReviewBoard({
             <span className="text-sm text-muted whitespace-nowrap">
               {currentMoveNumber}手目
             </span>
-            {!isTeacher && canPlay && (
+            {!canEdit && canPlay && (
               <span className="truncate rounded-lg bg-accent/15 px-2 py-1 text-xs text-accent-text">
                 打てます
               </span>
@@ -565,7 +579,7 @@ export default function ReviewBoard({
                 {isMaximized ? (isTeacher ? 'AI・チャットを表示' : 'チャットを表示') : '碁盤を広げる'}
               </span>
             </button>
-            {isTeacher && currentNode.children.length > 1 && (
+            {canEdit && currentNode.children.length > 1 && (
               <div className="flex items-center gap-1.5 text-accent-text text-sm whitespace-nowrap">
                 <GitBranch className="w-4 h-4" />
                 <span>{currentNode.children.length}変化</span>
@@ -590,10 +604,10 @@ export default function ReviewBoard({
             pvOverlay={pvOverlay}
             hoveredCandidateIndex={hoveredCandidateIndex}
             onCandidateHover={isTeacher || allowStudentInteraction ? handleCandidateHover : undefined}
-            readOnly={!isTeacher && !canPlay}
-            onCellClick={isTeacher ? handleCellClick : (canPlay ? handleStudentCellClick : undefined)}
-            onCellRightClick={isTeacher ? handleCellRightClick : undefined}
-            onBoardWheel={isTeacher ? handleBoardWheel : undefined}
+            readOnly={!canEdit && !canPlay}
+            onCellClick={canEdit ? handleCellClick : (canPlay ? handleStudentCellClick : undefined)}
+            onCellRightClick={canEdit ? handleCellRightClick : undefined}
+            onBoardWheel={canEdit ? handleBoardWheel : undefined}
             onCellMouseEnter={handleCellMouseEnter}
             onCellMouseLeave={handleCellMouseLeave}
             onDragStart={drawMode !== 'off' ? handleDrawDragStart : undefined}
@@ -603,7 +617,7 @@ export default function ReviewBoard({
         </div>
 
         {/* ナビゲーション */}
-        {isTeacher && (
+        {canEdit && (
           <div className="flex flex-col gap-2 sm:gap-3 w-full items-center">
             {/* ステップ移動 */}
             <div className="flex justify-center gap-2">
@@ -762,28 +776,33 @@ export default function ReviewBoard({
                 </button>
               )}
 
-              <div className="w-px h-5 bg-raised mx-1" />
+              {/* 候補手はAIの機能なので、生徒の自分用検討には出さない（三村さんの指示 2026-08-13） */}
+              {isTeacher && (
+                <>
+                  <div className="w-px h-5 bg-raised mx-1" />
 
-              {/* 盤上の候補手だけを消す（AIは動かしたまま）。Pocket KataGo と同じく F キーでも切り替わる。
-                  候補手を見せて説明する場面と、見せずに読ませる場面を行き来するためのもの。 */}
-              <button
-                data-testid="toggle-candidates"
-                onClick={() => setShowCandidates(prev => !prev)}
-                aria-pressed={showCandidates}
-                className={`flex items-center gap-1 rounded-lg border px-2 py-2 text-xs font-bold transition-all ${
-                  showCandidates ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
-                }`}
-                title={showCandidates ? 'AIの候補手を盤から消す (F)' : 'AIの候補手を盤に出す (F)'}
-              >
-                {showCandidates ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                候補手
-              </button>
+                  {/* 盤上の候補手だけを消す（AIは動かしたまま）。Pocket KataGo と同じく F キーでも切り替わる。
+                      候補手を見せて説明する場面と、見せずに読ませる場面を行き来するためのもの。 */}
+                  <button
+                    data-testid="toggle-candidates"
+                    onClick={() => setShowCandidates(prev => !prev)}
+                    aria-pressed={showCandidates}
+                    className={`flex items-center gap-1 rounded-lg border px-2 py-2 text-xs font-bold transition-all ${
+                      showCandidates ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
+                    }`}
+                    title={showCandidates ? 'AIの候補手を盤から消す (F)' : 'AIの候補手を盤に出す (F)'}
+                  >
+                    {showCandidates ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    候補手
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
 
         {/* 自動再生コントロール */}
-        {isTeacher && (
+        {canEdit && (
           <div className="flex justify-center items-center gap-2">
             <button
               onClick={autoReplay.toggle}
@@ -821,7 +840,7 @@ export default function ReviewBoard({
         )}
 
         {/* 変化選択 */}
-        {isTeacher && currentNode.children.length > 1 && (
+        {canEdit && currentNode.children.length > 1 && (
           <div className="flex justify-center gap-2 overflow-x-auto p-2">
             {currentNode.children.map((child, idx) => (
               <button

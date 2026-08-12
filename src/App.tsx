@@ -124,6 +124,9 @@ function App() {
   const myLiveGameIdRef = useRef<string | null>(null);
   // 検討中に盤へ打てる生徒（先生が保持する正本）。既定は誰も打てない
   const [reviewMovePermissions, setReviewMovePermissions] = useState<string[]>([]);
+  // 生徒が自分の棋譜履歴を開いた検討かどうか。先生が配信した検討は先生の操作に
+  // 追従させるが、自分で開いた棋譜は自分で並べられないと見るだけになってしまう。
+  const [reviewIsOwn, setReviewIsOwn] = useState(false);
   // LiveKitのメッセージ処理は接続時に作った関数の中で走るため、最新の許可をrefで見る
   const reviewMovePermissionsRef = useRef<string[]>([]);
   // 生徒側: 自分が今この検討盤に打てるか
@@ -394,6 +397,7 @@ function App() {
           setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null, hoveredCandidateRank: null, allowStudentInteraction: false });
           // 新しい検討が始まったら前回の許可は引き継がない（先生が改めて許可する）
           setReviewCanPlay(false);
+          setReviewIsOwn(false); // 先生の配信なので、進む・戻るは先生に従う
           setViewMode('review');
         }
         // 詰碁配信（生徒用）
@@ -944,6 +948,7 @@ function App() {
       setReviewBoardSize(parsed.size);
       // 検討を開き直したら着手の許可は持ち越さない
       setReviewMovePermissions([]);
+      setReviewIsOwn(false); // 先生がSGFを読み込んで配信する検討
       setViewMode('review');
 
       // 参加者に選ばれている生徒にだけ知らせる。
@@ -968,6 +973,9 @@ function App() {
       setReviewBoardSize(parsed.size);
       // 検討を開き直したら着手の許可は持ち越さない
       setReviewMovePermissions([]);
+      // 生徒が自分の履歴から開いた棋譜は本人の端末内だけの検討。
+      // 先生と同じ操作で並べられるようにする（AIは付けない）。
+      setReviewIsOwn(role === 'STUDENT');
       setViewMode('review');
 
       // 先生が開いた棋譜だけ、選択中の参加者へ共有する。
@@ -1620,6 +1628,7 @@ function App() {
                 movePermissions={reviewMovePermissions}
                 onToggleMovePermission={role === 'TEACHER' ? toggleReviewMovePermission : undefined}
                 canPlay={role === 'STUDENT' && reviewCanPlay}
+                selfReview={reviewIsOwn}
                 onStudentMove={handleStudentReviewMove}
                 registeredStudents={students}
                 chatMessages={chat.messages}
