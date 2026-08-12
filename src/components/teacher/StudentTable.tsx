@@ -50,8 +50,8 @@ export default function StudentTable({
           <tr className="text-[11px] tracking-wide text-muted whitespace-nowrap" style={{ background: 'var(--color-raised)', borderBottom: '1px solid var(--color-line)' }}>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 46 }}>状態</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 52 }}>カメラ</th>
-            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 52 }}>音声M</th>
-            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 52 }}>音声S</th>
+            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 62 }}>マイク</th>
+            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 76 }}>スピーカー</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 46 }}>共有</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 50 }}>対局</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 50 }}>詳細</th>
@@ -82,9 +82,15 @@ export default function StudentTable({
                 style={{ background: bgColor, cursor: row.isConnected ? 'pointer' : 'default' }}
                 onClick={() => row.isConnected && row.identity && onSelectStudent?.(row.identity)}
               >
-                {/* 状態 */}
+                {/* 状態。色相ではなく明度で示す（ヘッダーの接続ドットと同じ流儀） */}
                 <td className="px-2 py-1.5 border-b border-line text-center font-medium">
-                  {row.isConnected ? '▶' : ''}
+                  <span
+                    aria-label={row.isConnected ? '接続中' : '未接続'}
+                    title={row.isConnected ? '接続中' : '未接続'}
+                    className={`inline-block h-2.5 w-2.5 rounded-full ${
+                      row.isConnected ? 'bg-ink' : 'bg-line'
+                    }`}
+                  />
                 </td>
 
                 {/* カメラ */}

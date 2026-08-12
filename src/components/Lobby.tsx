@@ -201,7 +201,7 @@ export default function Lobby({
                 碁盤をクリックすると、ほかの人の対局を観戦できます。
               </p>
             )}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {playingGames.map(game => (
                 <GameThumbnail
                   key={game.id}
@@ -219,7 +219,7 @@ export default function Lobby({
         {finishedGames.length > 0 && (
           <div className="space-y-3">
             <h3 className="heading-section">終了した対局</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {finishedGames.map(game => (
                 <GameThumbnail
                   key={game.id}

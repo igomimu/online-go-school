@@ -38,12 +38,15 @@ export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnL
           onClick();
         }
       }}
-      className={`glass-panel p-2 transition-all hover:bg-raised ${
+      className={`glass-panel flex gap-3 p-2 transition-all hover:bg-raised sm:block ${
         isMyTurn ? 'ring-2 ring-kaya' : isActive ? 'ring-2 ring-line' : ''
       } ${game.status === 'finished' || game.status === 'interrupted' ? 'opacity-60' : ''}`}
     >
       {/* ミニ碁盤 */}
-      <svg width={totalSize} height={totalSize} viewBox={`0 0 ${totalSize} ${totalSize}`}>
+      <svg
+        viewBox={`0 0 ${totalSize} ${totalSize}`}
+        className="h-auto w-[104px] shrink-0 self-start sm:w-full"
+      >
         <rect width={totalSize} height={totalSize} fill="#DCB35C" />
         {/* 線 */}
         {Array.from({ length: size }).map((_, i) => (
@@ -81,7 +84,7 @@ export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnL
       </svg>
 
       {/* 情報 */}
-      <div className="mt-2 text-xs text-left space-y-0.5">
+      <div className="min-w-0 flex-1 space-y-0.5 text-left text-xs sm:mt-2">
         <div className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-black border border-line inline-block" />
           <span className="truncate">{blackName}</span>
