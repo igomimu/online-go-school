@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import GoBoard from './GoBoard';
 import ZoomTapConfirm from './ZoomTapConfirm';
 import type { Drawing, Marker } from './GoBoard';
-import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban, Triangle, MousePointerClick } from 'lucide-react';
+import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban, Triangle, MousePointerClick, Eye } from 'lucide-react';
 import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, formatKomiLabel, isTimeoutResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
@@ -91,6 +91,9 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   const canRequestUndo = game?.status === 'playing' && !undoRequest && isParticipant && hasOwnMove;
   const isDrawing = !!isTeacher && drawMode !== 'off';
   const effectiveDrawings = isTeacher ? drawings : syncedDrawings;
+  // 他人の対局を開いている生徒＝観戦。自分の対局と一目で区別が付くようにする
+  // （先生は元々どの対局も見る側なので、毎回出ると邪魔になるため対象外）。
+  const isSpectating = !isTeacher && !isParticipant;
 
   // 相手の着手等で手番が失われたら、拡大確認オーバーレイを開いたままにしない。
   // effect ではなくレンダー中に整えるのが、このリポジトリでの流儀
@@ -309,15 +312,23 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   return (
     <div className={`flex h-full flex-col ${isDedicatedWindow ? 'gap-1.5' : 'gap-3'}`}>
       {/* 対局情報ヘッダー */}
-      <div className={`glass-panel shrink-0 flex items-center justify-between gap-3 ${isDedicatedWindow ? 'px-3 py-1' : 'px-3 py-2 sm:px-4 sm:py-3'}`}>
+      <div className={`glass-panel shrink-0 flex items-center justify-between gap-3 ${isDedicatedWindow ? 'px-3 py-1' : 'px-3 py-2 sm:px-4 sm:py-3'} ${isSpectating ? 'border-l-2 border-l-nibi bg-nibi/10' : ''}`}>
         <div className="flex min-w-0 items-center gap-3 sm:gap-4 overflow-x-auto">
           {onBack && (
             <button
               onClick={onBack}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-raised hover:bg-line border border-line text-ink rounded-lg text-sm font-semibold transition-colors duration-150 shrink-0"
             >
-              <X className="w-4 h-4" /> 閉じてホーム
+              <X className="w-4 h-4" /> {isSpectating ? '観戦をやめる' : '閉じてホーム'}
             </button>
+          )}
+          {isSpectating && (
+            <span
+              data-testid="spectating-badge"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-nibi/45 px-2.5 py-1 text-sm font-semibold text-muted"
+            >
+              <Eye className="w-4 h-4" /> 観戦中
+            </span>
           )}
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-black border border-ink/30" />

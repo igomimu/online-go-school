@@ -211,4 +211,57 @@ describe('Lobby', () => {
     fireEvent.click(screen.getByText('対局を作成'));
     expect(onCreateGame).toHaveBeenCalled();
   });
+
+  // 押せば観戦できることは、押してみるまで分からない（2026-08-12 三村さん）
+  describe('観戦の案内', () => {
+    const spectateHint = '碁盤をクリックすると、ほかの人の対局を観戦できます。';
+
+    it('打っていない生徒には観戦できることを知らせる', () => {
+      render(
+        <Lobby
+          role="STUDENT"
+          participants={mockParticipants}
+          localIdentity="じろう"
+          activeSpeakers={[]}
+          games={[mockGame]}
+          studentJoinInfo=""
+          onSelectGame={vi.fn()}
+          myIdentity="じろう"
+        />
+      );
+      expect(screen.getByText(spectateHint)).toBeInTheDocument();
+    });
+
+    it('対局中の生徒には出さない', () => {
+      render(
+        <Lobby
+          role="STUDENT"
+          participants={mockParticipants}
+          localIdentity="たろう"
+          activeSpeakers={[]}
+          games={[mockGame]}
+          studentJoinInfo=""
+          onSelectGame={vi.fn()}
+          myIdentity="たろう"
+        />
+      );
+      expect(screen.queryByText(spectateHint)).not.toBeInTheDocument();
+    });
+
+    it('先生には出さない', () => {
+      render(
+        <Lobby
+          role="TEACHER"
+          participants={mockParticipants}
+          localIdentity="三村先生"
+          activeSpeakers={[]}
+          games={[mockGame]}
+          studentJoinInfo=""
+          onSelectGame={vi.fn()}
+          myIdentity="三村先生"
+        />
+      );
+      expect(screen.queryByText(spectateHint)).not.toBeInTheDocument();
+    });
+  });
 });

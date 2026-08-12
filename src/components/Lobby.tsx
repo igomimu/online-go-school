@@ -197,6 +197,12 @@ export default function Lobby({
         {playingGames.length > 0 && (
           <div className="space-y-3">
             <h3 className="heading-section text-base">進行中の対局</h3>
+            {/* 観戦できることは押してみないと分からないので、打っていない生徒にだけ知らせる */}
+            {role === 'STUDENT' && !myGame && (
+              <p className="text-sm text-muted">
+                碁盤をクリックすると、ほかの人の対局を観戦できます。
+              </p>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {playingGames.map(game => (
                 <GameThumbnail

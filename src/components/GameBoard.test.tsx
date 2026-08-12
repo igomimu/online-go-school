@@ -449,5 +449,28 @@ describe('GameBoard', () => {
       expect(mockSubmitMove).toHaveBeenCalledWith(4, 4);
     });
   });
+
+  // 他人の対局を開いたとき、自分の対局と同じ画面に見えると生徒が混乱する（2026-08-12 三村さん）
+  describe('観戦中の表示', () => {
+    it('他人の対局を開いた生徒には観戦中と出る', () => {
+      setupMock({ isParticipant: false, myColor: null, isMyTurn: false });
+      render(<GameBoard gameId="game-1" myIdentity="じろう" onBack={vi.fn()} />);
+      expect(screen.getByTestId('spectating-badge')).toBeInTheDocument();
+      expect(screen.getByText('観戦をやめる')).toBeInTheDocument();
+    });
+
+    it('自分の対局では観戦中と出ない', () => {
+      setupMock({});
+      render(<GameBoard gameId="game-1" myIdentity="たろう" onBack={vi.fn()} />);
+      expect(screen.queryByTestId('spectating-badge')).not.toBeInTheDocument();
+      expect(screen.getByText('閉じてホーム')).toBeInTheDocument();
+    });
+
+    it('先生はどの対局を開いても観戦中と出ない', () => {
+      setupMock({ isParticipant: false, myColor: null, isMyTurn: false });
+      render(<GameBoard gameId="game-1" myIdentity="teacher" isTeacher onBack={vi.fn()} />);
+      expect(screen.queryByTestId('spectating-badge')).not.toBeInTheDocument();
+    });
+  });
 });
 
