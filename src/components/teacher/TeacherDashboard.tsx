@@ -51,6 +51,8 @@ interface TeacherDashboardProps {
   onDisconnect: () => void;
   onReconnect: () => void;
   isReconnecting: boolean;
+  /** 回線の状態。ツールバーの「回線復旧」を切断時だけ朱にするために使う */
+  connectionState?: import('livekit-client').ConnectionState;
   onOpenStudentManager: () => void;
   onReloadData: () => void | Promise<void>;
   onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number; clock?: import('../../types/game').GameClock }[]) => void;
@@ -91,6 +93,7 @@ export default function TeacherDashboard({
   onDisconnect,
   onReconnect,
   isReconnecting,
+  connectionState,
   onOpenStudentManager,
   onReloadData,
   onCreateGames,
@@ -543,6 +546,7 @@ export default function TeacherDashboard({
         onDisconnect={onDisconnect}
         onReconnect={onReconnect}
         isReconnecting={isReconnecting}
+        connectionState={connectionState}
         onOpenStudentManager={onOpenStudentManager}
         onOpenTeacherGameWindow={onOpenTeacherGameWindow}
         onOpenTsumegoPicker={onProblemAssign ? () => setShowTsumegoPicker(true) : undefined}

@@ -96,28 +96,26 @@ export default function Lobby({
 
   return (
     <div className="flex flex-col gap-6 w-full">
-      {/* 入室ヘッダー: どの教室に入ったか明示（生徒の「部屋に入った」感） */}
+      {/* 入室ヘッダー: どの教室に入ったか明示（生徒の「部屋に入った」感）。
+          主役は生徒自身と待ち状態。教室IDは、生徒が読み上げる場面が無い
+          （招待リンク1本で入る運用）ので右上に小さく添えるだけにする。
+          カード内は左揃えで統一する（中央揃えを混ぜると視線の始点が定まらない）。 */}
       {role === 'STUDENT' && currentClassroomName && (
-        <div className="glass-panel border-l-2 border-l-kaya p-6">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="min-w-0">
-              <p className="text-xs tracking-widest text-muted">入室中</p>
-              <h2 className="mt-1 truncate text-2xl font-bold sm:text-3xl">
-                {currentClassroomName}
-              </h2>
-              <p className="mt-2 text-sm text-muted">
-                先生がレッスンを始めるのを待ってください
-              </p>
-            </div>
-            {currentStudentName && (
-              <div className="shrink-0 text-right">
-                <p className="text-xs text-muted">ようこそ</p>
-                <p className="mt-0.5 text-lg font-semibold">
-                  {currentStudentName} さん
-                </p>
-              </div>
-            )}
-          </div>
+        <div className="glass-panel border-l-2 border-l-kaya p-5 sm:p-6">
+          <p className="text-xs tracking-widest text-muted">ようこそ</p>
+          <h2 className="mt-1 truncate text-2xl font-bold">
+            {currentStudentName ? `${currentStudentName} さん` : currentClassroomName}
+          </h2>
+          <p className="mt-3 flex items-center gap-2 text-sm text-muted">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+            先生がレッスンを始めるのを待ってください
+          </p>
+          {/* 教室IDは補助。名前より先に切り詰められる位置に置く */}
+          {currentStudentName && (
+            <p className="mt-2 truncate font-mono text-[10px] text-muted/80">
+              教室 {currentClassroomName}
+            </p>
+          )}
         </div>
       )}
 

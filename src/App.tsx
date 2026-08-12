@@ -1515,6 +1515,7 @@ function App() {
             onDisconnect={handleDisconnect}
             onReconnect={handleReconnect}
             isReconnecting={isReconnecting}
+            connectionState={connectionState}
             onOpenStudentManager={() => setShowStudentManager(true)}
             onReloadData={reloadClassroomData}
             onCreateGames={async (pairs) => {
