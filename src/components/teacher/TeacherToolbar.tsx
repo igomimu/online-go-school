@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ConnectionState } from 'livekit-client';
 
 interface TeacherToolbarProps {
@@ -36,6 +36,91 @@ function faceText(face?: string): string {
   if (face === 'var(--color-accent)') return 'var(--color-accent-ink)';
   if (face === 'var(--color-alert-face)') return '#f8efec';
   return 'var(--color-ink)';
+}
+
+/** 副操作をまとめるドロップダウン。開いている間だけ中身をDOMに出す */
+function DropdownButton({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [open]);
+
+  return (
+    <div ref={boxRef} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        style={{
+          padding: '4px 10px',
+          fontSize: 11.5,
+          borderRadius: 6,
+          border: '1px solid var(--color-line)',
+          background: open ? 'var(--color-raised)' : 'transparent',
+          color: open ? 'var(--color-ink)' : 'var(--color-muted)',
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {label} ▾
+      </button>
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          style={{
+            position: 'absolute',
+            bottom: 'calc(100% + 4px)',
+            left: 0,
+            zIndex: 50,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            padding: 4,
+            minWidth: 150,
+            borderRadius: 8,
+            border: '1px solid var(--color-line)',
+            background: 'var(--color-surface)',
+            boxShadow: '0 14px 34px -26px rgba(60,45,20,.5)',
+          }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** ドロップダウンの中の項目 */
+function MenuItem({ label, onClick }: { label: string; onClick?: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '6px 10px',
+        fontSize: 12,
+        textAlign: 'left',
+        borderRadius: 6,
+        border: 'none',
+        background: 'transparent',
+        color: 'var(--color-ink)',
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {label}
+    </button>
+  );
 }
 
 /** 群の区切り */
@@ -263,16 +348,20 @@ export default function TeacherToolbar({
 
         <Divider />
 
-        {/* 副操作: 教材と名簿。押す手数は増やさず、重みだけ落とす */}
+        {/* 副操作: 教材と名簿はドロップダウンにまとめる */}
         <input ref={fileInputRef} type="file" accept=".sgf" onChange={onLoadSgf} className="hidden" />
-        <SmallButton label="SGF読込" onClick={() => fileInputRef.current?.click()} />
-        {onOpenTsumegoPicker && <SmallButton label="詰碁DB" onClick={onOpenTsumegoPicker} />}
-        <SmallButton label="生徒入替" onClick={onEditClassroom} />
-        <SmallButton label="生徒リンク" onClick={onShowStudentLinks} />
-        <SmallButton label="生徒管理" onClick={onOpenStudentManager} />
-        {studentJoinInfo && (
-          <SmallButton label={copied ? '✓ コピー済み' : '参加リンク'} onClick={copyLink} />
-        )}
+        <DropdownButton label="教材">
+          <MenuItem label="SGF読込" onClick={() => fileInputRef.current?.click()} />
+          {onOpenTsumegoPicker && <MenuItem label="詰碁DB" onClick={onOpenTsumegoPicker} />}
+        </DropdownButton>
+        <DropdownButton label="生徒管理">
+          <MenuItem label="生徒入替" onClick={onEditClassroom} />
+          <MenuItem label="生徒リンク" onClick={onShowStudentLinks} />
+          <MenuItem label="生徒管理" onClick={onOpenStudentManager} />
+          {studentJoinInfo && (
+            <MenuItem label={copied ? '✓ コピー済み' : '参加リンクをコピー'} onClick={copyLink} />
+          )}
+        </DropdownButton>
 
         <div style={{ flex: 1 }} />
 

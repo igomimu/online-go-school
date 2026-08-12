@@ -1,4 +1,17 @@
 import { expect, type Page } from '@playwright/test';
+
+/**
+ * ツールバーの副操作はドロップダウンにまとまっている（2026-08-13）。
+ * メニューを開いてから項目を押す。
+ */
+export async function clickToolbarMenuItem(
+  page: Page,
+  menu: '教材' | '生徒管理',
+  item: string,
+): Promise<void> {
+  await page.getByRole('button', { name: `${menu} ▾`, exact: true }).click();
+  await page.getByRole('button', { name: item, exact: true }).click();
+}
 import { TEST_CLASSROOM_NAME, TEST_STUDENT_A, TEST_STUDENT_B, TEST_TEACHER_PASSWORD } from './test-data';
 
 /**
@@ -155,7 +168,7 @@ export async function loadSgfForReview(
 ): Promise<Page> {
   const fileChooserPromise = page.waitForEvent('filechooser');
   const popupPromise = page.waitForEvent('popup', { timeout: 10_000 }).catch(() => null);
-  await page.getByRole('button', { name: 'SGF読込', exact: true }).click();
+  await clickToolbarMenuItem(page, '教材', 'SGF読込');
   const chooser = await fileChooserPromise;
   await chooser.setFiles({
     name: 'review.sgf',

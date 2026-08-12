@@ -49,7 +49,7 @@ test.describe('検討の別ウィンドウと生徒の着手権限', () => {
 
     // 本体は覆われず、教室ホーム（生徒一覧）が操作できるまま
     await expect(teacherPage.getByText('検討モード')).toHaveCount(0);
-    await expect(teacherPage.getByRole('button', { name: 'SGF読込', exact: true })).toBeVisible();
+    await expect(teacherPage.getByRole('button', { name: '教材 ▾', exact: true })).toBeVisible();
   });
 
   test('着手を許可した生徒の手が、先生の検討盤にも入る', async () => {

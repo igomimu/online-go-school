@@ -1,9 +1,46 @@
+import { Video, Mic, MicOff, Volume2, VolumeX, Eye, EyeOff } from 'lucide-react';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student } from '../../types/classroom';
 import type { GameSession, AudioPermissions } from '../../types/game';
 import { resolveGrade } from '../../utils/gradeCalc';
 import { anyIdentityMatchesPlayer, identityMatchesPlayer, studentIdentityCandidates } from '../../utils/identityUtils';
 import { isSharingTarget, type SharingTargets } from '../../utils/sharingTargets';
+
+/** 接続列のアイコン切替。押す操作はチェックボックスのまま（role=checkbox） */
+function ConnectionToggle({
+  checked,
+  onChange,
+  onLabel,
+  offLabel,
+  OnIcon,
+  OffIcon,
+  testId,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  onLabel: string;
+  offLabel: string;
+  OnIcon: typeof Mic;
+  OffIcon: typeof MicOff;
+  testId?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      data-testid={testId}
+      title={checked ? onLabel : offLabel}
+      onClick={e => {
+        e.stopPropagation();
+        onChange();
+      }}
+      className={checked ? 'text-accent-text' : 'text-line'}
+    >
+      {checked ? <OnIcon className="h-4 w-4" /> : <OffIcon className="h-4 w-4" />}
+    </button>
+  );
+}
 
 interface StudentTableProps {
   participants: ParticipantInfo[];
@@ -49,10 +86,7 @@ export default function StudentTable({
         <thead>
           <tr className="text-[11px] tracking-wide text-muted whitespace-nowrap" style={{ background: 'var(--color-raised)', borderBottom: '1px solid var(--color-line)' }}>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 46 }}>状態</th>
-            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 52 }}>カメラ</th>
-            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 62 }}>マイク</th>
-            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 76 }}>スピーカー</th>
-            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 46 }}>共有</th>
+            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 116 }}>接続</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 50 }}>対局</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 50 }}>詳細</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 56 }}>棋譜</th>
@@ -93,61 +127,57 @@ export default function StudentTable({
                   />
                 </td>
 
-                {/* カメラ */}
+                {/* 接続（カメラ・マイク・スピーカー・共有）。
+                    以前は4列に分かれ、見出しの「音声M/音声S」が何を指すか伝わらなかった。
+                    アイコンにしても押す操作は変えない（role=checkbox のまま）。 */}
                 <td className="px-2 py-1.5 border-b border-line text-center font-medium">
                   {row.isConnected && (
-                    <input type="checkbox" checked readOnly className="w-3 h-3" />
+                    <div className="flex items-center justify-center gap-1.5">
+                      {/* カメラは状態表示のみ（先生からは切り替えられない） */}
+                      <span title="カメラ" className="text-ink">
+                        <Video className="h-4 w-4" />
+                      </span>
+                      {row.identity !== localIdentity ? (
+                        <>
+                          <ConnectionToggle
+                            checked={perm.micAllowed}
+                            onChange={() => onToggleMic(row.identity)}
+                            onLabel="マイクが入っています（押すと切る）"
+                            offLabel="マイクが切れています（押すと入れる）"
+                            OnIcon={Mic}
+                            OffIcon={MicOff}
+                          />
+                          <ConnectionToggle
+                            checked={perm.canHear}
+                            onChange={() => onToggleHear(row.identity)}
+                            onLabel="こちらの声が聞こえています（押すと聞こえなくする）"
+                            offLabel="こちらの声が聞こえません（押すと聞こえるようにする）"
+                            OnIcon={Volume2}
+                            OffIcon={VolumeX}
+                          />
+                          {onToggleSharing ? (
+                            <ConnectionToggle
+                              testId={`share-${row.identity}`}
+                              checked={isSharingTarget(sharingTargets, row.identity)}
+                              onChange={() => onToggleSharing(row.identity)}
+                              onLabel="検討を見せています（外すと見せません）"
+                              offLabel="検討を見せていません"
+                              OnIcon={Eye}
+                              OffIcon={EyeOff}
+                            />
+                          ) : (
+                            <span title="共有" className="text-ink"><Eye className="h-4 w-4" /></span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <span title="マイク" className="text-ink"><Mic className="h-4 w-4" /></span>
+                          <span title="スピーカー" className="text-ink"><Volume2 className="h-4 w-4" /></span>
+                          <span title="共有" className="text-ink"><Eye className="h-4 w-4" /></span>
+                        </>
+                      )}
+                    </div>
                   )}
-                </td>
-
-                {/* 音声M（マイク） */}
-                <td className="px-2 py-1.5 border-b border-line text-center font-medium">
-                  {row.isConnected && row.identity !== localIdentity ? (
-                    <input
-                      type="checkbox"
-                      checked={perm.micAllowed}
-                      onChange={() => onToggleMic(row.identity)}
-                      onClick={e => e.stopPropagation()}
-                      className="w-3 h-3"
-                    />
-                  ) : row.isConnected ? (
-                    <input type="checkbox" checked readOnly className="w-3 h-3" />
-                  ) : null}
-                </td>
-
-                {/* 音声S（スピーカー） */}
-                <td className="px-2 py-1.5 border-b border-line text-center font-medium">
-                  {row.isConnected && row.identity !== localIdentity ? (
-                    <input
-                      type="checkbox"
-                      checked={perm.canHear}
-                      onChange={() => onToggleHear(row.identity)}
-                      onClick={e => e.stopPropagation()}
-                      className="w-3 h-3"
-                    />
-                  ) : row.isConnected ? (
-                    <input type="checkbox" checked readOnly className="w-3 h-3" />
-                  ) : null}
-                </td>
-
-                {/* 共有（＝検討の参加者）。対局中の生徒に検討を見せると邪魔になるので外せる。
-                    以前はチェック済みで固定の飾りだった（IGCの画面を再現したときの残り 2026-08-05） */}
-                <td className="px-2 py-1.5 border-b border-line text-center font-medium">
-                  {row.isConnected && row.identity !== localIdentity && onToggleSharing ? (
-                    <input
-                      type="checkbox"
-                      data-testid={`share-${row.identity}`}
-                      title={isSharingTarget(sharingTargets, row.identity)
-                        ? '検討を見せています（外すと見せません）'
-                        : '検討を見せていません'}
-                      checked={isSharingTarget(sharingTargets, row.identity)}
-                      onChange={() => onToggleSharing(row.identity)}
-                      onClick={e => e.stopPropagation()}
-                      className="w-3 h-3"
-                    />
-                  ) : row.isConnected ? (
-                    <input type="checkbox" checked readOnly className="w-3 h-3" />
-                  ) : null}
                 </td>
 
                 {/* 対局（進行中は状態表示、対局していない接続中の生徒は新規対局開始ボタン） */}

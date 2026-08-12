@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { TEST_STUDENT_A, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
 import { clearAllData, setupClassroomData, setupTeacherPassword, teardownSupabaseRoster } from './helpers/setup';
-import { loginAsTeacher, openClassroomAndConnect, waitForStudentJoined } from './helpers/teacher-actions';
+import { loginAsTeacher, openClassroomAndConnect, waitForStudentJoined, clickToolbarMenuItem } from './helpers/teacher-actions';
 import { loginAsStudent, waitForConnectedCount } from './helpers/student-actions';
 
 // 回帰テスト: SGFファイルの解答木が無く実質機能しなかった旧「詰碁」機能を、
@@ -41,7 +41,7 @@ test('詰碁データベースから配信した問題が生徒側で解答可�
     await waitForConnectedCount(studentAPage, 1);
 
     // 先生: 詰碁DBダイアログを開く
-    await teacherPage.getByRole('button', { name: '詰碁DB', exact: true }).click();
+    await clickToolbarMenuItem(teacherPage, '教材', '詰碁DB');
     await teacherPage.getByText('詰碁データベースから配信').waitFor({ timeout: 5_000 });
 
     // 9路で絞り込んでランダム取得(候補座標を絞りやすくするため)
@@ -128,7 +128,7 @@ test('問題のまちがい報告ボタンでモーダルが開閉する', async
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
     await waitForConnectedCount(studentAPage, 1);
 
-    await teacherPage.getByRole('button', { name: '詰碁DB', exact: true }).click();
+    await clickToolbarMenuItem(teacherPage, '教材', '詰碁DB');
     await teacherPage.getByText('詰碁データベースから配信').waitFor({ timeout: 5_000 });
     await teacherPage.getByRole('button', { name: 'ランダムに1問取得' }).click();
     await teacherPage.getByTestId('go-board').waitFor({ timeout: 15_000 });

@@ -72,7 +72,8 @@ export default function BoardThumbnailGrid({
         const label = `${student.name}(${student.internalRating || student.rank || '?'})`;
 
         return (
-          <div key={student.id}>
+          // 行の途中で切れた状態でスクロールが止まらないよう、各盤の上端に吸着させる
+          <div key={student.id} style={{ scrollSnapAlign: 'start' }}>
             {/* ラベル */}
             <div
               style={{

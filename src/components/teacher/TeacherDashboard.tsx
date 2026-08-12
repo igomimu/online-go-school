@@ -379,8 +379,10 @@ export default function TeacherDashboard({
 
       {/* 中央: 碁盤グリッド/観戦 + 右サイドバー（ビデオ+チャット） */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        {/* 碁盤エリア: サムネイルグリッド or 観戦パネル（対局は常に講師専用の別ウィンドウで行うため、教室ホーム画面には対局盤を埋め込まない） */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        {/* 碁盤エリア: サムネイルグリッド or 観戦パネル（対局は常に講師専用の別ウィンドウで行うため、教室ホーム画面には対局盤を埋め込まない）。
+            高さは生徒一覧のリサイザー次第で半端になるので、盤の行に吸着させて
+            「下段が途中で切れたまま」にならないようにする。 */}
+        <div style={{ flex: 1, overflowY: 'auto', scrollSnapType: 'y proximity' }}>
           {(orphanLiveGames.length > 0 || orphanGamesError) && (
             <div style={{
               margin: 8,
