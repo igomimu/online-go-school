@@ -172,6 +172,10 @@ card('foundations-dark.html', group='Foundations', theme='dark',
 card('board.html', group='碁盤', theme='light', title='三村囲碁オンライン — 碁盤', body=board_body)
 classroom_body = card('classroom.html', group='教室', theme='light',
                       title='三村囲碁オンライン — 教室', body=part('classroom.body.html'))
+# 検討中の提案。採否が決まったら parts ごと消す。
+proposal_body = card('proposal-participants.html', group='提案', theme='light',
+                     title='三村囲碁オンライン — 仲間が見えるようにする',
+                     body=part('proposal.body.html'))
 
 # --- 人が全画面で見る用（Artifact に publish する 1 枚） ------------------
 sep = '\n<hr style="max-width:960px;margin:64px auto 0;border:0;border-top:1px solid var(--color-line)">\n'
@@ -179,3 +183,8 @@ artifact = ('<title>三村囲碁オンライン デザイン</title>\n<style>\n'
             + sep.join([found_body, board_body, classroom_body]))
 (OUT / 'artifact.html').write_text(artifact, encoding='utf-8')
 print(f'  out/artifact.html: {len(artifact.encode()):,} bytes')
+
+# 提案は目的が違うので別の 1 枚にする（決まったら消す）。
+proposal_page = ('<title>仲間が見えるようにする</title>\n<style>\n' + CSS + PAGE_CSS + '\n</style>\n' + proposal_body)
+(OUT / 'artifact-proposal.html').write_text(proposal_page, encoding='utf-8')
+print(f'  out/artifact-proposal.html: {len(proposal_page.encode()):,} bytes')
