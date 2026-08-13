@@ -2,6 +2,7 @@ import { Copy, Check, Upload, Users, Plus, BookOpen, Link } from 'lucide-react';
 import { useState, useRef } from 'react';
 import type { GameSession, SavedGame } from '../types/game';
 import type { ParticipantInfo } from '../utils/classroomLiveKit';
+import type { ParticipantLogEntry } from '../hooks/useParticipantLog';
 import type { Student, Classroom } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import { findStudentByIdentity, getDisplayName, identityMatchesPlayer } from '../utils/identityUtils';
@@ -15,6 +16,8 @@ import StudentGameHistory from './StudentGameHistory';
 interface LobbyProps {
   role: 'TEACHER' | 'STUDENT';
   participants: ParticipantInfo[];
+  /** 教室への出入り。App が控えているので、対局から戻ってきても残っている */
+  participantLog?: ParticipantLogEntry[];
   localIdentity: string;
   activeSpeakers: string[];
   games: GameSession[];
@@ -50,6 +53,7 @@ interface LobbyProps {
 export default function Lobby({
   role,
   participants,
+  participantLog = [],
   localIdentity,
   activeSpeakers,
   games,
@@ -320,6 +324,23 @@ export default function Lobby({
               );
             })}
           </div>
+
+          {/* 出入り。対局していた間に誰が来たのかは、上の一覧では分からない */}
+          {participantLog.length > 0 && (
+            <div className="space-y-1 border-t border-line pt-3 text-xs text-muted">
+              {participantLog.slice(-3).map(entry => (
+                <div key={entry.key} className="flex gap-2">
+                  <span className="tabular shrink-0 text-muted/75">
+                    {entry.at.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span className="truncate">
+                    {getDisplayName(entry.identity, students)}さんが
+                    {entry.kind === 'join' ? '来ました' : '出ました'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* 保存棋譜（先生のみ） */}

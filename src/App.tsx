@@ -46,6 +46,7 @@ import ProblemBoard from './components/ProblemBoard';
 import ProblemMonitorPanel from './components/teacher/ProblemMonitorPanel';
 import { useChat } from './hooks/useChat';
 import { useNotificationSound } from './hooks/useNotificationSound';
+import { useParticipantLog } from './hooks/useParticipantLog';
 import type { ChatMessagePayload } from './types/chat';
 import type { AiAnalysisSyncPayload } from './types/ai';
 import { resolveEffectiveViewMode } from './utils/viewMode';
@@ -201,6 +202,8 @@ function App() {
 
 
   const classroomRef = useRef<ClassroomLiveKit | null>(null);
+  // 教室への出入り。対局や検討へ移っても消えないよう、教室ホームではなくここで控える
+  const { log: participantLog, record: recordParticipantEvent } = useParticipantLog();
 
   // チャット
   const chat = useChat(classroomRef);
@@ -493,11 +496,13 @@ function App() {
       },
       onParticipantJoined: (identity: string) => {
         notificationSound.play('connect');
+        recordParticipantEvent(identity, 'join');
         // 戻ってきたことも講師には見せる（切れたきり戻らないのか、復旧したのかが分かる）
         if (connectRole === 'TEACHER') pushAlert({ kind: 'rejoin', identity });
       },
       onParticipantLeft: (identity: string) => {
         notificationSound.play('disconnect');
+        recordParticipantEvent(identity, 'leave');
         if (connectRole === 'TEACHER') pushAlert({ kind: 'disconnect', identity });
       },
       onParticipantsChanged: (p: ParticipantInfo[]) => {
@@ -1560,6 +1565,7 @@ function App() {
           <Lobby
             role={role}
             participants={participants}
+            participantLog={participantLog}
             localIdentity={classroomRef.current?.localIdentity ?? ''}
             activeSpeakers={activeSpeakers}
             games={games}
