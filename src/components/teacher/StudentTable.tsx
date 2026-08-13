@@ -5,6 +5,7 @@ import type { GameSession, AudioPermissions } from '../../types/game';
 import { resolveGrade } from '../../utils/gradeCalc';
 import { anyIdentityMatchesPlayer, identityMatchesPlayer, studentIdentityCandidates } from '../../utils/identityUtils';
 import { isSharingTarget, type SharingTargets } from '../../utils/sharingTargets';
+import { displayRank, DEFAULT_RANK_DISPLAY, type RankDisplay } from '../../types/classroom';
 
 /** 接続列のアイコン切替。押す操作はチェックボックスのまま（role=checkbox） */
 function ConnectionToggle({
@@ -54,6 +55,8 @@ interface StudentTableProps {
   sharingTargets?: SharingTargets;
   onToggleSharing?: (identity: string) => void;
   onSelectStudent?: (identity: string) => void;
+  /** 棋力の見せ方（教室ごと）。段級=「初段」/ ランク=「R12」 */
+  rankDisplay?: RankDisplay;
   onOpenStudent?: (studentIdentity: string) => void;
   onOpenHistory?: (student: Student) => void;
   onStartGame?: (identity: string) => void;
@@ -72,6 +75,7 @@ export default function StudentTable({
   sharingTargets = null,
   onToggleSharing,
   onSelectStudent,
+  rankDisplay = DEFAULT_RANK_DISPLAY,
   onOpenStudent,
   onOpenHistory,
   onStartGame,
@@ -297,8 +301,8 @@ export default function StudentTable({
                 </td>
 
                 {/* 棋力 */}
-                <td className="px-2 py-1.5 border-b border-line text-center font-medium">
-                  {row.student?.internalRating || row.student?.rank || ''}
+                <td data-testid="student-rank-cell" className="px-2 py-1.5 border-b border-line text-center font-medium">
+                  {row.student ? displayRank(row.student, rankDisplay) : ''}
                 </td>
 
                 {/* 種別 */}

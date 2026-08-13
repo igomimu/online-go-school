@@ -3,6 +3,7 @@ import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student } from '../../types/classroom';
 import { anyIdentityMatchesPlayer, studentIdentityCandidates } from '../../utils/identityUtils';
 import GameThumbnail from '../GameThumbnail';
+import { displayRank, DEFAULT_RANK_DISPLAY, type RankDisplay } from '../../types/classroom';
 
 interface BoardThumbnailGridProps {
   games: GameSession[];
@@ -10,6 +11,8 @@ interface BoardThumbnailGridProps {
   participants: ParticipantInfo[];
   onSelectGame: (gameId: string) => void;
   onResumeGame?: (gameId: string) => void;
+  /** 棋力の見せ方（教室ごと） */
+  rankDisplay?: RankDisplay;
 }
 
 // IGC風の空碁盤スロット
@@ -47,6 +50,7 @@ export default function BoardThumbnailGrid({
   participants,
   onSelectGame,
   onResumeGame,
+  rankDisplay = DEFAULT_RANK_DISPLAY,
 }: BoardThumbnailGridProps) {
   const connectedIdentities = new Set(participants.map(p => p.identity));
 
@@ -69,7 +73,7 @@ export default function BoardThumbnailGrid({
         );
 
         // IGC風ラベル: 名前(Rxx)
-        const label = `${student.name}(${student.internalRating || student.rank || '?'})`;
+        const label = `${student.name}(${displayRank(student, rankDisplay) || '?'})`;
 
         return (
           // 行の途中で切れた状態でスクロールが止まらないよう、各盤の上端に吸着させる

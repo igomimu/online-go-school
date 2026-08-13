@@ -5,6 +5,7 @@ import type { ParticipantInfo } from '../utils/classroomLiveKit';
 import type { Student, Classroom } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import { findStudentByIdentity, getDisplayName, identityMatchesPlayer } from '../utils/identityUtils';
+import { displayRank } from '../types/classroom';
 import GameThumbnail from './GameThumbnail';
 import SavedGameList from './SavedGameList';
 import ClassroomSelector from './ClassroomSelector';
@@ -306,9 +307,9 @@ export default function Lobby({
                       {name}
                       {isLocal && <span className="ml-1 text-muted">(自分)</span>}
                     </span>
-                    {registered?.rank && (
+                    {registered && displayRank(registered) && (
                       <span className="tabular shrink-0 rounded border border-line px-1 py-0.5 text-xs text-muted">
-                        {registered.rank}
+                        {displayRank(registered)}
                       </span>
                     )}
                   </div>

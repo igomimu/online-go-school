@@ -1,4 +1,5 @@
 import type { Student, Classroom } from '../types/classroom';
+import { DEFAULT_RANK_DISPLAY } from '../types/classroom';
 import { getSupabase } from './liveGameApi';
 import { isGuestTeacher } from './authStore';
 
@@ -25,6 +26,7 @@ type GoSchoolClassroomRow = {
   id: string;
   name: string | null;
   max_capacity: number | null;
+  rank_display?: string | null;
 };
 
 export interface ClassroomRoster {
@@ -170,6 +172,7 @@ function buildRosterRows(studentRows: GoSchoolStudentRow[], classroomRows: GoSch
         name: row.name || row.id,
         maxCapacity: row.max_capacity || 10,
         studentIds: members.map(s => s.login_id),
+        rankDisplay: row.rank_display === 'rating' ? 'rating' as const : DEFAULT_RANK_DISPLAY,
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
@@ -219,7 +222,7 @@ export async function fetchRoster(): Promise<ClassroomRoster> {
       .order('name', { ascending: true }),
     supabase
       .from('go_school_classrooms')
-      .select('id,name,max_capacity')
+      .select('id,name,max_capacity,rank_display')
       .order('name', { ascending: true }),
   ]);
 
@@ -333,6 +336,7 @@ export async function upsertClassroom(classroom: Classroom): Promise<void> {
         id: cleaned.id,
         name: cleaned.name,
         max_capacity: cleaned.maxCapacity,
+        rank_display: cleaned.rankDisplay ?? DEFAULT_RANK_DISPLAY,
         updated_at: now,
       },
       { onConflict: 'id' },
@@ -377,6 +381,7 @@ export async function importAll(students: Student[], classrooms: Classroom[]): P
     id: c.id,
     name: c.name,
     max_capacity: c.maxCapacity,
+    rank_display: c.rankDisplay ?? DEFAULT_RANK_DISPLAY,
     updated_at: now,
   }));
   if (classroomRows.length > 0) {

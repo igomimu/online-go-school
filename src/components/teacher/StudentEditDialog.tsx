@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Student } from '../../types/classroom';
-import { RANK_OPTIONS } from '../../types/classroom';
+import { RANK_OPTIONS, RATING_OPTIONS, normalizeRank } from '../../types/classroom';
 import { upsertStudent } from '../../utils/classroomStore';
 import { resolveGrade } from '../../utils/gradeCalc';
 
@@ -97,21 +97,28 @@ export default function StudentEditDialog({ student, onClose, onSaved }: Student
             />
           </div>
           <div>
-            <label style={label}>段級位（棋力）</label>
-            <select value={form.rank} onChange={e => setForm(f => ({ ...f, rank: e.target.value }))} style={field}>
+            <label style={label}>段級位（一般の大人向け）</label>
+            <select
+              data-testid="student-rank-select"
+              value={normalizeRank(form.rank)}
+              onChange={e => setForm(f => ({ ...f, rank: e.target.value }))}
+              style={field}
+            >
               <option value="">未設定</option>
               {RANK_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
           <div>
-            <label style={label}>内部レーティング</label>
-            <input
-              type="text"
+            <label style={label}>ランク（道場の生徒向け）</label>
+            <select
+              data-testid="student-rating-select"
               value={form.internalRating}
               onChange={e => setForm(f => ({ ...f, internalRating: e.target.value }))}
-              placeholder="R3 など（任意）"
               style={field}
-            />
+            >
+              <option value="">未設定</option>
+              {RATING_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
           </div>
           <div>
             <label style={label}>生徒種別</label>

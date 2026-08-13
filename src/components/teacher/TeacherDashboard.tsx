@@ -340,6 +340,7 @@ export default function TeacherDashboard({
         }}
       >
         <StudentTable
+          rankDisplay={selectedClassroom?.rankDisplay}
           participants={filteredParticipants}
           students={filteredStudents}
           games={filteredGames}
@@ -450,6 +451,7 @@ export default function TeacherDashboard({
             />
           ) : (
             <BoardThumbnailGrid
+              rankDisplay={selectedClassroom?.rankDisplay}
               games={filteredGames}
               students={filteredStudents}
               participants={filteredParticipants}

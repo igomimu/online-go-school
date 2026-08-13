@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { Student, Classroom } from '../../types/classroom';
+import type { Student, Classroom, RankDisplay } from '../../types/classroom';
+import { DEFAULT_RANK_DISPLAY } from '../../types/classroom';
 import { upsertClassroom } from '../../utils/classroomStore';
 
 interface ClassroomSettingsDialogProps {
@@ -19,6 +20,7 @@ export default function ClassroomSettingsDialog({
   const [selectedEnrolled, setSelectedEnrolled] = useState<string | null>(null);
   const [selectedOther, setSelectedOther] = useState<string | null>(null);
   const [seatCount, setSeatCount] = useState(classroom.maxCapacity);
+  const [rankDisplay, setRankDisplay] = useState<RankDisplay>(classroom.rankDisplay ?? DEFAULT_RANK_DISPLAY);
   const [name, setName] = useState(classroom.name);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -72,6 +74,7 @@ export default function ClassroomSettingsDialog({
         name: name.trim() || classroom.name,
         studentIds: enrolledIds,
         maxCapacity: seatCount,
+        rankDisplay,
       });
       await onSave();
     } catch (err) {
@@ -160,6 +163,23 @@ export default function ClassroomSettingsDialog({
               {[5, 8, 10, 12, 15, 20].map(n => (
                 <option key={n} value={n}>{n}</option>
               ))}
+            </select>
+
+            {/* 棋力の見せ方は教室ごとに選ぶ。一般の大人は段級、道場の生徒はランク（2026-08-13 三村さん） */}
+            <label style={{ fontWeight: 'bold' }}>棋力の表示</label>
+            <select
+              data-testid="rank-display-select"
+              value={rankDisplay}
+              onChange={e => setRankDisplay(e.target.value as RankDisplay)}
+              style={{
+                padding: '2px 6px',
+                border: '1px solid var(--color-line)',
+                background: 'var(--color-ground)',
+                fontSize: 12,
+              }}
+            >
+              <option value="dan_kyu">段級（初段・3級）</option>
+              <option value="rating">ランク（R12）</option>
             </select>
           </div>
 
