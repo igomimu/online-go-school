@@ -1,0 +1,92 @@
+<div class="ds-wrap">
+
+  <p class="heading-section">三村囲碁オンライン / online.mimura15.jp</p>
+  <h1 class="heading-hero">デザイン基礎</h1>
+  <p class="ds-note">原則「色は盤上にだけ宿る」。UI は墨と生成りの無彩色階調で組み、色が付くのは碁盤と、盤と同色の榧アクセントだけ。榧は「進行中・自分の番・主アクション」にのみ使い、1画面に1つを目安にする。</p>
+
+  <section class="ds-sec">
+    <h2>色 — 素材の名前</h2>
+    <div class="ds-swatches">
+      <div class="ds-sw"><div class="chip" style="background:#15140f"></div><div class="meta"><div class="name">墨 sumi</div><div class="val">#15140f</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:#1d1b16"></div><div class="meta"><div class="name">盤陰 sumi-raised</div><div class="val">#1d1b16</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:#26231c"></div><div class="meta"><div class="name">sumi-high</div><div class="val">#26231c</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:#302c24"></div><div class="meta"><div class="name">sumi-line</div><div class="val">#302c24</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:#e9e4d9"></div><div class="meta"><div class="name">生成り kinari</div><div class="val">#e9e4d9</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:#9a9285"></div><div class="meta"><div class="name">鈍色 nibi</div><div class="val">#9a9285</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:#d6b279"></div><div class="meta"><div class="name">榧 kaya</div><div class="val">#d6b279</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:#8a7554"></div><div class="meta"><div class="name">kaya-soft</div><div class="val">#8a7554</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:#c8563c"></div><div class="meta"><div class="name">朱 shu</div><div class="val">#c8563c</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:#e0745a"></div><div class="meta"><div class="name">淡朱 shu-light</div><div class="val">#e0745a</div></div></div>
+    </div>
+    <p class="ds-note">色そのものの名前。明暗テーマで入れ替わりうるものは ground / surface / ink … と役割で持ち、実値をテーマごとに割り当てる。</p>
+  </section>
+
+  <section class="ds-sec">
+    <h2>色 — 役割（このページはライトが当たっている）</h2>
+    <div class="ds-swatches">
+      <div class="ds-sw"><div class="chip" style="background:var(--color-ground)"></div><div class="meta"><div class="name">ground 地</div><div class="val">--color-ground</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:var(--color-surface)"></div><div class="meta"><div class="name">surface パネル</div><div class="val">--color-surface</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:var(--color-raised)"></div><div class="meta"><div class="name">raised 副ボタン</div><div class="val">--color-raised</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:var(--color-line)"></div><div class="meta"><div class="name">line 境界</div><div class="val">--color-line</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:var(--color-ink)"></div><div class="meta"><div class="name">ink 本文</div><div class="val">--color-ink</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:var(--color-muted)"></div><div class="meta"><div class="name">muted 補助</div><div class="val">--color-muted</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:var(--color-accent)"></div><div class="meta"><div class="name">accent 榧</div><div class="val">--color-accent</div></div></div>
+      <div class="ds-sw"><div class="chip" style="background:var(--color-alert)"></div><div class="meta"><div class="name">alert 朱</div><div class="val">--color-alert</div></div></div>
+    </div>
+  </section>
+
+  <section class="ds-sec">
+    <h2>文字</h2>
+    <div class="glass-panel" style="padding:24px">
+      <h1 class="heading-hero" style="margin:0 0 18px">対局を始める</h1>
+      <p class="heading-section" style="margin:0 0 10px">セクション見出し（.heading-section）</p>
+      <p style="margin:0 0 10px">本文。和文の行間は 1.8。長い文でも読みやすいよう、欧文の 1.5 では詰まるので広げてある。囲碁の対局と検討を、教室と同じ距離感でオンラインに持ち込む。</p>
+      <p style="margin:0; color:var(--color-muted)">補助文（muted）。説明・注記はこの階調に落とす。</p>
+      <p class="tabular" style="margin:14px 0 0; font-size:1.375rem">残り時間 12:04 ／ 第 128 手</p>
+      <p class="ds-note">数字は .tabular（tabular-nums）。秒読みで桁が揺れない。</p>
+    </div>
+  </section>
+
+  <section class="ds-sec">
+    <h2>ボタン</h2>
+    <div class="ds-row">
+      <button class="premium-button">対局を始める</button>
+      <button class="secondary-button">検討にする</button>
+      <button class="premium-button" disabled style="opacity:.45">対局を始める（無効）</button>
+    </div>
+    <p class="ds-note">主アクション（.premium-button）が画面内で色の付く唯一の要素。1画面に1つ。副アクション（.secondary-button）は無彩色のまま。</p>
+  </section>
+
+  <section class="ds-sec">
+    <h2>入力</h2>
+    <div class="ds-stack">
+      <div>
+        <label class="field-label">生徒ID</label>
+        <input class="field-input" placeholder="SM1234" value="SM1042">
+      </div>
+      <div>
+        <label class="field-label">持ち時間</label>
+        <input class="field-input" placeholder="例: 20分 + 30秒">
+      </div>
+    </div>
+  </section>
+
+  <section class="ds-sec">
+    <h2>パネル</h2>
+    <div style="display:grid; gap:12px">
+      <div class="glass-panel" style="padding:20px; border-left:2px solid var(--color-accent)">
+        <p class="heading-section" style="margin:0 0 6px">進行中</p>
+        <p style="margin:0">三村智保 ● — ○ 長野優希　<span class="tabular">第 128 手</span></p>
+      </div>
+      <div class="glass-panel" style="padding:20px; border-left:2px solid var(--color-muted)">
+        <p class="heading-section" style="margin:0 0 6px">終了</p>
+        <p style="margin:0">古橋晴登 ● — ○ 鈴木榛人　<span class="tabular">黒 3目半勝ち</span></p>
+      </div>
+      <div class="glass-panel" style="padding:20px; border-left:2px solid var(--color-alert)">
+        <p class="heading-section" style="margin:0 0 6px; color:var(--color-alert-text)">通信が不安定です</p>
+        <p style="margin:0; color:var(--color-muted)">朱は警告のみ。アクセントと混ぜない。</p>
+      </div>
+    </div>
+  </section>
+
+</div>
