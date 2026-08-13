@@ -19,6 +19,11 @@ export interface Classroom {
   studentIds: string[];
   /** 棋力の見せ方。一般の大人の教室は段級、道場のクラスはランク */
   rankDisplay?: RankDisplay;
+  /**
+   * 道場の共有PCに置くリンクの鍵。これを持つ端末だけが名簿（氏名と4桁コード）を
+   * 取得でき、名前を押すだけで入室できる。教室IDとは別物にしてある。
+   */
+  rosterToken?: string;
 }
 
 // === igocampus strType → 表示名 ===

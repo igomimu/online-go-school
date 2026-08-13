@@ -21,6 +21,8 @@ interface TeacherToolbarProps {
   onClearAudioM?: () => void;
   onClearAudioS?: () => void;
   onClearSharing?: () => void;
+  /** 道場の共有PC用リンク。名簿から名前を選ぶだけで入れる画面へ繋がる */
+  rosterUrl?: string;
   /** 回線の状態。切れている時だけ「回線復旧」を朱にするために使う */
   connectionState?: ConnectionState;
 }
@@ -232,6 +234,7 @@ export default function TeacherToolbar({
   onClearAudioM,
   onClearAudioS,
   onClearSharing,
+  rosterUrl,
   connectionState,
 }: TeacherToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -243,6 +246,14 @@ export default function TeacherToolbar({
     navigator.clipboard.writeText(studentJoinInfo).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const [copiedRoster, setCopiedRoster] = useState(false);
+  const copyRosterUrl = () => {
+    if (!rosterUrl) return;
+    navigator.clipboard.writeText(rosterUrl).catch(() => {});
+    setCopiedRoster(true);
+    setTimeout(() => setCopiedRoster(false), 2000);
   };
 
   const copyClassroomId = () => {
@@ -358,6 +369,12 @@ export default function TeacherToolbar({
           <MenuItem label="生徒入替" onClick={onEditClassroom} />
           <MenuItem label="生徒リンク" onClick={onShowStudentLinks} />
           <MenuItem label="生徒管理" onClick={onOpenStudentManager} />
+          {rosterUrl && (
+            <MenuItem
+              label={copiedRoster ? '✓ コピー済み' : '道場PC用リンクをコピー'}
+              onClick={copyRosterUrl}
+            />
+          )}
           {studentJoinInfo && (
             <MenuItem label={copied ? '✓ コピー済み' : '参加リンクをコピー'} onClick={copyLink} />
           )}

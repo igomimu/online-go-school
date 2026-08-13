@@ -13,6 +13,7 @@ import {
 } from '../utils/authStore';
 import type { SavedAccount } from '../utils/authStore';
 import { usePwaInstall } from '../hooks/usePwaInstall';
+import { fetchClassroomRoster, type ClassroomRoster } from '../utils/classroomRoster';
 import { getTeacherDisplayName, setTeacherDisplayName } from '../utils/identityUtils';
 
 interface LoginScreenProps {
@@ -20,12 +21,18 @@ interface LoginScreenProps {
   onTeacherLogin: () => void;
   /** URL等で事前に設定された教室ID */
   prefilledClassroomId?: string;
+  /**
+   * 道場の共有PC用の鍵（?roster=...）。渡されると名簿から名前を選ぶだけで入れる。
+   * 生徒はIDを打たない（2026-08-13 三村さん）。
+   */
+  rosterToken?: string;
 }
 
 export default function LoginScreen({
   onStudentLogin,
   onTeacherLogin,
   prefilledClassroomId,
+  rosterToken,
 }: LoginScreenProps) {
   const [mode, setMode] = useState<'student' | 'teacher'>('student');
   const [accounts, setAccounts] = useState<SavedAccount[]>([]);
@@ -36,6 +43,11 @@ export default function LoginScreen({
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const pwaInstall = usePwaInstall();
+  // 共有PCの名簿
+  const [roster, setRoster] = useState<ClassroomRoster | null>(null);
+  const [rosterError, setRosterError] = useState('');
+  const [rosterLoading, setRosterLoading] = useState(!!rosterToken);
+  const [enteringCode, setEnteringCode] = useState<string | null>(null);
 
   // 先生
   const [teacherPw, setTeacherPw] = useState('');
@@ -86,6 +98,36 @@ export default function LoginScreen({
     if (selectedAccount?.studentId === account.studentId && selectedAccount?.classroomId === account.classroomId) {
       handleNewAccount();
     }
+  };
+
+  useEffect(() => {
+    if (!rosterToken) return;
+    let alive = true;
+    setRosterLoading(true);
+    fetchClassroomRoster(rosterToken)
+      .then(r => { if (alive) { setRoster(r); setRosterError(''); } })
+      .catch(err => { if (alive) setRosterError(err instanceof Error ? err.message : String(err)); })
+      .finally(() => { if (alive) setRosterLoading(false); });
+    return () => { alive = false; };
+  }, [rosterToken]);
+
+  /** 共有PCで名前を押したときの入室。IDの入力は無い */
+  const handleRosterPick = async (entry: { studentCode: string; name: string }) => {
+    if (!roster || enteringCode) return;
+    setEnteringCode(entry.studentCode);
+    setRosterError('');
+    const res = await supabaseSignInStudent(entry.studentCode, roster.classroomId);
+    setEnteringCode(null);
+    if (!res.ok) {
+      setRosterError(res.error || 'ログインに失敗しました');
+      return;
+    }
+    onStudentLogin(
+      res.studentId ?? entry.studentCode,
+      roster.classroomId,
+      entry.studentCode,
+      res.displayName || entry.name,
+    );
   };
 
   const handleStudentSubmit = async (e: React.FormEvent) => {
@@ -203,6 +245,65 @@ export default function LoginScreen({
           >
             <ArrowLeft className="w-4 h-4" /> 戻る
           </button>
+        </div>
+
+        <BuildStamp />
+      </LoginLayout>
+    );
+  }
+
+  // --- 道場の共有PC: 名簿から選ぶ ---
+  // IDも教室IDも打たせない。並び順は先生が決めた教室内の順序に従う。
+  if (rosterToken) {
+    return (
+      <LoginLayout>
+        <div className="glass-panel space-y-5 p-6 sm:p-7">
+          <div>
+            <p className="text-xs tracking-widest text-muted">道場のパソコン</p>
+            <h2 className="mt-1 text-2xl font-bold">
+              {roster?.classroomName || 'ネット道場'}
+            </h2>
+            <p className="mt-2 text-sm text-muted">自分の名前を押してください</p>
+          </div>
+
+          {rosterLoading && <p className="text-sm text-muted">名簿を読み込んでいます…</p>}
+          {rosterError && <p className="text-sm text-alert-text">{rosterError}</p>}
+
+          {roster && (
+            <div data-testid="roster-list" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {roster.students.map(entry => (
+                <button
+                  key={entry.studentCode}
+                  data-testid={`roster-pick-${entry.studentCode}`}
+                  onClick={() => handleRosterPick(entry)}
+                  disabled={!!enteringCode}
+                  className={`min-h-[56px] rounded-lg border px-3 py-3 text-base font-semibold transition-colors duration-150 ${
+                    enteringCode === entry.studentCode
+                      ? 'border-accent bg-accent text-accent-ink'
+                      : 'border-line bg-raised text-ink hover:bg-line disabled:opacity-50'
+                  }`}
+                >
+                  {enteringCode === entry.studentCode ? '入室中…' : entry.name}
+                </button>
+              ))}
+              {roster.students.length === 0 && (
+                <p className="col-span-full text-sm text-muted">
+                  この教室に生徒が登録されていません。
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6 flex items-center justify-between gap-4">
+          <button
+            data-testid="teacher-mode-link"
+            onClick={() => setMode('teacher')}
+            className="text-sm text-muted hover:text-ink"
+          >
+            先生としてログイン →
+          </button>
+          <ThemeToggle />
         </div>
 
         <BuildStamp />

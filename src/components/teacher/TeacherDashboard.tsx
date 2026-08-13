@@ -16,6 +16,7 @@ import VerticalResizer from './VerticalResizer';
 import { useStoredHeight } from './useStoredHeight';
 import type { ClassroomLiveKit } from '../../utils/classroomLiveKit';
 import TeacherToolbar from './TeacherToolbar';
+import { buildRosterUrl } from '../../utils/classroomRoster';
 import VideoTiles from '../VideoTiles';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
 import StudentLinkGenerator from './StudentLinkGenerator';
@@ -551,6 +552,7 @@ export default function TeacherDashboard({
         onReconnect={onReconnect}
         isReconnecting={isReconnecting}
         connectionState={connectionState}
+        rosterUrl={selectedClassroom?.rosterToken ? buildRosterUrl(selectedClassroom.rosterToken) : undefined}
         onOpenStudentManager={onOpenStudentManager}
         onOpenTeacherGameWindow={onOpenTeacherGameWindow}
         onOpenTsumegoPicker={onProblemAssign ? () => setShowTsumegoPicker(true) : undefined}

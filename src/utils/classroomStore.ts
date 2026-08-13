@@ -27,6 +27,7 @@ type GoSchoolClassroomRow = {
   name: string | null;
   max_capacity: number | null;
   rank_display?: string | null;
+  roster_token?: string | null;
 };
 
 export interface ClassroomRoster {
@@ -173,6 +174,8 @@ function buildRosterRows(studentRows: GoSchoolStudentRow[], classroomRows: GoSch
         maxCapacity: row.max_capacity || 10,
         studentIds: members.map(s => s.login_id),
         rankDisplay: row.rank_display === 'rating' ? 'rating' as const : DEFAULT_RANK_DISPLAY,
+        // 共有PCの鍵はサーバーが発行する。教室の保存で消してしまわないよう読むだけにする
+        rosterToken: row.roster_token ?? undefined,
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
@@ -222,7 +225,7 @@ export async function fetchRoster(): Promise<ClassroomRoster> {
       .order('name', { ascending: true }),
     supabase
       .from('go_school_classrooms')
-      .select('id,name,max_capacity,rank_display')
+      .select('id,name,max_capacity,rank_display,roster_token')
       .order('name', { ascending: true }),
   ]);
 

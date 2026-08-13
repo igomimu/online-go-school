@@ -148,6 +148,21 @@ async function seedSupabaseRoster(classroomId: string, classroomName: string): P
   if (studentError) throw new Error(`Failed to seed students: ${studentError.message}`);
 }
 
+/** 教室に発行された共有PC用の鍵を読む（先生が「道場PC用リンクをコピー」で得るもの） */
+export async function fetchRosterToken(classroomId: string): Promise<string> {
+  const { url, serviceRoleKey } = getRosterSeedEnv();
+  const supabase = createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await supabase
+    .from('go_school_classrooms')
+    .select('roster_token')
+    .eq('id', classroomId)
+    .maybeSingle();
+  if (error) throw new Error(`Failed to read roster token: ${error.message}`);
+  return (data?.roster_token as string | null) ?? '';
+}
+
 export async function teardownSupabaseRoster(classroomId: string): Promise<void> {
   try {
     const { url, serviceRoleKey } = getRosterSeedEnv();

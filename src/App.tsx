@@ -181,6 +181,8 @@ function App() {
   const [studentClassroomId, setStudentClassroomId] = useState<string | null>(null);
   // URLから事前設定された教室ID
   const [prefilledClassroomId, setPrefilledClassroomId] = useState<string | undefined>(undefined);
+  // 道場の共有PC用（?roster=...）。名簿から名前を選ぶだけで入れる
+  const [rosterToken, setRosterToken] = useState<string | undefined>(undefined);
 
   // 生徒自動接続の重複防止
   const studentAutoConnectRef = useRef(false);
@@ -569,6 +571,9 @@ function App() {
     const urlToken = params.get('token');
 
     if (urlClassroomId) setPrefilledClassroomId(urlClassroomId);
+
+    const urlRosterToken = params.get('roster');
+    if (urlRosterToken) setRosterToken(urlRosterToken);
 
     if (urlLkUrl) setLivekitUrl(urlLkUrl);
     if (urlRoom) setRoomName(urlRoom);
@@ -1263,6 +1268,7 @@ function App() {
       <>
         <LoginScreen
           prefilledClassroomId={prefilledClassroomId}
+          rosterToken={rosterToken}
           onStudentLogin={(sid, cid, rawCode, displayName) => {
             // Supabase Session は LoginScreen 側で確立済み（失敗時はここに来ない）
             localStorage.setItem('go-school-last-role', 'STUDENT');
