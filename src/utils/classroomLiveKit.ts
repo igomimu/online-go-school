@@ -62,8 +62,10 @@ export interface ParticipantInfo {
 
 export type ClassroomEventHandler = {
   onMessage?: (msg: ClassroomMessage, sender?: string) => void;
-  onParticipantJoined?: (identity: string) => void;
-  onParticipantLeft?: (identity: string) => void;
+  // name は LiveKit 側の表示名。identity（sid:1000 など）は名簿と照合できないことがあるので、
+  // 人が読める名前を出したい側はこちらを使う
+  onParticipantJoined?: (identity: string, name?: string) => void;
+  onParticipantLeft?: (identity: string, name?: string) => void;
   onParticipantsChanged?: (participants: ParticipantInfo[]) => void;
   onConnectionStateChanged?: (state: ConnectionState) => void;
   onActiveSpeakersChanged?: (speakers: string[]) => void;
@@ -123,12 +125,12 @@ export class ClassroomLiveKit {
     });
 
     this.room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
-      this.handlers.onParticipantJoined?.(participant.identity);
+      this.handlers.onParticipantJoined?.(participant.identity, participant.name);
       this.notifyParticipantsChanged();
     });
 
     this.room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
-      this.handlers.onParticipantLeft?.(participant.identity);
+      this.handlers.onParticipantLeft?.(participant.identity, participant.name);
       this.notifyParticipantsChanged();
     });
 

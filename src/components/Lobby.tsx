@@ -87,6 +87,14 @@ export default function Lobby({
   const playingGames = games.filter(g => g.status === 'playing');
   const finishedGames = games.filter(g => g.status === 'finished');
 
+  // 出入りの行。LiveKit の表示名を第一に使う。identity（sid:1000 など）は名簿の id とも
+  // 生徒コードとも一致しないことがあり、それだけで名前を作ると「不明(1000)さん」になる。
+  // どちらでも人の名前にならない出入りは、名前の代わりに ID を晒すくらいなら出さない。
+  const visibleLog = participantLog
+    .map(entry => ({ entry, name: entry.name || findStudentByIdentity(entry.identity, students)?.name || '' }))
+    .filter(row => row.name !== '')
+    .slice(-3);
+
   // 自分が参加中の対局
   const myGame = games.find(g =>
     g.status === 'playing' &&
@@ -326,16 +334,15 @@ export default function Lobby({
           </div>
 
           {/* 出入り。対局していた間に誰が来たのかは、上の一覧では分からない */}
-          {participantLog.length > 0 && (
+          {visibleLog.length > 0 && (
             <div className="space-y-1 border-t border-line pt-3 text-xs text-muted">
-              {participantLog.slice(-3).map(entry => (
+              {visibleLog.map(({ entry, name }) => (
                 <div key={entry.key} className="flex gap-2">
                   <span className="tabular shrink-0 text-muted/75">
                     {entry.at.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <span className="truncate">
-                    {getDisplayName(entry.identity, students)}さんが
-                    {entry.kind === 'join' ? '来ました' : '出ました'}
+                    {name}さんが{entry.kind === 'join' ? '来ました' : '出ました'}
                   </span>
                 </div>
               ))}

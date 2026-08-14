@@ -231,10 +231,11 @@ describe('ClassroomLiveKit', () => {
 
       (classroom.room as unknown as { emit: Function }).emit(
         'participantConnected',
-        { identity: 'はなこ' }
+        { identity: 'sid:1000', name: 'はなこ' }
       );
 
-      expect(onParticipantJoined).toHaveBeenCalledWith('はなこ');
+      // identity だけでは名簿と照合できないことがあるので、表示名も一緒に渡す
+      expect(onParticipantJoined).toHaveBeenCalledWith('sid:1000', 'はなこ');
     });
 
     it('ParticipantDisconnectedでonParticipantLeftが呼ばれる', () => {
@@ -243,10 +244,10 @@ describe('ClassroomLiveKit', () => {
 
       (classroom.room as unknown as { emit: Function }).emit(
         'participantDisconnected',
-        { identity: 'たろう' }
+        { identity: 'sid:1001', name: 'たろう' }
       );
 
-      expect(onParticipantLeft).toHaveBeenCalledWith('たろう');
+      expect(onParticipantLeft).toHaveBeenCalledWith('sid:1001', 'たろう');
     });
 
     it('ConnectionStateChangedでonConnectionStateChangedが呼ばれる', () => {

@@ -7,6 +7,11 @@ export interface ParticipantLogEntry {
    */
   key: string;
   identity: string;
+  /**
+   * LiveKit 側の表示名。identity（sid:1000 など）は名簿の id とも生徒コードとも
+   * 一致しないことがあり、それだけでは「不明(1000)」にしかならない。
+   */
+  name: string;
   kind: 'join' | 'leave';
   at: Date;
 }
@@ -28,10 +33,11 @@ export function useParticipantLog(limit = 20) {
   const seq = useRef(0);
   const [log, setLog] = useState<ParticipantLogEntry[]>([]);
 
-  const record = useCallback((identity: string, kind: 'join' | 'leave') => {
+  const record = useCallback((identity: string, kind: 'join' | 'leave', name = '') => {
     const entry: ParticipantLogEntry = {
       key: `${identity}-${kind}-${++seq.current}`,
       identity,
+      name,
       kind,
       at: new Date(),
     };

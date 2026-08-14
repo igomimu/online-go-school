@@ -264,4 +264,87 @@ describe('Lobby', () => {
       expect(screen.queryByText(spectateHint)).not.toBeInTheDocument();
     });
   });
+  describe('出入りのひとこと', () => {
+    const at = new Date('2026-08-14T14:02:00');
+
+    it('LiveKit の表示名で「◯◯さんが来ました」と出す', () => {
+      render(
+        <Lobby
+          role="STUDENT"
+          participants={mockParticipants}
+          participantLog={[
+            { key: 'k1', identity: 'sid:1000', name: '長野優希', kind: 'join', at },
+          ]}
+          localIdentity="たろう"
+          activeSpeakers={[]}
+          games={[]}
+          studentJoinInfo=""
+          onSelectGame={vi.fn()}
+          myIdentity="たろう"
+        />
+      );
+      expect(screen.getByText(/長野優希さんが来ました/)).toBeInTheDocument();
+    });
+
+    it('出て行った人は「出ました」と出す', () => {
+      render(
+        <Lobby
+          role="STUDENT"
+          participants={mockParticipants}
+          participantLog={[
+            { key: 'k1', identity: 'sid:1000', name: '長野優希', kind: 'leave', at },
+          ]}
+          localIdentity="たろう"
+          activeSpeakers={[]}
+          games={[]}
+          studentJoinInfo=""
+          onSelectGame={vi.fn()}
+          myIdentity="たろう"
+        />
+      );
+      expect(screen.getByText(/長野優希さんが出ました/)).toBeInTheDocument();
+    });
+
+    it('名前が引けない出入りは行ごと出さない（「不明(1000)さん」を出さない）', () => {
+      render(
+        <Lobby
+          role="STUDENT"
+          participants={mockParticipants}
+          participantLog={[
+            { key: 'k1', identity: 'sid:1000', name: '', kind: 'join', at },
+          ]}
+          localIdentity="たろう"
+          activeSpeakers={[]}
+          games={[]}
+          studentJoinInfo=""
+          onSelectGame={vi.fn()}
+          myIdentity="たろう"
+        />
+      );
+      expect(screen.queryByText(/さんが来ました/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/不明/)).not.toBeInTheDocument();
+    });
+
+    it('直近3件だけ出す', () => {
+      const names = ['一郎', '二郎', '三郎', '四郎'];
+      render(
+        <Lobby
+          role="STUDENT"
+          participants={mockParticipants}
+          participantLog={names.map((name, i) => ({
+            key: `k${i}`, identity: `sid:100${i}`, name, kind: 'join' as const, at,
+          }))}
+          localIdentity="たろう"
+          activeSpeakers={[]}
+          games={[]}
+          studentJoinInfo=""
+          onSelectGame={vi.fn()}
+          myIdentity="たろう"
+        />
+      );
+      expect(screen.queryByText(/一郎さんが来ました/)).not.toBeInTheDocument();
+      expect(screen.getByText(/四郎さんが来ました/)).toBeInTheDocument();
+      expect(screen.getAllByText(/さんが来ました/)).toHaveLength(3);
+    });
+  });
 });

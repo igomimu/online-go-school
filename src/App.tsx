@@ -494,15 +494,15 @@ function App() {
           notificationSound.play('gameEnd');
         }
       },
-      onParticipantJoined: (identity: string) => {
+      onParticipantJoined: (identity: string, name?: string) => {
         notificationSound.play('connect');
-        recordParticipantEvent(identity, 'join');
+        recordParticipantEvent(identity, 'join', name);
         // 戻ってきたことも講師には見せる（切れたきり戻らないのか、復旧したのかが分かる）
         if (connectRole === 'TEACHER') pushAlert({ kind: 'rejoin', identity });
       },
-      onParticipantLeft: (identity: string) => {
+      onParticipantLeft: (identity: string, name?: string) => {
         notificationSound.play('disconnect');
-        recordParticipantEvent(identity, 'leave');
+        recordParticipantEvent(identity, 'leave', name);
         if (connectRole === 'TEACHER') pushAlert({ kind: 'disconnect', identity });
       },
       onParticipantsChanged: (p: ParticipantInfo[]) => {
