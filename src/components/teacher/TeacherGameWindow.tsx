@@ -9,6 +9,7 @@ import { getNextTeacherTurnGameId, isTeacherParticipant, isTeacherTurn } from '.
 import ClassroomAlerts, { type ClassroomAlert } from './ClassroomAlerts';
 import { subscribeTeacherAlerts } from '../../utils/teacherAlertChannel';
 import { resumeLiveGame } from '../../utils/liveGameApi';
+import { isTimeoutResult } from '../../utils/scoring';
 
 interface TeacherGameWindowProps {
   classroomId: string;
@@ -199,6 +200,8 @@ export default function TeacherGameWindow({
                   setActiveSimulGameId(game.id);
                   setShowList(false);
                 }}
+                onResume={gameId => { void resumeLiveGame(gameId); }}
+                allowTimeoutResume
                 isMyTurn={myTurn}
                 turnLabel={
                   myTurn
@@ -207,7 +210,9 @@ export default function TeacherGameWindow({
                       ? '相手考慮中'
                       : game.status === 'scoring'
                         ? '整地中'
-                        : '中断'
+                        : game.status === 'finished' && isTimeoutResult(game.result)
+                          ? '時間切れ'
+                          : '中断'
                 }
               />
             );
