@@ -12,7 +12,6 @@ vi.mock('../hooks/useLiveGame', () => {
     useLiveGame: vi.fn(),
   };
 });
-
 function createMockGame(overrides: Partial<GameSession> = {}): GameSession {
   return {
     id: 'game-1',
@@ -207,6 +206,25 @@ describe('GameBoard', () => {
     );
     expect(screen.queryByText('投了')).not.toBeInTheDocument();
     expect(screen.queryByText('パス')).not.toBeInTheDocument();
+  });
+
+  it('着手で手番が替わっても操作欄の高さを変えない', () => {
+    setupMock({ game: createMockGame({ currentColor: 'BLACK', moveNumber: 2 }) });
+    const { rerender } = render(
+      <GameBoard gameId="game-1" myIdentity="たろう" />
+    );
+
+    const myTurnSlot = screen.getByTestId('game-controls-slot');
+    expect(myTurnSlot).toHaveClass('h-9', 'shrink-0', 'overflow-x-auto');
+    expect(screen.getByText('パス')).toBeInTheDocument();
+
+    setupMock({ game: createMockGame({ currentColor: 'WHITE', moveNumber: 3 }) });
+    rerender(<GameBoard gameId="game-1" myIdentity="たろう" />);
+
+    const opponentTurnSlot = screen.getByTestId('game-controls-slot');
+    expect(opponentTurnSlot).toHaveClass('h-9', 'shrink-0', 'overflow-x-auto');
+    expect(screen.queryByText('パス')).not.toBeInTheDocument();
+    expect(screen.getByText('相手の番です')).toBeInTheDocument();
   });
 
   it('終局時は結果を表示しボタンは非表示', () => {
@@ -473,4 +491,3 @@ describe('GameBoard', () => {
     });
   });
 });
-

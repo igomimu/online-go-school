@@ -705,47 +705,50 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
         </div>
       )}
 
-      {/* 操作ボタン行＋ターン表示を1行にまとめてコンパクト化
-          （パス・投了は手番の対局者本人のみ、「待った」は手番に関係なく対局者に表示）。 */}
+      {/* 操作ボタン行＋ターン表示を高さ固定の1行にまとめる。
+          手番のたびにパス・投了が出入りしても、flex-1 の碁盤へ割り当てる高さを変えない。
+          横幅が足りない画面では、この操作欄だけを横スクロールさせる。 */}
       {game.status === 'playing' && (
-        <div className="shrink-0 flex flex-wrap items-center justify-center gap-2">
-          {isMyTurn && !undoRequest && (
-            <>
-              <button
-                onClick={handlePassClick}
-                className="secondary-button flex items-center gap-1.5 text-xs px-3 py-1.5"
-              >
-                <SkipForward className="w-3.5 h-3.5" /> パス
-              </button>
-              <button
-                onClick={handleResignClick}
-                className="secondary-button flex items-center gap-1.5 text-xs px-3 py-1.5 border-alert/25 hover:bg-alert/10 hover:text-alert-text"
-              >
-                <Flag className="w-3.5 h-3.5" /> 投了
-              </button>
-            </>
-          )}
-          {/* 「待った」は滅多に押さない申請なので、パス・投了より一段軽くする。
-              手番がどちらかは上の対局情報バー（手番側に敷いた面）で示している。 */}
-          {canRequestUndo && (
-            <button
-              onClick={() => {
-                if (confirm('自分の最後の一手を取り消す「待った」を相手に申請しますか？\n（相手が既に打っていれば、その一手も一緒に戻ります）')) requestUndo();
-              }}
-              className="flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-[11px] text-muted transition-colors duration-150 hover:bg-raised hover:text-ink"
-            >
-              <Undo2 className="h-3.5 w-3.5" /> 待った
-            </button>
-          )}
-          <span data-testid="turn-indicator" className="text-xs text-muted">
-            {isMyTurn ? (
-              <span className="text-accent-text font-bold">あなたの番です</span>
-            ) : isParticipant ? (
-              '相手の番です'
-            ) : (
-              `${resolvePlayerName(currentColor === 'BLACK' ? game.black_player : game.white_player, students)}の番`
+        <div data-testid="game-controls-slot" className="h-9 shrink-0 overflow-x-auto">
+          <div className="flex h-full w-max min-w-full items-center justify-center gap-2 px-1">
+            {isMyTurn && !undoRequest && (
+              <>
+                <button
+                  onClick={handlePassClick}
+                  className="secondary-button flex items-center gap-1.5 text-xs px-3 py-1.5"
+                >
+                  <SkipForward className="w-3.5 h-3.5" /> パス
+                </button>
+                <button
+                  onClick={handleResignClick}
+                  className="secondary-button flex items-center gap-1.5 text-xs px-3 py-1.5 border-alert/25 hover:bg-alert/10 hover:text-alert-text"
+                >
+                  <Flag className="w-3.5 h-3.5" /> 投了
+                </button>
+              </>
             )}
-          </span>
+            {/* 「待った」は滅多に押さない申請なので、パス・投了より一段軽くする。
+                手番がどちらかは上の対局情報バー（手番側に敷いた面）で示している。 */}
+            {canRequestUndo && (
+              <button
+                onClick={() => {
+                  if (confirm('自分の最後の一手を取り消す「待った」を相手に申請しますか？\n（相手が既に打っていれば、その一手も一緒に戻ります）')) requestUndo();
+                }}
+                className="flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-[11px] text-muted transition-colors duration-150 hover:bg-raised hover:text-ink"
+              >
+                <Undo2 className="h-3.5 w-3.5" /> 待った
+              </button>
+            )}
+            <span data-testid="turn-indicator" className="text-xs text-muted">
+              {isMyTurn ? (
+                <span className="text-accent-text font-bold">あなたの番です</span>
+              ) : isParticipant ? (
+                '相手の番です'
+              ) : (
+                `${resolvePlayerName(currentColor === 'BLACK' ? game.black_player : game.white_player, students)}の番`
+              )}
+            </span>
+          </div>
         </div>
       )}
 
