@@ -13,9 +13,11 @@ interface Props {
   onResize: (next: number) => void;
   onCommit: (next: number) => void;
   label: string;
+  /** カメラ列など、調整できることを常時見せたい境界に短い案内を表示する。 */
+  showLabel?: boolean;
 }
 
-export default function VerticalResizer({ targetRef, onResize, onCommit, label }: Props) {
+export default function VerticalResizer({ targetRef, onResize, onCommit, label, showLabel = false }: Props) {
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const latestRef = useRef(0);
@@ -70,13 +72,21 @@ export default function VerticalResizer({ targetRef, onResize, onCommit, label }
       }}
       style={{
         flexShrink: 0,
-        height: 7,
+        height: showLabel ? 18 : 7,
         cursor: 'row-resize',
         touchAction: 'none',
         background: dragging ? 'var(--color-accent)' : 'var(--color-line)',
         transition: dragging ? undefined : 'background-color .15s ease-in-out',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: dragging ? 'var(--color-accent-ink)' : 'var(--color-muted)',
+        fontSize: 10,
+        userSelect: 'none',
       }}
       title={`${label}（上下にドラッグ、矢印キーでも動きます）`}
-    />
+    >
+      {showLabel ? '↕ 映像の高さを調整' : null}
+    </div>
   );
 }

@@ -63,4 +63,18 @@ describe('VerticalResizer', () => {
     expect(onResize).toHaveBeenLastCalledWith(184);
     expect(onCommit).toHaveBeenLastCalledWith(184);
   });
+
+  it('カメラ列では高さを調整できる案内を表示する', () => {
+    const ref = createRef<HTMLDivElement>();
+    render(
+      <VerticalResizer
+        targetRef={ref}
+        onResize={vi.fn()}
+        onCommit={vi.fn()}
+        label="参加者映像の高さ"
+        showLabel
+      />,
+    );
+    expect(screen.getByText('↕ 映像の高さを調整')).toBeInTheDocument();
+  });
 });

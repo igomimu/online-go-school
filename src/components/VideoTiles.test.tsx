@@ -56,6 +56,23 @@ describe('VideoTiles', () => {
     expect(requestFullscreen).toHaveBeenCalledOnce();
   });
 
+  it('講師が映像列を広げた高さに合わせ、16対9のままタイルを拡大する', () => {
+    const studentVideo = document.createElement('video');
+    render(
+      <VideoTiles
+        videoElements={new Map([['sid:1004', studentVideo]])}
+        localIdentity="teacher"
+        participants={participants}
+        variant="classroom"
+        classroomTileHeight={180}
+      />,
+    );
+
+    const tile = studentVideo.parentElement?.parentElement as HTMLElement;
+    expect(tile).toHaveStyle({ height: '180px', width: '320px' });
+    expect(studentVideo.parentElement).toHaveClass('[&>video]:object-contain');
+  });
+
   it('映像がない時は参加者映像の空枠を表示しない', () => {
     render(
       <VideoTiles

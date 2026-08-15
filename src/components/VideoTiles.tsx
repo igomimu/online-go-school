@@ -10,6 +10,8 @@ interface VideoTilesProps {
   participants?: ParticipantInfo[];
   students?: Student[];
   variant?: 'compact' | 'classroom';
+  /** 講師画面の可変映像高。未指定なら従来の16:9既定サイズ。 */
+  classroomTileHeight?: number;
 }
 
 function VideoTile({
@@ -17,11 +19,13 @@ function VideoTile({
   videoElement,
   isLocal,
   variant,
+  classroomTileHeight,
 }: {
   label: string;
   videoElement: HTMLVideoElement;
   isLocal: boolean;
   variant: 'compact' | 'classroom';
+  classroomTileHeight?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const displayLabel = isLocal ? '自分' : (label || '参加者');
@@ -49,7 +53,13 @@ function VideoTile({
 
   if (variant === 'classroom') {
     return (
-      <div className="group relative shrink-0 w-[168px] sm:w-[192px] aspect-video bg-black overflow-hidden border border-white/15">
+      <div
+        className="group relative shrink-0 w-[168px] sm:w-[192px] aspect-video bg-black overflow-hidden border border-white/15"
+        style={classroomTileHeight === undefined ? undefined : {
+          height: classroomTileHeight,
+          width: classroomTileHeight * (16 / 9),
+        }}
+      >
         <div
           ref={containerRef}
           className={`absolute inset-0 [&>video]:w-full [&>video]:h-full [&>video]:object-contain ${isLocal ? '[&>video]:scale-x-[-1]' : ''}`}
@@ -89,6 +99,7 @@ export default function VideoTiles({
   participants = [],
   students = [],
   variant = 'compact',
+  classroomTileHeight,
 }: VideoTilesProps) {
   if (videoElements.size === 0) return null;
 
@@ -119,6 +130,7 @@ export default function VideoTiles({
             videoElement={element}
             isLocal={identity === localIdentity}
             variant={variant}
+            classroomTileHeight={classroomTileHeight}
           />
         ))}
       </div>

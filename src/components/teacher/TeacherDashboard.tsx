@@ -285,6 +285,9 @@ export default function TeacherDashboard({
   // 生徒一覧の高さは、つまんで変えられる
   const roster = useStoredHeight('roster', 72, 640);
   const rosterRef = useRef<HTMLDivElement>(null);
+  // 参加者映像も、縦長のカメラや表情を大きく見たい場面に合わせて広げられる。
+  const videoStrip = useStoredHeight('video-strip', 96, 360);
+  const videoStripRef = useRef<HTMLDivElement>(null);
 
   // タイトルバーのクラス名
   const classroomName = selectedClassroom?.name || '三村囲碁オンライン';
@@ -302,11 +305,14 @@ export default function TeacherDashboard({
       {/* 参加者映像は教室全体を見渡せるよう、細い右欄ではなく上部へ横一列に置く。 */}
       {videoElements.size > 0 && (
         <div
+          ref={videoStripRef}
           data-testid="teacher-video-strip"
           style={{
             flexShrink: 0,
+            height: videoStrip.height ?? undefined,
             background: '#000',
             borderBottom: '1px solid var(--color-line)',
+            overflow: 'hidden',
           }}
         >
           <VideoTiles
@@ -315,8 +321,18 @@ export default function TeacherDashboard({
             participants={participants}
             students={allStudents}
             variant="classroom"
+            classroomTileHeight={videoStrip.height === null ? undefined : Math.max(64, videoStrip.height - 16)}
           />
         </div>
+      )}
+      {videoElements.size > 0 && (
+        <VerticalResizer
+          label="参加者映像の高さ"
+          targetRef={videoStripRef}
+          onResize={videoStrip.commit}
+          onCommit={videoStrip.save}
+          showLabel
+        />
       )}
 
       {/* タイトルバー */}
