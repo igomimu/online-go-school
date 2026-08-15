@@ -5,7 +5,7 @@ import type { Student, Classroom, RankDisplay } from '../../types/classroom';
 import { DEFAULT_RANK_DISPLAY } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
 import { identityMatchesPlayer, parseIdentity, resolvePlayerName, stripSid, studentIdentityCandidates } from '../../utils/identityUtils';
-import { fetchActiveLiveGamesForPlayers, finishGame, getSupabase, liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
+import { fetchActiveLiveGamesForPlayers, finishGame, getSupabase, interruptGame, liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
 import { loadSavedGamesForStudent } from '../../utils/savedGames';
 import { isTimeoutResult } from '../../utils/scoring';
 
@@ -48,7 +48,6 @@ interface TeacherDashboardProps {
   videoElements: Map<string, HTMLVideoElement>;
   studentJoinInfo: string;
   onCreateGame: () => void;
-  onStartGameWithStudent?: (identity: string) => void;
   onStartLecture: () => void;
   onLoadSgf: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onDisconnect: () => void;
@@ -90,7 +89,6 @@ export default function TeacherDashboard({
   videoElements,
   studentJoinInfo,
   onCreateGame,
-  onStartGameWithStudent,
   onStartLecture,
   onLoadSgf,
   onDisconnect,
@@ -322,6 +320,15 @@ export default function TeacherDashboard({
     }
   }, []);
 
+  const handleInterruptGame = useCallback(async (gameId: string) => {
+    if (!confirm('この対局を中断しますか？\nあとで「再開」から続けられます。')) return;
+    try {
+      await interruptGame(gameId);
+    } catch (err) {
+      alert(`対局の中断に失敗しました: ${err}`);
+    }
+  }, []);
+
   // 生徒一覧の高さは、つまんで変えられる
   const roster = useStoredHeight('roster', 72, 640);
   const rosterRef = useRef<HTMLDivElement>(null);
@@ -434,24 +441,10 @@ export default function TeacherDashboard({
           sharingTargets={sharingTargets}
           onToggleSharing={onToggleSharing}
           onOpenHistory={handleOpenHistory}
-          onStartGame={onStartGameWithStudent}
+          onInterruptGame={gameId => { void handleInterruptGame(gameId); }}
+          onResumeGame={onResumeGame}
           onEditStudent={setEditingStudentInfo}
           onMoveStudent={handleMoveStudent}
-          onOpenStudent={(identity) => {
-            // 対局中(playing)の生徒のみ来る前提（StudentTable 側で gate 済み）
-            const game = filteredGames.find(g =>
-              (identityMatchesPlayer(identity, g.blackPlayer) || identityMatchesPlayer(identity, g.whitePlayer)) &&
-              g.status === 'playing'
-            );
-            if (!game) return;
-            // 先生自身の対局なら講師専用の別ウィンドウ（1盤表示+ローテーション）で開く
-            if (identityMatchesPlayer(localIdentity, game.blackPlayer) || identityMatchesPlayer(localIdentity, game.whitePlayer)) {
-              setObservingGameId(null);
-              onOpenTeacherGameWindow();
-            } else {
-              setObservingGameId(game.id);
-            }
-          }}
         />
       </div>
       <VerticalResizer

@@ -86,18 +86,6 @@ export async function clickReconnectAndWaitCycle(page: Page, timeout = 30_000): 
   await expect(button).toBeEnabled();
 }
 
-/**
- * StudentTable で指定生徒の行の「開く」ボタンを取得する。
- * disabled / enabled の状態確認や click に使う。
- */
-export function getOpenStudentButton(page: Page, studentId: string) {
-  const name = studentNameFromId(studentId);
-  const row = name
-    ? page.locator(`tr[data-student-id="${studentId}"], tr`).filter({ hasText: name }).first()
-    : page.locator(`tr[data-student-id="${studentId}"]`).first();
-  return row.locator('button', { hasText: '開く' });
-}
-
 function studentNameFromId(studentId: string): string | undefined {
   if (studentId === TEST_STUDENT_A.id || studentId === TEST_STUDENT_A.code) return TEST_STUDENT_A.name;
   if (studentId === TEST_STUDENT_B.id || studentId === TEST_STUDENT_B.code) return TEST_STUDENT_B.name;

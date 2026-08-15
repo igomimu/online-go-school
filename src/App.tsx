@@ -81,7 +81,6 @@ function App() {
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
   const [autoOpenedGameId, setAutoOpenedGameId] = useState<string | null>(null);
   const [showGameCreation, setShowGameCreation] = useState(false);
-  const [gameCreationBlack, setGameCreationBlack] = useState<string | null>(null); // 生徒一覧から開始した時の黒番プリセット
   const [showSettings, setShowSettings] = useState(false);
 
   // 教師フェーズ: manage=教室管理, classroom=授業中
@@ -973,7 +972,6 @@ function App() {
     }
     await liveGameList.createGame(opts);
     setShowGameCreation(false);
-    setGameCreationBlack(null);
   };
 
   // 詰碁: 配信
@@ -1583,8 +1581,7 @@ function App() {
             onChatSend={chat.sendMessage}
             videoElements={videoElements}
             studentJoinInfo={studentJoinInfo}
-            onCreateGame={() => { setGameCreationBlack(null); setShowGameCreation(true); }}
-            onStartGameWithStudent={(identity) => { setGameCreationBlack(identity); setShowGameCreation(true); }}
+            onCreateGame={() => { setShowGameCreation(true); }}
             onStartLecture={handleStartLecture}
             onLoadSgf={handleSgfLoadFromLobby}
             onDisconnect={handleDisconnect}
@@ -1785,10 +1782,9 @@ function App() {
         <GameCreationDialog
           students={participants.filter(p => p.identity !== (classroomRef.current?.localIdentity ?? '')).map(p => p.identity)}
           teacherName={classroomRef.current?.localIdentity || TEACHER_IDENTITY}
-          onClose={() => { setShowGameCreation(false); setGameCreationBlack(null); }}
+          onClose={() => { setShowGameCreation(false); }}
           onCreate={handleCreateGame}
           registeredStudents={students}
-          initialBlackPlayer={gameCreationBlack ?? undefined}
           onNigiriDraw={handleNigiriDraw}
         />
       )}

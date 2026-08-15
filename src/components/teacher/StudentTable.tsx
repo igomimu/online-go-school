@@ -6,6 +6,7 @@ import { resolveGrade } from '../../utils/gradeCalc';
 import { anyIdentityMatchesPlayer, identityMatchesPlayer, studentIdentityCandidates } from '../../utils/identityUtils';
 import { isSharingTarget, type SharingTargets } from '../../utils/sharingTargets';
 import { displayRank, DEFAULT_RANK_DISPLAY, type RankDisplay } from '../../types/classroom';
+import { isTimeoutResult } from '../../utils/scoring';
 
 /** 接続列のアイコン切替。押す操作はチェックボックスのまま（role=checkbox） */
 function ConnectionToggle({
@@ -57,9 +58,9 @@ interface StudentTableProps {
   onSelectStudent?: (identity: string) => void;
   /** 棋力の見せ方（教室ごと）。段級=「初段」/ ランク=「R12」 */
   rankDisplay?: RankDisplay;
-  onOpenStudent?: (studentIdentity: string) => void;
   onOpenHistory?: (student: Student) => void;
-  onStartGame?: (identity: string) => void;
+  onInterruptGame?: (gameId: string) => void;
+  onResumeGame?: (gameId: string) => void;
   onEditStudent?: (student: Student) => void;
   onMoveStudent?: (studentId: string, direction: 'up' | 'down') => void;
 }
@@ -76,9 +77,9 @@ export default function StudentTable({
   onToggleSharing,
   onSelectStudent,
   rankDisplay = DEFAULT_RANK_DISPLAY,
-  onOpenStudent,
   onOpenHistory,
-  onStartGame,
+  onInterruptGame,
+  onResumeGame,
   onEditStudent,
   onMoveStudent,
 }: StudentTableProps) {
@@ -91,8 +92,7 @@ export default function StudentTable({
           <tr className="text-[11px] tracking-wide text-muted whitespace-nowrap" style={{ background: 'var(--color-raised)', borderBottom: '1px solid var(--color-line)' }}>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 46 }}>状態</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 116 }}>接続</th>
-            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 50 }}>対局</th>
-            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 50 }}>詳細</th>
+            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 64 }}>操作</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 56 }}>棋譜</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 50 }}>編集</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 52 }}>順序</th>
@@ -107,6 +107,9 @@ export default function StudentTable({
         <tbody>
           {rows.map((row, i) => {
             const perm = audioPermissions[row.identity] || { canHear: true, micAllowed: true, cameraAllowed: true };
+            const canInterrupt = row.game?.status === 'playing' || row.game?.status === 'scoring';
+            const canResume = row.game?.status === 'interrupted'
+              || (row.game?.status === 'finished' && isTimeoutResult(row.game.result));
             // 接続中は面を一段持ち上げ、先頭（アクティブ）行だけ榧を薄く敷く
             const bgColor = row.isConnected
               ? (i === 0 ? 'color-mix(in oklab, var(--color-accent) 16%, var(--color-surface))' : 'var(--color-raised)')
@@ -184,43 +187,38 @@ export default function StudentTable({
                   )}
                 </td>
 
-                {/* 対局（進行中は状態表示、対局していない接続中の生徒は新規対局開始ボタン） */}
+                {/* 操作。盤を開く操作は中央の碁盤クリックへ一本化し、ここには状態変更だけを置く。 */}
                 <td className="px-2 py-1.5 border-b border-line text-center font-medium">
-                  {row.gameStatus === 'playing' && '●'}
-                  {row.gameStatus === 'scoring' && '整'}
-                  {row.gameStatus === 'finished' && '済'}
-                  {row.gameStatus === 'interrupted' && '断'}
-                  {/* 時間切れ終局は再開できるよう一覧に残るが、次の対局は普通に始められる必要がある */}
-                  {(!row.gameStatus || row.gameStatus === 'finished') && row.isConnected && row.identity && onStartGame && (
+                  {canInterrupt && row.game && onInterruptGame && (
                     <button
-                      className="px-1 border border-accent/40 bg-accent text-accent-ink hover:bg-accent/85"
-                      style={{ fontSize: 10 }}
-                      title="この生徒と新規対局を開始"
+                      type="button"
+                      data-testid={`interrupt-game-${row.student?.id || row.identity}`}
+                      className="rounded border border-alert/60 bg-surface px-2 py-0.5 text-alert-text hover:bg-alert/10"
+                      style={{ fontSize: 10.5, fontWeight: 700 }}
                       onClick={e => {
                         e.stopPropagation();
-                        onStartGame(row.identity);
+                        onInterruptGame(row.game!.id);
                       }}
                     >
-                      対局
+                      中断
                     </button>
                   )}
-                </td>
-
-                {/* 詳細 — 対局中の生徒のみ観戦モードへ */}
-                <td className="px-2 py-1.5 border-b border-line text-center font-medium">
-                  {row.isConnected && (
+                  {canResume && row.game && onResumeGame && (
                     <button
-                      className={row.gameStatus === 'playing'
-                        ? "px-1 text-xs border border-line bg-raised text-ink hover:bg-line"
-                        : "px-1 text-xs border border-line bg-ground text-muted cursor-not-allowed"}
-                      style={{ fontSize: 10 }}
-                      disabled={row.gameStatus !== 'playing'}
+                      type="button"
+                      data-testid={`resume-game-${row.student?.id || row.identity}`}
+                      className="rounded border border-accent/50 bg-accent px-2 py-0.5 text-accent-ink hover:bg-accent/85"
+                      style={{ fontSize: 10.5, fontWeight: 700 }}
                       onClick={e => {
                         e.stopPropagation();
-                        if (row.gameStatus === 'playing' && row.identity) onOpenStudent?.(row.identity);
+                        if (
+                          row.game?.status === 'finished'
+                          && !confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')
+                        ) return;
+                        onResumeGame(row.game!.id);
                       }}
                     >
-                      開く
+                      再開
                     </button>
                   )}
                 </td>
@@ -335,6 +333,7 @@ interface StudentRow {
   displayName: string;
   isConnected: boolean;
   student: Student | null;
+  game: GameSession | null;
   gameStatus: 'playing' | 'scoring' | 'finished' | 'interrupted' | null;
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -357,11 +356,12 @@ function buildRows(
     const isConnected = !!p && p.identity !== localIdentity;
     const identity = p?.identity || s.id;
     const candidates = [...studentCandidates, identity];
-    // 時間切れ終局の対局は再開のため一覧に残るので、進行中の対局を優先して拾う
+    // 中断局や時間切れ局が一覧に残っていても、現在進行中の対局を最優先する。
     const matchesCandidates = (g: GameSession) =>
       anyIdentityMatchesPlayer(candidates, g.blackPlayer) ||
       anyIdentityMatchesPlayer(candidates, g.whitePlayer);
-    const game = games.find(g => matchesCandidates(g) && g.status !== 'finished')
+    const game = games.find(g => matchesCandidates(g) && (g.status === 'playing' || g.status === 'scoring'))
+      ?? games.find(g => matchesCandidates(g) && g.status === 'interrupted')
       ?? games.find(matchesCandidates);
 
     rows.push({
@@ -369,6 +369,7 @@ function buildRows(
       displayName: p?.name || s.name,
       isConnected,
       student: s,
+      game: game ?? null,
       gameStatus: game?.status || null,
       canMoveUp: i > 0,
       canMoveDown: i < students.length - 1,
@@ -387,13 +388,15 @@ function buildRows(
     const matchesParticipant = (g: GameSession) =>
       identityMatchesPlayer(p.identity, g.blackPlayer) ||
       identityMatchesPlayer(p.identity, g.whitePlayer);
-    const game = games.find(g => matchesParticipant(g) && g.status !== 'finished')
+    const game = games.find(g => matchesParticipant(g) && (g.status === 'playing' || g.status === 'scoring'))
+      ?? games.find(g => matchesParticipant(g) && g.status === 'interrupted')
       ?? games.find(matchesParticipant);
     rows.push({
       identity: p.identity,
       displayName: p.name || p.identity,
       isConnected: true,
       student: null,
+      game: game ?? null,
       gameStatus: game?.status || null,
       canMoveUp: false,
       canMoveDown: false,
