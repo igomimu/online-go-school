@@ -68,6 +68,7 @@ export type ClassroomEventHandler = {
   onParticipantLeft?: (identity: string, name?: string) => void;
   onParticipantsChanged?: (participants: ParticipantInfo[]) => void;
   onConnectionStateChanged?: (state: ConnectionState) => void;
+  onReconnected?: () => void;
   onActiveSpeakersChanged?: (speakers: string[]) => void;
 };
 
@@ -136,6 +137,10 @@ export class ClassroomLiveKit {
 
     this.room.on(RoomEvent.ConnectionStateChanged, (state: ConnectionState) => {
       this.handlers.onConnectionStateChanged?.(state);
+    });
+
+    this.room.on(RoomEvent.Reconnected, () => {
+      this.handlers.onReconnected?.();
     });
 
     this.room.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {

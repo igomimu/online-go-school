@@ -50,6 +50,7 @@ import { useParticipantLog } from './hooks/useParticipantLog';
 import type { ChatMessagePayload } from './types/chat';
 import type { AiAnalysisSyncPayload } from './types/ai';
 import { resolveEffectiveViewMode } from './utils/viewMode';
+import { applyMediaIntent, clearMediaIntent, loadMediaIntent, saveMediaIntent, type MediaIntent } from './utils/mediaIntent';
 
 import { Settings } from 'lucide-react';
 
@@ -91,6 +92,25 @@ function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   const [audioPermissions, setAudioPermissions] = useState<AudioPermissions>({});
+  // 実トラックの状態とは別に「本人が最後にONにしていたか」を保持する。
+  // Room再作成やページ再読込でLiveKitのgetterがfalseへ戻っても、この値から復元する。
+  const mediaIntentRef = useRef<Record<Role, MediaIntent>>({
+    TEACHER: loadMediaIntent('TEACHER'),
+    STUDENT: loadMediaIntent('STUDENT'),
+  });
+
+  const rememberMediaIntent = useCallback((targetRole: Role, patch: Partial<MediaIntent>) => {
+    const next = { ...mediaIntentRef.current[targetRole], ...patch };
+    mediaIntentRef.current[targetRole] = next;
+    saveMediaIntent(targetRole, next);
+  }, []);
+
+  const restoreMediaIntent = useCallback(async (classroom: ClassroomLiveKit, targetRole: Role) => {
+    const desired = mediaIntentRef.current[targetRole];
+    const actual = await applyMediaIntent(classroom, desired);
+    setIsMicEnabled(actual.mic);
+    setIsCameraEnabled(actual.camera);
+  }, []);
 
   // 参加者
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
@@ -503,9 +523,13 @@ function App() {
         // メディア制御（生徒用）
         if (msg.type === 'MEDIA_CONTROL' && connectRole === 'STUDENT' && msg.payload) {
           const p = msg.payload as { micAllowed: boolean; cameraAllowed: boolean };
-          if (!p.micAllowed && classroomRef.current?.isMicrophoneEnabled) {
-            classroomRef.current.disableMicrophone();
+          if (!p.micAllowed) {
+            if (classroomRef.current?.isMicrophoneEnabled) {
+              classroomRef.current.disableMicrophone();
+            }
             setIsMicEnabled(false);
+            // 講師が明示的に禁止した状態は、再接続で勝手に覆さない。
+            rememberMediaIntent('STUDENT', { mic: false });
           }
         }
 
@@ -541,6 +565,11 @@ function App() {
           saveAccount(rawStudentCode || studentId, studentClassroomId);
         }
       },
+      // Full reconnectでは一度ローカルトラックが外れて再公開されるため、
+      // LiveKitのReconnectedイベントを正本にして直前の利用状態を再適用する。
+      onReconnected: () => {
+        void restoreMediaIntent(classroom, connectRole);
+      },
       onActiveSpeakersChanged: (speakers: string[]) => {
         setActiveSpeakers(speakers);
       },
@@ -575,6 +604,7 @@ function App() {
       });
 
       await classroom.connect(livekitUrl, connectToken);
+      await restoreMediaIntent(classroom, connectRole);
       setConnectionError('');
 
       if (connectRole === 'TEACHER') {
@@ -589,7 +619,7 @@ function App() {
     // notificationSound.play は ref 経由）。依存に入れると毎レンダー作り直しになり、
     // かえって接続処理が張り直される。rawStudentCode は studentId と同時に更新される。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomName, livekitUrl, studentId, studentClassroomId, selectedClassroomId, userName]);
+  }, [roomName, livekitUrl, studentId, studentClassroomId, selectedClassroomId, userName, rememberMediaIntent, restoreMediaIntent]);
 
   // URL params for student auto-join
   useEffect(() => {
@@ -768,6 +798,7 @@ function App() {
     try {
       const enabled = await classroomRef.current.toggleMicrophone();
       setIsMicEnabled(enabled);
+      if (role) rememberMediaIntent(role, { mic: enabled });
     } catch (err) {
       setAudioDebug(`マイクエラー: ${err instanceof Error ? err.message : String(err)}`);
       alert(mediaErrorMessage(err, 'マイク'));
@@ -796,6 +827,7 @@ function App() {
     try {
       const enabled = await classroomRef.current.toggleCamera();
       setIsCameraEnabled(enabled);
+      if (role) rememberMediaIntent(role, { camera: enabled });
     } catch (err) {
       setAudioDebug(`カメラエラー: ${err instanceof Error ? err.message : String(err)}`);
       alert(mediaErrorMessage(err, 'カメラ'));
@@ -803,6 +835,12 @@ function App() {
   };
 
   const handleDisconnect = async () => {
+    if (role) {
+      clearMediaIntent(role);
+      mediaIntentRef.current[role] = { mic: false, camera: false };
+    }
+    setIsMicEnabled(false);
+    setIsCameraEnabled(false);
     // 生徒用自動ログイン情報の消去
     localStorage.removeItem('go-school-last-role');
     localStorage.removeItem('go-school-last-student-id');
@@ -853,11 +891,9 @@ function App() {
   };
 
   // 回線復旧: 現在の Room を畳んで同じ識別情報で再接続。viewMode や teacherPhase は維持。
-  // 「ユーザー意図」のマイク/カメラ状態は React state を信じて復元する（getter は切断後に false を返すため）。
+  // connectLiveKitが保存済みの利用意図からマイク・カメラも復元する。
   const handleReconnect = useCallback(async () => {
     if (!role || isReconnecting) return;
-    const wantMic = isMicEnabled;
-    const wantCam = isCameraEnabled;
     const identity = role === 'TEACHER'
       ? TEACHER_IDENTITY
       : (studentId ? makeStudentIdentity(studentId) : userName);
@@ -867,21 +903,12 @@ function App() {
       setParticipants([]);
       setVideoElements(new Map());
       await connectLiveKit(role, identity, roomName, selectedClassroomId ?? studentClassroomId ?? '');
-      const classroom = classroomRef.current;
-      if (wantMic && classroom) {
-        await classroom.enableMicrophone();
-        setIsMicEnabled(true);
-      }
-      if (wantCam && classroom) {
-        await classroom.enableCamera();
-        setIsCameraEnabled(true);
-      }
     } catch (err) {
       setConnectionError(err instanceof Error ? err.message : '回線復旧に失敗しました');
     } finally {
       setIsReconnecting(false);
     }
-  }, [role, isReconnecting, isMicEnabled, isCameraEnabled, userName, studentId, roomName, selectedClassroomId, studentClassroomId, connectLiveKit]);
+  }, [role, isReconnecting, userName, studentId, roomName, selectedClassroomId, studentClassroomId, connectLiveKit]);
 
   const saveSettings = () => {
     localStorage.setItem('lk-url', livekitUrl);
@@ -1187,6 +1214,7 @@ function App() {
       setAudioDebug(prev => prev + ' [先生音声状態リセット]');
       await classroomRef.current.room.localParticipant.setMicrophoneEnabled(true);
       setIsMicEnabled(true);
+      if (role) rememberMediaIntent(role, { mic: true });
       setIsMuted(false);
     } catch (err) {
       console.error('Clear audio M error:', err);

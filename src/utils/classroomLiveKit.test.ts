@@ -7,6 +7,7 @@ vi.mock('livekit-client', () => {
     ParticipantConnected: 'participantConnected',
     ParticipantDisconnected: 'participantDisconnected',
     ConnectionStateChanged: 'connectionStateChanged',
+    Reconnected: 'reconnected',
     ActiveSpeakersChanged: 'activeSpeakersChanged',
     TrackSubscribed: 'trackSubscribed',
     TrackUnsubscribed: 'trackUnsubscribed',
@@ -260,6 +261,15 @@ describe('ClassroomLiveKit', () => {
       );
 
       expect(onConnectionStateChanged).toHaveBeenCalledWith('connected');
+    });
+
+    it('LiveKitの自動再接続完了をonReconnectedへ通知する', () => {
+      const onReconnected = vi.fn();
+      classroom.setHandlers({ onReconnected });
+
+      (classroom.room as unknown as { emit: Function }).emit('reconnected');
+
+      expect(onReconnected).toHaveBeenCalledOnce();
     });
 
     it('ActiveSpeakersChangedでidentity配列が渡される', () => {
