@@ -180,6 +180,7 @@ export function formatGameResultMessage(result: string): string {
   }
   // 設定間違いで始めた対局を講師が取り消したもの（勝敗ではない）
   if (result === '取消') return 'この対局は取り消されました';
+  if (result === '中断') return 'この対局は中断中です';
   const timedOut = timedOutColorFromResult(result);
   if (timedOut) {
     const loserColor = timedOut === 'BLACK' ? '黒' : '白';

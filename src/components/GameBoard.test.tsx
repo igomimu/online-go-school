@@ -37,6 +37,8 @@ describe('GameBoard', () => {
   const mockSubmitResign = vi.fn();
   const mockSetDeadStones = vi.fn();
   const mockFinishWithResult = vi.fn();
+  const mockInterruptGame = vi.fn();
+  const mockResumeGame = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -89,6 +91,9 @@ describe('GameBoard', () => {
       enterScoring: vi.fn(),
       setDeadStones: mockSetDeadStones,
       finishWithResult: mockFinishWithResult,
+      resetGame: vi.fn(),
+      interruptGame: mockInterruptGame,
+      resumeGame: mockResumeGame,
       ...overrides,
     };
 
@@ -227,6 +232,24 @@ describe('GameBoard', () => {
     expect(screen.getByText('相手の番です')).toBeInTheDocument();
   });
 
+  it('講師は手番に関係なく対局を中断でき、生徒には中断ボタンを出さない', () => {
+    const game = createMockGame({ currentColor: 'WHITE', moveNumber: 3 });
+    setupMock({ game, myColor: null, isParticipant: false, isMyTurn: false });
+    const { unmount } = render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+    expect(screen.queryByTestId('interrupt-game')).not.toBeInTheDocument();
+    unmount();
+
+    setupMock({ game, myColor: null, isParticipant: false, isMyTurn: false });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<GameBoard gameId="game-1" myIdentity="先生" isTeacher />);
+    fireEvent.click(screen.getByTestId('interrupt-game'));
+
+    expect(mockInterruptGame).toHaveBeenCalledTimes(1);
+    expect(window.confirm).toHaveBeenCalledWith(
+      'この対局を中断しますか？\n棋譜履歴の「再開」から後で続けられます。',
+    );
+  });
+
   it('終局時は結果を表示しボタンは非表示', () => {
     const game = createMockGame({ status: 'finished', result: 'B+R' });
     setupMock({ game });
@@ -351,7 +374,6 @@ describe('GameBoard', () => {
     expect(container.querySelector('line[stroke="#e53e3e"]')).not.toBeInTheDocument();
   });
   it('時間切れ終局では講師にだけ「対局を再開する」ボタンを出す', () => {
-    const mockResumeGame = vi.fn();
     const game = createMockGame({ status: 'finished', result: 'W+T' });
 
     setupMock({ game, resumeGame: mockResumeGame });
@@ -365,6 +387,22 @@ describe('GameBoard', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByTestId('resume-timeout-game'));
     expect(mockResumeGame).toHaveBeenCalled();
+  });
+
+  it('中断した対局は講師がその場から再開でき、生徒には再開ボタンを出さない', () => {
+    const game = createMockGame({ status: 'interrupted', result: '中断', moveNumber: 42 });
+
+    setupMock({ game });
+    const { unmount } = render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+    expect(screen.getByText('この対局は中断中です')).toBeInTheDocument();
+    expect(screen.queryByTestId('resume-interrupted-game')).not.toBeInTheDocument();
+    unmount();
+
+    setupMock({ game });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<GameBoard gameId="game-1" myIdentity="先生" isTeacher />);
+    fireEvent.click(screen.getByTestId('resume-interrupted-game'));
+    expect(mockResumeGame).toHaveBeenCalledTimes(1);
   });
 
   it('投了で終わった対局には再開ボタンを出さない', () => {

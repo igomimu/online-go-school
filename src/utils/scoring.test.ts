@@ -164,6 +164,10 @@ describe('formatGameResultMessage', () => {
     expect(formatGameResultMessage('取消')).toBe('この対局は取り消されました');
   });
 
+  it('中断した対局は終局結果ではなく再開待ちとして表示する', () => {
+    expect(formatGameResultMessage('中断')).toBe('この対局は中断中です');
+  });
+
   it('未知の結果表記はそのままラベル付きで表示', () => {
     expect(formatGameResultMessage('強制終局')).toBe('結果: 強制終局');
   });

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import GoBoard from './GoBoard';
 import ZoomTapConfirm from './ZoomTapConfirm';
 import type { Drawing, Marker } from './GoBoard';
-import { Flag, SkipForward, Check, RefreshCw, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban, Triangle, MousePointerClick, Eye } from 'lucide-react';
+import { Flag, SkipForward, Check, RefreshCw, Pause, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban, Triangle, MousePointerClick, Eye } from 'lucide-react';
 import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, formatKomiLabel, isTimeoutResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
@@ -54,6 +54,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     setDeadStones,
     finishWithResult,
     resetGame,
+    interruptGame,
     resumeGame,
     teacherColor,
     requestUndo,
@@ -217,6 +218,12 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     const resultStr = formatScoringResult(scoringResult);
     finishWithResult(resultStr);
   }, [scoringResult, finishWithResult]);
+
+  const handleInterruptClick = useCallback(async () => {
+    if (!isTeacher) return;
+    if (!confirm('この対局を中断しますか？\n棋譜履歴の「再開」から後で続けられます。')) return;
+    await interruptGame();
+  }, [isTeacher, interruptGame]);
 
   const broadcastDrawings = useCallback((nextDrawings: Drawing[]) => {
     classroom?.broadcast({ type: 'DRAW_UPDATE', payload: nextDrawings });
@@ -672,6 +679,13 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               <button onClick={handleScoringConfirm} className="premium-button flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4" /> 確定
               </button>
+              <button
+                data-testid="interrupt-game"
+                onClick={handleInterruptClick}
+                className="secondary-button flex items-center gap-2 text-sm"
+              >
+                <Pause className="w-4 h-4" /> 中断
+              </button>
             </div>
           )}
         </div>
@@ -739,6 +753,15 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                 <Undo2 className="h-3.5 w-3.5" /> 待った
               </button>
             )}
+            {isTeacher && !undoRequest && (
+              <button
+                data-testid="interrupt-game"
+                onClick={handleInterruptClick}
+                className="flex items-center gap-1.5 rounded-md border border-alert/30 px-2.5 py-1 text-[11px] font-bold text-alert-text transition-colors duration-150 hover:bg-alert/10"
+              >
+                <Pause className="h-3.5 w-3.5" /> 中断
+              </button>
+            )}
             <span data-testid="turn-indicator" className="text-xs text-muted">
               {isMyTurn ? (
                 <span className="text-accent-text font-bold">あなたの番です</span>
@@ -778,6 +801,18 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               data-testid="resume-timeout-game"
               onClick={async () => {
                 if (!confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')) return;
+                await resumeGame();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/15 hover:bg-accent/20 text-accent-text border border-accent/30 rounded-lg transition-colors duration-150 font-bold"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> 対局を再開する
+            </button>
+          )}
+          {isTeacher && game.status === 'interrupted' && (
+            <button
+              data-testid="resume-interrupted-game"
+              onClick={async () => {
+                if (!confirm('中断したこの対局を再開しますか？')) return;
                 await resumeGame();
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/15 hover:bg-accent/20 text-accent-text border border-accent/30 rounded-lg transition-colors duration-150 font-bold"

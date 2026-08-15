@@ -17,6 +17,7 @@ import {
   updateDeadStones as apiUpdateDeadStones,
   finishGame as apiFinishGame,
   resetLiveGame as apiResetLiveGame,
+  interruptGame as apiInterruptGame,
   resumeLiveGame as apiResumeLiveGame,
   requestUndo as apiRequestUndo,
   respondUndo as apiRespondUndo,
@@ -170,6 +171,8 @@ export interface UseLiveGameResult {
   setDeadStones: (deadStones: string[]) => Promise<void>;
   finishWithResult: (result: string) => Promise<void>;
   resetGame: () => Promise<void>;
+  /** 講師が対局を打ち掛けにし、棋譜履歴から後で再開できる状態にする */
+  interruptGame: () => Promise<void>;
   /** 時間切れ・中断で終わった対局を再開する（終局からの再開は講師のみ、サーバー側で判定） */
   resumeGame: () => Promise<void>;
   requestUndo: () => Promise<void>;
@@ -919,6 +922,18 @@ export function useLiveGame(
     }
   }, [activeGame]);
 
+  // 講師による打ち掛け。サーバー側で棋譜履歴を保存し、時計を止める。
+  const interruptGameFn = useCallback(async () => {
+    if (!activeGame) return;
+    try {
+      await apiInterruptGame(activeGame.id);
+      // Realtimeの到着を待たず、講師画面をすぐ中断表示に切り替える。
+      setGame((prev) => prev ? { ...prev, status: 'interrupted', result: '中断' } : null);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, [activeGame]);
+
   // 時間切れ・中断で終わった対局を再開する（講師のみ。サーバー側で権限と時計の復元を行う）
   const resumeGameFn = useCallback(async () => {
     if (!activeGame) return;
@@ -932,6 +947,7 @@ export function useLiveGame(
   return {
     game: activeGame,
     teacherColor,
+    interruptGame: interruptGameFn,
     resumeGame: resumeGameFn,
     boardState: derived.boardState,
     currentColor: derived.currentColor,
