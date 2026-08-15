@@ -8,15 +8,15 @@ export interface AiSettings {
 
 export interface AiTopMove {
   move: string;            // GTP format: "D4", "Q16", "pass"
-  winrate: number;         // 0-100%
-  scoreLead: number;       // Score lead from current player's perspective
+  winrate: number;         // Black winrate (0-100%) after client normalization
+  scoreLead: number;       // Black score lead after client normalization
   visits: number;
   pv: string[];            // Principal variation (GTP moves)
 }
 
 export interface AiAnalysisResult {
-  winrate: number;         // Current position winrate (0-100%)
-  scoreLead: number;       // Score lead
+  winrate: number;         // Black winrate (0-100%)
+  scoreLead: number;       // Black score lead
   topMoves: AiTopMove[];   // Top candidate moves
   ownership?: number[];    // Board ownership values (-1 to 1)
   analysisTime?: number;   // Server-side analysis time in seconds

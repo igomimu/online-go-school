@@ -58,6 +58,12 @@ const TEACHER_GAME_WINDOW_NAME = 'teacher-game-window';
 // 講師専用の検討別ウィンドウ。中身は本体からポータルで描く（PopupPortal 参照）。
 const TEACHER_REVIEW_WINDOW_NAME = 'teacher-review-window';
 
+function reviewKomiFromSgf(value: string | undefined, fallback = 6.5): number {
+  if (value === undefined || value.trim() === '') return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function App() {
   const [role, setRole] = useState<Role | null>(null);
   const [userName, setUserName] = useState('');
@@ -115,6 +121,7 @@ function App() {
   const [reviewRootNode, setReviewRootNode] = useState<GameNode | null>(null);
   const [reviewCurrentNode, setReviewCurrentNode] = useState<GameNode | null>(null);
   const [reviewBoardSize, setReviewBoardSize] = useState(19);
+  const [reviewKomi, setReviewKomi] = useState(6.5);
   // 検討の参加者。null=全員 / 配列=その生徒だけ / 空配列=誰にも配信しない
   const [reviewTargetStudents, setReviewTargetStudents] = useState<SharingTargets>(null);
   // 検討開始（棋譜を開いた瞬間）は useCallback の中から送るので、最新の参加者を ref で読む
@@ -210,11 +217,29 @@ function App() {
 
   // 通知音
   const notificationSound = useNotificationSound();
+  const playNotificationSound = notificationSound.play;
 
   // Supabase権威型 対局リスト（先生・生徒共通、Realtime購読）
   const effectiveClassroomId =
     role === 'TEACHER' ? selectedClassroomId : studentClassroomId;
   const liveGameList = useLiveGameList(effectiveClassroomId);
+
+  // Supabase Realtimeで終局を受けたら、講師にだけ1回チャイムを鳴らす。
+  // 現行対局はfinished更新と同時に一覧から消えるため、旧GAME_ENDEDメッセージ待ちでは検知できない。
+  // 時間切れは下の専用警告音で知らせるので、通常チャイムとは重ねない。
+  const handledFinishedEventRef = useRef(0);
+  useEffect(() => {
+    const event = liveGameList.finishedGameEvent;
+    if (!event || handledFinishedEventRef.current === event.sequence) return;
+    handledFinishedEventRef.current = event.sequence;
+    if (
+      role === 'TEACHER'
+      && event.game.classroom_id === effectiveClassroomId
+      && !isTimeoutResult(event.game.result)
+    ) {
+      playNotificationSound('gameEnd');
+    }
+  }, [liveGameList.finishedGameEvent, role, effectiveClassroomId, playNotificationSound]);
 
   // 自分（生徒）の進行中の対局。上の ref に写して、メッセージ処理から見られるようにする
   useEffect(() => {
@@ -399,6 +424,7 @@ function App() {
           setReviewRootNode(root);
           setReviewCurrentNode(root);
           setReviewBoardSize(p.boardSize);
+          setReviewKomi(reviewKomiFromSgf(parsed.metadata?.komi));
           setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null, hoveredCandidateRank: null, allowStudentInteraction: false });
           // 新しい検討が始まったら前回の許可は引き継がない（先生が改めて許可する）
           setReviewCanPlay(false);
@@ -490,7 +516,7 @@ function App() {
         }
 
         // 対局終了時の通知音
-        if (msg.type === 'GAME_ENDED') {
+        if (msg.type === 'GAME_ENDED' && connectRole === 'TEACHER') {
           notificationSound.play('gameEnd');
         }
       },
@@ -956,6 +982,7 @@ function App() {
       setReviewRootNode(root);
       setReviewCurrentNode(root);
       setReviewBoardSize(parsed.size);
+      setReviewKomi(reviewKomiFromSgf(parsed.metadata?.komi));
       // 検討を開き直したら着手の許可は持ち越さない
       setReviewMovePermissions([]);
       setReviewIsOwn(false); // 先生がSGFを読み込んで配信する検討
@@ -981,6 +1008,7 @@ function App() {
       setReviewRootNode(root);
       setReviewCurrentNode(root);
       setReviewBoardSize(parsed.size);
+      setReviewKomi(Number.isFinite(game.komi) ? game.komi : reviewKomiFromSgf(parsed.metadata?.komi));
       // 検討を開き直したら着手の許可は持ち越さない
       setReviewMovePermissions([]);
       // 生徒が自分の履歴から開いた棋譜は本人の端末内だけの検討。
@@ -1629,6 +1657,7 @@ function App() {
                 rootNode={reviewRootNode}
                 currentNode={reviewCurrentNode}
                 boardSize={reviewBoardSize}
+                komi={reviewKomi}
                 onSetCurrentNode={setReviewCurrentNode}
                 isTeacher={role === 'TEACHER'}
                 classroomRef={classroomRef}

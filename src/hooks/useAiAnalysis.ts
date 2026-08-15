@@ -6,8 +6,27 @@ import { analyzePosition, convertMovesToKatago, loadAiSettings, saveAiSettings }
 interface UseAiAnalysisOptions {
   boardSize: number;
   komi: number;
-  handicapStones?: { x: number; y: number }[];
+  initialStones?: { x: number; y: number; color: 'BLACK' | 'WHITE' }[];
+  toPlay?: 'BLACK' | 'WHITE';
   active?: boolean;
+}
+
+/** KataGoの「次に打つ側」基準の応答を、画面表示用の黒基準へ統一する。 */
+export function normalizeAiResultForBlack(
+  result: AiAnalysisResult,
+  toPlay: 'BLACK' | 'WHITE',
+): AiAnalysisResult {
+  if (toPlay === 'BLACK') return result;
+  return {
+    ...result,
+    winrate: 100 - result.winrate,
+    scoreLead: -result.scoreLead,
+    topMoves: result.topMoves.map(move => ({
+      ...move,
+      winrate: 100 - move.winrate,
+      scoreLead: -move.scoreLead,
+    })),
+  };
 }
 
 export function useAiAnalysis(
@@ -19,6 +38,11 @@ export function useAiAnalysis(
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
   const [errorState, setErrorState] = useState<{ key: string; message: string } | null>(null);
   const [settings, setSettings] = useState<AiSettings>(() => loadAiSettings());
+
+  const inferredToPlay: 'BLACK' | 'WHITE' = options.toPlay
+    ?? (moveHistory.length > 0
+      ? (moveHistory[moveHistory.length - 1].color === 'BLACK' ? 'WHITE' : 'BLACK')
+      : (options.initialStones?.some(stone => stone.color === 'BLACK') ? 'WHITE' : 'BLACK'));
 
   // Cache: 局面・分析条件を含む安定キー -> result
   const cacheRef = useRef(new Map<string, AiAnalysisResult>());
@@ -41,14 +65,15 @@ export function useAiAnalysis(
           boardSize: options.boardSize,
           komi: options.komi,
           maxVisits: settings.maxVisits,
-          initialStones: options.handicapStones?.map(s => {
+          initialStones: options.initialStones?.map(s => {
             const col = s.x >= 9
               ? String.fromCharCode(64 + s.x + 1)
               : String.fromCharCode(64 + s.x);
             const row = options.boardSize - s.y + 1;
-            return ['B', `${col}${row}`] as [string, string];
+            return [s.color === 'BLACK' ? 'B' : 'W', `${col}${row}`] as [string, string];
           }),
         } satisfies AiAnalysisRequest,
+        toPlay: inferredToPlay,
       })
     : null;
 
@@ -56,7 +81,7 @@ export function useAiAnalysis(
   useEffect(() => {
     if (!analysisKey) return;
 
-    const parsed = JSON.parse(analysisKey) as { request: AiAnalysisRequest };
+    const parsed = JSON.parse(analysisKey) as { request: AiAnalysisRequest; toPlay: 'BLACK' | 'WHITE' };
 
     // Check cache
     const cached = cacheRef.current.get(analysisKey);
@@ -82,17 +107,19 @@ export function useAiAnalysis(
       const runAnalysis = async () => {
         try {
           const quickVisits = Math.min(10, parsed.request.maxVisits);
-          const quickResult = await analyzePosition(
+          const quickRawResult = await analyzePosition(
             { ...parsed.request, maxVisits: quickVisits },
             activeController.signal,
           );
           if (activeController.signal.aborted) return;
+          const quickResult = normalizeAiResultForBlack(quickRawResult, parsed.toPlay);
           setResultState({ key: analysisKey, result: quickResult });
 
           let finalResult = quickResult;
           if (parsed.request.maxVisits > quickVisits) {
-            finalResult = await analyzePosition(parsed.request, activeController.signal);
+            const deepRawResult = await analyzePosition(parsed.request, activeController.signal);
             if (activeController.signal.aborted) return;
+            finalResult = normalizeAiResultForBlack(deepRawResult, parsed.toPlay);
             setResultState({ key: analysisKey, result: finalResult });
           }
 

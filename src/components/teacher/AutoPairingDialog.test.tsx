@@ -52,13 +52,19 @@ describe('AutoPairingDialog', () => {
     );
   });
 
-  it('秒読み「なし」にすると持ち時間0＆秒読み0で時間無制限(clock未定義)になる', () => {
+  it('秒読み「なし」にすると持ち時間の初期値が30分になる', () => {
     const onCreateGames = vi.fn();
     render(<AutoPairingDialog {...defaultProps} onCreateGames={onCreateGames} />);
     fireEvent.click(screen.getByRole('button', { name: 'なし' }));
     fireEvent.click(screen.getByText('1局を一括開始'));
     const pairs = onCreateGames.mock.calls[0][0];
-    expect(pairs[0].clock).toBeUndefined();
+    expect(pairs[0].clock).toEqual(expect.objectContaining({
+      mainTimeSeconds: 1800,
+      byoyomiSeconds: 0,
+      byoyomiPeriods: 0,
+      blackTimeLeft: 1800,
+      whiteTimeLeft: 1800,
+    }));
   });
 
   it('秒読み秒数を60秒に変更すると clock に反映される', () => {

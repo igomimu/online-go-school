@@ -24,6 +24,7 @@ interface ReviewBoardProps {
   rootNode: GameNode;
   currentNode: GameNode;
   boardSize: number;
+  komi?: number;
   onSetCurrentNode: (node: GameNode) => void;
   isTeacher: boolean;
   classroomRef: React.RefObject<ClassroomLiveKit | null>;
@@ -103,6 +104,7 @@ export default function ReviewBoard({
   rootNode,
   currentNode,
   boardSize,
+  komi = 6.5,
   onSetCurrentNode,
   isTeacher,
   classroomRef,
@@ -345,9 +347,25 @@ export default function ReviewBoard({
     return moves;
   }, [currentNode]);
 
+  // SGFのAB/AWなど、初期局面に置かれている石をKataGoへ渡す。
+  // 通常の着手石にはnumberが付くため、セットアップ石だけを分離できる。
+  const initialStones = useMemo(() => rootNode.board.flatMap((row, y) => (
+    row.flatMap((stone, x) => stone && stone.number === undefined
+      ? [{ x: x + 1, y: y + 1, color: stone.color }]
+      : [])
+  )), [rootNode]);
+
+  // KataGoの勝率・目数差は「次に打つ側」基準。白番局面では黒基準へ反転するため、
+  // 現局面の次手を明示する。置き碁の初期局面は白番から始まる。
+  const aiToPlay: 'BLACK' | 'WHITE' = currentNode.move
+    ? (currentNode.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
+    : (initialStones.some(stone => stone.color === 'BLACK') ? 'WHITE' : currentNode.activeColor);
+
   const aiAnalysis = useAiAnalysis(currentNode, moveHistory, {
     boardSize,
-    komi: 6.5, // Default; could be passed via props
+    komi,
+    initialStones,
+    toPlay: aiToPlay,
     active: isTeacher, // KataGoへの接続は先生端末だけ。生徒は同期結果を表示する。
   });
   const updateAiSettings = aiAnalysis.updateSettings;

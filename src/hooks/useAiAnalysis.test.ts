@@ -29,7 +29,7 @@ const node: GameNode = {
 const result = {
   winrate: 52.3,
   scoreLead: 1.2,
-  topMoves: [],
+  topMoves: [{ move: 'D4', winrate: 54, scoreLead: 2.5, visits: 1000, pv: ['D4'] }],
 };
 
 describe('useAiAnalysis', () => {
@@ -127,5 +127,35 @@ describe('useAiAnalysis', () => {
       await vi.advanceTimersByTimeAsync(100);
     });
     expect(analyzePositionMock).not.toHaveBeenCalled();
+  });
+
+  it('白番のKataGo応答を黒基準へ反転し、棋譜のコミと初期石を送る', async () => {
+    analyzePositionMock.mockResolvedValue(result);
+    const { result: hook } = renderHook(() => useAiAnalysis(node, [], {
+      boardSize: 9,
+      komi: 0.5,
+      toPlay: 'WHITE',
+      initialStones: [
+        { x: 3, y: 3, color: 'BLACK' },
+        { x: 7, y: 7, color: 'BLACK' },
+      ],
+    }));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+
+    expect(analyzePositionMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        komi: 0.5,
+        initialStones: [['B', 'C7'], ['B', 'G3']],
+      }),
+      expect.any(AbortSignal),
+    );
+    expect(hook.current.result).toEqual(expect.objectContaining({
+      winrate: 47.7,
+      scoreLead: -1.2,
+      topMoves: [expect.objectContaining({ winrate: 46, scoreLead: -2.5 })],
+    }));
   });
 });

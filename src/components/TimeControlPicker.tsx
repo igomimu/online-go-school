@@ -85,7 +85,12 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
         </button>
         <button
           type="button"
-          onClick={() => set({ byoyomiEnabled: false })}
+          onClick={() => set({
+            byoyomiEnabled: false,
+            // 秒読みなしは持時間だけで打つ設定。未入力(0分)なら30分を初期値にする。
+            // すでに講師が15分などを入力している場合は、その値を尊重する。
+            ...(value.mainMinutes === 0 ? { mainMinutes: 30 } : {}),
+          })}
           className={segBtnCls(!value.byoyomiEnabled)}
           style={segBtn(!value.byoyomiEnabled)}
         >
