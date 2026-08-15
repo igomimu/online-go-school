@@ -165,6 +165,26 @@ describe('ReviewBoard', () => {
     expect(screen.getByTestId('review-info-column')).toHaveClass('lg:flex-1', 'lg:basis-0');
   });
 
+  it('手ごとのコメント量が変わってもPCの碁盤領域へ高さを返さない', () => {
+    const { root } = makeTree();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+
+    expect(screen.getByTestId('review-controls')).toHaveClass(
+      'lg:h-[190px]',
+      'lg:shrink-0',
+      'lg:overflow-y-auto',
+    );
+  });
+
   it('生徒側にも先生のAI候補手とホバー中のPVを同時表示する', () => {
     const { root } = makeTree();
     const syncedResult = {

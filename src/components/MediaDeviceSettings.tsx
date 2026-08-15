@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Settings2, X } from 'lucide-react';
 import type { ClassroomLiveKit } from '../utils/classroomLiveKit';
 import {
@@ -26,6 +27,7 @@ interface Props {
  */
 export default function MediaDeviceSettings({ classroom, className = '', iconOnly = false }: Props) {
   const [open, setOpen] = useState(false);
+  const dialogTitleId = useId();
   const [devices, setDevices] = useState<Record<DeviceKind, MediaDeviceChoice[]>>({
     audioinput: [],
     videoinput: [],
@@ -68,6 +70,15 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
       navigator.mediaDevices?.removeEventListener?.('devicechange', onChange);
     };
   }, [open, reload]);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [open]);
 
   const choose = useCallback(async (kind: DeviceKind, deviceId: string) => {
     setSelected(prev => ({ ...prev, [kind]: deviceId }));
@@ -114,30 +125,46 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
         {!iconOnly && '音声・映像の設定'}
       </button>
 
-      {open && (
-        <div className="absolute right-0 z-50 mt-2 w-72 space-y-3 rounded-lg border border-line bg-surface p-3 shadow-2xl">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-bold">音声・映像の設定</span>
-            <button onClick={() => setOpen(false)} aria-label="閉じる" className="text-muted hover:text-ink">
-              <X className="w-4 h-4" />
-            </button>
+      {open && createPortal(
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-[90] cursor-default bg-black/10"
+            onClick={() => setOpen(false)}
+            aria-label="音声・映像の設定を閉じる"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={dialogTitleId}
+            className="fixed inset-x-3 top-3 z-[100] max-h-[calc(100dvh-1.5rem)] w-auto overflow-y-auto rounded-lg border border-line bg-surface p-3 shadow-2xl sm:inset-x-auto sm:right-4 sm:top-16 sm:w-80 sm:max-h-[calc(100dvh-5rem)]"
+          >
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span id={dialogTitleId} className="text-sm font-bold">音声・映像の設定</span>
+                <button type="button" onClick={() => setOpen(false)} aria-label="閉じる" className="p-1 text-muted hover:text-ink">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {needsPermission && (
+                <p className="text-xs text-muted">
+                  機器の名前は、マイクかカメラを一度オンにすると出ます。
+                </p>
+              )}
+
+              {renderRow('audioinput')}
+              {renderRow('videoinput')}
+
+              {error && <p className="text-xs text-alert-text">{error}</p>}
+
+              <p className="text-xs text-muted">
+                選んだ機器はこの端末に残り、回線復旧のあとも使われます。
+              </p>
+            </div>
           </div>
-
-          {needsPermission && (
-            <p className="text-xs text-muted">
-              機器の名前は、マイクかカメラを一度オンにすると出ます。
-            </p>
-          )}
-
-          {renderRow('audioinput')}
-          {renderRow('videoinput')}
-
-          {error && <p className="text-xs text-alert-text">{error}</p>}
-
-          <p className="text-xs text-muted">
-            選んだ機器はこの端末に残り、回線復旧のあとも使われます。
-          </p>
-        </div>
+        </>,
+        document.body,
       )}
     </div>
   );

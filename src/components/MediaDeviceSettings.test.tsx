@@ -33,6 +33,28 @@ describe('MediaDeviceSettings', () => {
     expect(screen.getAllByText('自動（ブラウザにまかせる）').length).toBe(2);
   });
 
+  it('ヘッダーの高さに閉じ込めず、画面内の固定パネルとして開く', async () => {
+    const { container } = render(
+      <header className="overflow-hidden h-12">
+        <MediaDeviceSettings classroom={null} iconOnly />
+      </header>,
+    );
+    fireEvent.click(screen.getByTestId('media-device-settings'));
+
+    const dialog = await screen.findByRole('dialog', { name: '音声・映像の設定' });
+    expect(dialog).toHaveClass('fixed', 'max-h-[calc(100dvh-1.5rem)]', 'overflow-y-auto');
+    expect(container.contains(dialog)).toBe(false);
+  });
+
+  it('Escapeキーで設定パネルを閉じる', async () => {
+    render(<MediaDeviceSettings classroom={null} iconOnly />);
+    fireEvent.click(screen.getByTestId('media-device-settings'));
+    expect(await screen.findByRole('dialog', { name: '音声・映像の設定' })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: '音声・映像の設定' })).not.toBeInTheDocument();
+  });
+
   it('選ぶと LiveKit を切り替え、端末に残す', async () => {
     const switchDevice = vi.fn().mockResolvedValue(undefined);
     render(<MediaDeviceSettings classroom={{ switchDevice } as unknown as ClassroomLiveKit} />);

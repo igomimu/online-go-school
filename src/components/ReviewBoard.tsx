@@ -616,8 +616,15 @@ export default function ReviewBoard({
           />
         </div>
 
-        {/* ナビゲーション */}
-        {canEdit && (
+        {/* 手順・注釈・コメント。PCでは高さを固定して内部だけを送る。
+            棋譜コメントや変化一覧が手ごとに出入りしても、その上の碁盤へ高さを
+            返さないため、ホイール手順移動中に盤が伸び縮みしない。 */}
+        <div
+          data-testid="review-controls"
+          className="space-y-2 sm:space-y-3 lg:h-[190px] lg:shrink-0 lg:overflow-y-auto lg:pr-1"
+        >
+          {/* ナビゲーション */}
+          {canEdit && (
           <div className="flex flex-col gap-2 sm:gap-3 w-full items-center">
             {/* ステップ移動 */}
             <div className="flex justify-center gap-2">
@@ -799,10 +806,10 @@ export default function ReviewBoard({
               )}
             </div>
           </div>
-        )}
+          )}
 
-        {/* 自動再生コントロール */}
-        {canEdit && (
+          {/* 自動再生コントロール */}
+          {canEdit && (
           <div className="flex justify-center items-center gap-2">
             <button
               onClick={autoReplay.toggle}
@@ -827,20 +834,20 @@ export default function ReviewBoard({
               ))}
             </div>
           </div>
-        )}
+          )}
 
-        {/* コメント表示 */}
-        {currentNode.comment && (
+          {/* コメント表示 */}
+          {currentNode.comment && (
           <div className="glass-panel px-4 py-3">
             <div className="flex items-start gap-2 text-sm">
               <MessageSquare className="w-4 h-4 text-muted mt-0.5 flex-shrink-0" />
               <div className="text-ink whitespace-pre-wrap">{currentNode.comment}</div>
             </div>
           </div>
-        )}
+          )}
 
-        {/* 変化選択 */}
-        {canEdit && currentNode.children.length > 1 && (
+          {/* 変化選択 */}
+          {canEdit && currentNode.children.length > 1 && (
           <div className="flex justify-center gap-2 overflow-x-auto p-2">
             {currentNode.children.map((child, idx) => (
               <button
@@ -852,7 +859,8 @@ export default function ReviewBoard({
               </button>
             ))}
           </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* PCでは碁盤と1:1になる授業情報カラム。生徒にもAI結果を同じ大きさで表示する。 */}

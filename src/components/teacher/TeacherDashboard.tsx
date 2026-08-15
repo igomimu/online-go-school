@@ -282,11 +282,9 @@ export default function TeacherDashboard({
     }
   }, []);
 
-  // 生徒一覧とカメラの高さは、つまんで変えられる（残りはチャットが受け取る）
+  // 生徒一覧の高さは、つまんで変えられる
   const roster = useStoredHeight('roster', 72, 640);
-  const video = useStoredHeight('video', 56, 480);
   const rosterRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLDivElement>(null);
 
   // タイトルバーのクラス名
   const classroomName = selectedClassroom?.name || '三村囲碁オンライン';
@@ -301,8 +299,28 @@ export default function TeacherDashboard({
       color: 'var(--color-ink)',
       fontSize: 12,
     }}>
+      {/* 参加者映像は教室全体を見渡せるよう、細い右欄ではなく上部へ横一列に置く。 */}
+      {videoElements.size > 0 && (
+        <div
+          data-testid="teacher-video-strip"
+          style={{
+            flexShrink: 0,
+            background: '#000',
+            borderBottom: '1px solid var(--color-line)',
+          }}
+        >
+          <VideoTiles
+            videoElements={videoElements}
+            localIdentity={localIdentity}
+            participants={participants}
+            students={allStudents}
+            variant="classroom"
+          />
+        </div>
+      )}
+
       {/* タイトルバー */}
-      <div style={{
+      <div data-testid="teacher-classroom-title" style={{
         background: 'var(--color-surface)',
         color: 'var(--color-ink)',
         padding: '10px 14px',
@@ -379,7 +397,7 @@ export default function TeacherDashboard({
         onCommit={roster.save}
       />
 
-      {/* 中央: 碁盤グリッド/観戦 + 右サイドバー（ビデオ+チャット） */}
+      {/* 中央: 碁盤グリッド/観戦 + 右サイドバー（音声設定+チャット） */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {/* 碁盤エリア: サムネイルグリッド or 観戦パネル（対局は常に講師専用の別ウィンドウで行うため、教室ホーム画面には対局盤を埋め込まない）。
             高さは生徒一覧のリサイザー次第で半端になるので、盤の行に吸着させて
@@ -479,49 +497,6 @@ export default function TeacherDashboard({
           minHeight: 0,
           background: 'var(--color-surface)',
         }}>
-          {/* 右上: カメラ映像。高さは下の取っ手で変えられ、詰めたぶんは会話が受け取る。
-              以前は下限 180px で固定していたため、窓を小さくすると入力欄が押し出されて
-              見えなくなっていた（三村さん報告 2026-08-04、800×600 で下端より 63px 下）。 */}
-          {videoElements.size > 0 ? (
-            <div ref={videoRef} style={{
-              background: '#000',
-              height: video.height ?? 180,
-              flexShrink: 0,
-              overflow: 'hidden',
-              position: 'relative',
-            }}>
-              <div style={{ padding: 4 }}>
-                <VideoTiles
-                  videoElements={videoElements}
-                  localIdentity={localIdentity}
-                  participants={participants}
-                  students={allStudents}
-                />
-              </div>
-            </div>
-          ) : (
-            // 誰も映像を出していないときに黒枠が居座ると、そのぶん会話が読めなくなる。
-            // 何も映っていないことだけ伝えて、高さはチャットに渡す。
-            <div style={{
-              flexShrink: 0,
-              padding: '4px 8px',
-              borderBottom: '1px solid var(--color-line)',
-              color: 'var(--color-muted)',
-              fontSize: 11,
-            }}>
-              カメラ映像なし
-            </div>
-          )}
-
-          {videoElements.size > 0 && (
-            <VerticalResizer
-              label="カメラの高さ"
-              targetRef={videoRef}
-              onResize={video.commit}
-              onCommit={video.save}
-            />
-          )}
-
           {/* 音声・映像の設定。自分の入出力に関わるものをチャットの並びにまとめる */}
           <div style={{ flexShrink: 0, padding: '6px 8px', borderBottom: '1px solid var(--color-line)' }}>
             <MediaDeviceSettings classroom={classroom ?? null} />
