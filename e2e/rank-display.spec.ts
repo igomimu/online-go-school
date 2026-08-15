@@ -5,7 +5,6 @@ import {
   loginAsTeacher,
   openClassroomAndConnect,
   waitForStudentJoined,
-  clickToolbarMenuItem,
 } from './helpers/teacher-actions';
 import { loginAsStudent } from './helpers/student-actions';
 
@@ -62,13 +61,17 @@ test.describe('棋力の表示方法', () => {
     const rankCell = teacherPage.getByTestId('student-rank-cell').first();
     await expect(rankCell).toHaveText('初段', { timeout: 10_000 });
 
-    // 教室設定を「ランク」に変える
-    await clickToolbarMenuItem(teacherPage, '生徒管理', '生徒入替');
-    await teacherPage.getByTestId('rank-display-select').selectOption('rating');
-    await teacherPage.getByRole('button', { name: '保存', exact: true }).click();
-    await expect(teacherPage.getByTestId('rank-display-select')).toHaveCount(0, { timeout: 10_000 });
+    // 授業中のタイトル行から「ランク」に変えると、その場で一覧へ反映される
+    await teacherPage.getByTestId('rank-display-rating').click();
+    await expect(teacherPage.getByTestId('rank-display-rating')).toHaveAttribute('aria-pressed', 'true');
+    await expect(rankCell).toHaveText('R12', { timeout: 10_000 });
 
-    // 一覧が R12 に変わる
+    // 「段級」に戻す操作も授業画面内だけで完結する
+    await teacherPage.getByTestId('rank-display-dan_kyu').click();
+    await expect(rankCell).toHaveText('初段', { timeout: 10_000 });
+
+    // テスト終了時の保存値をランクへ戻して、画面配置も記録する
+    await teacherPage.getByTestId('rank-display-rating').click();
     await expect(rankCell).toHaveText('R12', { timeout: 10_000 });
     await teacherPage.screenshot({ path: 'test-results/rank-display-rating.png' });
   });

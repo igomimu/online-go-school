@@ -5,6 +5,7 @@ import {
   loadCachedRoster,
   loadClassrooms,
   loadStudents,
+  updateClassroomRankDisplay,
   upsertStudent,
 } from './classroomStore';
 import type { Student, Classroom } from '../types/classroom';
@@ -72,6 +73,21 @@ describe('教室メンバーの正規化', () => {
 
     expect(classrooms[0].studentIds).toEqual(['S001', 'S002']);
     expect(classrooms[1].studentIds).toEqual(['S003']);
+  });
+});
+
+describe('授業中の棋力表示保存', () => {
+  it('名簿を更新せず、選択中教室の棋力表示だけを保存する', async () => {
+    const eq = vi.fn(async () => ({ error: null }));
+    const update = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ update }));
+    vi.mocked(getSupabase).mockReturnValue({ from } as never);
+
+    await updateClassroomRankDisplay('CLS001', 'rating');
+
+    expect(from).toHaveBeenCalledWith('go_school_classrooms');
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ rank_display: 'rating' }));
+    expect(eq).toHaveBeenCalledWith('id', 'CLS001');
   });
 });
 

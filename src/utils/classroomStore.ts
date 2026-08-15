@@ -1,4 +1,4 @@
-import type { Student, Classroom } from '../types/classroom';
+import type { Student, Classroom, RankDisplay } from '../types/classroom';
 import { DEFAULT_RANK_DISPLAY } from '../types/classroom';
 import { getSupabase } from './liveGameApi';
 import { isGuestTeacher } from './authStore';
@@ -361,6 +361,24 @@ export async function upsertClassroom(classroom: Classroom): Promise<void> {
         if (error) throw new Error(error.message);
       }),
   ));
+}
+
+/** 授業中の表示切替用。名簿の所属や並び順には触れず、棋力表示だけを更新する。 */
+export async function updateClassroomRankDisplay(
+  classroomId: string,
+  rankDisplay: RankDisplay,
+): Promise<void> {
+  const targetId = classroomId.trim();
+  if (!targetId) throw new Error('教室が選択されていません');
+
+  const { error } = await getSupabase()
+    .from('go_school_classrooms')
+    .update({
+      rank_display: rankDisplay,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', targetId);
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteClassroom(id: string): Promise<void> {

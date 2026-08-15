@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import type { GameSession, AudioPermissions, SavedGame } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
-import type { Student, Classroom } from '../../types/classroom';
+import type { Student, Classroom, RankDisplay } from '../../types/classroom';
+import { DEFAULT_RANK_DISPLAY } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
 import { identityMatchesPlayer, parseIdentity, resolvePlayerName, stripSid, studentIdentityCandidates } from '../../utils/identityUtils';
 import { fetchActiveLiveGamesForPlayers, finishGame, getSupabase, liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
@@ -24,7 +25,8 @@ import AutoPairingDialog from './AutoPairingDialog';
 import GameObserverPanel from './GameObserverPanel';
 import StudentEditDialog from './StudentEditDialog';
 import TsumegoPickerDialog from './TsumegoPickerDialog';
-import { upsertClassroom } from '../../utils/classroomStore';
+import RankDisplaySwitcher from './RankDisplaySwitcher';
+import { updateClassroomRankDisplay, upsertClassroom } from '../../utils/classroomStore';
 import { applyLiveBoardSnapshotsToSessions, useLiveBoards } from '../../hooks/useLiveBoards';
 
 interface TeacherDashboardProps {
@@ -116,6 +118,12 @@ export default function TeacherDashboard({
   const [orphanLiveGames, setOrphanLiveGames] = useState<LiveGameRow[]>([]);
   const [orphanGamesError, setOrphanGamesError] = useState<string | null>(null);
   const [clearingGameId, setClearingGameId] = useState<string | null>(null);
+  const [rankDisplayOverride, setRankDisplayOverride] = useState<{
+    classroomId: string;
+    value: RankDisplay;
+  } | null>(null);
+  const [rankDisplaySaving, setRankDisplaySaving] = useState(false);
+  const [rankDisplayError, setRankDisplayError] = useState<string | null>(null);
 
   // 棋譜履歴表示用のステート
   const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
@@ -173,6 +181,38 @@ export default function TeacherDashboard({
   const selectedClassroom = selectedClassroomId
     ? classrooms.find(c => c.id === selectedClassroomId)
     : null;
+
+  // 保存直後から一覧へ反映し、名簿の再読込が追いついたら親データへ戻す。
+  const effectiveRankDisplay =
+    rankDisplayOverride?.classroomId === selectedClassroomId
+      ? rankDisplayOverride.value
+      : selectedClassroom?.rankDisplay ?? DEFAULT_RANK_DISPLAY;
+
+  useEffect(() => {
+    setRankDisplayError(null);
+    setRankDisplayOverride(current => {
+      if (!current || current.classroomId !== selectedClassroomId) return null;
+      return selectedClassroom?.rankDisplay === current.value ? null : current;
+    });
+  }, [selectedClassroomId, selectedClassroom?.rankDisplay]);
+
+  const handleRankDisplayChange = useCallback(async (next: RankDisplay) => {
+    if (!selectedClassroom || rankDisplaySaving || next === effectiveRankDisplay) return;
+
+    setRankDisplayOverride({ classroomId: selectedClassroom.id, value: next });
+    setRankDisplaySaving(true);
+    setRankDisplayError(null);
+    try {
+      await updateClassroomRankDisplay(selectedClassroom.id, next);
+      await onReloadData();
+    } catch (err) {
+      console.error('Failed to update rank display:', err);
+      setRankDisplayOverride(null);
+      setRankDisplayError('保存できませんでした');
+    } finally {
+      setRankDisplaySaving(false);
+    }
+  }, [selectedClassroom, rankDisplaySaving, effectiveRankDisplay, onReloadData]);
 
   // 生徒の上下位置の並べ替え
   const handleMoveStudent = useCallback(async (studentId: string, direction: 'up' | 'down') => {
@@ -360,7 +400,15 @@ export default function TeacherDashboard({
           fontSize: 10,
           fontWeight: 'bold',
         }}>囲</span>
-        三村囲碁オンライン 〜 {classroomName}
+        <span>三村囲碁オンライン 〜 {classroomName}</span>
+        {selectedClassroom && (
+          <RankDisplaySwitcher
+            value={effectiveRankDisplay}
+            disabled={rankDisplaySaving}
+            message={rankDisplaySaving ? '保存中…' : rankDisplayError}
+            onChange={value => { void handleRankDisplayChange(value); }}
+          />
+        )}
       </div>
 
       {/* 生徒一覧テーブル */}
@@ -375,7 +423,7 @@ export default function TeacherDashboard({
         }}
       >
         <StudentTable
-          rankDisplay={selectedClassroom?.rankDisplay}
+          rankDisplay={effectiveRankDisplay}
           participants={filteredParticipants}
           students={filteredStudents}
           games={filteredGames}
@@ -486,7 +534,7 @@ export default function TeacherDashboard({
             />
           ) : (
             <BoardThumbnailGrid
-              rankDisplay={selectedClassroom?.rankDisplay}
+              rankDisplay={effectiveRankDisplay}
               games={filteredGames}
               students={filteredStudents}
               participants={filteredParticipants}
