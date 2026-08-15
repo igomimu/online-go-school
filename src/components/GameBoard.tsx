@@ -304,6 +304,12 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     const isTeacherSide = teacherColor === color;
     const isLow = timeLeft <= 10 && timeLeft > 0;
     const highlight = (isLow || isByoyomi) && !isTeacherSide;
+    // 音声は「10秒、20秒…」と経過時間を読むため、文字も同じ向きで0→B秒と増やす。
+    // 内部の timeLeft は時間切れ判定に使う残り秒なので、表示時だけ経過秒へ変換する。
+    const byoyomiElapsed = Math.min(
+      clock.byoyomiSeconds,
+      Math.max(0, Math.floor(clock.byoyomiSeconds - timeLeft)),
+    );
     return (
       <span
         data-testid={isBlack ? 'clock-black' : 'clock-white'}
@@ -314,7 +320,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
         }`}
       >
         <span className="tabular block text-sm font-bold">
-          {isByoyomi ? `${Math.ceil(timeLeft)}秒` : formatTime(timeLeft)}
+          {isByoyomi ? `${byoyomiElapsed}秒` : formatTime(timeLeft)}
         </span>
         {isByoyomi && (
           <span className="block text-[10px] font-normal">

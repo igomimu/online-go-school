@@ -412,7 +412,7 @@ describe('GameBoard', () => {
     expect(screen.queryByTestId('resume-timeout-game')).not.toBeInTheDocument();
   });
 
-  it('講師側の秒読み回数は「残∞」と表示する（切れ負けにならないため）', () => {
+  it('秒読みは音声と同じく経過秒を増やし、講師側の回数は「残∞」と表示する', () => {
     const game = createMockGame({ blackPlayer: 'たろう', whitePlayer: 'teacher' });
     setupMock({
       game,
@@ -426,8 +426,8 @@ describe('GameBoard', () => {
       },
     });
     render(<GameBoard gameId="game-1" myIdentity="たろう" />);
-    expect(screen.getByTestId('clock-white')).toHaveTextContent('12秒秒読み 残∞');
-    expect(screen.getByTestId('clock-black')).toHaveTextContent('25秒秒読み 残1');
+    expect(screen.getByTestId('clock-white')).toHaveTextContent('18秒秒読み 残∞');
+    expect(screen.getByTestId('clock-black')).toHaveTextContent('5秒秒読み 残1');
   });
 
   // 2026-08-04 三村さん指定: 直前に打たれた石に▲。今どこに打たれたかがひと目で分かる
