@@ -16,17 +16,22 @@ export interface MediaIntentController {
 
 const DEFAULT_MEDIA_INTENT: MediaIntent = { mic: false, camera: false };
 
-function storageKey(role: MediaIntentRole): string {
-  return `go-school-media-intent-${role.toLowerCase()}`;
+/**
+ * scope は「誰の設定か」。道場の共有PCでは同じ端末を生徒が代わる代わる使うので、
+ * 生徒は生徒IDごとに分けて持つ。渡さなければ役割ごとの1つ（講師用）になる。
+ */
+function storageKey(role: MediaIntentRole, scope?: string): string {
+  const base = `go-school-media-intent-${role.toLowerCase()}`;
+  return scope ? `${base}-${scope}` : base;
 }
 
 /**
  * 最後に本人が使っていたマイク・カメラ状態。
- * LiveKitのトラック状態とは分けて保存し、Room再作成やページ再読込の後に復元する。
+ * LiveKitのトラック状態とは分けて保存し、再入室・Room再作成・ページ再読込の後に復元する。
  */
-export function loadMediaIntent(role: MediaIntentRole): MediaIntent {
+export function loadMediaIntent(role: MediaIntentRole, scope?: string): MediaIntent {
   try {
-    const raw = localStorage.getItem(storageKey(role));
+    const raw = localStorage.getItem(storageKey(role, scope));
     if (!raw) return { ...DEFAULT_MEDIA_INTENT };
     const parsed = JSON.parse(raw) as Partial<MediaIntent>;
     return {
@@ -38,19 +43,11 @@ export function loadMediaIntent(role: MediaIntentRole): MediaIntent {
   }
 }
 
-export function saveMediaIntent(role: MediaIntentRole, intent: MediaIntent): void {
+export function saveMediaIntent(role: MediaIntentRole, intent: MediaIntent, scope?: string): void {
   try {
-    localStorage.setItem(storageKey(role), JSON.stringify(intent));
+    localStorage.setItem(storageKey(role, scope), JSON.stringify(intent));
   } catch {
     // 保存できなくても現在の通話操作は続けられる。
-  }
-}
-
-export function clearMediaIntent(role: MediaIntentRole): void {
-  try {
-    localStorage.removeItem(storageKey(role));
-  } catch {
-    // 明示的な退出処理自体は止めない。
   }
 }
 

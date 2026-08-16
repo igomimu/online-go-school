@@ -50,7 +50,7 @@ import { useParticipantLog } from './hooks/useParticipantLog';
 import type { ChatMessagePayload } from './types/chat';
 import type { AiAnalysisSyncPayload } from './types/ai';
 import { resolveEffectiveViewMode } from './utils/viewMode';
-import { applyMediaIntent, clearMediaIntent, loadMediaIntent, saveMediaIntent, type MediaIntent } from './utils/mediaIntent';
+import { applyMediaIntent, loadMediaIntent, saveMediaIntent, type MediaIntent } from './utils/mediaIntent';
 
 import { Settings } from 'lucide-react';
 
@@ -98,14 +98,24 @@ function App() {
     STUDENT: loadMediaIntent('STUDENT'),
   });
 
+  // 誰の設定か。道場の共有PCは生徒が代わる代わる使うので、生徒は生徒IDごとに分けて持つ。
+  // 接続のたびに入れ替える（講師は端末に1つでよいので undefined）。
+  const mediaIntentScopeRef = useRef<string | undefined>(undefined);
+
   const rememberMediaIntent = useCallback((targetRole: Role, patch: Partial<MediaIntent>) => {
     const next = { ...mediaIntentRef.current[targetRole], ...patch };
     mediaIntentRef.current[targetRole] = next;
-    saveMediaIntent(targetRole, next);
+    saveMediaIntent(targetRole, next, targetRole === 'STUDENT' ? mediaIntentScopeRef.current : undefined);
   }, []);
 
+  // 入室のたびに、その人が前回どうしていたかを読み直してから当てる。
+  // 再接続（onReconnected）でも同じ経路を通る。
   const restoreMediaIntent = useCallback(async (classroom: ClassroomLiveKit, targetRole: Role) => {
-    const desired = mediaIntentRef.current[targetRole];
+    const desired = loadMediaIntent(
+      targetRole,
+      targetRole === 'STUDENT' ? mediaIntentScopeRef.current : undefined,
+    );
+    mediaIntentRef.current[targetRole] = desired;
     const actual = await applyMediaIntent(classroom, desired);
     setIsMicEnabled(actual.mic);
     setIsCameraEnabled(actual.camera);
@@ -330,6 +340,8 @@ function App() {
   const connectLiveKit = useCallback(async (connectRole: Role, connectUserName: string, overrideRoomName?: string, overrideClassroomId?: string) => {
     const effectiveRoomName = overrideRoomName || roomName;
     const effectiveClassroomId = overrideClassroomId ?? selectedClassroomId ?? '';
+    // 前回のマイク・カメラを読み出す先を、これから入る人に合わせる
+    mediaIntentScopeRef.current = connectRole === 'STUDENT' ? (studentId ?? undefined) : undefined;
     classroomRef.current?.destroy();
     const classroom = new ClassroomLiveKit();
     classroomRef.current = classroom;
@@ -834,10 +846,8 @@ function App() {
   };
 
   const handleDisconnect = async () => {
-    if (role) {
-      clearMediaIntent(role);
-      mediaIntentRef.current[role] = { mic: false, camera: false };
-    }
+    // マイク・カメラの状態は消さない。次に入るときに前回のとおりで始められるよう、
+    // 生徒IDごとに端末へ残す（共有PCでも別の生徒の設定は引き継がない）。
     setIsMicEnabled(false);
     setIsCameraEnabled(false);
     // 生徒用自動ログイン情報の消去

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyMediaIntent, clearMediaIntent, loadMediaIntent, saveMediaIntent } from './mediaIntent';
+import { applyMediaIntent, loadMediaIntent, saveMediaIntent } from './mediaIntent';
 
 describe('mediaIntent', () => {
   beforeEach(() => localStorage.clear());
@@ -16,14 +16,11 @@ describe('mediaIntent', () => {
     expect(loadMediaIntent('TEACHER')).toEqual({ mic: true, camera: false });
   });
 
-  it('明示的な退出時は、その役割の保存状態だけを消す', () => {
-    saveMediaIntent('STUDENT', { mic: true, camera: true });
-    saveMediaIntent('TEACHER', { mic: true, camera: true });
+  it('共有PCでは生徒ごとに分けて持つ（前の生徒の設定を引き継がない）', () => {
+    saveMediaIntent('STUDENT', { mic: true, camera: true }, 'SM1001');
 
-    clearMediaIntent('STUDENT');
-
-    expect(loadMediaIntent('STUDENT')).toEqual({ mic: false, camera: false });
-    expect(loadMediaIntent('TEACHER')).toEqual({ mic: true, camera: true });
+    expect(loadMediaIntent('STUDENT', 'SM1001')).toEqual({ mic: true, camera: true });
+    expect(loadMediaIntent('STUDENT', 'SM1002')).toEqual({ mic: false, camera: false });
   });
 
   it('壊れた保存値があっても安全にOFFへ戻す', () => {
