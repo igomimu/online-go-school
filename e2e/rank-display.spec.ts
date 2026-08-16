@@ -75,4 +75,32 @@ test.describe('棋力の表示方法', () => {
     await expect(rankCell).toHaveText('R12', { timeout: 10_000 });
     await teacherPage.screenshot({ path: 'test-results/rank-display-rating.png' });
   });
+  test('講師がランクへ切り替えると、生徒の参加者一覧もランクになる', async () => {
+    // 生徒の棋力を段級=初段 / ランク=R12 にする
+    await teacherPage.getByRole('button', { name: '編集', exact: true }).first().click();
+    await teacherPage.getByTestId('student-rank-select').selectOption('初段');
+    await teacherPage.getByTestId('student-rating-select').selectOption('R12');
+    await teacherPage.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(teacherPage.getByTestId('student-rank-select')).toHaveCount(0, { timeout: 10_000 });
+
+    // 生徒の端末にも名簿を持たせる（本番では講師機と共有PCのキャッシュから来る）
+    await studentPage.evaluate(({ id, name }) => {
+      localStorage.setItem('go-school-students', JSON.stringify([
+        { id, name, rank: '初段', internalRating: 'R12', type: 'ネット生', grade: '', country: '' },
+      ]));
+    }, { id: TEST_STUDENT_A.id, name: TEST_STUDENT_A.name });
+    await studentPage.reload();
+    await expect(studentPage.getByTestId('participant-rank').first())
+      .toHaveText('初段', { timeout: 20_000 });
+
+    // 講師が「ランク」に切り替えると、生徒の画面も追従する
+    await teacherPage.getByTestId('rank-display-rating').click();
+    await expect(studentPage.getByTestId('participant-rank').first())
+      .toHaveText('R12', { timeout: 20_000 });
+
+    // 「段級」に戻せば生徒も戻る
+    await teacherPage.getByTestId('rank-display-dan_kyu').click();
+    await expect(studentPage.getByTestId('participant-rank').first())
+      .toHaveText('初段', { timeout: 20_000 });
+  });
 });

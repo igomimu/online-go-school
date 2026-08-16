@@ -6,7 +6,7 @@ import type { ParticipantLogEntry } from '../hooks/useParticipantLog';
 import type { Student, Classroom } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import { findStudentByIdentity, getDisplayName, identityMatchesPlayer } from '../utils/identityUtils';
-import { displayRank } from '../types/classroom';
+import { displayRank, DEFAULT_RANK_DISPLAY, type RankDisplay } from '../types/classroom';
 import GameThumbnail from './GameThumbnail';
 import SavedGameList from './SavedGameList';
 import ClassroomSelector from './ClassroomSelector';
@@ -38,6 +38,8 @@ interface LobbyProps {
   classrooms?: Classroom[];
   selectedClassroomId?: string | null;
   onSelectClassroom?: (id: string | null) => void;
+  /** 棋力の見せ方。教室の設定（講師が授業中に切り替える）に従う */
+  rankDisplay?: RankDisplay;
   onOpenStudentManager?: () => void;
 
   // 入室中の教室表示（生徒側の「部屋に入った」感を出すためのヘッダー用）
@@ -68,6 +70,7 @@ export default function Lobby({
   classrooms = [],
   selectedClassroomId,
   onSelectClassroom,
+  rankDisplay = DEFAULT_RANK_DISPLAY,
   onOpenStudentManager,
   currentClassroomName,
   currentStudentName,
@@ -319,9 +322,12 @@ export default function Lobby({
                       {name}
                       {isLocal && <span className="ml-1 text-muted">(自分)</span>}
                     </span>
-                    {registered && displayRank(registered) && (
-                      <span className="tabular shrink-0 rounded border border-line px-1 py-0.5 text-xs text-muted">
-                        {displayRank(registered)}
+                    {registered && displayRank(registered, rankDisplay) && (
+                      <span
+                        data-testid="participant-rank"
+                        className="tabular shrink-0 rounded border border-line px-1 py-0.5 text-xs text-muted"
+                      >
+                        {displayRank(registered, rankDisplay)}
                       </span>
                     )}
                   </div>

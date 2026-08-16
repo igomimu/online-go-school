@@ -57,6 +57,8 @@ interface TeacherDashboardProps {
   connectionState?: import('livekit-client').ConnectionState;
   onOpenStudentManager: () => void;
   onReloadData: () => void | Promise<void>;
+  /** 棋力表示を切り替えたことを生徒へ配る（名簿を読み直さない生徒のため） */
+  onRankDisplayChanged?: (value: RankDisplay) => void;
   onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number; clock?: import('../../types/game').GameClock }[]) => void;
   onProblemAssign?: (problem: import('../../types/problem').Problem) => void;
   onClearAudioM?: () => void;
@@ -97,6 +99,7 @@ export default function TeacherDashboard({
   connectionState,
   onOpenStudentManager,
   onReloadData,
+  onRankDisplayChanged,
   onCreateGames,
   onProblemAssign,
   onClearAudioM,
@@ -202,6 +205,7 @@ export default function TeacherDashboard({
     setRankDisplayError(null);
     try {
       await updateClassroomRankDisplay(selectedClassroom.id, next);
+      onRankDisplayChanged?.(next);
       await onReloadData();
     } catch (err) {
       console.error('Failed to update rank display:', err);
@@ -210,7 +214,7 @@ export default function TeacherDashboard({
     } finally {
       setRankDisplaySaving(false);
     }
-  }, [selectedClassroom, rankDisplaySaving, effectiveRankDisplay, onReloadData]);
+  }, [selectedClassroom, rankDisplaySaving, effectiveRankDisplay, onReloadData, onRankDisplayChanged]);
 
   // 生徒の上下位置の並べ替え
   const handleMoveStudent = useCallback(async (studentId: string, direction: 'up' | 'down') => {

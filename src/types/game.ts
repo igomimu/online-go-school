@@ -84,9 +84,15 @@ export type GameMessageType =
   | 'REVIEW_STUDENT_MOVE'
   | 'AUDIO_CONTROL'
   | 'MEDIA_CONTROL'
+  | 'RANK_DISPLAY'
   | 'CHAT_MESSAGE'
   | 'GAME_UNDO_REQUEST'
   | 'GAME_UNDO_RESPONSE';
+
+/** 授業中に講師が切り替える棋力の見せ方。生徒の画面もこれに合わせる */
+export interface RankDisplayPayload {
+  value: import('./classroom').RankDisplay;
+}
 
 export interface GameCreatedPayload {
   game: GameSession;

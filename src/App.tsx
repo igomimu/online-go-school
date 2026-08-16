@@ -7,8 +7,9 @@ import { playReviewMove } from './utils/reviewMove';
 import { toggleSharingTarget, type SharingTargets } from './utils/sharingTargets';
 import { ClassroomLiveKit } from './utils/classroomLiveKit';
 import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './utils/classroomLiveKit';
-import type { ViewMode, AudioPermissions, SavedGame } from './types/game';
-import type { Student, Classroom } from './types/classroom';
+import type { ViewMode, AudioPermissions, SavedGame, RankDisplayPayload } from './types/game';
+import type { Student, Classroom, RankDisplay } from './types/classroom';
+import { DEFAULT_RANK_DISPLAY } from './types/classroom';
 import { fetchToken } from './utils/livekitToken';
 import { getDisplayName, getTeacherDisplayName, identityMatchesPlayer, makeStudentIdentity, TEACHER_IDENTITY } from './utils/identityUtils';
 import { ConnectionState } from 'livekit-client';
@@ -97,6 +98,11 @@ function App() {
     TEACHER: loadMediaIntent('TEACHER'),
     STUDENT: loadMediaIntent('STUDENT'),
   });
+
+  // 棋力の見せ方（段級 / ランク）。正本は教室の設定で、講師が授業中に切り替える。
+  // 生徒は名簿を読めるとは限らないので、LiveKit で受け取った値を優先する。
+  const [syncedRankDisplay, setSyncedRankDisplay] = useState<RankDisplay | null>(null);
+  const rankDisplayRef = useRef<RankDisplay>(DEFAULT_RANK_DISPLAY);
 
   // 誰の設定か。道場の共有PCは生徒が代わる代わる使うので、生徒は生徒IDごとに分けて持つ。
   // 接続のたびに入れ替える（講師は端末に1つでよいので undefined）。
@@ -236,6 +242,27 @@ function App() {
     }
   }, []);
 
+
+  // 名簿を読み直したら、配る棋力表示も教室の設定に合わせる
+  useEffect(() => {
+    const current = classrooms.find(c => c.id === (selectedClassroomId ?? studentClassroomId))?.rankDisplay;
+    if (current) rankDisplayRef.current = current;
+  }, [classrooms, selectedClassroomId, studentClassroomId]);
+
+  // 講師が授業中に切り替えたら、その場で生徒へ配る（生徒は名簿を読み直さない）
+  const handleRankDisplayChanged = useCallback((value: RankDisplay) => {
+    rankDisplayRef.current = value;
+    void classroomRef.current?.broadcast({
+      type: 'RANK_DISPLAY',
+      payload: { value } satisfies RankDisplayPayload,
+    });
+  }, []);
+
+  // 生徒が使う値。受け取った値 → 端末に残る教室設定 → 既定（段級）の順
+  const studentRankDisplay: RankDisplay =
+    syncedRankDisplay
+    ?? classrooms.find(c => c.id === studentClassroomId)?.rankDisplay
+    ?? DEFAULT_RANK_DISPLAY;
 
   const classroomRef = useRef<ClassroomLiveKit | null>(null);
   // 教室への出入り。対局や検討へ移っても消えないよう、教室ホームではなくここで控える
@@ -531,6 +558,12 @@ function App() {
           }
         }
 
+        // 棋力の見せ方（生徒用）。講師が授業中に切り替えたら生徒の画面も合わせる
+        if (msg.type === 'RANK_DISPLAY' && connectRole === 'STUDENT' && msg.payload) {
+          const p = msg.payload as RankDisplayPayload;
+          if (p.value === 'rating' || p.value === 'dan_kyu') setSyncedRankDisplay(p.value);
+        }
+
         // メディア制御（生徒用）
         if (msg.type === 'MEDIA_CONTROL' && connectRole === 'STUDENT' && msg.payload) {
           const p = msg.payload as { micAllowed: boolean; cameraAllowed: boolean };
@@ -559,7 +592,14 @@ function App() {
         notificationSound.play('connect');
         recordParticipantEvent(identity, 'join', name);
         // 戻ってきたことも講師には見せる（切れたきり戻らないのか、復旧したのかが分かる）
-        if (connectRole === 'TEACHER') pushAlert({ kind: 'rejoin', identity });
+        if (connectRole === 'TEACHER') {
+          pushAlert({ kind: 'rejoin', identity });
+          // 後から入った生徒にも、今の棋力の見せ方を伝える
+          void classroom.broadcast({
+            type: 'RANK_DISPLAY',
+            payload: { value: rankDisplayRef.current } satisfies RankDisplayPayload,
+          });
+        }
       },
       onParticipantLeft: (identity: string, name?: string) => {
         notificationSound.play('disconnect');
@@ -1602,6 +1642,7 @@ function App() {
             connectionState={connectionState}
             onOpenStudentManager={() => setShowStudentManager(true)}
             onReloadData={reloadClassroomData}
+            onRankDisplayChanged={handleRankDisplayChanged}
             onCreateGames={async (pairs) => {
               const me = classroomRef.current?.localIdentity ?? userName;
               if (
@@ -1641,6 +1682,7 @@ function App() {
             classrooms={classrooms}
             selectedClassroomId={selectedClassroomId}
             onSelectClassroom={setSelectedClassroomId}
+            rankDisplay={studentRankDisplay}
             currentClassroomName={currentClassroomName}
             currentStudentName={currentStudentName}
             chatMessages={chat.messages}

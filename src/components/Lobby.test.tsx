@@ -347,4 +347,45 @@ describe('Lobby', () => {
       expect(screen.getAllByText(/さんが来ました/)).toHaveLength(3);
     });
   });
+  describe('棋力の見せ方', () => {
+    // 教室の設定（講師が授業中に切り替える）に生徒の画面も従う
+    const students = [
+      { id: 'たろう', name: 'たろう', rank: '初段', internalRating: 'R12', type: 'ネット生', grade: '', country: '' },
+    ];
+
+    it('既定は段級で出す', () => {
+      render(
+        <Lobby
+          role="STUDENT"
+          participants={mockParticipants}
+          localIdentity="たろう"
+          activeSpeakers={[]}
+          games={[]}
+          studentJoinInfo=""
+          onSelectGame={vi.fn()}
+          myIdentity="たろう"
+          students={students}
+        />
+      );
+      expect(screen.getByTestId('participant-rank')).toHaveTextContent('初段');
+    });
+
+    it('講師がランクを選んでいれば生徒の画面もランクで出す', () => {
+      render(
+        <Lobby
+          role="STUDENT"
+          participants={mockParticipants}
+          localIdentity="たろう"
+          activeSpeakers={[]}
+          games={[]}
+          studentJoinInfo=""
+          onSelectGame={vi.fn()}
+          myIdentity="たろう"
+          students={students}
+          rankDisplay="rating"
+        />
+      );
+      expect(screen.getByTestId('participant-rank')).toHaveTextContent('R12');
+    });
+  });
 });
