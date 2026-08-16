@@ -23,6 +23,7 @@ import {
   interruptGameOnUnload,
 } from './utils/unloadInterrupt';
 import { fetchRoster, loadStudents, loadClassrooms } from './utils/classroomStore';
+import { fetchMyClassroomRoster } from './utils/studentRoster';
 import { saveAccount, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } from './utils/authStore';
 
 import Header from './components/Header';
@@ -242,6 +243,23 @@ function App() {
     }
   }, []);
 
+
+  // 生徒は名簿（棋力）を読めないので、自分の教室ぶんだけ Edge Function から取る。
+  // これが無いと、講師機のキャッシュが残っていない端末では棋力が一切出ない。
+  useEffect(() => {
+    if (role !== 'STUDENT' || !studentId) return;
+    let alive = true;
+    fetchMyClassroomRoster()
+      .then(res => {
+        if (!alive || !res) return;
+        if (res.students.length > 0) setStudents(res.students);
+        rankDisplayRef.current = res.classroom.rankDisplay;
+        // 講師が授業中に切り替えた値（LiveKit で届く）があればそちらを優先する
+        setSyncedRankDisplay(prev => prev ?? res.classroom.rankDisplay);
+      })
+      .catch(err => console.warn('[roster] 生徒名簿を取得できませんでした:', err));
+    return () => { alive = false; };
+  }, [role, studentId]);
 
   // 名簿を読み直したら、配る棋力表示も教室の設定に合わせる
   useEffect(() => {

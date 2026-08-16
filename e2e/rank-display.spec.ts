@@ -103,4 +103,23 @@ test.describe('棋力の表示方法', () => {
     await expect(studentPage.getByTestId('participant-rank').first())
       .toHaveText('初段', { timeout: 20_000 });
   });
+  test('生徒の端末に名簿が無くても、自分の教室の棋力は出る', async () => {
+    // 生徒の棋力を段級=初段 / ランク=R12 にする
+    await teacherPage.getByRole('button', { name: '編集', exact: true }).first().click();
+    await teacherPage.getByTestId('student-rank-select').selectOption('初段');
+    await teacherPage.getByTestId('student-rating-select').selectOption('R12');
+    await teacherPage.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(teacherPage.getByTestId('student-rank-select')).toHaveCount(0, { timeout: 10_000 });
+
+    // 生徒の端末から名簿のキャッシュを消す（講師機を使ったことのない実際の生徒と同じ状態）
+    await studentPage.evaluate(() => {
+      localStorage.removeItem('go-school-students');
+      localStorage.removeItem('go-school-classrooms');
+    });
+    await studentPage.reload();
+
+    // Edge Function から自分の教室ぶんを取り、棋力が出る
+    await expect(studentPage.getByTestId('participant-rank').first())
+      .toHaveText('初段', { timeout: 20_000 });
+  });
 });
