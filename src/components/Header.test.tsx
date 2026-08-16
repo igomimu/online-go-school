@@ -79,6 +79,44 @@ describe('Header', () => {
     expect(screen.queryByTitle('音声OFF')).not.toBeInTheDocument();
   });
 
+  // 子どもは面の色の濃淡を状態として読まない。「オン / オフ」の語が必ず出ていること
+  it('生徒のマイク・スピーカー・カメラにオン/オフの語が出る', () => {
+    render(
+      <Header
+        {...defaultProps}
+        role="STUDENT"
+        userName="たろう"
+        isMicEnabled={false}
+        isMuted={false}
+        isCameraEnabled={true}
+        onToggleCamera={vi.fn()}
+      />,
+    );
+    const mic = screen.getByTitle('自分の声を送る');
+    const speaker = screen.getByTitle('相手の声が聞こえています（押すと止める）');
+    const camera = screen.getByTitle('自分の顔を送っています（押すと止める）');
+    expect(mic).toHaveTextContent('マイク');
+    expect(mic).toHaveTextContent('オフ');
+    expect(speaker).toHaveTextContent('オン');
+    expect(camera).toHaveTextContent('オン');
+  });
+
+  it('声を拾っている間はマイクのボタンに輪が付く', () => {
+    const { rerender } = render(
+      <Header {...defaultProps} role="STUDENT" userName="たろう" isMicEnabled={true} isSpeaking={false} />,
+    );
+    const title = '自分の声を送っています（押すと止める）';
+    expect(screen.getByTitle(title).className).not.toContain('ring-2');
+
+    rerender(<Header {...defaultProps} role="STUDENT" userName="たろう" isMicEnabled={true} isSpeaking={true} />);
+    expect(screen.getByTitle(title).className).toContain('ring-2');
+  });
+
+  it('マイクが切れている間は声を拾っても輪は付かない', () => {
+    render(<Header {...defaultProps} role="STUDENT" userName="たろう" isMicEnabled={false} isSpeaking={true} />);
+    expect(screen.getByTitle('自分の声を送る').className).not.toContain('ring-2');
+  });
+
   it('カメラボタン（オプション）', () => {
     const onToggleCamera = vi.fn();
     render(<Header {...defaultProps} isCameraEnabled={true} onToggleCamera={onToggleCamera} />);

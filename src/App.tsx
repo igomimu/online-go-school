@@ -1512,6 +1512,7 @@ function App() {
           onToggleMute={handleToggleMute}
           isCameraEnabled={isCameraEnabled}
           onToggleCamera={handleToggleCamera}
+          isSpeaking={activeSpeakers.includes(classroomRef.current?.localIdentity ?? '')}
           onDisconnect={handleDisconnect}
         />
       )}
@@ -1523,6 +1524,7 @@ function App() {
           localIdentity={classroomRef.current?.localIdentity ?? ''}
           participants={participants}
           students={students}
+          isCameraEnabled={isCameraEnabled}
         />
       )}
 

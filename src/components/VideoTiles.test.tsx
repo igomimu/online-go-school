@@ -8,6 +8,22 @@ const participants: ParticipantInfo[] = [
   { identity: 'sid:1004', name: '金子 大地', isSpeaking: false, audioEnabled: true, videoEnabled: true },
 ];
 
+/** LiveKit が作る <video> の代わり */
+const videoEl = () => document.createElement('video');
+
+const participant = (
+  identity: string,
+  name: string,
+  state: Partial<ParticipantInfo> = {},
+): ParticipantInfo => ({
+  identity,
+  name,
+  isSpeaking: false,
+  audioEnabled: true,
+  videoEnabled: true,
+  ...state,
+});
+
 describe('VideoTiles', () => {
   it('講師画面では本人を先頭にして、横スクロール可能な大きい映像を並べる', () => {
     const teacherVideo = document.createElement('video');
@@ -83,5 +99,91 @@ describe('VideoTiles', () => {
     );
 
     expect(screen.queryByLabelText('参加者映像')).not.toBeInTheDocument();
+  });
+
+  // ここから: マイク・カメラのオン/オフを子どもに分かる形で出す（2026-08-16）
+  const remoteOnly = () => new Map([['sid:2000', videoEl()]]);
+
+  it('一度もカメラを点けていないと、代わりに「カメラ オフ」の枠が出る', () => {
+    render(
+      <VideoTiles
+        videoElements={remoteOnly()}
+        localIdentity="sid:1000"
+        isCameraEnabled={false}
+      />,
+    );
+    expect(screen.getByText('カメラ オフ')).toBeInTheDocument();
+  });
+
+  it('カメラを止めた人のタイルは黒いままにせず「カメラ オフ」を被せる', () => {
+    const elements = remoteOnly();
+    elements.set('sid:1000', videoEl());
+    render(
+      <VideoTiles
+        videoElements={elements}
+        localIdentity="sid:1000"
+        isCameraEnabled={false}
+        participants={[
+          participant('sid:1000', 'たろう', { videoEnabled: false }),
+          participant('sid:2000', '三村九段'),
+        ]}
+      />,
+    );
+    // 自分のタイル1つぶんだけ（枠の重ね置きは出さない）
+    expect(screen.getAllByText('カメラ オフ')).toHaveLength(1);
+  });
+
+  it('講師画面でもカメラを止めた生徒に「カメラ オフ」を被せる', () => {
+    render(
+      <VideoTiles
+        videoElements={new Map([['sid:1004', videoEl()]])}
+        localIdentity="teacher"
+        variant="classroom"
+        participants={[participant('sid:1004', '金子 大地', { videoEnabled: false })]}
+      />,
+    );
+    expect(screen.getByText('カメラ オフ')).toBeInTheDocument();
+  });
+
+  it('マイクが切れている人には札を出す', () => {
+    render(
+      <VideoTiles
+        videoElements={remoteOnly()}
+        localIdentity="sid:1000"
+        participants={[participant('sid:2000', '三村九段', { audioEnabled: false })]}
+      />,
+    );
+    expect(screen.getByTitle('マイクが切れています')).toBeInTheDocument();
+  });
+
+  it('全員が映っていて声も出せるなら札は出ない', () => {
+    const elements = remoteOnly();
+    elements.set('sid:1000', videoEl());
+    render(
+      <VideoTiles
+        videoElements={elements}
+        localIdentity="sid:1000"
+        isCameraEnabled={true}
+        participants={[
+          participant('sid:1000', 'たろう'),
+          participant('sid:2000', '三村九段'),
+        ]}
+      />,
+    );
+    expect(screen.queryByText('カメラ オフ')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('マイクが切れています')).not.toBeInTheDocument();
+  });
+
+  it('参加者の状態が分からないときは札を出さない', () => {
+    render(<VideoTiles videoElements={remoteOnly()} localIdentity="sid:1000" />);
+    expect(screen.queryByText('カメラ オフ')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('マイクが切れています')).not.toBeInTheDocument();
+  });
+
+  it('映像が1つも無ければ何も描かない', () => {
+    const { container } = render(
+      <VideoTiles videoElements={new Map()} localIdentity="sid:1000" isCameraEnabled={false} />,
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 });

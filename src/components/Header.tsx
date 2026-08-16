@@ -18,6 +18,8 @@ interface HeaderProps {
   onToggleMute: () => void;
   isCameraEnabled?: boolean;
   onToggleCamera?: () => void;
+  /** 自分の声が実際に拾えているか（マイクが生きている証拠を子どもに見せる） */
+  isSpeaking?: boolean;
   onDisconnect: () => void;
   /** 使用マイク・カメラの切り替えに使う */
   classroom?: ClassroomLiveKit | null;
@@ -34,6 +36,7 @@ export default function Header({
   onToggleMute,
   isCameraEnabled,
   onToggleCamera,
+  isSpeaking = false,
   onDisconnect,
   classroom,
 }: HeaderProps) {
@@ -47,11 +50,21 @@ export default function Header({
   // 生徒のメディアボタンは3つを等分に並べる。以前は説明文をそのままラベルにしていたため、
   // スマホ幅で名前や「1人接続中」が1文字ずつ縦積みになり、カメラのボタンは画面外に切れて
   // 押せなかった。押せることを優先し、説明は title に残す。
-  const studentMediaButton = (active: boolean) =>
-    `flex h-[46px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg border transition-colors duration-150 ${
+  //
+  // 状態は「面の明暗」だけに頼らない。子どもは薄い色の差を状態として読まないので、
+  // アイコンの斜線・「オン / オフ」の語・小さな色面（榧＝動いている / 朱＝止まっている）の
+  // 3つを重ねる。色が見分けられなくても語で分かる、語が読めなくても斜線で分かる。
+  const studentMediaButton = (active: boolean, speaking = false) =>
+    `flex min-h-[58px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg border px-1 py-1.5 transition-colors duration-150 ${
       active
         ? 'border-accent/35 bg-accent/12 text-accent-text'
         : 'border-line bg-raised text-muted hover:bg-line'
+    } ${speaking ? 'ring-2 ring-accent' : ''}`;
+
+  // オン/オフの札。オフは朱の面に白抜きで、押し忘れているものが遠目にも分かる
+  const stateChip = (on: boolean) =>
+    `rounded px-2 py-0.5 text-xs font-bold leading-none ${
+      on ? 'bg-accent text-accent-ink' : 'bg-alert-face text-[#f8efec]'
     }`;
 
   return (
@@ -82,12 +95,15 @@ export default function Header({
           <div className="flex min-w-0 flex-1 items-stretch gap-2">
             <button
               onClick={onToggleMic}
-              className={studentMediaButton(isMicEnabled)}
+              className={studentMediaButton(isMicEnabled, isMicEnabled && isSpeaking)}
               aria-pressed={isMicEnabled}
               title={isMicEnabled ? '自分の声を送っています（押すと止める）' : '自分の声を送る'}
             >
-              {isMicEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-              <span className="text-[10px] font-bold leading-none">マイク</span>
+              {isMicEnabled
+                ? <Mic className="h-5 w-5" />
+                : <MicOff className="h-5 w-5 text-alert-text" />}
+              <span className="text-[11px] font-bold leading-none">マイク</span>
+              <span className={stateChip(isMicEnabled)}>{isMicEnabled ? 'オン' : 'オフ'}</span>
             </button>
             <button
               onClick={onToggleMute}
@@ -95,8 +111,11 @@ export default function Header({
               aria-pressed={!isMuted}
               title={isMuted ? '相手の声が切れています（押すと聞こえる）' : '相手の声が聞こえています（押すと止める）'}
             >
-              {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-              <span className="text-[10px] font-bold leading-none">スピーカー</span>
+              {isMuted
+                ? <VolumeX className="h-5 w-5 text-alert-text" />
+                : <Volume2 className="h-5 w-5" />}
+              <span className="text-[11px] font-bold leading-none">スピーカー</span>
+              <span className={stateChip(!isMuted)}>{isMuted ? 'オフ' : 'オン'}</span>
             </button>
             {onToggleCamera && (
               <button
@@ -105,8 +124,11 @@ export default function Header({
                 aria-pressed={!!isCameraEnabled}
                 title={isCameraEnabled ? '自分の顔を送っています（押すと止める）' : '自分の映像を送る'}
               >
-                {isCameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-                <span className="text-[10px] font-bold leading-none">カメラ</span>
+                {isCameraEnabled
+                  ? <Video className="h-5 w-5" />
+                  : <VideoOff className="h-5 w-5 text-alert-text" />}
+                <span className="text-[11px] font-bold leading-none">カメラ</span>
+                <span className={stateChip(!!isCameraEnabled)}>{isCameraEnabled ? 'オン' : 'オフ'}</span>
               </button>
             )}
           </div>
@@ -122,7 +144,7 @@ export default function Header({
               }`}
               title={isMicEnabled ? 'マイクOFF' : 'マイクON'}
             >
-              {isMicEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+              {isMicEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5 text-alert-text" />}
             </button>
             <button
               onClick={onToggleMute}
@@ -145,7 +167,7 @@ export default function Header({
                 }`}
                 title={isCameraEnabled ? 'カメラOFF' : 'カメラON'}
               >
-                {isCameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                {isCameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5 text-alert-text" />}
               </button>
             )}
           </>
