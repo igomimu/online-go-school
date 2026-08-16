@@ -204,6 +204,9 @@ export class ClassroomLiveKit {
           isLocal: true,
         });
       }
+      // 自分のマイク・カメラを初めて点けたときは publish であって unmute ではないので、
+      // TrackUnmuted は飛ばない。ここで知らせないと参加者一覧の自分だけ「切」のまま残る
+      this.notifyParticipantsChanged();
     });
 
     this.room.on(RoomEvent.LocalTrackUnpublished, (
@@ -220,6 +223,7 @@ export class ClassroomLiveKit {
           isLocal: true,
         });
       }
+      this.notifyParticipantsChanged();
     });
 
     this.room.on(RoomEvent.TrackMuted, () => this.notifyParticipantsChanged());

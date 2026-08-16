@@ -145,6 +145,24 @@ describe('VideoTiles', () => {
     expect(screen.getByText('カメラ オフ')).toBeInTheDocument();
   });
 
+  it('カメラを点けた直後、参加者一覧が古くても自分の映像は隠さない', () => {
+    const elements = remoteOnly();
+    elements.set('sid:1000', videoEl());
+    render(
+      <VideoTiles
+        videoElements={elements}
+        localIdentity="sid:1000"
+        isCameraEnabled={true}
+        participants={[
+          // LiveKit のイベントが届く前の、まだ「切」のままの自分
+          participant('sid:1000', 'たろう', { videoEnabled: false }),
+          participant('sid:2000', '三村九段'),
+        ]}
+      />,
+    );
+    expect(screen.queryByText('カメラ オフ')).not.toBeInTheDocument();
+  });
+
   it('マイクが切れている人には札を出す', () => {
     render(
       <VideoTiles

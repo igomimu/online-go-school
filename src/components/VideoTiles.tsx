@@ -181,14 +181,16 @@ export default function VideoTiles({
 
   // 参加者情報が渡らない画面では状態が分からない。その場合は札を出さない
   // （映っているものをそのまま出す）。
+  // 自分のカメラだけは App が持つ isCameraEnabled を正本にする。参加者一覧は
+  // LiveKit のイベント経由で遅れて届くことがあり、点けた直後に自分の映像へ
+  // 「カメラ オフ」が被る。
   const stateFor = (identity: string): { cameraOn: boolean; micOn: boolean } => {
+    const isSelf = identity === localIdentity;
     const p = participants.find(pp => pp.identity === identity);
-    if (!p) {
-      return {
-        cameraOn: identity === localIdentity ? isCameraEnabled !== false : true,
-        micOn: true,
-      };
+    if (isSelf && isCameraEnabled !== undefined) {
+      return { cameraOn: isCameraEnabled, micOn: p ? p.audioEnabled : true };
     }
+    if (!p) return { cameraOn: true, micOn: true };
     return { cameraOn: p.videoEnabled, micOn: p.audioEnabled };
   };
 
