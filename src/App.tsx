@@ -49,6 +49,7 @@ import ProblemMonitorPanel from './components/teacher/ProblemMonitorPanel';
 import { useChat } from './hooks/useChat';
 import { useNotificationSound } from './hooks/useNotificationSound';
 import { useParticipantLog } from './hooks/useParticipantLog';
+import { useIdleAloneExit } from './hooks/useIdleAloneExit';
 import type { ChatMessagePayload } from './types/chat';
 import type { AiAnalysisSyncPayload } from './types/ai';
 import { resolveEffectiveViewMode } from './utils/viewMode';
@@ -77,6 +78,8 @@ function App() {
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [connectionError, setConnectionError] = useState('');
   const [isReconnecting, setIsReconnecting] = useState(false);
+  // 一人きりのまま放置されて自動で教室を出た状態（回線障害と区別して案内を出す）
+  const [idleExited, setIdleExited] = useState(false);
 
   // 画面状態
   const [viewMode, setViewMode] = useState<ViewMode>('lobby');
@@ -977,6 +980,31 @@ function App() {
     }
   }, [role, isReconnecting, userName, studentId, roomName, selectedClassroomId, studentClassroomId, connectLiveKit]);
 
+  // 一人きり＋無操作が続いたら自分から教室を出る（開けっぱなしのタブが LiveKit の
+  // 参加者分を食い続けるため）。ログアウトはしないので、ボタン一つで戻れる。
+  const handleIdleExit = useCallback(() => {
+    classroomRef.current?.destroy();
+    classroomRef.current = null;
+    setConnectionState(ConnectionState.Disconnected);
+    setParticipants([]);
+    setVideoElements(new Map());
+    setActiveSpeakers([]);
+    setIsMicEnabled(false);
+    setIsCameraEnabled(false);
+    setIdleExited(true);
+  }, []);
+
+  useIdleAloneExit({
+    // 授業中なら必ず 2 人以上いる。自分だけの部屋のときにしか働かせない。
+    active: connectionState === ConnectionState.Connected && participants.length <= 1 && !idleExited,
+    onIdle: handleIdleExit,
+  });
+
+  const handleRejoinAfterIdle = useCallback(async () => {
+    setIdleExited(false);
+    await handleReconnect();
+  }, [handleReconnect]);
+
   const saveSettings = () => {
     localStorage.setItem('lk-url', livekitUrl);
     setShowSettings(false);
@@ -1438,6 +1466,34 @@ function App() {
   }
 
   // --- 生徒接続画面 ---
+  // 一人きりのまま放置されて自動で教室を出たとき。回線が切れたのではないと分かる書き方にする。
+  if (idleExited && connectionState !== ConnectionState.Connected) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-6 px-4">
+        <div className="glass-panel p-8 w-full max-w-lg space-y-6">
+          <div className="space-y-3">
+            <h2 className="text-2xl font-bold text-ink">教室から出ました</h2>
+            <p className="text-base text-ink" style={{ lineHeight: 1.8 }}>
+              しばらく使っていなかったので、いったん教室から出ました。
+              こわれたのではありません。つづけるときは下のボタンを押してください。
+            </p>
+          </div>
+          <button
+            onClick={handleRejoinAfterIdle}
+            disabled={isReconnecting}
+            className="premium-button w-full text-lg"
+            style={{ paddingTop: 16, paddingBottom: 16 }}
+          >
+            {isReconnecting ? '入りなおしています…' : 'もう一度入る'}
+          </button>
+          <button onClick={handleDisconnect} className="text-muted/75 hover:text-muted text-sm w-full text-center">
+            終わる
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (role === 'STUDENT' && connectionState !== ConnectionState.Connected) {
     const hasCredentials = !!(livekitUrl && roomName);
 
