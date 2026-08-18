@@ -10,7 +10,7 @@ import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './
 import type { ViewMode, AudioPermissions, SavedGame, RankDisplayPayload } from './types/game';
 import type { Student, Classroom, RankDisplay } from './types/classroom';
 import { DEFAULT_RANK_DISPLAY } from './types/classroom';
-import { fetchToken } from './utils/livekitToken';
+import { fetchToken, TeacherAbsentError } from './utils/livekitToken';
 import { getDisplayName, getTeacherDisplayName, identityMatchesPlayer, makeStudentIdentity, TEACHER_IDENTITY } from './utils/identityUtils';
 import { ConnectionState } from 'livekit-client';
 import { useLiveGameList } from './hooks/useLiveGameList';
@@ -80,6 +80,8 @@ function App() {
   const [isReconnecting, setIsReconnecting] = useState(false);
   // 一人きりのまま放置されて自動で教室を出た状態（回線障害と区別して案内を出す）
   const [idleExited, setIdleExited] = useState(false);
+  // 先生がまだ教室を開いていないので入れない状態（生徒だけ）。先生が入るまで待って自動で繋ぐ。
+  const [waitingForTeacher, setWaitingForTeacher] = useState(false);
 
   // 画面状態
   const [viewMode, setViewMode] = useState<ViewMode>('lobby');
@@ -678,13 +680,21 @@ function App() {
       await classroom.connect(livekitUrl, connectToken);
       await restoreMediaIntent(classroom, connectRole);
       setConnectionError('');
+      setWaitingForTeacher(false);
 
       if (connectRole === 'TEACHER') {
         const baseUrl = `${window.location.origin}${window.location.pathname}`;
         setStudentJoinInfo(`${baseUrl}?classroomId=${effectiveClassroomId}`);
       }
     } catch (err) {
-      setConnectionError(err instanceof Error ? err.message : '接続に失敗しました');
+      // 先生待ちは「失敗」ではないので、赤いエラーではなく待機画面に振り分ける
+      if (err instanceof TeacherAbsentError) {
+        setWaitingForTeacher(true);
+        setConnectionError('');
+      } else {
+        setWaitingForTeacher(false);
+        setConnectionError(err instanceof Error ? err.message : '接続に失敗しました');
+      }
     }
     // chat / notificationSound は中身が ref と updater で書かれていて、古い closure を
     // 掴んでも取りこぼさない（useChat.handleChatMessage は依存 [] ＋ setMessages(prev=>…)、
@@ -788,6 +798,16 @@ function App() {
       studentAutoConnectRef.current = false;
     }
   }, [role, connectionState, studentId, livekitUrl, roomName, connectLiveKit]);
+
+  // 先生が入るまで、生徒側は静かに待って自動で繋ぎ直す。
+  // 待っている間に叩くのはトークンAPIだけで LiveKit には繋がないので、参加者分を使わない。
+  useEffect(() => {
+    if (!waitingForTeacher || role !== 'STUDENT' || !studentId) return;
+    const timer = setInterval(() => {
+      void connectLiveKit('STUDENT', makeStudentIdentity(studentId));
+    }, 20_000);
+    return () => clearInterval(timer);
+  }, [waitingForTeacher, role, studentId, connectLiveKit]);
 
   // 検討の矢印キーは ReviewBoard 側が扱う（Home/End/Delete も含めて一式そこにある）。
   // ここにも同じ処理があったが、検討を別ウィンドウに出すと本体（教室ホーム）で矢印を
@@ -1515,7 +1535,21 @@ function App() {
             )}
           </div>
 
-          {connectionState === ConnectionState.Connecting ? (
+          {waitingForTeacher ? (
+            <div className="space-y-4">
+              <p className="text-base text-ink" style={{ lineHeight: 1.8 }}>
+                先生がまだ教室を開いていません。<br />
+                先生が入ると自動で教室に入れます。このまま待っていてください。
+              </p>
+              <p className="text-xs text-muted" aria-live="polite">先生を待っています…</p>
+              <button
+                onClick={() => studentId && connectLiveKit('STUDENT', makeStudentIdentity(studentId))}
+                className="secondary-button w-full"
+              >
+                今すぐためす
+              </button>
+            </div>
+          ) : connectionState === ConnectionState.Connecting ? (
             <div className="text-center text-accent-text">接続中...</div>
           ) : connectionError ? (
             <div className="space-y-4">

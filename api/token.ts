@@ -1,8 +1,28 @@
-import { AccessToken } from 'livekit-server-sdk';
+import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { identityBelongsToStudent } from './tokenAuth.js';
+
+// 先生の LiveKit identity（src/utils/identityUtils.ts の TEACHER_IDENTITY と同じ値）
+const TEACHER_IDENTITY = 'teacher';
+
+/**
+ * その教室に先生が入っているか、LiveKit に聞く。
+ *
+ * 生徒だけで教室を使えないようにするための門番。IGC（ネット囲碁学園）も同じ作りで、
+ * 生徒が先生不在の部屋に繋いだままにならないので、LiveKit の参加者分も無駄に減らない。
+ */
+async function isTeacherInRoom(
+  roomName: string,
+  host: string,
+  apiKey: string,
+  apiSecret: string,
+): Promise<boolean> {
+  const svc = new RoomServiceClient(host, apiKey, apiSecret);
+  const participants = await svc.listParticipants(roomName);
+  return participants.some(p => p.identity.replace(/^sid:/, '') === TEACHER_IDENTITY);
+}
 
 // SHA-256 ハッシュ化ヘルパー
 function sha256(text: string): string {
@@ -32,6 +52,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const authHeader = (req.headers['authorization'] as string) ?? '';
   let authorized = false;
+  // 生徒の要求だけ「先生が居るか」を見る。先生と service_role（E2E・保守）は素通し。
+  let requesterIsStudent = false;
+
+  // 一時トークンは1回きりなので、ここではまだ使用済みにしない。
+  // 先生が居なくて 409 を返す場合に焼いてしまうと、先生が入ってからの入り直しができなくなる。
+  // 実際に消費するのは、先生の在室まで確かめてトークンを発行すると決まってから。
+  let pendingJoinTokenHash: string | null = null;
 
   // 1. パスA: rawToken (一時トークン) がある場合
   if (rawToken) {
@@ -39,17 +66,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const nowStr = new Date().toISOString();
 
-    const { data: joinToken, error: updateErr } = await supabase
+    const { data: joinToken, error: readErr } = await supabase
       .from('go_school_join_tokens')
-      .update({ used_at: nowStr })
+      .select('student_id, online_classroom_id')
       .eq('token_hash', tokenHash)
       .is('used_at', null)
       .gt('expires_at', nowStr)
-      .select('student_id, online_classroom_id')
       .maybeSingle();
 
-    if (updateErr) {
-      console.error('[token-auth] DB update error:', updateErr.message);
+    if (readErr) {
+      console.error('[token-auth] DB read error:', readErr.message);
       return res.status(500).json({ error: 'Database verification failed' });
     }
 
@@ -62,6 +88,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (isRoomValid && isIdentityValid) {
         authorized = true;
+        requesterIsStudent = true;
+        pendingJoinTokenHash = tokenHash;
       } else {
         console.warn(`[token-auth] Token authorization mismatch. expectedRoom: ${expectedRoom}, actualRoom: ${roomName}, studentUuid: ${studentUuid}, identity: ${identity}`);
       }
@@ -89,6 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const expectedRoom = `go-${studentClassroomId}`;
           if (roomName === expectedRoom && identityBelongsToStudent(identity, studentId)) {
             authorized = true;
+            requesterIsStudent = true;
           }
         }
       }
@@ -101,6 +130,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   //  認証されるようになったため、無認証フォールバックを撤去した。2026-06-09）
   if (!authorized) {
     return res.status(403).json({ error: 'Forbidden: Unauthorized to join this room' });
+  }
+
+  // 先生が教室を開いていないうちは、生徒にトークンを渡さない。
+  // 繋がせてから切るのではなく最初から繋がせないので、参加者分を1分も使わない。
+  if (requesterIsStudent) {
+    const livekitHost = (process.env.LIVEKIT_URL || process.env.VITE_LIVEKIT_URL || '')
+      .replace(/^ws/, 'http');
+    if (!livekitHost) {
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+    try {
+      if (!(await isTeacherInRoom(roomName, livekitHost, apiKey, apiSecret))) {
+        return res.status(409).json({
+          error: '先生がまだ教室を開いていません',
+          reason: 'teacher_absent',
+        });
+      }
+    } catch (err) {
+      // LiveKit に聞けなかったときは通す。門番が壊れて授業が止まる方が害が大きい。
+      console.error('[token-auth] teacher presence check failed:', err instanceof Error ? err.message : err);
+    }
+  }
+
+  // ここまで来たら実際に入れる。一時トークンをここで使用済みにする。
+  // `is('used_at', null)` を残しているので、同時に2回来ても片方しか通らない。
+  if (pendingJoinTokenHash) {
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const { data: consumed, error: consumeErr } = await supabase
+      .from('go_school_join_tokens')
+      .update({ used_at: new Date().toISOString() })
+      .eq('token_hash', pendingJoinTokenHash)
+      .is('used_at', null)
+      .select('student_id')
+      .maybeSingle();
+
+    if (consumeErr) {
+      console.error('[token-auth] DB update error:', consumeErr.message);
+      return res.status(500).json({ error: 'Database verification failed' });
+    }
+    if (!consumed) {
+      // 読んでから消費するまでの間に誰かが使った
+      return res.status(403).json({ error: 'Forbidden: Unauthorized to join this room' });
+    }
   }
 
   // LiveKit JWT 発行

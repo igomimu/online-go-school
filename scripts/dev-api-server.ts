@@ -52,6 +52,8 @@ loadEnvFile(path.join(process.env.HOME || '', '.secrets', 'online-go-school-kata
 // dev の .env はフロント向けに VITE_ 接頭辞付きのため、ここで橋渡しする。
 process.env.LIVEKIT_API_KEY ||= process.env.VITE_LIVEKIT_API_KEY;
 process.env.LIVEKIT_API_SECRET ||= process.env.VITE_LIVEKIT_API_SECRET;
+// 先生の在室確認で LiveKit の管理APIを叩くのに要る（本番は Vercel に VITE_LIVEKIT_URL がある）
+process.env.LIVEKIT_URL ||= process.env.VITE_LIVEKIT_URL;
 process.env.SUPABASE_URL ||= process.env.VITE_DOJO_SUPABASE_URL;
 // SUPABASE_SERVICE_ROLE_KEY は ~/.secrets/supabase-dojo-service.env から取得済み
 // VITE_DOJO_SUPABASE_KEY は publishable key なので service_role の代替にはならない
