@@ -74,6 +74,9 @@ test.describe('狭い幅でのレイアウト', () => {
   });
 
   test('生徒スマホ360px: ヘッダーが縦積みにならず、操作が画面内に収まる', async () => {
+    // 先生が教室を開くまで生徒は入れない
+    await loginAsTeacher(teacherPage, TEST_TEACHER_PASSWORD);
+    await openClassroomAndConnect(teacherPage);
     await loginAsStudent(studentPage, { studentCode: TEST_STUDENT_A.code, classroomId });
 
     // 「生徒」バッジ・氏名・接続人数が1文字ずつ縦に積まれていないこと
@@ -98,9 +101,9 @@ test.describe('狭い幅でのレイアウト', () => {
   });
 
   test('対局画面560px: 対局者名・持ち時間・手数が潰れない', async () => {
-    await loginAsStudent(studentPage, { studentCode: TEST_STUDENT_A.code, classroomId });
     await loginAsTeacher(teacherPage, TEST_TEACHER_PASSWORD);
     await openClassroomAndConnect(teacherPage);
+    await loginAsStudent(studentPage, { studentCode: TEST_STUDENT_A.code, classroomId });
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
     await createGame(teacherPage, {
       blackName: TEST_STUDENT_A.name,

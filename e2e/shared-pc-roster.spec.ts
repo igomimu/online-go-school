@@ -1,6 +1,7 @@
-import { test, expect } from '@playwright/test';
-import { TEST_STUDENT_A, generateClassroomId } from './helpers/test-data';
-import { clearAllData, setupClassroomData, teardownSupabaseRoster, fetchRosterToken } from './helpers/setup';
+import { test, expect, type BrowserContext, type Page } from '@playwright/test';
+import { TEST_STUDENT_A, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
+import { clearAllData, setupClassroomData, setupTeacherPassword, teardownSupabaseRoster, fetchRosterToken } from './helpers/setup';
+import { loginAsTeacher, openClassroomAndConnect } from './helpers/teacher-actions';
 
 /**
  * 道場の共有PC（2026-08-13 三村さん）。
@@ -13,8 +14,10 @@ import { clearAllData, setupClassroomData, teardownSupabaseRoster, fetchRosterTo
 test.describe('道場の共有PC', () => {
   let classroomId: string;
   let rosterToken: string;
+  let teacherContext: BrowserContext;
+  let teacherPage: Page;
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, browser }) => {
     classroomId = generateClassroomId('roster');
     await page.goto('/');
     await clearAllData(page);
@@ -22,9 +25,21 @@ test.describe('道場の共有PC', () => {
 
     // 教室に発行された共有PCの鍵を取る（先生が「道場PC用リンクをコピー」で得るもの）
     rosterToken = await fetchRosterToken(classroomId);
+
+    // 先生が教室を開くまで生徒は入れないので、先に開けておく
+    teacherContext = await browser.newContext();
+    teacherPage = await teacherContext.newPage();
+    await teacherPage.goto('/');
+    await clearAllData(teacherPage);
+    await setupTeacherPassword(teacherPage, TEST_TEACHER_PASSWORD);
+    await setupClassroomData(teacherPage, classroomId);
+    await teacherPage.reload();
+    await loginAsTeacher(teacherPage, TEST_TEACHER_PASSWORD);
+    await openClassroomAndConnect(teacherPage);
   });
 
   test.afterEach(async () => {
+    await teacherContext?.close();
     await teardownSupabaseRoster(classroomId);
   });
 

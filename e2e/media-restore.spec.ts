@@ -2,6 +2,7 @@ import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { TEST_STUDENT_A, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
 import { clearAllData, setupTeacherPassword, setupClassroomData, teardownSupabaseRoster } from './helpers/setup';
 import { loginAsStudent } from './helpers/student-actions';
+import { loginAsTeacher, openClassroomAndConnect } from './helpers/teacher-actions';
 
 /**
  * マイク・カメラの状態まわりの回帰テスト。
@@ -33,6 +34,9 @@ test.describe('マイク・カメラの状態', () => {
     await setupTeacherPassword(teacherPage, TEST_TEACHER_PASSWORD);
     await setupClassroomData(teacherPage, classroomId);
     await teacherPage.reload();
+    // 先生が教室を開くまで生徒は入れない
+    await loginAsTeacher(teacherPage, TEST_TEACHER_PASSWORD);
+    await openClassroomAndConnect(teacherPage);
 
     await studentPage.goto('/');
     await clearAllData(studentPage);

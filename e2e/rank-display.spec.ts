@@ -36,10 +36,11 @@ test.describe('棋力の表示方法', () => {
     await studentPage.goto('/');
     await clearAllData(studentPage);
     await studentPage.reload();
-    await loginAsStudent(studentPage, { studentCode: TEST_STUDENT_A.code, classroomId });
-
+    // 先生が教室を開くまで生徒は入れないので、先生を先に入れる
     await loginAsTeacher(teacherPage, TEST_TEACHER_PASSWORD);
     await openClassroomAndConnect(teacherPage);
+
+    await loginAsStudent(studentPage, { studentCode: TEST_STUDENT_A.code, classroomId });
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
   });
 
