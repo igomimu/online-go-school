@@ -77,7 +77,7 @@ export default function BoardThumbnailGrid({
 
         return (
           // 行の途中で切れた状態でスクロールが止まらないよう、各盤の上端に吸着させる
-          <div key={student.id} style={{ scrollSnapAlign: 'start' }}>
+          <div key={student.id} data-testid={`board-slot-${student.id}`} style={{ scrollSnapAlign: 'start' }}>
             {/* ラベル */}
             <div
               style={{
@@ -95,7 +95,7 @@ export default function BoardThumbnailGrid({
 
             {/* 碁盤 */}
             {game ? (
-              <div onClick={() => onSelectGame(game.id)} style={{ cursor: 'pointer' }}>
+              <div data-testid={`open-board-${student.id}`} onClick={() => onSelectGame(game.id)} style={{ cursor: 'pointer' }}>
                 <GameThumbnail game={game} onClick={() => onSelectGame(game.id)} students={students} onResume={onResumeGame} allowTimeoutResume />
               </div>
             ) : (

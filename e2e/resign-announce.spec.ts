@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { TEST_STUDENT_A, TEST_STUDENT_B, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
 import { clearAllData, setupTeacherPassword, setupClassroomData, teardownSupabaseRoster } from './helpers/setup';
-import { loginAsTeacher, openClassroomAndConnect, waitForStudentJoined, createGame, getOpenStudentButton, waitForObserverPanel } from './helpers/teacher-actions';
+import { loginAsTeacher, openClassroomAndConnect, waitForStudentJoined, createGame, getStudentBoard, waitForObserverPanel } from './helpers/teacher-actions';
 import { loginAsStudent, enterAssignedGame, waitForMyTurn, playMove } from './helpers/student-actions';
 
 // 投了は結果が一瞬で決まり碁盤も自動で閉じるため、結果を声と大きな表示で伝える（2026-08-02）。
@@ -54,8 +54,8 @@ test('投了すると「〇の中押し勝ちです」と読み上げ、結果�
       boardSize: 9,
       expectedPlayersCount: 3,
     });
-    const openBtn = getOpenStudentButton(teacherPage, TEST_STUDENT_A.id);
-    await expect(openBtn).toBeEnabled({ timeout: 10_000 });
+    const openBtn = getStudentBoard(teacherPage, TEST_STUDENT_A.id);
+    await expect(openBtn).toBeVisible({ timeout: 10_000 });
     await openBtn.click();
     await waitForObserverPanel(teacherPage);
 

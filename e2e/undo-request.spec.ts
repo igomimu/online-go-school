@@ -6,7 +6,7 @@ import {
   openClassroomAndConnect,
   waitForStudentJoined,
   createGame,
-  getOpenStudentButton,
+  getStudentBoard,
   waitForObserverPanel,
 } from './helpers/teacher-actions';
 import {
@@ -79,8 +79,8 @@ test.describe('「待った」機能（対局者どうしの同意制）', () =>
       expectedPlayersCount: 3,
     });
 
-    const openBtn = getOpenStudentButton(teacherPage, TEST_STUDENT_A.id);
-    await expect(openBtn).toBeEnabled({ timeout: 10_000 });
+    const openBtn = getStudentBoard(teacherPage, TEST_STUDENT_A.id);
+    await expect(openBtn).toBeVisible({ timeout: 10_000 });
     await openBtn.click();
     await waitForObserverPanel(teacherPage);
 
@@ -144,8 +144,8 @@ test.describe('「待った」機能（対局者どうしの同意制）', () =>
       mainMinutes: 5,
     });
 
-    const openBtn = getOpenStudentButton(teacherPage, TEST_STUDENT_A.id);
-    await expect(openBtn).toBeEnabled({ timeout: 10_000 });
+    const openBtn = getStudentBoard(teacherPage, TEST_STUDENT_A.id);
+    await expect(openBtn).toBeVisible({ timeout: 10_000 });
     await openBtn.click();
     await waitForObserverPanel(teacherPage);
 
@@ -197,8 +197,8 @@ test.describe('「待った」機能（対局者どうしの同意制）', () =>
       expectedPlayersCount: 3,
     });
 
-    const openBtn = getOpenStudentButton(teacherPage, TEST_STUDENT_A.id);
-    await expect(openBtn).toBeEnabled({ timeout: 10_000 });
+    const openBtn = getStudentBoard(teacherPage, TEST_STUDENT_A.id);
+    await expect(openBtn).toBeVisible({ timeout: 10_000 });
     await openBtn.click();
     await waitForObserverPanel(teacherPage);
 
@@ -248,8 +248,8 @@ test.describe('「待った」機能（対局者どうしの同意制）', () =>
       expectedPlayersCount: 3,
     });
 
-    const openBtn = getOpenStudentButton(teacherPage, TEST_STUDENT_A.id);
-    await expect(openBtn).toBeEnabled({ timeout: 10_000 });
+    const openBtn = getStudentBoard(teacherPage, TEST_STUDENT_A.id);
+    await expect(openBtn).toBeVisible({ timeout: 10_000 });
     await openBtn.click();
     await waitForObserverPanel(teacherPage);
 
@@ -297,8 +297,8 @@ test.describe('「待った」機能（対局者どうしの同意制）', () =>
       expectedPlayersCount: 3,
     });
 
-    const openBtn = getOpenStudentButton(teacherPage, TEST_STUDENT_A.id);
-    await expect(openBtn).toBeEnabled({ timeout: 10_000 });
+    const openBtn = getStudentBoard(teacherPage, TEST_STUDENT_A.id);
+    await expect(openBtn).toBeVisible({ timeout: 10_000 });
     await openBtn.click();
     await waitForObserverPanel(teacherPage);
 

@@ -97,6 +97,21 @@ function studentNameFromId(studentId: string): string | undefined {
  * 遷移したことを確認する。onBack時のみ出現する「閉じてホーム」ボタンを目印に使う
  * （8c6bbef で「← 戻る」から改名）。
  */
+/**
+ * 生徒の盤（中央のサムネイル）。対局が無ければ存在しない。
+ *
+ * 以前は生徒一覧の行に「開く」ボタンがあったが、2dcff9e で
+ * 「盤を開く操作は中央の碁盤クリックへ一本化」された。
+ */
+export function getStudentBoard(page: Page, studentId: string) {
+  return page.getByTestId(`open-board-${studentId}`);
+}
+
+/** 生徒の枠そのもの。対局の有無にかかわらず必ずある。 */
+export function getStudentBoardSlot(page: Page, studentId: string) {
+  return page.getByTestId(`board-slot-${studentId}`);
+}
+
 export async function waitForObserverPanel(page: Page, timeout = 10_000): Promise<void> {
   await expect(page.getByRole('button', { name: '閉じてホーム' })).toBeVisible({ timeout });
 }

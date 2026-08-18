@@ -6,7 +6,7 @@ import {
   openClassroomAndConnect,
   waitForStudentJoined,
   createGame,
-  getOpenStudentButton,
+  getStudentBoard,
   waitForObserverPanel,
 } from './helpers/teacher-actions';
 import {
@@ -93,8 +93,8 @@ test.describe('先生1+生徒2 対局フルシナリオ', () => {
     });
 
     // === 先生が観戦パネル（GameBoard）に入る ===
-    const openBtn = getOpenStudentButton(teacherPage, TEST_STUDENT_A.id);
-    await expect(openBtn).toBeEnabled({ timeout: 10_000 });
+    const openBtn = getStudentBoard(teacherPage, TEST_STUDENT_A.id);
+    await expect(openBtn).toBeVisible({ timeout: 10_000 });
     await openBtn.click();
     await waitForObserverPanel(teacherPage);
 
