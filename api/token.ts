@@ -20,8 +20,26 @@ async function isTeacherInRoom(
   apiSecret: string,
 ): Promise<boolean> {
   const svc = new RoomServiceClient(host, apiKey, apiSecret);
-  const participants = await svc.listParticipants(roomName);
-  return participants.some(p => p.identity.replace(/^sid:/, '') === TEACHER_IDENTITY);
+
+  // 🔴 先に部屋の有無を見る。LiveKit Cloud は存在しない部屋に listParticipants すると
+  // TwirpError(not_found) を投げるが、自前サーバー（開発・E2E用）は空リストを返す。
+  // listParticipants だけで判断すると、本番でだけ例外→素通しになる。
+  const rooms = await svc.listRooms([roomName]);
+  if (rooms.length === 0) return false;
+
+  try {
+    const participants = await svc.listParticipants(roomName);
+    return participants.some(p => p.identity.replace(/^sid:/, '') === TEACHER_IDENTITY);
+  } catch (err) {
+    // 部屋を見てから聞くまでの間に空になって消えた
+    if (isNotFound(err)) return false;
+    throw err;
+  }
+}
+
+function isNotFound(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return code === 'not_found';
 }
 
 // SHA-256 ハッシュ化ヘルパー
