@@ -1,5 +1,6 @@
 import { test, devices, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
+import { clearLiveGames } from './helpers/setup';
 
 /**
  * みむいご通信に載せる紹介画像を撮るためだけのスペック。合否ではなく写真が目的。
@@ -34,6 +35,10 @@ test('みむいご通信用: デモ教室の対局画面を撮る', async ({ bro
   test.skip(!TEACHER_PW, 'TEST_TEACHER_PASSWORD が未設定');
   fs.mkdirSync(OUT, { recursive: true });
 
+  // 前回の撮影で作った対局が「中断」で残っていると、同じ相手の新しい対局が
+  // 生徒の画面に出てこない。撮影前に掃除する（デモ教室は仮名の生徒だけの撮影用）。
+  await clearLiveGames(CLASSROOM_ID);
+
   const teacherCtx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const blackCtx = await browser.newContext({ ...devices['iPhone 13'] });
   const whiteCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -64,10 +69,15 @@ test('みむいご通信用: デモ教室の対局画面を撮る', async ({ bro
       await page.getByTestId('classroom-id-input').fill(CLASSROOM_ID);
       await page.getByTestId('student-login-button').click();
     }
+    // 「先生が対局を作成するのをお待ちください」は対局が1つも無いときだけ出る。
+    // デモ教室に中断した対局が残っていると出ないので、必ず出るロビーの文言で待つ。
     await Promise.race([
-      page.getByText('先生が対局を作成するのをお待ちください').waitFor({ timeout: 40_000 }),
+      page.getByText('先生がレッスンを始めるのを待ってください').waitFor({ timeout: 40_000 }),
       page.getByTestId('go-board').waitFor({ state: 'visible', timeout: 40_000 }),
-    ]);
+    ]).catch(async (err) => {
+      const txt = (await page.evaluate(() => document.body.innerText)).replace(/\n+/g, ' | ').slice(0, 400);
+      throw new Error(`[${who.code}] 入室できず: ${txt}\n---\n${err}`);
+    });
   }
 
   // 先生側に2人とも接続済みで出るまで待つ
@@ -101,7 +111,10 @@ test('みむいご通信用: デモ教室の対局画面を撮る', async ({ bro
   for (const page of [black, white]) {
     const openButton = page.getByRole('button', { name: '碁盤を開く', exact: true });
     if (await openButton.isVisible().catch(() => false)) await openButton.click();
-    await expect(page.getByTestId('go-board')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('go-board')).toBeVisible({ timeout: 30_000 }).catch(async (err) => {
+      const txt = (await page.evaluate(() => document.body.innerText)).replace(/\n+/g, ' | ').slice(0, 500);
+      throw new Error(`碁盤が開かない: ${txt}\n---\n${err}`);
+    });
   }
 
   // === 序盤を並べる ===

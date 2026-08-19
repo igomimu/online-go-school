@@ -163,6 +163,24 @@ export async function fetchRosterToken(classroomId: string): Promise<string> {
   return (data?.roster_token as string | null) ?? '';
 }
 
+/**
+ * 教室に残っている対局だけ消す（名簿はそのまま）。
+ *
+ * デモ教室のように使い回す教室では、前回の撮影で作った対局が「中断」のまま残り、
+ * 次に同じ相手で対局を作っても生徒の画面に出てこない。撮影の前後で掃除する。
+ */
+export async function clearLiveGames(classroomId: string): Promise<void> {
+  const { url, serviceRoleKey } = getRosterSeedEnv();
+  const supabase = createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { error } = await supabase
+    .from('go_school_live_games')
+    .delete()
+    .eq('classroom_id', classroomId);
+  if (error) throw new Error(`Failed to clear live games: ${error.message}`);
+}
+
 export async function teardownSupabaseRoster(classroomId: string): Promise<void> {
   try {
     const { url, serviceRoleKey } = getRosterSeedEnv();
