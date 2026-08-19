@@ -91,7 +91,9 @@ test('時間切れで終わった対局を講師が再開でき、切れた側�
     await expect(teacherGameWindow.getByTestId('classroom-alert-timeout')).toHaveCount(0, { timeout: 20_000 });
 
     // 生徒側の盤が対局中に戻り、切れていた黒の秒読みが規定回数（1回）復元されている
-    await expect(studentAPage.getByTestId('clock-black')).toContainText('秒読 10秒 [1]', { timeout: 30_000 });
+    // 表示は「<秒読みの経過秒>秒 秒読み 残<回数>」（a64d46b でこの形になった）。
+    // 経過秒は 0 から増えていくので、ここで見るべきは復元された回数のほう。
+    await expect(studentAPage.getByTestId('clock-black')).toContainText('秒読み 残1', { timeout: 30_000 });
     await expect(studentAPage.getByText('あなたの番です')).toBeVisible({ timeout: 15_000 });
     await expect(studentAPage.getByText(/時間切れ/)).toHaveCount(0);
 

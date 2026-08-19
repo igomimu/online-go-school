@@ -214,7 +214,7 @@ test('秒読みの回数消費の告知が二重に読み上げられない（�
 
 // 回帰テスト: 講師は時間切れ負けにならない（2026-08-01）。
 // 回線トラブル等で先生の時計が切れても対局を続行できる必要があるため、
-// 秒読みを使い切っても終局せず、秒読みが繰り返される（表示は [∞]）。
+// 秒読みを使い切っても終局せず、秒読みが繰り返される（表示は「残∞」）。
 test('講師は秒読みを使い切っても時間切れ負けにならない（持ち時間0・秒読み10秒×1）', async ({ browser }) => {
   test.setTimeout(150_000);
   const classroomId = generateClassroomId('noloss');
@@ -274,7 +274,7 @@ test('講師は秒読みを使い切っても時間切れ負けにならない�
     await studentAPage.waitForTimeout(25_000);
 
     await expect(studentAPage.getByText(/時間切れ/)).toHaveCount(0);
-    await expect(studentAPage.getByTestId('clock-white')).toContainText('[∞]');
+    await expect(studentAPage.getByTestId('clock-white')).toContainText('残∞');
     await expect(studentAPage.getByText('相手の番です')).toBeVisible();
   } finally {
     for (const ctx of contexts) await ctx.close().catch(() => {});
