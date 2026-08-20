@@ -135,13 +135,13 @@ export function playStoneSound(): void {
  * しきい値はここだけを直せば変えられる。
  */
 export const CAPTURE_STEPS = [
-  { min: 3, file: 'nuki3.ogg' },  // 3子以上＝たくさん抜いた（2026-08-20 三村さんの指定）
-  { min: 2, file: 'nuki2.ogg' },
-  { min: 1, file: 'nuki1.ogg' },  // 1子
-] as const;
+  { min: 8, file: 'nuki3.ogg' },  // 8子以上
+  { min: 4, file: 'nuki2.ogg' },  // 4〜7子
+  { min: 1, file: 'nuki1.ogg' },  // 3子以下
+] as const;   // 段階は 2026-08-20 三村さんの指定
 
 /** 後方互換。 */
-export const MANY_CAPTURES = 3;
+export const MANY_CAPTURES = 4;
 
 /**
  * 石を取った音。着手音の直後に少し遅らせて重ねる（実際の対局でも打つ→抜くの順）。
