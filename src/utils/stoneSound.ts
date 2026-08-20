@@ -11,7 +11,7 @@ const STORAGE_KEY = 'ogs.stoneSoundEnabled';
 const VOLUME = 0.6;
 
 const STONE_FILES = ['ishioto1.ogg', 'ishioto2.ogg', 'ishioto3.ogg'] as const;
-const CAPTURE_FILES = ['nuki1.ogg', 'nuki2.ogg'] as const;
+const CAPTURE_FILES = ['nuki1.ogg', 'nuki2.ogg', 'nuki3.ogg'] as const;
 const ALL_FILES = [...STONE_FILES, ...CAPTURE_FILES];
 
 let enabled = readEnabled();
@@ -125,19 +125,31 @@ export function playStoneSound(): void {
   play(STONE_FILES[Math.floor(Math.random() * STONE_FILES.length)]);
 }
 
-/** ここから「たくさん抜いた」音に切り替える石数。 */
-export const MANY_CAPTURES = 3;
+/**
+ * 抜き音の段階。min 以上の石数でその音を鳴らす（多いほうから先に判定する）。
+ *
+ * 実際の碁盤では、取った石が多いほど抜く音は長く鳴る（2026-08-20 三村さんの指摘）。
+ * nuki1 と nuki2 は 0.74 / 0.80 秒でほぼ同じ長さのため、音色は変わっても
+ * 「量が伝わらない」状態だった。長い音 nuki3（1.60秒）を足して3段階にしている。
+ *
+ * しきい値はここだけを直せば変えられる。
+ */
+export const CAPTURE_STEPS = [
+  { min: 5, file: 'nuki3.ogg' },  // たくさん抜いた
+  { min: 2, file: 'nuki2.ogg' },
+  { min: 1, file: 'nuki1.ogg' },  // 1子
+] as const;
+
+/** 後方互換（旧: 3子以上で大きい音）。 */
+export const MANY_CAPTURES = 5;
 
 /**
  * 石を取った音。着手音の直後に少し遅らせて重ねる（実際の対局でも打つ→抜くの順）。
- *
- * 1〜2子は軽い音、3子以上は大きい音。当初は 10子以上を大きい音にしていたが、
- * 実戦で10子以上抜く場面は稀で使い分けがほとんど起きていなかった
- * （2026-08-02 三村さんの指摘）。
  *
  * @param count 取った石数
  */
 export function playCaptureSound(count: number): void {
   if (!enabled) return;
-  play(count >= MANY_CAPTURES ? 'nuki2.ogg' : 'nuki1.ogg', 140);
+  const step = CAPTURE_STEPS.find((s) => count >= s.min) ?? CAPTURE_STEPS[CAPTURE_STEPS.length - 1];
+  play(step.file, 140);
 }
