@@ -11,7 +11,10 @@ const STORAGE_KEY = 'ogs.stoneSoundEnabled';
 const VOLUME = 0.6;
 
 const STONE_FILES = ['ishioto1.ogg', 'ishioto2.ogg', 'ishioto3.ogg'] as const;
-const CAPTURE_FILES = ['nuki1.ogg', 'nuki2.ogg', 'nuki3.ogg'] as const;
+const CAPTURE_FILES = [
+  'capture1.ogg', 'capture2.ogg', 'capture3.ogg', 'capture4.ogg', 'capture5.ogg',
+  'nuki2.ogg',
+] as const;
 const ALL_FILES = [...STONE_FILES, ...CAPTURE_FILES];
 
 let enabled = readEnabled();
@@ -129,19 +132,25 @@ export function playStoneSound(): void {
  * 抜き音の段階。min 以上の石数でその音を鳴らす（多いほうから先に判定する）。
  *
  * 実際の碁盤では、取った石が多いほど抜く音は長く鳴る（2026-08-20 三村さんの指摘）。
- * nuki1 と nuki2 は 0.74 / 0.80 秒でほぼ同じ長さのため、音色は変わっても
- * 「量が伝わらない」状態だった。長い音 nuki3（1.60秒）を足して3段階にしている。
+ * capture1〜5 は三村さんが実際の碁盤で 1個→5個 と増やして録音したもの。
+ * 長さが同じでも、音を聞けば複数個であることが分かる。
  *
- * しきい値はここだけを直せば変えられる。
+ * 8個以上は囲Trap（いごぽん）用に録った nuki2 を使う。あれは大量に取る前提の音で、
+ * 普通の対局では大げさに響く（1個を取る場面を想定していなかった）。
+ *
+ * しきい値はこの表だけを直せば変えられる。
  */
 export const CAPTURE_STEPS = [
-  { min: 8, file: 'nuki3.ogg' },  // 8子以上
-  { min: 4, file: 'nuki2.ogg' },  // 4〜7子
-  { min: 1, file: 'nuki1.ogg' },  // 3子以下
-] as const;   // 段階は 2026-08-20 三村さんの指定
+  { min: 8, file: 'nuki2.ogg' },     // 8個以上（囲Trap用の音源＝大量に取る音）
+  { min: 5, file: 'capture5.ogg' },  // 5〜7個
+  { min: 4, file: 'capture4.ogg' },
+  { min: 3, file: 'capture3.ogg' },
+  { min: 2, file: 'capture2.ogg' },
+  { min: 1, file: 'capture1.ogg' },  // 1個
+] as const;
 
 /** 後方互換。 */
-export const MANY_CAPTURES = 4;
+export const MANY_CAPTURES = 8;
 
 /**
  * 石を取った音。着手音の直後に少し遅らせて重ねる（実際の対局でも打つ→抜くの順）。
