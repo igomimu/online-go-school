@@ -237,7 +237,18 @@
   - [x] ローカルビルド確認 (TypeScript typecheck 正常終了)
   - [x] 本番環境（Vercel）へのデプロイ
 
+## 2026-08-22: 検討対象切替・黒白入替
+
+- [x] 最新の `origin/main` を隔離worktreeで確認する
+- [x] ホーム画面で検討対象を開始前に選べる既存導線を確認する
+- [x] 検討中に対象外へ切り替えた生徒を即時退出させる
+- [x] 検討中に対象へ戻した生徒へ開始データと現在盤を送る
+- [x] 対局者選択の間に黒白入替ボタンを追加し、手合割を維持する
+- [x] 関連テスト・全体テスト・ビルド・画面表示を検証する
+
 ## レビュー結果
+- 2026-08-22: 検討開始前・検討中の参加生徒オン/オフを連動。途中で外した生徒は対局中なら対局盤、それ以外はホームへ戻し、途中で戻した生徒には開始データ・現在盤・着手権限を順に即時配信する。対局作成画面には黒番・白番選択の間に入替ボタンを追加し、選択済みの手合割を維持する。
+- 検証: `node --env-file=<既存env> node_modules/vitest/vitest.mjs run --reporter=dot` 61 files / 603 tests passed、対象テスト28件 passed、ESLint成功、`npm run build`成功。共有DBを使う `sharing-target.spec.ts` は、手元の旧service-roleキーがSupabase側で無効化済み（`Legacy API keys are disabled`）のためseed前に停止。途中参加・退出の差分判定とホーム/対局作成UIは単体テストで固定した。
 - 2026-07-18: 本番DBに残っていた `test-class-*` / `wiring-*` / `debugfull-*` / `verify-*` / `single-*` / `reconnect-*` の未終了E2E対局59件と、教室レコードがなくE2E専用生徒1010だけが参加していた孤立 `CLS001` 中断局1件、対応する残存テスト教室2件を削除。実教室 `CLS20160919347` は清掃前から未終了0件で、1001/1002の直近局はいずれも正常終局済みだったため変更していない。
 - 再発防止: `e2e/security.spec.ts` に `afterAll` 清掃を追加し、`teardownSupabaseRoster` が対局削除・生徒紐付け解除のエラーを黙殺しないよう修正。Playwrightの古い `.bin` リンクもnpm版へ戻した。
 - 検証: OS defunct 0件、重複開発サーバー0件、LiveKitルーム0件、自動テスト由来の未終了対局0件・テスト教室0件。`BASE_URL=https://online.mimura15.jp npx playwright test e2e/security.spec.ts --project=chromium --reporter=line` 3/3 passed、実行後も残骸0件、`npm run build` 成功。

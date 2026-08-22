@@ -73,6 +73,36 @@ describe('GameCreationDialog', () => {
     expect((screen.getByTestId('white-player-select') as HTMLSelectElement).value).toBe('teacher');
   });
 
+  it('黒白を入れ替えるボタンで対局者だけを交換し、手合割を維持する', async () => {
+    const onCreate = vi.fn();
+    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
+
+    fireEvent.click(screen.getByTestId('handicap-3'));
+    fireEvent.click(screen.getByTestId('swap-players-button'));
+
+    expect((screen.getByTestId('black-player-select') as HTMLSelectElement).value).toBe('はなこ');
+    expect((screen.getByTestId('white-player-select') as HTMLSelectElement).value).toBe('たろう');
+    fireEvent.click(screen.getByText('対局開始'));
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        blackPlayer: 'はなこ',
+        whitePlayer: 'たろう',
+        handicap: 3,
+        komi: 0.5,
+      }),
+    ));
+  });
+
+  it('黒白入替ボタンは黒番と白番の選択欄の間にある', () => {
+    render(<GameCreationDialog {...defaultProps} />);
+    const black = screen.getByTestId('black-player-select');
+    const swap = screen.getByTestId('swap-players-button');
+    const white = screen.getByTestId('white-player-select');
+
+    expect(black.compareDocumentPosition(swap) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(swap.compareDocumentPosition(white) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('同じプレイヤーを選ぶとエラーメッセージ', () => {
     render(<GameCreationDialog {...defaultProps} students={['たろう']} />);
     // students=[たろう]だけだと、black=たろう, white=三村先生（異なる）

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toggleSharingTarget, isSharingTarget } from './sharingTargets';
+import { getSharingTargetChanges, toggleSharingTarget, isSharingTarget } from './sharingTargets';
 
 const ALL = ['sid:1', 'sid:2', 'sid:3'];
 
@@ -46,5 +46,28 @@ describe('toggleSharingTarget', () => {
     const off = toggleSharingTarget(null, 'sid:1', one);
     expect(off).toEqual([]);
     expect(toggleSharingTarget(off, 'sid:1', one)).toBeNull();
+  });
+});
+
+describe('getSharingTargetChanges', () => {
+  it('全員配信から一人外したときは、その生徒だけが退出対象になる', () => {
+    expect(getSharingTargetChanges(null, ['sid:1', 'sid:3'], ALL)).toEqual({
+      added: [],
+      removed: ['sid:2'],
+    });
+  });
+
+  it('対象外の生徒を戻したときは、その生徒だけが途中参加対象になる', () => {
+    expect(getSharingTargetChanges(['sid:1'], ['sid:1', 'sid:2'], ALL)).toEqual({
+      added: ['sid:2'],
+      removed: [],
+    });
+  });
+
+  it('全員に戻すと、対象外だった生徒をまとめて途中参加させる', () => {
+    expect(getSharingTargetChanges(['sid:2'], null, ALL)).toEqual({
+      added: ['sid:1', 'sid:3'],
+      removed: [],
+    });
   });
 });

@@ -59,10 +59,25 @@ test('共有を外した生徒には検討が届かない', async ({ browser }) 
     await expect(studentAPage.getByText('検討モード')).toHaveCount(0);
     await expect(studentAPage.getByText('先生が対局を作成するのをお待ちください')).toBeVisible();
 
+    // 検討室から対象へ戻すと、その場で現在の検討へ参加できる
+    const reviewShareA = review.getByTestId(`review-share-sid:${TEST_STUDENT_A.id}`);
+    const reviewShareB = review.getByTestId(`review-share-sid:${TEST_STUDENT_B.id}`);
+    await expect(reviewShareA).not.toBeChecked();
+    await expect(reviewShareB).toBeChecked();
+    await reviewShareA.check();
+    await expect(studentAPage.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
+    await expect(studentAPage.getByText('0手目')).toBeVisible({ timeout: 10_000 });
+
+    // 誤って参加させた生徒を検討室から外すと、即座にホームへ戻る
+    await reviewShareB.uncheck();
+    await expect(studentBPage.getByText('検討モード')).toHaveCount(0, { timeout: 15_000 });
+    await expect(studentBPage.getByText('先生が対局を作成するのをお待ちください')).toBeVisible();
+
     // 盤を進めても、外した生徒には届かない
     await review.keyboard.press('ArrowRight');
     await expect(review.getByText('1手目')).toBeVisible({ timeout: 10_000 });
-    await expect(studentAPage.getByText('検討モード')).toHaveCount(0);
+    await expect(studentAPage.getByText('1手目')).toBeVisible({ timeout: 10_000 });
+    await expect(studentBPage.getByText('検討モード')).toHaveCount(0);
   } finally {
     for (const ctx of contexts) await ctx.close().catch(() => {});
     await teardownSupabaseRoster(classroomId);

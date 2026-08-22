@@ -4,7 +4,11 @@ import type { GameNode } from './utils/treeUtilsV2';
 import { convertSgfToGameTree } from './utils/treeUtilsV2';
 import { parseSGFTree } from './utils/sgfUtils';
 import { playReviewMove } from './utils/reviewMove';
-import { toggleSharingTarget, type SharingTargets } from './utils/sharingTargets';
+import {
+  getSharingTargetChanges,
+  toggleSharingTarget,
+  type SharingTargets,
+} from './utils/sharingTargets';
 import { ClassroomLiveKit } from './utils/classroomLiveKit';
 import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './utils/classroomLiveKit';
 import type { ViewMode, AudioPermissions, SavedGame, RankDisplayPayload } from './types/game';
@@ -66,6 +70,19 @@ function reviewKomiFromSgf(value: string | undefined, fallback = 6.5): number {
   if (value === undefined || value.trim() === '') return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function reviewBoardUpdatePayload(node: GameNode, boardSize: number) {
+  const nextColor = node.move
+    ? (node.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
+    : 'BLACK';
+  return {
+    boardState: node.board,
+    boardSize,
+    nextColor,
+    markers: node.markers,
+    moveNumber: node.move ? node.nextNumber - 1 : 0,
+  };
 }
 
 function App() {
@@ -168,6 +185,8 @@ function App() {
   // 検討開始（棋譜を開いた瞬間）は useCallback の中から送るので、最新の参加者を ref で読む
   const reviewTargetStudentsRef = useRef<SharingTargets>(null);
   useEffect(() => { reviewTargetStudentsRef.current = reviewTargetStudents; }, [reviewTargetStudents]);
+  // 検討中に対象へ戻した生徒へ、同じ棋譜を途中参加として開かせるための開始データ。
+  const reviewSourceSgfRef = useRef<string | null>(null);
   // 生徒が自分の対局を持っているか。LiveKitのメッセージ処理は接続時に作った関数の中で
   // 走るので、そこから最新の状態を見るために ref に写す
   const myLiveGameIdRef = useRef<string | null>(null);
@@ -506,6 +525,7 @@ function App() {
           setReviewCurrentNode(root);
           setReviewBoardSize(p.boardSize);
           setReviewKomi(reviewKomiFromSgf(parsed.metadata?.komi));
+          reviewSourceSgfRef.current = p.sgf;
           setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null, hoveredCandidateRank: null, allowStudentInteraction: false });
           // 新しい検討が始まったら前回の許可は引き継がない（先生が改めて許可する）
           setReviewCanPlay(false);
@@ -556,6 +576,7 @@ function App() {
           }
           setReviewRootNode(null);
           setReviewCurrentNode(null);
+          reviewSourceSgfRef.current = null;
           setReviewCanPlay(false);
           setSyncedNode(null);
           setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null, hoveredCandidateRank: null, allowStudentInteraction: false });
@@ -817,22 +838,12 @@ function App() {
   useEffect(() => {
     if (role !== 'TEACHER' || viewMode !== 'review' || !reviewCurrentNode) return;
     if (!classroomRef.current?.isConnected) return;
-    const node = reviewCurrentNode;
-    const nextColor = node.move
-      ? (node.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
-      : 'BLACK';
     // 「配信先の生徒」で絞れるようにする。空なら全員（以前は常に全員へ送っていた）
     void classroomRef.current.sendToOrAll({
       type: 'BOARD_UPDATE',
-      payload: {
-        boardState: node.board,
-        boardSize: reviewBoardSize,
-        nextColor,
-        markers: node.markers,
-        moveNumber: node.move ? node.nextNumber - 1 : 0,
-      },
-    }, reviewTargetStudents);
-  }, [reviewCurrentNode, role, viewMode, reviewBoardSize, reviewTargetStudents]);
+      payload: reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize),
+    }, reviewTargetStudentsRef.current);
+  }, [reviewCurrentNode, role, viewMode, reviewBoardSize]);
 
   // 検討モード: 着手権限を生徒へ配る。
   // 許可を外された生徒にも届く必要があるので、配信先の絞り込みとは別に必ず全員へ送る。
@@ -852,13 +863,54 @@ function App() {
     void classroomRef.current?.sendTo({ type: 'REVIEW_STUDENT_MOVE', payload: { x, y } }, [TEACHER_IDENTITY]);
   }, []);
 
-  // 生徒一覧の「共有」列。対局中の生徒を検討から外せるようにするためのもの
+  // ホームと検討室で共通の参加者更新。
+  // 検討中に外した生徒は即時退出、戻した生徒は開始データ→現在盤の順で途中参加させる。
+  const updateReviewTargets = useCallback((next: SharingTargets) => {
+    const room = classroomRef.current;
+    const all = (room?.participants ?? [])
+      .map(p => p.identity)
+      .filter(id => id !== room?.localIdentity);
+    const previous = reviewTargetStudentsRef.current;
+    const { added, removed } = getSharingTargetChanges(previous, next, all);
+
+    reviewTargetStudentsRef.current = next;
+    setReviewTargetStudents(next);
+
+    if (removed.length > 0) {
+      setReviewMovePermissions(current => current.filter(identity => !removed.includes(identity)));
+    }
+    if (role !== 'TEACHER' || viewMode !== 'review' || !room?.isConnected) return;
+
+    if (removed.length > 0) {
+      void room.sendTo({ type: 'REVIEW_END', payload: {} }, removed);
+    }
+
+    const sourceSgf = reviewSourceSgfRef.current;
+    if (added.length > 0 && sourceSgf && reviewCurrentNode) {
+      void (async () => {
+        await room.sendTo({
+          type: 'REVIEW_START',
+          payload: { sgf: sourceSgf, boardSize: reviewBoardSize },
+        }, added);
+        await room.sendTo({
+          type: 'BOARD_UPDATE',
+          payload: reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize),
+        }, added);
+        await room.sendTo({
+          type: 'REVIEW_PERMISSIONS',
+          payload: { allowed: reviewMovePermissionsRef.current },
+        }, added);
+      })();
+    }
+  }, [role, viewMode, reviewCurrentNode, reviewBoardSize]);
+
+  // 生徒一覧の「共有」列。開始前の対象選択にも、検討中の入退室にも使う。
   const toggleSharingStudent = useCallback((identity: string) => {
     const all = (classroomRef.current?.participants ?? [])
       .map(p => p.identity)
       .filter(id => id !== classroomRef.current?.localIdentity);
-    setReviewTargetStudents(prev => toggleSharingTarget(prev, identity, all));
-  }, []);
+    updateReviewTargets(toggleSharingTarget(reviewTargetStudentsRef.current, identity, all));
+  }, [updateReviewTargets]);
 
   const toggleReviewMovePermission = useCallback((identity: string) => {
     setReviewMovePermissions(prev => (
@@ -1039,6 +1091,7 @@ function App() {
     setReviewRootNode(null);
     setReviewCurrentNode(null);
     setReviewMovePermissions([]);
+    reviewSourceSgfRef.current = null;
   }, [role, viewMode]);
 
   // 対局選択
@@ -1124,6 +1177,7 @@ function App() {
       setReviewCurrentNode(root);
       setReviewBoardSize(parsed.size);
       setReviewKomi(reviewKomiFromSgf(parsed.metadata?.komi));
+      reviewSourceSgfRef.current = content;
       // 検討を開き直したら着手の許可は持ち越さない
       setReviewMovePermissions([]);
       setReviewIsOwn(false); // 先生がSGFを読み込んで配信する検討
@@ -1150,6 +1204,7 @@ function App() {
       setReviewCurrentNode(root);
       setReviewBoardSize(parsed.size);
       setReviewKomi(Number.isFinite(game.komi) ? game.komi : reviewKomiFromSgf(parsed.metadata?.komi));
+      reviewSourceSgfRef.current = game.sgf;
       // 検討を開き直したら着手の許可は持ち越さない
       setReviewMovePermissions([]);
       // 生徒が自分の履歴から開いた棋譜は本人の端末内だけの検討。
@@ -1187,6 +1242,7 @@ function App() {
     setViewMode('lobby');
     setActiveGameId(null);
     setReviewMovePermissions([]);
+    reviewSourceSgfRef.current = null;
   }, [role, viewMode]);
 
   // 対局の再開処理
@@ -1766,7 +1822,7 @@ function App() {
             onProblemAssign={handleProblemAssign}
             onClearAudioM={handleClearAudioM}
             onClearAudioS={handleClearAudioS}
-            onClearSharing={() => setReviewTargetStudents(null)}
+            onClearSharing={() => updateReviewTargets(null)}
             sharingTargets={reviewTargetStudents}
             onToggleSharing={toggleSharingStudent}
             onSelectSavedGame={handleSelectSavedGame}
@@ -1851,7 +1907,7 @@ function App() {
                 participants={participants}
                 localIdentity={classroomRef.current?.localIdentity ?? ''}
                 targetStudents={reviewTargetStudents}
-                onSetTargetStudents={setReviewTargetStudents}
+                onSetTargetStudents={updateReviewTargets}
                 onBack={handleBackToLobby}
                 movePermissions={reviewMovePermissions}
                 onToggleMovePermission={role === 'TEACHER' ? toggleReviewMovePermission : undefined}

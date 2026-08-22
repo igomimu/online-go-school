@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X } from 'lucide-react';
+import { ArrowUpDown, X } from 'lucide-react';
 import type { Student } from '../types/classroom';
 import { suggestHandicap } from '../types/classroom';
 import { findStudentByIdentity, getDisplayName } from '../utils/identityUtils';
@@ -141,6 +141,14 @@ export default function GameCreationDialog({
     setHandicapTouched(true);
   }, [blackPlayer, whitePlayer]);
 
+  const swapPlayers = () => {
+    nigiriSwapRef.current = true;
+    setBlackPlayer(whitePlayer);
+    setWhitePlayer(blackPlayer);
+    // 黒白だけを入れ替える操作なので、講師が選んだ手合割は維持する。
+    setHandicapTouched(true);
+  };
+
   const handleSubmit = async () => {
     if (submitting || blackPlayer === whitePlayer) return;
     setSubmitting(true);
@@ -191,6 +199,17 @@ export default function GameCreationDialog({
             })}
           </select>
         </div>
+
+        <button
+          type="button"
+          data-testid="swap-players-button"
+          onClick={swapPlayers}
+          disabled={blackPlayer === whitePlayer}
+          className="mx-auto flex items-center gap-1.5 rounded-md border border-field-line bg-raised px-3 py-1.5 text-sm font-medium text-ink transition-colors duration-150 hover:bg-ink/10 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
+          黒白を入れ替える
+        </button>
 
         {/* 白番 */}
         <div>

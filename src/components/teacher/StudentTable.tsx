@@ -91,7 +91,8 @@ export default function StudentTable({
         <thead>
           <tr className="text-[11px] tracking-wide text-muted whitespace-nowrap" style={{ background: 'var(--color-raised)', borderBottom: '1px solid var(--color-line)' }}>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 46 }}>状態</th>
-            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 116 }}>接続</th>
+            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 92 }}>接続</th>
+            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 58 }}>検討</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 64 }}>操作</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 56 }}>棋譜</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 50 }}>編集</th>
@@ -134,7 +135,7 @@ export default function StudentTable({
                   />
                 </td>
 
-                {/* 接続（カメラ・マイク・スピーカー・共有）。
+                {/* 接続（カメラ・マイク・スピーカー）。
                     以前は4列に分かれ、見出しの「音声M/音声S」が何を指すか伝わらなかった。
                     アイコンにしても押す操作は変えない（role=checkbox のまま）。 */}
                 <td className="px-2 py-1.5 border-b border-line text-center font-medium">
@@ -162,28 +163,29 @@ export default function StudentTable({
                             OnIcon={Volume2}
                             OffIcon={VolumeX}
                           />
-                          {onToggleSharing ? (
-                            <ConnectionToggle
-                              testId={`share-${row.identity}`}
-                              checked={isSharingTarget(sharingTargets, row.identity)}
-                              onChange={() => onToggleSharing(row.identity)}
-                              onLabel="検討を見せています（外すと見せません）"
-                              offLabel="検討を見せていません"
-                              OnIcon={Eye}
-                              OffIcon={EyeOff}
-                            />
-                          ) : (
-                            <span title="共有" className="text-ink"><Eye className="h-4 w-4" /></span>
-                          )}
                         </>
                       ) : (
                         <>
                           <span title="マイク" className="text-ink"><Mic className="h-4 w-4" /></span>
                           <span title="スピーカー" className="text-ink"><Volume2 className="h-4 w-4" /></span>
-                          <span title="共有" className="text-ink"><Eye className="h-4 w-4" /></span>
                         </>
                       )}
                     </div>
+                  )}
+                </td>
+
+                {/* 検討の対象。開始前・開始後とも同じオン/オフを使う。 */}
+                <td className="px-2 py-1.5 border-b border-line text-center font-medium">
+                  {row.isConnected && row.identity !== localIdentity && onToggleSharing && (
+                    <ConnectionToggle
+                      testId={`share-${row.identity}`}
+                      checked={isSharingTarget(sharingTargets, row.identity)}
+                      onChange={() => onToggleSharing(row.identity)}
+                      onLabel="検討オン（押すと対象外）"
+                      offLabel="検討オフ（押すと対象に戻す）"
+                      OnIcon={Eye}
+                      OffIcon={EyeOff}
+                    />
                   )}
                 </td>
 

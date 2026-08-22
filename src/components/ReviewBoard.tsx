@@ -929,12 +929,25 @@ export default function ReviewBoard({
                     return (
                       <div key={s.identity} className="flex items-center gap-1">
                         <button
+                          type="button"
+                          role="checkbox"
+                          aria-checked={isSelected}
+                          data-testid={`review-share-${s.identity}`}
                           onClick={() => toggleStudent(s.identity)}
-                          className={`flex-1 min-w-0 text-left px-3 py-1.5 rounded-lg text-sm truncate transition-all ${
-                            isSelected ? 'bg-accent/12 text-accent-text' : 'bg-ink/5 text-muted'
+                          title={isSelected ? '検討に参加中（押すと退出）' : '検討の対象外（押すと参加）'}
+                          className={`flex flex-1 min-w-0 items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors duration-150 ${
+                            isSelected ? 'bg-accent/12 text-accent-text' : 'bg-ink/5 text-muted hover:bg-ink/10'
                           }`}
                         >
-                          {s.name || getDisplayName(s.identity, registeredStudents ?? [])}
+                          {isSelected
+                            ? <Eye className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            : <EyeOff className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                          <span className="min-w-0 flex-1 truncate">
+                            {s.name || getDisplayName(s.identity, registeredStudents ?? [])}
+                          </span>
+                          <span className="shrink-0 text-xs font-medium">
+                            {isSelected ? '参加中' : '対象外'}
+                          </span>
                         </button>
                         {onToggleMovePermission && (
                           <button

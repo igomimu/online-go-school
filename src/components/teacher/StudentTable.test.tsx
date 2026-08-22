@@ -156,4 +156,28 @@ describe('StudentTable', () => {
     expect(onInterruptGame).toHaveBeenCalledWith('current-playing');
     expect(screen.queryByRole('button', { name: '再開' })).not.toBeInTheDocument();
   });
+
+  it('ホーム画面に独立した検討列を表示し、生徒ごとにオン・オフできる', () => {
+    const onToggleSharing = vi.fn();
+    const props = {
+      participants: [participant],
+      students: [student],
+      games: [],
+      audioPermissions: {},
+      localIdentity: 'teacher',
+      onToggleHear: vi.fn(),
+      onToggleMic: vi.fn(),
+      onToggleSharing,
+    };
+    const { rerender } = render(<StudentTable {...props} sharingTargets={null} />);
+
+    expect(screen.getByRole('columnheader', { name: '検討' })).toBeInTheDocument();
+    const toggle = screen.getByTestId('share-sid:S001');
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(toggle);
+    expect(onToggleSharing).toHaveBeenCalledWith('sid:S001');
+
+    rerender(<StudentTable {...props} sharingTargets={[]} />);
+    expect(screen.getByTestId('share-sid:S001')).toHaveAttribute('aria-checked', 'false');
+  });
 });

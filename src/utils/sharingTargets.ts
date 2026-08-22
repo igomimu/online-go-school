@@ -33,3 +33,19 @@ export function toggleSharingTarget(
 export function isSharingTarget(targets: SharingTargets, identity: string): boolean {
   return targets === null || targets.includes(identity);
 }
+
+/** 配信先を更新したとき、途中参加・途中退出させる生徒を求める */
+export function getSharingTargetChanges(
+  previous: SharingTargets,
+  next: SharingTargets,
+  allIdentities: string[],
+): { added: string[]; removed: string[] } {
+  return {
+    added: allIdentities.filter(
+      identity => !isSharingTarget(previous, identity) && isSharingTarget(next, identity),
+    ),
+    removed: allIdentities.filter(
+      identity => isSharingTarget(previous, identity) && !isSharingTarget(next, identity),
+    ),
+  };
+}
