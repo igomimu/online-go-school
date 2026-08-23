@@ -99,8 +99,9 @@ export default function ClassroomSettingsDialog({
     const target = studentTypeDrafts[index];
     if (target.originalName && allStudents.some(student => student.type === target.originalName)) {
       const count = allStudents.filter(student => student.type === target.originalName).length;
-      setError(`「${target.originalName}」は${count}名が使用中です。名称変更するか、先に生徒の区分を変更してください。`);
-      return;
+      if (!window.confirm(`「${target.originalName}」は${count}名が使用中です。削除すると該当生徒の区分は「未設定」になります。削除しますか？`)) {
+        return;
+      }
     }
     setError('');
     setStudentTypeDrafts(prev => prev.filter((_, i) => i !== index));

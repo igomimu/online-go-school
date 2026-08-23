@@ -1,46 +1,5 @@
--- Student type names are shared across classrooms because a student can belong
--- to more than one classroom while student_type remains a profile attribute.
-CREATE TABLE IF NOT EXISTS public.go_school_student_types (
-  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  name text NOT NULL UNIQUE CHECK (name = btrim(name) AND name <> ''),
-  display_order integer NOT NULL CHECK (display_order >= 0),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS go_school_student_types_display_order_idx
-  ON public.go_school_student_types (display_order);
-
-DROP TRIGGER IF EXISTS set_go_school_student_types_updated_at ON public.go_school_student_types;
-CREATE TRIGGER set_go_school_student_types_updated_at
-  BEFORE UPDATE ON public.go_school_student_types
-  FOR EACH ROW
-  EXECUTE FUNCTION public.set_go_school_roster_updated_at();
-
-ALTER TABLE public.go_school_student_types ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS go_school_student_types_teacher_all ON public.go_school_student_types;
-CREATE POLICY go_school_student_types_teacher_all
-  ON public.go_school_student_types
-  FOR ALL
-  TO authenticated
-  USING (auth.jwt()->>'app_role' = 'teacher')
-  WITH CHECK (auth.jwt()->>'app_role' = 'teacher');
-
-REVOKE ALL ON TABLE public.go_school_student_types FROM anon, authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.go_school_student_types TO authenticated;
-GRANT ALL ON TABLE public.go_school_student_types TO service_role;
-GRANT USAGE, SELECT ON SEQUENCE public.go_school_student_types_id_seq TO authenticated, service_role;
-
-INSERT INTO public.go_school_student_types (name, display_order)
-SELECT value, ordinality - 1
-FROM unnest(ARRAY[
-  'ネット生', '教室生', 'ネット教室生', '大人会員', '家族', '体験',
-  'プロ志望', '元生徒', 'Jネット生', 'スポット', 'ネット道場生', '道場生'
-]::text[]) WITH ORDINALITY AS defaults(value, ordinality)
-ON CONFLICT (name) DO NOTHING;
-
--- Replace the ordered master and rename existing student profiles atomically.
+-- Deleting a configured type now clears that profile field for affected
+-- students, matching the UI's "未設定" choice.
 CREATE OR REPLACE FUNCTION public.replace_go_school_student_types(p_entries jsonb)
 RETURNS void
 LANGUAGE plpgsql
@@ -82,8 +41,6 @@ BEGIN
     AND entry.original_name <> btrim(entry.name)
     AND student.student_type = entry.original_name;
 
-  -- Deleting a type moves affected profiles to the existing "unassigned"
-  -- representation instead of leaving an orphaned label.
   UPDATE public.go_school_students AS student
   SET student_type = ''
   FROM public.go_school_student_types AS current_type
@@ -94,8 +51,6 @@ BEGIN
       WHERE entry.original_name = current_type.name
     );
 
-  -- Supabase SQL safety checks require an explicit predicate, even for an
-  -- intentional full-table replacement inside this transaction.
   DELETE FROM public.go_school_student_types WHERE true;
 
   INSERT INTO public.go_school_student_types (name, display_order)

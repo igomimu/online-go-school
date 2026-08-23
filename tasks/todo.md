@@ -364,6 +364,7 @@
 - 生徒管理ページと教室ホームの生徒編集ダイアログは、固定配列ではなく共通マスターを参照する。マスター外の旧区分も選択肢から消さず移行できる。
 - 検証: 対象11テスト、Vitest 69 files / 644 tests、ESLint、production buildが成功。本番DBで初期区分12件、RLS、名称変更RPC、migration履歴を確認し、RPCのトランザクション試験もロールバック付きで成功した。アプリ内ブラウザは接続先が検出されなかったため、画面操作はDOMテストで名称変更・使用中削除の防止まで確認した。
 - 追加修正: 全件入れ替えのDELETEへ `WHERE true` を明示し、Supabaseの「DELETE requires a WHERE clause」安全検査に対応。本番関数定義と修正migration履歴を確認し、同じRPCのロールバック試験も成功した。
+- 追加修正: 使用中区分の削除も保存エラーにせず、影響人数を確認後、該当生徒を「未設定」へ移して削除する。本番DBで8名が使用中の区分を削除し、区分0件・旧割当0件になることを確認して全変更をロールバックした。
 - 2026-07-18: 1001/1002をログインさせて講師が2名相手に対局を始めたが1局だけになる問題を調査。実教室 `CLS20160919347` の直近DBでは、作成された対局は `sid:1002 vs teacher` が2回で、`sid:1001 vs teacher` は新規作成されていなかった。原因候補として、手動対局作成ダイアログが開始後に閉じず、別生徒から開き直しても内部stateが最初の `initialBlackPlayer` のまま残る挙動を修正。開始後は閉じ、作成中は二重押し不可にした。さらに `manage_game_action` create で同一教室・同じ2人の進行中対局を409で拒否する保険を追加。
 - 検証: 関連Vitest 22/22 passed、Deno identity shared test 4 suites/12 steps passed、`deno check manage_game_action` 成功、`npm run build` 成功、`npx vitest run --testTimeout=10000` 392/392 passed。本番Edgeで同じ `sid:1002 vs teacher` の2回作成を実測し、1回目200・2回目409を確認後、検証用対局を強制終局で清掃。Supabase `manage_game_action` と Vercel production `dpl_7PuABgJGiGe7LxHveEjbRVtCcvrK` を本番反映。実教室の進行中対局は最終確認で0件。
 - 2026-07-18: 教師ホームの進行中碁盤一覧が `liveRowToSession` の空盤プレースホルダを表示していたため、`useLiveBoards` のライブ着手スナップショットを `GameSession` へ合成して実盤面・手数・手番が出るようにした。別ウィンドウ対局盤は `?mode=game` でも名簿を再読込し、対局者欄を `sid:<id>` や `teacher` ではなく生徒名・講師表示名で出すようにした。

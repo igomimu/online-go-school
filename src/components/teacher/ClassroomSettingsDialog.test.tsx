@@ -50,7 +50,8 @@ describe('ClassroomSettingsDialog 生徒区分', () => {
     expect(onSave).toHaveBeenCalled();
   });
 
-  it('使用中の区分は削除せず、変更方法を表示する', () => {
+  it('使用中の区分は確認後に削除し、保存対象から外す', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(
       <ClassroomSettingsDialog
         classroom={classroom}
@@ -62,8 +63,13 @@ describe('ClassroomSettingsDialog 生徒区分', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'ネット生を削除' }));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('該当生徒の区分は「未設定」になります'));
+    expect(screen.getByRole('textbox', { name: '生徒区分 1' })).toHaveValue('教室生');
 
-    expect(screen.getByText(/「ネット生」は1名が使用中です/)).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: '生徒区分 1' })).toHaveValue('ネット生');
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+
+    await waitFor(() => expect(replaceStudentTypes).toHaveBeenCalledWith([
+      { originalName: '教室生', name: '教室生' },
+    ]));
   });
 });
