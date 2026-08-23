@@ -51,3 +51,23 @@ export function getNextTeacherTurnGameId(
     });
   return waiting[0]?.game.id ?? null;
 }
+
+/** 一覧へ新しく加わった進行中の盤を返す。sessions は新しい対局が先の並び。 */
+export function getNewActiveGameId(
+  sessions: GameSessionInfo[],
+  previousGameIds: ReadonlySet<string>,
+): string | null {
+  return sessions.find(({ game }) =>
+    !previousGameIds.has(game.id) && (game.status === 'playing' || game.status === 'scoring'),
+  )?.game.id ?? null;
+}
+
+/** 自動表示に使う盤。中断・終局盤は一覧から明示的に選んだ場合だけ表示する。 */
+export function getDefaultActiveGameId(
+  sessions: GameSessionInfo[],
+  teacherIdentity: string,
+): string | null {
+  return getNextTeacherTurnGameId(sessions, teacherIdentity)
+    ?? sessions.find(({ game }) => game.status === 'playing' || game.status === 'scoring')?.game.id
+    ?? null;
+}

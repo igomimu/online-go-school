@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { getNextTeacherTurnGameId, isTeacherParticipant, type GameSessionInfo } from './simulRotation';
+import {
+  getNewActiveGameId,
+  getDefaultActiveGameId,
+  getNextTeacherTurnGameId,
+  isTeacherParticipant,
+  type GameSessionInfo,
+} from './simulRotation';
 
 describe('getNextTeacherTurnGameId (次盤選定ロジック)', () => {
   const teacherId = 'teacher';
@@ -97,5 +103,53 @@ describe('getNextTeacherTurnGameId (次盤選定ロジック)', () => {
     ];
     const result = getNextTeacherTurnGameId(sessions, teacherId);
     expect(result).toBe('game-2');
+  });
+});
+
+describe('getNewActiveGameId (新規盤の検出)', () => {
+  const session = (id: string, status: string): GameSessionInfo => ({
+    game: { id, status, black_player: 'sid:student-a', white_player: 'teacher' },
+    snapshot: { currentColor: 'BLACK', lastMoveAt: null },
+  });
+
+  it('古い中断局が表示中でも、追加された新規対局を初手前に検出する', () => {
+    const sessions = [session('new-playing', 'playing'), session('old-interrupted', 'interrupted')];
+    expect(getNewActiveGameId(sessions, new Set(['old-interrupted']))).toBe('new-playing');
+  });
+
+  it('追加されたのが中断局だけなら自動切替しない', () => {
+    const sessions = [session('new-interrupted', 'interrupted'), session('old-interrupted', 'interrupted')];
+    expect(getNewActiveGameId(sessions, new Set(['old-interrupted']))).toBeNull();
+  });
+
+  it('既に把握している進行中対局は新規局として扱わない', () => {
+    const sessions = [session('playing', 'playing'), session('old-interrupted', 'interrupted')];
+    expect(getNewActiveGameId(sessions, new Set(['playing', 'old-interrupted']))).toBeNull();
+  });
+});
+
+describe('getDefaultActiveGameId (自動表示する盤)', () => {
+  const teacherId = 'teacher';
+  const session = (id: string, status: string, currentColor: 'BLACK' | 'WHITE' = 'BLACK'): GameSessionInfo => ({
+    game: { id, status, black_player: 'sid:student-a', white_player: teacherId },
+    snapshot: { currentColor, lastMoveAt: null },
+  });
+
+  it('相手の初手前でも進行中の新規対局を表示する', () => {
+    const sessions = [session('new-playing', 'playing'), session('old-interrupted', 'interrupted')];
+    expect(getDefaultActiveGameId(sessions, teacherId)).toBe('new-playing');
+  });
+
+  it('終局後に古い中断局へ自動的に戻らない', () => {
+    const sessions = [session('old-interrupted', 'interrupted')];
+    expect(getDefaultActiveGameId(sessions, teacherId)).toBeNull();
+  });
+
+  it('講師の手番になっている盤を優先する', () => {
+    const sessions = [
+      session('opponent-turn', 'playing', 'BLACK'),
+      session('teacher-turn', 'playing', 'WHITE'),
+    ];
+    expect(getDefaultActiveGameId(sessions, teacherId)).toBe('teacher-turn');
   });
 });

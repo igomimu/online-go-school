@@ -5,7 +5,13 @@ import { deriveLiveBoardSnapshots, useLiveBoards } from '../../hooks/useLiveBoar
 import { useLiveGameList } from '../../hooks/useLiveGameList';
 import GameThumbnail from '../GameThumbnail';
 import GameBoard from '../GameBoard';
-import { getNextTeacherTurnGameId, isTeacherParticipant, isTeacherTurn } from './simulRotation';
+import {
+  getDefaultActiveGameId,
+  getNewActiveGameId,
+  getNextTeacherTurnGameId,
+  isTeacherParticipant,
+  isTeacherTurn,
+} from './simulRotation';
 import ClassroomAlerts, { type ClassroomAlert } from './ClassroomAlerts';
 import { subscribeTeacherAlerts } from '../../utils/teacherAlertChannel';
 import { resumeLiveGame } from '../../utils/liveGameApi';
@@ -78,18 +84,33 @@ export default function TeacherGameWindow({
     return getNextTeacherTurnGameId(sessions, teacherIdentity);
   }, [sessions, teacherIdentity]);
 
-  // 表示する盤のID。選択中の盤が対局リストから消えた（終局等）/未選択の場合は
-  // 手番の盤→先頭の盤へフォールバックする。
+  // 表示する盤のID。中断・終局盤は一覧から明示的に選んだ場合だけ表示し、
+  // 自動選択では手番の盤→進行中の盤へフォールバックする。
   const selectionValid = activeSimulGameId !== null && sessions.some(s => s.game.id === activeSimulGameId);
   const resolvedActiveId = selectionValid
     ? activeSimulGameId
-    : (nextGameId ?? sessions[0]?.game.id ?? null);
+    : getDefaultActiveGameId(sessions, teacherIdentity);
 
   // フォールバックした選択はレンダー中に確定させてスティッキーにする
   // （対局追加などで games の並びが変わっても表示中の盤が入れ替わらないように）。
   // レンダー中のstate調整はReact公式パターン（effect内のsetStateは使わない）。
   if (!selectionValid && activeSimulGameId !== resolvedActiveId) {
     setActiveSimulGameId(resolvedActiveId);
+  }
+
+  // 教室ホームで新規対局を作ったとき、別ウィンドウが古い中断局を表示したままだと、
+  // 生徒の初手が届くまで次盤選定が走らない。追加された進行中IDをその場で選び、
+  // 初手前の空盤から新規対局を表示する。手動で中断局を選んだだけの操作には反応しない。
+  const sessionIdsHash = sessions.map(s => s.game.id).join('|');
+  const [previousSessionIdsHash, setPreviousSessionIdsHash] = useState(sessionIdsHash);
+  if (sessionIdsHash !== previousSessionIdsHash) {
+    const previousIds = new Set(previousSessionIdsHash.split('|').filter(Boolean));
+    const newActiveGameId = getNewActiveGameId(sessions, previousIds);
+    setPreviousSessionIdsHash(sessionIdsHash);
+    if (newActiveGameId && newActiveGameId !== activeSimulGameId) {
+      setActiveSimulGameId(newActiveGameId);
+      setShowList(false);
+    }
   }
 
   // 対局の進行状態を監視するためのハッシュ（手動選択とローテーションの競合防止:
@@ -111,8 +132,10 @@ export default function TeacherGameWindow({
       if (activeSession && activeSession.game.status !== 'scoring') {
         const myTurn = activeSession.game.status === 'playing' && isTeacherTurn(activeSession.game, activeSession.snapshot.currentColor, teacherIdentity);
         if (!myTurn) {
-          const nextId = getNextTeacherTurnGameId(sessions, teacherIdentity);
-          if (nextId && nextId !== resolvedActiveId) {
+          const nextId = activeSession.game.status === 'playing'
+            ? getNextTeacherTurnGameId(sessions, teacherIdentity)
+            : getDefaultActiveGameId(sessions, teacherIdentity);
+          if (nextId !== resolvedActiveId) {
             setActiveSimulGameId(nextId);
           }
         }
@@ -230,7 +253,7 @@ export default function TeacherGameWindow({
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, color: 'var(--color-muted)' }}>
-          対局がありません。
+          進行中の対局がありません。中断局は「一覧」から再開できます。
         </div>
       )}
 
