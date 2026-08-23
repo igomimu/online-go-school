@@ -126,23 +126,37 @@ export interface SupabaseSessionResult {
   error?: string;
   displayName?: string;
   studentId?: string; // UUID（validate_student_session が返す student.id）
+  classroomId?: string;
+  classroomName?: string;
+  classroomCorrected?: boolean;
+  requiresClassroomSelection?: boolean;
+  classrooms?: Array<{ id: string; name: string }>;
 }
 
 export async function supabaseSignInStudent(
   studentId: string,
-  classroomId: string,
+  classroomId: string = '',
 ): Promise<SupabaseSessionResult> {
   try {
     const supabase = getSupabase();
     
     // 1. 匿名サインイン
-    const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
-    if (authError || !authData.session) {
-      console.error('[Supabase Auth] Anonymous sign-in failed:', authError);
+    const existing = await supabase.auth.getSession();
+    let session = existing.data.session;
+    if (!session) {
+      const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
+      if (authError || !authData.session) {
+        console.error('[Supabase Auth] Anonymous sign-in failed:', authError);
+        return { ok: false, error: 'サーバーに接続できません（匿名サインイン失敗）' };
+      }
+      session = authData.session;
+    }
+    if (!session) {
+      console.error('[Supabase Auth] Anonymous sign-in returned no session');
       return { ok: false, error: 'サーバーに接続できません（匿名サインイン失敗）' };
     }
-    
-    const token = authData.session.access_token;
+
+    const token = session.access_token;
 
     // 2. validate_student_session Edge Function の呼び出し
     const fnUrl = `${functionsBaseUrl()}/validate_student_session`;
@@ -158,6 +172,18 @@ export async function supabaseSignInStudent(
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
       console.error('[Supabase Auth] Student validation failed:', errBody.error || res.status);
+      if (res.status === 409 && errBody.code === 'classroom_selection_required') {
+        return {
+          ok: false,
+          requiresClassroomSelection: true,
+          classrooms: Array.isArray(errBody.classrooms)
+            ? errBody.classrooms.map((c: { id?: string; name?: string }) => ({
+              id: String(c.id ?? ''),
+              name: String(c.name ?? c.id ?? ''),
+            })).filter((c: { id: string }) => c.id)
+            : [],
+        };
+      }
       await supabase.auth.signOut().catch(() => {});
       return {
         ok: false,
@@ -181,6 +207,9 @@ export async function supabaseSignInStudent(
       ok: true,
       displayName: result.display_name || studentId,
       studentId: result.student_id,
+      classroomId: result.classroom_id,
+      classroomName: result.classroom_name,
+      classroomCorrected: result.classroom_corrected === true,
     };
   } catch (err) {
     console.error('[Supabase Auth] Unexpected error in student sign-in:', err);

@@ -45,8 +45,8 @@ test.describe('先生が居ないと生徒は入れない', () => {
   });
 
   async function submitStudentLogin(): Promise<void> {
+    await studentPage.goto(`/?classroomId=${encodeURIComponent(classroomId)}`);
     await studentPage.getByTestId('student-id-input').fill(TEST_STUDENT_A.code);
-    await studentPage.getByTestId('classroom-id-input').fill(classroomId);
     await studentPage.getByTestId('student-login-button').click();
   }
 

@@ -146,6 +146,14 @@ async function seedSupabaseRoster(classroomId: string, classroomName: string): P
       },
     ], { onConflict: 'login_id' });
   if (studentError) throw new Error(`Failed to seed students: ${studentError.message}`);
+
+  const { error: membershipError } = await supabase
+    .from('go_school_classroom_memberships')
+    .upsert([
+      { classroom_id: classroomId, student_login_id: TEST_STUDENT_A.code, classroom_position: 0 },
+      { classroom_id: classroomId, student_login_id: TEST_STUDENT_B.code, classroom_position: 1 },
+    ], { onConflict: 'classroom_id,student_login_id' });
+  if (membershipError) throw new Error(`Failed to seed memberships: ${membershipError.message}`);
 }
 
 /** 教室に発行された共有PC用の鍵を読む（先生が「道場PC用リンクをコピー」で得るもの） */
@@ -197,10 +205,10 @@ export async function teardownSupabaseRoster(classroomId: string): Promise<void>
       throw new Error(`Failed to delete live games: ${liveGamesError.message}`);
     }
 
-    // 2. 生徒の紐付けを解除
+    // 2. この教室の所属を解除（他教室の所属は残す）
     const { error: studentsError } = await supabase
-      .from('go_school_students')
-      .update({ classroom_id: null, classroom_position: null })
+      .from('go_school_classroom_memberships')
+      .delete()
       .eq('classroom_id', classroomId);
     if (studentsError) {
       throw new Error(`Failed to detach students: ${studentsError.message}`);

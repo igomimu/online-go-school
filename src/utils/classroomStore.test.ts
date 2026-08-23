@@ -65,14 +65,14 @@ describe('名簿キャッシュ', () => {
 });
 
 describe('教室メンバーの正規化', () => {
-  it('生徒の複数教室所属を先勝ちで排除する', () => {
+  it('同じ教室内の重複だけを除き、複数教室所属は保持する', () => {
     const classrooms = cleanupDuplicateStudentsInClassrooms([
-      { id: 'A', name: 'A', maxCapacity: 10, studentIds: ['S001', 'S002'] },
+      { id: 'A', name: 'A', maxCapacity: 10, studentIds: ['S001', 'S002', 'S002'] },
       { id: 'B', name: 'B', maxCapacity: 10, studentIds: ['S002', 'S003'] },
     ]);
 
     expect(classrooms[0].studentIds).toEqual(['S001', 'S002']);
-    expect(classrooms[1].studentIds).toEqual(['S003']);
+    expect(classrooms[1].studentIds).toEqual(['S002', 'S003']);
   });
 });
 
@@ -93,13 +93,14 @@ describe('授業中の棋力表示保存', () => {
 
 describe('生徒情報保存', () => {
   it('生徒ID変更時に既存の教室所属と表示順を引き継ぐ', async () => {
-    const { upserts, deletes } = installSupabaseMock([
+    const { studentUpserts, membershipUpserts, deletes } = installSupabaseMock([
       {
         login_id: 'OLD001',
         name: '旧IDの生徒',
-        classroom_id: 'CLASS-A',
-        classroom_position: 2,
       },
+    ], [
+      { classroom_id: 'CLASS-A', student_login_id: 'OLD001', classroom_position: 2 },
+      { classroom_id: 'CLASS-B', student_login_id: 'OLD001', classroom_position: 1 },
     ]);
 
     await upsertStudent(
@@ -117,12 +118,10 @@ describe('生徒情報保存', () => {
       'OLD001',
     );
 
-    expect(upserts).toHaveLength(1);
-    expect(upserts[0]).toMatchObject({
+    expect(studentUpserts).toHaveLength(1);
+    expect(studentUpserts[0]).toMatchObject({
       login_id: 'NEW001',
       name: '新IDの生徒',
-      classroom_id: 'CLASS-A',
-      classroom_position: 2,
       rank: '1D',
       internal_rating: 'R2',
       student_type: 'ネット生',
@@ -130,11 +129,15 @@ describe('生徒情報保存', () => {
       country: '千葉県',
       birthdate: '2015-04-02',
     });
+    expect(membershipUpserts).toEqual([
+      expect.objectContaining({ classroom_id: 'CLASS-A', student_login_id: 'NEW001', classroom_position: 2 }),
+      expect.objectContaining({ classroom_id: 'CLASS-B', student_login_id: 'NEW001', classroom_position: 1 }),
+    ]);
     expect(deletes).toEqual(['OLD001']);
   });
 
   it('変更後の生徒IDが既に存在する場合は保存しない', async () => {
-    const { upserts, deletes } = installSupabaseMock([
+    const { studentUpserts, deletes } = installSupabaseMock([
       {
         login_id: 'OLD001',
         name: '旧IDの生徒',
@@ -163,7 +166,7 @@ describe('生徒情報保存', () => {
       'OLD001',
     )).rejects.toThrow('生徒ID「NEW001」は既に使われています');
 
-    expect(upserts).toHaveLength(0);
+    expect(studentUpserts).toHaveLength(0);
     expect(deletes).toHaveLength(0);
   });
 });
@@ -173,36 +176,54 @@ function installSupabaseMock(initialRows: Array<Partial<{
   name: string | null;
   classroom_id: string | null;
   classroom_position: number | null;
-}>>) {
+}>>, initialMemberships: Array<{
+  classroom_id: string;
+  student_login_id: string;
+  classroom_position: number | null;
+}> = []) {
   const rows = new Map(initialRows.map(row => [row.login_id, row]));
-  const upserts: unknown[] = [];
+  const studentUpserts: unknown[] = [];
+  const membershipUpserts: unknown[] = [];
   const deletes: string[] = [];
 
   const supabase = {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn((_: string, value: string) => ({
-          maybeSingle: vi.fn(async () => ({
-            data: rows.get(value) ?? null,
-            error: null,
+    from: vi.fn((table: string) => table === 'go_school_classroom_memberships'
+      ? {
+          select: vi.fn(() => ({
+            eq: vi.fn(async (_: string, value: string) => ({
+              data: initialMemberships.filter(m => m.student_login_id === value),
+              error: null,
+            })),
           })),
-        })),
-      })),
-      upsert: vi.fn(async (row: { login_id: string }) => {
-        upserts.push(row);
-        rows.set(row.login_id, row);
-        return { error: null };
-      }),
-      delete: vi.fn(() => ({
-        eq: vi.fn(async (_: string, value: string) => {
-          deletes.push(value);
-          rows.delete(value);
-          return { error: null };
+          upsert: vi.fn(async (records: unknown[]) => {
+            membershipUpserts.push(...records);
+            return { error: null };
+          }),
+        }
+      : {
+          select: vi.fn(() => ({
+            eq: vi.fn((_: string, value: string) => ({
+              maybeSingle: vi.fn(async () => ({
+                data: rows.get(value) ?? null,
+                error: null,
+              })),
+            })),
+          })),
+          upsert: vi.fn(async (row: { login_id: string }) => {
+            studentUpserts.push(row);
+            rows.set(row.login_id, row);
+            return { error: null };
+          }),
+          delete: vi.fn(() => ({
+            eq: vi.fn(async (_: string, value: string) => {
+              deletes.push(value);
+              rows.delete(value);
+              return { error: null };
+            }),
+          })),
         }),
-      })),
-    })),
   };
 
   vi.mocked(getSupabase).mockReturnValue(supabase as never);
-  return { upserts, deletes };
+  return { studentUpserts, membershipUpserts, deletes };
 }

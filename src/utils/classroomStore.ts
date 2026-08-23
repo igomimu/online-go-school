@@ -30,6 +30,12 @@ type GoSchoolClassroomRow = {
   roster_token?: string | null;
 };
 
+type GoSchoolMembershipRow = {
+  classroom_id: string;
+  student_login_id: string;
+  classroom_position: number | null;
+};
+
 export interface ClassroomRoster {
   students: Student[];
   classrooms: Classroom[];
@@ -62,23 +68,6 @@ function normalizeStudent(student: Student): Student {
     grade: student.grade || '',
     country: student.country || '',
     birthdate: student.birthdate || '',
-  };
-}
-
-function toStudentRow(student: Student, classroomId?: string | null, position?: number | null) {
-  const normalized = normalizeStudent(student);
-  return {
-    login_id: normalized.id,
-    name: normalized.name,
-    classroom_id: classroomId ?? null,
-    classroom_position: position ?? null,
-    rank: normalized.rank,
-    internal_rating: normalized.internalRating,
-    student_type: normalized.type,
-    grade: normalized.grade,
-    country: normalized.country,
-    birthdate: normalized.birthdate || null,
-    updated_at: new Date().toISOString(),
   };
 }
 
@@ -132,47 +121,63 @@ function e2eAllowedClassroomId(): string | null {
   }
 }
 
-function buildRoster(studentRows: GoSchoolStudentRow[], classroomRows: GoSchoolClassroomRow[]): ClassroomRoster {
+function buildRoster(
+  studentRows: GoSchoolStudentRow[],
+  classroomRows: GoSchoolClassroomRow[],
+  membershipRows: GoSchoolMembershipRow[],
+): ClassroomRoster {
   // ゲスト（デモ見学）先生にはデモ教室とその所属生徒だけを見せる。
   // 名簿・教室セレクタ・生徒一覧はすべてこの roster 由来なので、ここで絞れば実データは出ない。
   if (isGuestTeacher()) {
-    studentRows = studentRows.filter(row => row.classroom_id === DEMO_CLASSROOM_ID);
+    const demoStudentIds = new Set(
+      membershipRows.filter(row => row.classroom_id === DEMO_CLASSROOM_ID).map(row => row.student_login_id),
+    );
+    studentRows = studentRows.filter(row => demoStudentIds.has(row.login_id));
+    membershipRows = membershipRows.filter(row => row.classroom_id === DEMO_CLASSROOM_ID);
     classroomRows = classroomRows.filter(row => row.id === DEMO_CLASSROOM_ID);
-    return buildRosterRows(studentRows, classroomRows);
+    return buildRosterRows(studentRows, classroomRows, membershipRows);
   }
 
   const allowedId = e2eAllowedClassroomId();
   classroomRows = classroomRows.filter(row => (allowedId !== null && row.id === allowedId) || !isTestClassroom(row.id, row.name));
-  return buildRosterRows(studentRows, classroomRows);
+  const visibleClassroomIds = new Set(classroomRows.map(row => row.id));
+  membershipRows = membershipRows.filter(row => visibleClassroomIds.has(row.classroom_id));
+  return buildRosterRows(studentRows, classroomRows, membershipRows);
 }
 
-function buildRosterRows(studentRows: GoSchoolStudentRow[], classroomRows: GoSchoolClassroomRow[]): ClassroomRoster {
+function buildRosterRows(
+  studentRows: GoSchoolStudentRow[],
+  classroomRows: GoSchoolClassroomRow[],
+  membershipRows: GoSchoolMembershipRow[],
+): ClassroomRoster {
   const students = studentRows
     .map(toStudent)
     .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
 
-  const studentsByClassroom = new Map<string, GoSchoolStudentRow[]>();
-  for (const row of studentRows) {
-    if (!row.classroom_id) continue;
-    const list = studentsByClassroom.get(row.classroom_id) ?? [];
-    list.push(row);
-    studentsByClassroom.set(row.classroom_id, list);
+  const studentById = new Map(studentRows.map(row => [row.login_id, row]));
+  const membersByClassroom = new Map<string, Array<{ student: GoSchoolStudentRow; position: number | null }>>();
+  for (const membership of membershipRows) {
+    const student = studentById.get(membership.student_login_id);
+    if (!student) continue;
+    const list = membersByClassroom.get(membership.classroom_id) ?? [];
+    list.push({ student, position: membership.classroom_position });
+    membersByClassroom.set(membership.classroom_id, list);
   }
 
   const classrooms = classroomRows
     .map(row => {
-      const members = studentsByClassroom.get(row.id) ?? [];
+      const members = membersByClassroom.get(row.id) ?? [];
       members.sort((a, b) => {
-        const posA = a.classroom_position ?? Number.MAX_SAFE_INTEGER;
-        const posB = b.classroom_position ?? Number.MAX_SAFE_INTEGER;
+        const posA = a.position ?? Number.MAX_SAFE_INTEGER;
+        const posB = b.position ?? Number.MAX_SAFE_INTEGER;
         if (posA !== posB) return posA - posB;
-        return (a.name || a.login_id).localeCompare(b.name || b.login_id, 'ja');
+        return (a.student.name || a.student.login_id).localeCompare(b.student.name || b.student.login_id, 'ja');
       });
       return {
         id: row.id,
         name: row.name || row.id,
         maxCapacity: row.max_capacity || 10,
-        studentIds: members.map(s => s.login_id),
+        studentIds: members.map(member => member.student.login_id),
         rankDisplay: row.rank_display === 'rating' ? 'rating' as const : DEFAULT_RANK_DISPLAY,
         // 共有PCの鍵はサーバーが発行する。教室の保存で消してしまわないよう読むだけにする
         rosterToken: row.roster_token ?? undefined,
@@ -203,8 +208,8 @@ export function loadCachedRoster(): ClassroomRoster {
 
 // 重複登録を自動検知して排除するクリーンアップヘルパー
 export function cleanupDuplicateStudentsInClassrooms(classrooms: Classroom[]): Classroom[] {
-  const seenStudentIds = new Set<string>();
   return classrooms.map(c => {
+    const seenStudentIds = new Set<string>();
     const uniqueStudentIds = c.studentIds.filter(sid => {
       if (seenStudentIds.has(sid)) return false;
       seenStudentIds.add(sid);
@@ -218,7 +223,11 @@ export function cleanupDuplicateStudentsInClassrooms(classrooms: Classroom[]): C
 
 export async function fetchRoster(): Promise<ClassroomRoster> {
   const supabase = getSupabase();
-  const [{ data: studentRows, error: studentsError }, { data: classroomRows, error: classroomsError }] = await Promise.all([
+  const [
+    { data: studentRows, error: studentsError },
+    { data: classroomRows, error: classroomsError },
+    { data: membershipRows, error: membershipsError },
+  ] = await Promise.all([
     supabase
       .from('go_school_students')
       .select('login_id,name,classroom_id,classroom_position,rank,internal_rating,student_type,grade,country,birthdate')
@@ -227,14 +236,19 @@ export async function fetchRoster(): Promise<ClassroomRoster> {
       .from('go_school_classrooms')
       .select('id,name,max_capacity,rank_display,roster_token')
       .order('name', { ascending: true }),
+    supabase
+      .from('go_school_classroom_memberships')
+      .select('classroom_id,student_login_id,classroom_position'),
   ]);
 
   if (studentsError) throw new Error(studentsError.message);
   if (classroomsError) throw new Error(classroomsError.message);
+  if (membershipsError) throw new Error(membershipsError.message);
 
   const roster = buildRoster(
     (studentRows ?? []) as GoSchoolStudentRow[],
     (classroomRows ?? []) as GoSchoolClassroomRow[],
+    (membershipRows ?? []) as GoSchoolMembershipRow[],
   );
 
   // サーバーが空でローカルに名簿がある場合は、ローカルを正として返す。
@@ -258,7 +272,7 @@ export async function upsertStudent(student: Student, previousId?: string): Prom
   if (!normalized.id) throw new Error('ログインコードが空です');
 
   const supabase = getSupabase();
-  let previousMembership: Pick<GoSchoolStudentRow, 'classroom_id' | 'classroom_position'> | null = null;
+  let previousMemberships: GoSchoolMembershipRow[] = [];
 
   if (previousId && previousId !== normalized.id) {
     const [{ data: existing, error: existingError }, { data: previous, error: previousError }] = await Promise.all([
@@ -268,22 +282,19 @@ export async function upsertStudent(student: Student, previousId?: string): Prom
         .eq('login_id', normalized.id)
         .maybeSingle(),
       supabase
-        .from('go_school_students')
-        .select('classroom_id,classroom_position')
-        .eq('login_id', previousId)
-        .maybeSingle(),
+        .from('go_school_classroom_memberships')
+        .select('classroom_id,student_login_id,classroom_position')
+        .eq('student_login_id', previousId),
     ]);
 
     if (existingError) throw new Error(existingError.message);
     if (previousError) throw new Error(previousError.message);
     if (existing) throw new Error(`生徒ID「${normalized.id}」は既に使われています`);
 
-    previousMembership = previous as Pick<GoSchoolStudentRow, 'classroom_id' | 'classroom_position'> | null;
+    previousMemberships = (previous ?? []) as GoSchoolMembershipRow[];
   }
 
-  const row = previousMembership
-    ? toStudentRow(normalized, previousMembership.classroom_id, previousMembership.classroom_position)
-    : toStudentProfileRow(normalized);
+  const row = toStudentProfileRow(normalized);
 
   const { error } = await supabase
     .from('go_school_students')
@@ -291,6 +302,17 @@ export async function upsertStudent(student: Student, previousId?: string): Prom
   if (error) throw new Error(error.message);
 
   if (previousId && previousId !== normalized.id) {
+    if (previousMemberships.length > 0) {
+      const { error: membershipError } = await supabase
+        .from('go_school_classroom_memberships')
+        .upsert(previousMemberships.map(membership => ({
+          classroom_id: membership.classroom_id,
+          student_login_id: normalized.id,
+          classroom_position: membership.classroom_position,
+          updated_at: new Date().toISOString(),
+        })), { onConflict: 'classroom_id,student_login_id' });
+      if (membershipError) throw new Error(membershipError.message);
+    }
     const { error: deleteError } = await supabase
       .from('go_school_students')
       .delete()
@@ -347,20 +369,22 @@ export async function upsertClassroom(classroom: Classroom): Promise<void> {
   if (classroomError) throw new Error(classroomError.message);
 
   const { error: clearError } = await supabase
-    .from('go_school_students')
-    .update({ classroom_id: null, classroom_position: null, updated_at: now })
+    .from('go_school_classroom_memberships')
+    .delete()
     .eq('classroom_id', cleaned.id);
   if (clearError) throw new Error(clearError.message);
 
-  await Promise.all(cleaned.studentIds.map((studentId, index) =>
-    supabase
-      .from('go_school_students')
-      .update({ classroom_id: cleaned.id, classroom_position: index, updated_at: now })
-      .eq('login_id', studentId)
-      .then(({ error }) => {
-        if (error) throw new Error(error.message);
-      }),
-  ));
+  if (cleaned.studentIds.length > 0) {
+    const { error: membershipError } = await supabase
+      .from('go_school_classroom_memberships')
+      .upsert(cleaned.studentIds.map((studentId, index) => ({
+        classroom_id: cleaned.id,
+        student_login_id: studentId,
+        classroom_position: index,
+        updated_at: now,
+      })), { onConflict: 'classroom_id,student_login_id' });
+    if (membershipError) throw new Error(membershipError.message);
+  }
 }
 
 /** 授業中の表示切替用。名簿の所属や並び順には触れず、棋力表示だけを更新する。 */
@@ -410,20 +434,31 @@ export async function importAll(students: Student[], classrooms: Classroom[]): P
     if (error) throw new Error(error.message);
   }
 
-  const membership = new Map<string, { classroomId: string; position: number }>();
-  for (const classroom of cleanedClassrooms) {
-    classroom.studentIds.forEach((studentId, index) => {
-      membership.set(studentId, { classroomId: classroom.id, position: index });
-    });
-  }
-
-  const studentRows = students.map(s => {
-    const normalized = normalizeStudent(s);
-    const member = membership.get(normalized.id);
-    return toStudentRow(normalized, member?.classroomId ?? null, member?.position ?? null);
-  });
+  const studentRows = students.map(s => toStudentProfileRow(normalizeStudent(s)));
   if (studentRows.length > 0) {
     const { error } = await supabase.from('go_school_students').upsert(studentRows, { onConflict: 'login_id' });
+    if (error) throw new Error(error.message);
+  }
+
+  const membershipRows = cleanedClassrooms.flatMap(classroom =>
+    classroom.studentIds.map((studentId, index) => ({
+      classroom_id: classroom.id,
+      student_login_id: studentId,
+      classroom_position: index,
+      updated_at: now,
+    })),
+  );
+  if (wantedClassroomIds.size > 0) {
+    const { error } = await supabase
+      .from('go_school_classroom_memberships')
+      .delete()
+      .in('classroom_id', [...wantedClassroomIds]);
+    if (error) throw new Error(error.message);
+  }
+  if (membershipRows.length > 0) {
+    const { error } = await supabase
+      .from('go_school_classroom_memberships')
+      .upsert(membershipRows, { onConflict: 'classroom_id,student_login_id' });
     if (error) throw new Error(error.message);
   }
 

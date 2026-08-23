@@ -7,9 +7,8 @@
 //   参加者一覧に棋力を出すが、生徒は名簿を読めないので出せなかった（2026-08-16）。
 //
 // どの教室を返すか:
-//   JWT の user_metadata.classroom_id は、ログイン時に本人が入力した値をそのまま
-//   書いたものなので信用しない。名簿で student_id から所属教室を引き直し、
-//   それを正本にする。名簿に居ない移行期の生徒だけ metadata を使う。
+//   JWT の classroom_id を選択中教室として使うが、所属テーブルで本人の所属を
+//   必ず再確認する。
 //
 // 返すもの: 同じ教室の生徒の login_id・氏名・段級・ランクと、教室名・棋力表示。
 // 生年月日・学年・所在地・共有PCの鍵は返さない（生徒の画面に要らない）。
@@ -74,39 +73,56 @@ Deno.serve(async (req) => {
 
   const admin = createClient(supabaseUrl, serviceRoleKey)
 
-  const { data: me, error: meErr } = await admin
-    .from('go_school_students')
-    .select('classroom_id')
-    .eq('login_id', studentId)
-    .maybeSingle()
-  if (meErr) {
-    return json({ error: 'Roster lookup failed', detail: meErr.message }, 500)
-  }
-
-  // 名簿に居る生徒は所属教室が正本。居ない（道場DB経由の移行期）生徒だけ metadata を使う
-  const classroomId = (me?.classroom_id as string | null)
-    ?? (typeof meta.classroom_id === 'string' ? meta.classroom_id : '')
+  const classroomId = typeof meta.classroom_id === 'string' ? meta.classroom_id : ''
   if (!classroomId) {
-    return json({ error: 'No classroom for this student' }, 404)
+    return json({ error: 'No classroom in session' }, 404)
   }
 
-  const [{ data: classroom, error: classroomErr }, { data: students, error: studentsErr }] = await Promise.all([
+  const { data: myMembership, error: membershipErr } = await admin
+    .from('go_school_classroom_memberships')
+    .select('classroom_id')
+    .eq('student_login_id', studentId)
+    .eq('classroom_id', classroomId)
+    .maybeSingle()
+  if (membershipErr) {
+    return json({ error: 'Membership lookup failed', detail: membershipErr.message }, 500)
+  }
+  if (!myMembership) {
+    return json({ error: 'Forbidden: not a classroom member' }, 403)
+  }
+
+  const [{ data: classroom, error: classroomErr }, { data: memberships, error: membershipsErr }] = await Promise.all([
     admin
       .from('go_school_classrooms')
       .select('id, name, rank_display')
       .eq('id', classroomId)
       .maybeSingle(),
     admin
-      .from('go_school_students')
-      .select('login_id, name, rank, internal_rating, classroom_position')
+      .from('go_school_classroom_memberships')
+      .select('student_login_id, classroom_position')
       .eq('classroom_id', classroomId),
   ])
   if (classroomErr) {
     return json({ error: 'Classroom lookup failed', detail: classroomErr.message }, 500)
   }
-  if (studentsErr) {
-    return json({ error: 'Roster lookup failed', detail: studentsErr.message }, 500)
+  if (membershipsErr) {
+    return json({ error: 'Roster lookup failed', detail: membershipsErr.message }, 500)
   }
+
+  const loginIds = (memberships ?? []).map(m => m.student_login_id as string)
+  const { data: students, error: studentsErr } = loginIds.length === 0
+    ? { data: [], error: null }
+    : await admin
+      .from('go_school_students')
+      .select('login_id, name, rank, internal_rating')
+      .in('login_id', loginIds)
+  if (studentsErr) {
+    return json({ error: 'Student lookup failed', detail: studentsErr.message }, 500)
+  }
+
+  const positionByStudent = new Map(
+    (memberships ?? []).map(m => [m.student_login_id as string, m.classroom_position as number | null]),
+  )
 
   // 先生が決めた並び順（classroom_position）を尊重し、無い分は名前順で後ろに置く
   const roster = (students ?? [])
@@ -115,7 +131,7 @@ Deno.serve(async (req) => {
       name: (s.name as string) || (s.login_id as string),
       rank: (s.rank as string | null) ?? '',
       internalRating: (s.internal_rating as string | null) ?? '',
-      position: (s.classroom_position as number | null) ?? Number.MAX_SAFE_INTEGER,
+      position: positionByStudent.get(s.login_id as string) ?? Number.MAX_SAFE_INTEGER,
     }))
     .sort((a, b) => (a.position !== b.position ? a.position - b.position : a.name.localeCompare(b.name, 'ja')))
     .map(({ id, name, rank, internalRating }) => ({ id, name, rank, internalRating }))

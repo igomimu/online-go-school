@@ -30,7 +30,7 @@ export function initUnloadInterruptAuthCache(): void {
 
 export function getPendingResumeGameId(): string | null {
   try {
-    return sessionStorage.getItem(PENDING_RESUME_KEY);
+    return localStorage.getItem(PENDING_RESUME_KEY);
   } catch {
     return null;
   }
@@ -38,7 +38,7 @@ export function getPendingResumeGameId(): string | null {
 
 export function clearPendingResumeGameId(): void {
   try {
-    sessionStorage.removeItem(PENDING_RESUME_KEY);
+    localStorage.removeItem(PENDING_RESUME_KEY);
   } catch {
     // ignore
   }
@@ -46,7 +46,9 @@ export function clearPendingResumeGameId(): void {
 
 export function interruptGameOnUnload(gameId: string): void {
   try {
-    sessionStorage.setItem(PENDING_RESUME_KEY, gameId);
+    // sessionStorage はウィンドウを閉じると消える。子どもが同じリンクを
+    // 開き直した時にも自動復帰できるよう端末内に永続化する。
+    localStorage.setItem(PENDING_RESUME_KEY, gameId);
   } catch {
     // ignore
   }

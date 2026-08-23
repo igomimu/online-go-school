@@ -28,7 +28,7 @@ import {
 } from './utils/unloadInterrupt';
 import { fetchRoster, loadStudents, loadClassrooms } from './utils/classroomStore';
 import { fetchMyClassroomRoster } from './utils/studentRoster';
-import { saveAccount, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } from './utils/authStore';
+import { saveAccount, supabaseSignInStudent, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } from './utils/authStore';
 
 import Header from './components/Header';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -780,12 +780,23 @@ function App() {
             const cid = localStorage.getItem('go-school-last-student-classroom-id');
             const name = localStorage.getItem('go-school-last-student-name');
             if (sid && cid && name) {
-              setStudentId(sid);
-              setRawStudentCode(code || sid);
-              setStudentClassroomId(cid);
-              setRoomName(`go-${cid}`);
-              setUserName(name);
-              setRole('STUDENT');
+              // 保存済みJWT/教室IDをそのまま信用せず、現在の所属を再検証する。
+              // 単一所属なら誤った古いリンクもcanonical教室へ自動補正される。
+              const restored = await supabaseSignInStudent(code || sid, cid);
+              if (restored.ok && restored.classroomId) {
+                const restoredClassroomId = restored.classroomId;
+                const restoredStudentId = restored.studentId || sid;
+                const restoredName = restored.displayName || name;
+                localStorage.setItem('go-school-last-student-id', restoredStudentId);
+                localStorage.setItem('go-school-last-student-classroom-id', restoredClassroomId);
+                localStorage.setItem('go-school-last-student-name', restoredName);
+                setStudentId(restoredStudentId);
+                setRawStudentCode(code || sid);
+                setStudentClassroomId(restoredClassroomId);
+                setRoomName(`go-${restoredClassroomId}`);
+                setUserName(restoredName);
+                setRole('STUDENT');
+              }
             }
           }
         }
@@ -1347,10 +1358,12 @@ function App() {
     );
     if (!pendingGame) return;
 
-    clearPendingResumeGameId();
-    void resumeLiveGame(pendingGame.id).catch((err) => {
-      console.error('Failed to resume pending interrupted game:', err);
-    });
+    void resumeLiveGame(pendingGame.id)
+      .then(() => clearPendingResumeGameId())
+      .catch((err) => {
+        // 先生が一時不在・回線未復旧でも、次回読み込みで再試行できるよう残す。
+        console.error('Failed to resume pending interrupted game:', err);
+      });
   }, [role, games, userName]);
 
   // 音声制御（先生用）

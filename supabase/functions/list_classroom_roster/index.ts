@@ -78,20 +78,35 @@ Deno.serve(async (req) => {
     return json({ error: 'Invalid roster token' }, 404)
   }
 
-  const { data: students, error: studentsErr } = await admin
-    .from('go_school_students')
-    .select('login_id, name, classroom_position')
+  const { data: memberships, error: membershipsErr } = await admin
+    .from('go_school_classroom_memberships')
+    .select('student_login_id, classroom_position')
     .eq('classroom_id', classroom.id)
-  if (studentsErr) {
-    return json({ error: 'Roster lookup failed', detail: studentsErr.message }, 500)
+  if (membershipsErr) {
+    return json({ error: 'Roster lookup failed', detail: membershipsErr.message }, 500)
   }
+
+  const loginIds = (memberships ?? []).map(m => m.student_login_id as string)
+  const { data: students, error: studentsErr } = loginIds.length === 0
+    ? { data: [], error: null }
+    : await admin
+      .from('go_school_students')
+      .select('login_id, name')
+      .in('login_id', loginIds)
+  if (studentsErr) {
+    return json({ error: 'Student lookup failed', detail: studentsErr.message }, 500)
+  }
+
+  const positionByStudent = new Map(
+    (memberships ?? []).map(m => [m.student_login_id as string, m.classroom_position as number | null]),
+  )
 
   // 先生が決めた並び順（classroom_position）を尊重し、無い分は名前順で後ろに置く
   const roster = (students ?? [])
     .map(s => ({
       studentCode: s.login_id as string,
       name: (s.name as string) || (s.login_id as string),
-      position: (s.classroom_position as number | null) ?? Number.MAX_SAFE_INTEGER,
+      position: positionByStudent.get(s.login_id as string) ?? Number.MAX_SAFE_INTEGER,
     }))
     .sort((a, b) => (a.position !== b.position ? a.position - b.position : a.name.localeCompare(b.name, 'ja')))
     .map(({ studentCode, name }) => ({ studentCode, name }))

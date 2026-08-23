@@ -7,21 +7,19 @@
 //   1. フロントが supabase.auth.signInAnonymously() で anon user 作成
 //   2. その JWT を Authorization: Bearer ヘッダーで本関数に POST
 //   3. 本関数が JWT を検証 → sub (anon user uuid) 取得
-//   4. body の studentId を dojo-app students で照合
-//      (student_type='net', status='active')
-//   5. service_role で auth.admin.updateUserById により user_metadata を上書き
-//   6. フロントが supabase.auth.refreshSession() で metadata 反映済み JWT を受ける
-//   7. custom_access_token_hook が user_metadata を JWT claim に昇格
+//   4. body の studentCode をオンライン名簿で照合
+//   5. 所属が1教室なら自動確定。複数ならリンク指定の教室を検証し、
+//      指定なし/不一致なら所属教室の選択肢を返す
+//   6. service_role で auth.admin.updateUserById により user_metadata を上書き
+//   7. フロントが supabase.auth.refreshSession() で metadata 反映済み JWT を受ける
+//   8. custom_access_token_hook が user_metadata を JWT claim に昇格
 //
-// classroom_id について:
-//   dojo-app `students` に classroom_id カラムは存在しない。classroom は
-//   online-go-school の先生ブラウザ localStorage で管理されているため、
-//   本関数では classroom_id を検証せず body の値をそのまま user_metadata に
-//   書き込む。Stage 7 の RLS では student_id / app_role を主ゲートとし、
-//   classroom_id は UX グルーピング用途にとどめる。
+// classroom_id はクライアント入力を信用しない。所属テーブルを正本にして
+// canonical ID をJWTへ書き込む。
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { versionResponse } from '../_shared/version.ts'
+import { resolveClassroomSelection, type ClassroomChoice } from '../_shared/classroom_membership.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,7 +29,7 @@ const corsHeaders = {
 
 interface ValidateRequest {
   studentCode: string
-  classroomId: string
+  classroomId?: string
 }
 
 function json(body: unknown, status = 200) {
@@ -67,8 +65,8 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: 'Invalid JSON' }, 400)
   }
-  if (!body.studentCode || !body.classroomId) {
-    return json({ error: 'studentCode and classroomId are required' }, 400)
+  if (!body.studentCode) {
+    return json({ error: 'studentCode is required' }, 400)
   }
 
   if (body.studentCode.length > 50) {
@@ -93,6 +91,7 @@ Deno.serve(async (req) => {
   const admin = createClient(supabaseUrl, serviceRoleKey)
   let resolvedId: string | null = null
   let resolvedName: string | null = null
+  let classrooms: ClassroomChoice[] = []
 
   // ① オンライン道場 専用名簿(go_school_students)を最優先で照合（道場アプリとは独立）
   const { data: gsStudent, error: gsErr } = await admin
@@ -106,6 +105,21 @@ Deno.serve(async (req) => {
   if (gsStudent) {
     resolvedId = gsStudent.login_id
     resolvedName = gsStudent.name || gsStudent.login_id
+    const { data: memberships, error: membershipErr } = await admin
+      .from('go_school_classroom_memberships')
+      .select('classroom_id, go_school_classrooms!inner(name)')
+      .eq('student_login_id', gsStudent.login_id)
+    if (membershipErr) {
+      return json({ error: 'Membership lookup failed', detail: membershipErr.message }, 500)
+    }
+    classrooms = (memberships ?? []).map((row) => {
+      const linked = row.go_school_classrooms as unknown as { name?: string } | { name?: string }[] | null
+      const classroom = Array.isArray(linked) ? linked[0] : linked
+      return {
+        id: row.classroom_id as string,
+        name: classroom?.name || (row.classroom_id as string),
+      }
+    })
   } else {
     // ② 移行期フォールバック: 道場DB(student_code / UUID)でも照合
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -133,11 +147,26 @@ Deno.serve(async (req) => {
     return json({ error: 'Student not found or inactive' }, 403)
   }
 
+  if (classrooms.length === 0) {
+    return json({ error: 'No classroom membership', code: 'no_classroom_membership' }, 403)
+  }
+
+  const requestedClassroomId = (body.classroomId || '').trim()
+  const { selected: selectedClassroom } = resolveClassroomSelection(classrooms, requestedClassroomId)
+
+  if (!selectedClassroom) {
+    return json({
+      error: 'Classroom selection required',
+      code: 'classroom_selection_required',
+      classrooms,
+    }, 409)
+  }
+
   // user_metadata 上書き
   const { error: updateErr } = await admin.auth.admin.updateUserById(user.id, {
     user_metadata: {
       student_id: resolvedId,
-      classroom_id: body.classroomId,
+      classroom_id: selectedClassroom.id,
       app_role: 'student',
       display_name: resolvedName,
     },
@@ -150,6 +179,8 @@ Deno.serve(async (req) => {
     ok: true,
     display_name: resolvedName,
     student_id: resolvedId,
-    classroom_id: body.classroomId,
+    classroom_id: selectedClassroom.id,
+    classroom_name: selectedClassroom.name,
+    classroom_corrected: requestedClassroomId !== '' && requestedClassroomId !== selectedClassroom.id,
   })
 })

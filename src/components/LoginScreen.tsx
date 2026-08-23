@@ -5,6 +5,7 @@ import BoardCorner from './BoardCorner';
 import ThemeToggle from './ThemeToggle';
 import {
   loadAccounts,
+  saveAccount,
   deleteAccount,
   setTeacherPassword,
   supabaseSignInStudent,
@@ -39,6 +40,7 @@ export default function LoginScreen({
   const [showDropdown, setShowDropdown] = useState(false);
   const [studentId, setStudentId] = useState('');
   const [classroomId, setClassroomId] = useState(prefilledClassroomId || '');
+  const [classroomChoices, setClassroomChoices] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedAccount, setSelectedAccount] = useState<SavedAccount | null>(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -81,6 +83,7 @@ export default function LoginScreen({
     setClassroomId(account.classroomId);
     setShowDropdown(false);
     setError('');
+    setClassroomChoices([]);
   };
 
   const handleNewAccount = () => {
@@ -89,6 +92,7 @@ export default function LoginScreen({
     setClassroomId(prefilledClassroomId || '');
     setShowDropdown(false);
     setError('');
+    setClassroomChoices([]);
   };
 
   const handleDeleteAccount = (e: React.MouseEvent, account: SavedAccount) => {
@@ -122,12 +126,55 @@ export default function LoginScreen({
       setRosterError(res.error || 'ログインに失敗しました');
       return;
     }
+    saveAccount(
+      entry.studentCode,
+      res.classroomId ?? roster.classroomId,
+      res.displayName || entry.name,
+      res.classroomName || roster.classroomName,
+    );
     onStudentLogin(
       res.studentId ?? entry.studentCode,
-      roster.classroomId,
+      res.classroomId ?? roster.classroomId,
       entry.studentCode,
       res.displayName || entry.name,
     );
+  };
+
+  const completeStudentLogin = (
+    res: Awaited<ReturnType<typeof supabaseSignInStudent>>,
+    rawCode: string,
+    fallbackClassroomId: string,
+  ) => {
+    const resolvedClassroomId = res.classroomId || fallbackClassroomId;
+    saveAccount(
+      rawCode,
+      resolvedClassroomId,
+      res.displayName,
+      res.classroomName,
+    );
+    onStudentLogin(
+      res.studentId ?? rawCode,
+      resolvedClassroomId,
+      rawCode,
+      res.displayName,
+    );
+  };
+
+  const signInToClassroom = async (sid: string, cid: string) => {
+    setSubmitting(true);
+    setError('');
+    const res = await supabaseSignInStudent(sid, cid);
+    setSubmitting(false);
+    if (res.requiresClassroomSelection) {
+      setClassroomChoices(res.classrooms ?? []);
+      return;
+    }
+    if (!res.ok) {
+      setError(res.error || 'ログインに失敗しました');
+      return;
+    }
+    setClassroomChoices([]);
+    completeStudentLogin(res, sid, cid);
   };
 
   const handleStudentSubmit = async (e: React.FormEvent) => {
@@ -135,25 +182,14 @@ export default function LoginScreen({
     if (submitting) return;
     const sid = studentId.trim();
     const cid = classroomId.trim();
-    if (!sid || !cid) {
-      setError('生徒コードと教室IDを入力してください');
+    if (!sid) {
+      setError('生徒コードを入力してください');
       return;
     }
     // Supabase Session の確立を待ってから入室する。
     // （以前は入室と並行実行していたため、メタデータ昇格前の匿名 JWT で
     //   /api/token を叩いて LiveKit 入室が 403 になるレースがあった）
-    setSubmitting(true);
-    setError('');
-    const res = await supabaseSignInStudent(sid, cid);
-    setSubmitting(false);
-    if (!res.ok) {
-      setError(res.error || 'ログインに失敗しました');
-      return;
-    }
-    // App.tsx の makeStudentIdentity に渡す ID は UUID でなければならない
-    // （api/token.ts が meta.student_id = UUID と比較するため）
-    // また、接続成功時に localStorage に保存するため生の入力値 (sid) も第3引数で渡す
-    onStudentLogin(res.studentId ?? sid, cid, sid, res.displayName);
+    await signInToClassroom(sid, cid);
   };
 
   const handleTeacherSubmit = async (e: React.FormEvent) => {
@@ -382,28 +418,38 @@ export default function LoginScreen({
               autoFocus={accounts.length === 0}
             />
           </div>
-          <div>
-            <label className="field-label">教室ID</label>
-            <input
-              data-testid="classroom-id-input"
-              type="text"
-              value={classroomId}
-              onChange={e => { setClassroomId(e.target.value); setError(''); }}
-              placeholder="先生から受け取った教室ID"
-              className="field-input tabular"
-            />
-            {selectedAccount?.classroomName && classroomId === selectedAccount.classroomId && (
-              <p className="mt-2 text-sm text-muted">
-                接続先: <span className="font-medium text-ink">{selectedAccount.classroomName}</span>
-              </p>
-            )}
-          </div>
+          {(prefilledClassroomId || selectedAccount?.classroomName) && classroomChoices.length === 0 && (
+            <div className="rounded-lg border border-field-line bg-ground px-4 py-3 text-sm text-muted">
+              接続先: <span className="font-medium text-ink">
+                {selectedAccount?.classroomName || '参加リンクの教室'}
+              </span>
+            </div>
+          )}
+
+          {classroomChoices.length > 0 && (
+            <fieldset className="space-y-2">
+              <legend className="field-label">参加する教室を選んでください</legend>
+              {classroomChoices.map(classroom => (
+                <button
+                  key={classroom.id}
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => void signInToClassroom(studentId.trim(), classroom.id)}
+                  className="secondary-button w-full text-left disabled:opacity-60"
+                >
+                  {classroom.name}
+                </button>
+              ))}
+            </fieldset>
+          )}
 
           {error && <p className="text-alert-text text-sm">{error}</p>}
 
-          <button data-testid="student-login-button" type="submit" disabled={submitting} className="premium-button w-full disabled:opacity-60">
-            {submitting ? '確認中...' : selectedAccount?.classroomName ? `${selectedAccount.classroomName} に参加` : '参加する'}
-          </button>
+          {classroomChoices.length === 0 && (
+            <button data-testid="student-login-button" type="submit" disabled={submitting} className="premium-button w-full disabled:opacity-60">
+              {submitting ? '確認中...' : selectedAccount?.classroomName ? `${selectedAccount.classroomName} に参加` : '参加する'}
+            </button>
+          )}
         </form>
       </div>
 

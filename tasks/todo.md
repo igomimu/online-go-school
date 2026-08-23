@@ -249,6 +249,22 @@
 ## レビュー結果
 - 2026-08-22: 検討開始前・検討中の参加生徒オン/オフを連動。途中で外した生徒は対局中なら対局盤、それ以外はホームへ戻し、途中で戻した生徒には開始データ・現在盤・着手権限を順に即時配信する。対局作成画面には黒番・白番選択の間に入替ボタンを追加し、選択済みの手合割を維持する。
 - 検証: `node --env-file=<既存env> node_modules/vitest/vitest.mjs run --reporter=dot` 61 files / 603 tests passed、対象テスト28件 passed、ESLint成功、`npm run build`成功。共有DBを使う `sharing-target.spec.ts` は、手元の旧service-roleキーがSupabase側で無効化済み（`Legacy API keys are disabled`）のためseed前に停止。途中参加・退出の差分判定とホーム/対局作成UIは単体テストで固定した。
+
+## 2026-08-23: 複数教室所属・子ども向け再入室
+
+- [x] 生徒と教室の多対多所属を追加し、既存の単一所属を移行する
+- [x] 生徒ログイン時に参加先教室への所属をサーバー側で検証する
+- [x] リンク指定なしで複数所属の場合は教室名から選べるようにする
+- [x] 誤った教室IDを受け入れず、所属教室へ安全に案内する
+- [x] ウィンドウを閉じても中断対局へ簡単に復帰できるようにする
+- [x] 関連テスト・全体テスト・ビルドを検証する
+
+## レビュー結果
+- 生徒プロフィールと教室所属を多対多テーブルへ分離。既存27件の所属を移行し、鈴木榛人（1016）は正しい教室 `CLS20160919347` に所属していることを本番DBで確認した。
+- 生徒コードだけで本人を特定し、所属が1教室なら正しい教室へ自動補正、複数なら教室名ボタンから選択する。教室IDの手入力欄は廃止した。
+- 中断対局IDをウィンドウ終了で消える保存先から端末内の永続保存へ移し、再開成功後にだけ削除するよう変更した。
+- 本番DB migrationと `validate_student_session` / `list_classroom_roster` / `list_classroom_students` を反映済み。誤った教室IDで1016を認証し、正しい教室へ補正されることを実測した。
+- 検証: Vitest 64 files / 615 tests passed、Deno helper test 3 steps passed、Edge Function 3本の `deno check` 成功、ESLint成功、production build成功。
 - 2026-07-18: 本番DBに残っていた `test-class-*` / `wiring-*` / `debugfull-*` / `verify-*` / `single-*` / `reconnect-*` の未終了E2E対局59件と、教室レコードがなくE2E専用生徒1010だけが参加していた孤立 `CLS001` 中断局1件、対応する残存テスト教室2件を削除。実教室 `CLS20160919347` は清掃前から未終了0件で、1001/1002の直近局はいずれも正常終局済みだったため変更していない。
 - 再発防止: `e2e/security.spec.ts` に `afterAll` 清掃を追加し、`teardownSupabaseRoster` が対局削除・生徒紐付け解除のエラーを黙殺しないよう修正。Playwrightの古い `.bin` リンクもnpm版へ戻した。
 - 検証: OS defunct 0件、重複開発サーバー0件、LiveKitルーム0件、自動テスト由来の未終了対局0件・テスト教室0件。`BASE_URL=https://online.mimura15.jp npx playwright test e2e/security.spec.ts --project=chromium --reporter=line` 3/3 passed、実行後も残骸0件、`npm run build` 成功。

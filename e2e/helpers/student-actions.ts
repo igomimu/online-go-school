@@ -10,8 +10,11 @@ export async function loginAsStudent(
   page: Page,
   opts: { studentCode: string; classroomId: string },
 ): Promise<void> {
+  const current = new URL(page.url());
+  if (current.searchParams.get('classroomId') !== opts.classroomId) {
+    await page.goto(`/?classroomId=${encodeURIComponent(opts.classroomId)}`);
+  }
   await page.getByTestId('student-id-input').fill(opts.studentCode);
-  await page.getByTestId('classroom-id-input').fill(opts.classroomId);
   await page.getByTestId('student-login-button').click();
 
   const result = await Promise.race([

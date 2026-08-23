@@ -66,7 +66,6 @@ test('みむいご通信用: デモ教室の対局画面を撮る', async ({ bro
     const idInput = page.getByTestId('student-id-input');
     if (await idInput.isVisible().catch(() => false)) {
       await idInput.fill(who.code);
-      await page.getByTestId('classroom-id-input').fill(CLASSROOM_ID);
       await page.getByTestId('student-login-button').click();
     }
     // 「先生が対局を作成するのをお待ちください」は対局が1つも無いときだけ出る。
