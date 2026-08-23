@@ -86,7 +86,8 @@ export function getNhkAnnouncement(
 /** 考慮時間へ入った瞬間の案内。remaining は今回分を除いた残数。 */
 export function getNhkConsiderationAnnouncement(total: number, remaining: number): string {
   const current = Math.max(1, total - remaining);
-  return `${current}回目の考慮時間に入りました。残り${remaining}回です。`;
+  // 漢字の「入りました」は一部TTSが「いりました」と読むため、発話文字列はひらがなにする。
+  return `${current}回目の考慮時間にはいりました。残り${remaining}回です。`;
 }
 
 /** 60秒の考慮時間を使い切り、次の考慮時間へ続くときの案内。 */

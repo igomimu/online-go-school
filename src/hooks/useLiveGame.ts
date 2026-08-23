@@ -12,6 +12,7 @@ import {
   speakByoyomi,
 } from '../utils/byoyomiVoice';
 import { formatResultSpeech } from '../utils/scoring';
+import { reconcileLiveMoves } from '../utils/liveMoveReconcile';
 import { switchClock } from './useGameClock';
 import type { GameClock } from '../types/game';
 import {
@@ -43,6 +44,8 @@ export interface DerivedState {
   whiteCaptures: number;
   lastMove: LiveMoveRow | null;
 }
+
+const MOVE_RECONCILE_INTERVAL_MS = 3000;
 
 const EMPTY_MOVES: LiveMoveRow[] = [];
 
@@ -212,6 +215,20 @@ export function useLiveGame(
     }
 
     let cancelled = false;
+    let moveReconcileInFlight = false;
+
+    const reconcileMovesFromServer = async () => {
+      if (moveReconcileInFlight || cancelled) return;
+      moveReconcileInFlight = true;
+      try {
+        const serverMoves = await fetchLiveMoves(gameId);
+        if (!cancelled) setMoves(current => reconcileLiveMoves(current, serverMoves));
+      } catch {
+        // Realtimeが正常な間は無視できる保険経路。次回の照合で再試行する。
+      } finally {
+        moveReconcileInFlight = false;
+      }
+    };
 
     (async () => {
       setLoading(true);
@@ -239,6 +256,9 @@ export function useLiveGame(
         onGameChange: (row) => {
           setGame(row);
           setLocalClock(row.clock ?? null);
+          // submit_move は着手INSERT後に必ず games.updated_at も更新する。
+          // moves側INSERTだけを取り逃した場合、この更新を合図にサーバー棋譜へ追いつく。
+          void reconcileMovesFromServer();
         },
         onMoveInsert: (row) => {
           setMoves((prev) => {
@@ -263,8 +283,15 @@ export function useLiveGame(
       channelRef.current = channel;
     })();
 
+    // Realtimeチャンネルの再接続中はINSERTとgames UPDATEを両方取り逃すことがある。
+    // 双方の端末が通知を受けなくても、数秒以内に正本の棋譜へ収束させる。
+    const reconcileTimer = window.setInterval(() => {
+      void reconcileMovesFromServer();
+    }, MOVE_RECONCILE_INTERVAL_MS);
+
     return () => {
       cancelled = true;
+      window.clearInterval(reconcileTimer);
       channel?.unsubscribe();
       channelRef.current = null;
     };

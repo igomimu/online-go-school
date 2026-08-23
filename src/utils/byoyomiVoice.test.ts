@@ -108,8 +108,8 @@ describe('NHK杯方式の読み上げ', () => {
   });
 
   it('考慮時間へ入った回数と残数を案内する', () => {
-    expect(getNhkConsiderationAnnouncement(4, 3)).toBe('1回目の考慮時間に入りました。残り3回です。');
-    expect(getNhkConsiderationAnnouncement(4, 1)).toBe('3回目の考慮時間に入りました。残り1回です。');
+    expect(getNhkConsiderationAnnouncement(4, 3)).toBe('1回目の考慮時間にはいりました。残り3回です。');
+    expect(getNhkConsiderationAnnouncement(4, 1)).toBe('3回目の考慮時間にはいりました。残り1回です。');
   });
 
   it('最後の60秒考慮時間は終盤を1〜10と読む', () => {
