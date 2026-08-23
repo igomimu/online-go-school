@@ -58,7 +58,7 @@ describe('StudentTable', () => {
 
     const row = screen.getByText('たろう').closest('tr');
     expect(row).not.toBeNull();
-    expect(screen.getByRole('columnheader', { name: '操作' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '対局操作' })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: '対局' })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: '詳細' })).not.toBeInTheDocument();
     fireEvent.click(within(row!).getByRole('button', { name: '中断' }));
@@ -155,6 +155,48 @@ describe('StudentTable', () => {
     fireEvent.click(screen.getByRole('button', { name: '中断' }));
     expect(onInterruptGame).toHaveBeenCalledWith('current-playing');
     expect(screen.queryByRole('button', { name: '再開' })).not.toBeInTheDocument();
+  });
+
+  it('進行中の対局をホームから取り消せる', () => {
+    const onCancelGame = vi.fn();
+    render(
+      <StudentTable
+        participants={[participant]}
+        students={[student]}
+        games={[game]}
+        audioPermissions={{}}
+        localIdentity="teacher"
+        onToggleHear={vi.fn()}
+        onToggleMic={vi.fn()}
+        onInterruptGame={vi.fn()}
+        onCancelGame={onCancelGame}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    expect(onCancelGame).toHaveBeenCalledWith('game-1');
+  });
+
+  it('中断局には再開と取消の両方を表示する', () => {
+    const onResumeGame = vi.fn();
+    const onCancelGame = vi.fn();
+    render(
+      <StudentTable
+        participants={[participant]}
+        students={[student]}
+        games={[{ ...game, status: 'interrupted', result: '中断' }]}
+        audioPermissions={{}}
+        localIdentity="teacher"
+        onToggleHear={vi.fn()}
+        onToggleMic={vi.fn()}
+        onResumeGame={onResumeGame}
+        onCancelGame={onCancelGame}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '再開' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    expect(onCancelGame).toHaveBeenCalledWith('game-1');
   });
 
   it('ホーム画面に独立した検討列を表示し、生徒ごとにオン・オフできる', () => {

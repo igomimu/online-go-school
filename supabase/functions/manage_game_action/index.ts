@@ -251,6 +251,12 @@ Deno.serve(async (req) => {
     if (action === 'finish') {
       const { result } = params || {}
       const normalizedResult = result ?? null
+      const isCancellation = normalizedResult === '取消'
+
+      // 対局の取消は勝敗操作ではなく講師の管理操作。生徒からは実行させない。
+      if (isCancellation && !isTeacher && !isServiceRole) {
+        return json({ error: 'Forbidden: Only teachers can cancel games' }, 403)
+      }
 
       const { data: gameForHistory, error: historyGameErr } = await supabase
         .from('go_school_live_games')
@@ -284,7 +290,16 @@ Deno.serve(async (req) => {
 
       if (error) throw error
 
-      await saveGameHistory(supabase, gameForHistory, normalizedResult)
+      if (isCancellation) {
+        // 中断時には同じIDで棋譜が一度保存されているため、それも含めて削除する。
+        const { error: deleteHistoryError } = await supabase
+          .from('go_school_games')
+          .delete()
+          .eq('id', game_id)
+        if (deleteHistoryError) throw deleteHistoryError
+      } else {
+        await saveGameHistory(supabase, gameForHistory, normalizedResult)
+      }
 
       return json({ ok: true })
     }

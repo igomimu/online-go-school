@@ -61,6 +61,7 @@ interface StudentTableProps {
   onOpenHistory?: (student: Student) => void;
   onInterruptGame?: (gameId: string) => void;
   onResumeGame?: (gameId: string) => void;
+  onCancelGame?: (gameId: string) => void;
   onEditStudent?: (student: Student) => void;
   onMoveStudent?: (studentId: string, direction: 'up' | 'down') => void;
 }
@@ -80,6 +81,7 @@ export default function StudentTable({
   onOpenHistory,
   onInterruptGame,
   onResumeGame,
+  onCancelGame,
   onEditStudent,
   onMoveStudent,
 }: StudentTableProps) {
@@ -93,7 +95,7 @@ export default function StudentTable({
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 46 }}>状態</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 92 }}>接続</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 58 }}>検討</th>
-            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 64 }}>操作</th>
+            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 96 }}>対局操作</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 56 }}>棋譜</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 50 }}>編集</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 52 }}>順序</th>
@@ -111,6 +113,9 @@ export default function StudentTable({
             const canInterrupt = row.game?.status === 'playing' || row.game?.status === 'scoring';
             const canResume = row.game?.status === 'interrupted'
               || (row.game?.status === 'finished' && isTimeoutResult(row.game.result));
+            const canCancel = row.game?.status === 'playing'
+              || row.game?.status === 'scoring'
+              || row.game?.status === 'interrupted';
             // 接続中は面を一段持ち上げ、先頭（アクティブ）行だけ榧を薄く敷く
             const bgColor = row.isConnected
               ? (i === 0 ? 'color-mix(in oklab, var(--color-accent) 16%, var(--color-surface))' : 'var(--color-raised)')
@@ -191,38 +196,55 @@ export default function StudentTable({
 
                 {/* 操作。盤を開く操作は中央の碁盤クリックへ一本化し、ここには状態変更だけを置く。 */}
                 <td className="px-2 py-1.5 border-b border-line text-center font-medium">
-                  {canInterrupt && row.game && onInterruptGame && (
-                    <button
-                      type="button"
-                      data-testid={`interrupt-game-${row.student?.id || row.identity}`}
-                      className="rounded border border-alert/60 bg-surface px-2 py-0.5 text-alert-text hover:bg-alert/10"
-                      style={{ fontSize: 10.5, fontWeight: 700 }}
-                      onClick={e => {
-                        e.stopPropagation();
-                        onInterruptGame(row.game!.id);
-                      }}
-                    >
-                      中断
-                    </button>
-                  )}
-                  {canResume && row.game && onResumeGame && (
-                    <button
-                      type="button"
-                      data-testid={`resume-game-${row.student?.id || row.identity}`}
-                      className="rounded border border-accent/50 bg-accent px-2 py-0.5 text-accent-ink hover:bg-accent/85"
-                      style={{ fontSize: 10.5, fontWeight: 700 }}
-                      onClick={e => {
-                        e.stopPropagation();
-                        if (
-                          row.game?.status === 'finished'
-                          && !confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')
-                        ) return;
-                        onResumeGame(row.game!.id);
-                      }}
-                    >
-                      再開
-                    </button>
-                  )}
+                  <div className="flex items-center justify-center gap-1">
+                    {canInterrupt && row.game && onInterruptGame && (
+                      <button
+                        type="button"
+                        data-testid={`interrupt-game-${row.student?.id || row.identity}`}
+                        className="rounded border border-alert/60 bg-surface px-2 py-0.5 text-alert-text hover:bg-alert/10"
+                        style={{ fontSize: 10.5, fontWeight: 700 }}
+                        onClick={e => {
+                          e.stopPropagation();
+                          onInterruptGame(row.game!.id);
+                        }}
+                      >
+                        中断
+                      </button>
+                    )}
+                    {canResume && row.game && onResumeGame && (
+                      <button
+                        type="button"
+                        data-testid={`resume-game-${row.student?.id || row.identity}`}
+                        className="rounded border border-accent/50 bg-accent px-2 py-0.5 text-accent-ink hover:bg-accent/85"
+                        style={{ fontSize: 10.5, fontWeight: 700 }}
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (
+                            row.game?.status === 'finished'
+                            && !confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')
+                          ) return;
+                          onResumeGame(row.game!.id);
+                        }}
+                      >
+                        再開
+                      </button>
+                    )}
+                    {canCancel && row.game && onCancelGame && (
+                      <button
+                        type="button"
+                        data-testid={`cancel-game-${row.student?.id || row.identity}`}
+                        title="この対局を履歴に残さず取り消す"
+                        className="rounded border border-line bg-surface px-2 py-0.5 text-muted hover:border-alert/60 hover:bg-alert/10 hover:text-alert-text"
+                        style={{ fontSize: 10.5, fontWeight: 700 }}
+                        onClick={e => {
+                          e.stopPropagation();
+                          onCancelGame(row.game!.id);
+                        }}
+                      >
+                        取消
+                      </button>
+                    )}
+                  </div>
                 </td>
 
                 {/* 棋譜履歴 */}

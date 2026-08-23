@@ -57,6 +57,8 @@ interface TeacherDashboardProps {
   connectionState?: import('livekit-client').ConnectionState;
   onOpenStudentManager: () => void;
   onReloadData: () => void | Promise<void>;
+  /** 取消後、Realtimeが不調でもホームから確実に消すため対局一覧を再取得する。 */
+  onReloadGames?: () => void | Promise<void>;
   /** 棋力表示を切り替えたことを生徒へ配る（名簿を読み直さない生徒のため） */
   onRankDisplayChanged?: (value: RankDisplay) => void;
   onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number; clock?: import('../../types/game').GameClock }[]) => void;
@@ -99,6 +101,7 @@ export default function TeacherDashboard({
   connectionState,
   onOpenStudentManager,
   onReloadData,
+  onReloadGames,
   onRankDisplayChanged,
   onCreateGames,
   onProblemAssign,
@@ -333,6 +336,16 @@ export default function TeacherDashboard({
     }
   }, []);
 
+  const handleCancelGame = useCallback(async (gameId: string) => {
+    if (!confirm('この対局を取り消します。\n中断中の記録を含め、棋譜履歴には残りません。よろしいですか？')) return;
+    try {
+      await finishGame(gameId, '取消');
+      await onReloadGames?.();
+    } catch (err) {
+      alert(`対局の取り消しに失敗しました: ${err}`);
+    }
+  }, [onReloadGames]);
+
   // 生徒一覧の高さは、つまんで変えられる
   const roster = useStoredHeight('roster', 72, 640);
   const rosterRef = useRef<HTMLDivElement>(null);
@@ -447,6 +460,7 @@ export default function TeacherDashboard({
           onOpenHistory={handleOpenHistory}
           onInterruptGame={gameId => { void handleInterruptGame(gameId); }}
           onResumeGame={onResumeGame}
+          onCancelGame={gameId => { void handleCancelGame(gameId); }}
           onEditStudent={setEditingStudentInfo}
           onMoveStudent={handleMoveStudent}
         />

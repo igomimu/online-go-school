@@ -265,6 +265,14 @@
 - 中断対局IDをウィンドウ終了で消える保存先から端末内の永続保存へ移し、再開成功後にだけ削除するよう変更した。
 - 本番DB migrationと `validate_student_session` / `list_classroom_roster` / `list_classroom_students` を反映済み。誤った教室IDで1016を認証し、正しい教室へ補正されることを実測した。
 - 検証: Vitest 64 files / 615 tests passed、Deno helper test 3 steps passed、Edge Function 3本の `deno check` 成功、ESLint成功、production build成功。
+
+## 2026-08-23: 開始済み対局の取消・中断局の残留解消
+
+- [ ] 先生ホームの生徒行から進行中対局を取り消せるようにする
+- [ ] 中断局にも「再開」と「取消」を並べ、不要な局を解除できるようにする
+- [ ] 取消は講師専用とし、途中保存された中断棋譜も履歴から削除する
+- [ ] Realtime不調時も取消後の一覧を再取得して表示を消す
+- [ ] 関連テスト・全体テスト・本番反映を検証する
 - 2026-07-18: 本番DBに残っていた `test-class-*` / `wiring-*` / `debugfull-*` / `verify-*` / `single-*` / `reconnect-*` の未終了E2E対局59件と、教室レコードがなくE2E専用生徒1010だけが参加していた孤立 `CLS001` 中断局1件、対応する残存テスト教室2件を削除。実教室 `CLS20160919347` は清掃前から未終了0件で、1001/1002の直近局はいずれも正常終局済みだったため変更していない。
 - 再発防止: `e2e/security.spec.ts` に `afterAll` 清掃を追加し、`teardownSupabaseRoster` が対局削除・生徒紐付け解除のエラーを黙殺しないよう修正。Playwrightの古い `.bin` リンクもnpm版へ戻した。
 - 検証: OS defunct 0件、重複開発サーバー0件、LiveKitルーム0件、自動テスト由来の未終了対局0件・テスト教室0件。`BASE_URL=https://online.mimura15.jp npx playwright test e2e/security.spec.ts --project=chromium --reporter=line` 3/3 passed、実行後も残骸0件、`npm run build` 成功。

@@ -1819,6 +1819,7 @@ function App() {
             connectionState={connectionState}
             onOpenStudentManager={() => setShowStudentManager(true)}
             onReloadData={reloadClassroomData}
+            onReloadGames={liveGameList.refresh}
             onRankDisplayChanged={handleRankDisplayChanged}
             onCreateGames={async (pairs) => {
               const me = classroomRef.current?.localIdentity ?? userName;
