@@ -151,7 +151,7 @@ async function getRoleAuthToken(sb: SupabaseClient): Promise<string | null> {
 }
 
 async function executeGameAction(
-  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all' | 'request_undo' | 'respond_undo' | 'list_active_for_players',
+  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'delete_saved_game' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all' | 'request_undo' | 'respond_undo' | 'list_active_for_players',
   gameId?: string,
   params?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
@@ -317,6 +317,11 @@ export async function updateDeadStones(gameId: string, deadStones: string[]): Pr
 
 export async function finishGame(gameId: string, result: string): Promise<void> {
   await executeGameAction('finish', gameId, { result });
+}
+
+/** 保存棋譜を削除する。対応する中断局があれば同時に解除する（講師専用）。 */
+export async function deleteSavedGame(gameId: string): Promise<void> {
+  await executeGameAction('delete_saved_game', gameId);
 }
 
 export async function interruptGame(gameId: string): Promise<void> {

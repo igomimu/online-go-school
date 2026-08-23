@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { Trash2 } from 'lucide-react';
 import type { GameSession, AudioPermissions, SavedGame } from '../../types/game';
 import type { ParticipantInfo } from '../../utils/classroomLiveKit';
 import type { Student, Classroom, RankDisplay } from '../../types/classroom';
 import { DEFAULT_RANK_DISPLAY } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
 import { identityMatchesPlayer, parseIdentity, resolvePlayerName, stripSid, studentIdentityCandidates } from '../../utils/identityUtils';
-import { fetchActiveLiveGamesForPlayers, finishGame, getSupabase, interruptGame, liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
+import { deleteSavedGame, fetchActiveLiveGamesForPlayers, finishGame, getSupabase, interruptGame, liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
 import { loadSavedGamesForStudent } from '../../utils/savedGames';
 import { isTimeoutResult } from '../../utils/scoring';
 
@@ -133,6 +134,7 @@ export default function TeacherDashboard({
   const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
   const [historyGames, setHistoryGames] = useState<SavedGame[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [deletingHistoryGameId, setDeletingHistoryGameId] = useState<string | null>(null);
 
   const handleOpenHistory = useCallback(async (student: Student) => {
     setHistoryStudent(student);
@@ -335,6 +337,24 @@ export default function TeacherDashboard({
       alert(`対局の中断に失敗しました: ${err}`);
     }
   }, []);
+
+  const handleDeleteHistoryGame = useCallback(async (game: SavedGame) => {
+    const interruptedNote = game.result === '中断'
+      ? '\nこの中断局は再開できなくなり、ホームの表示からも消えます。'
+      : '';
+    if (!confirm(`この棋譜を削除しますか？${interruptedNote}`)) return;
+
+    setDeletingHistoryGameId(game.id);
+    try {
+      await deleteSavedGame(game.id);
+      setHistoryGames(prev => prev.filter(saved => saved.id !== game.id));
+      await onReloadGames?.();
+    } catch (err) {
+      alert(`棋譜の削除に失敗しました: ${err}`);
+    } finally {
+      setDeletingHistoryGameId(null);
+    }
+  }, [onReloadGames]);
 
   const handleCancelGame = useCallback(async (gameId: string) => {
     if (!confirm('この対局を取り消します。\n中断中の記録を含め、棋譜履歴には残りません。よろしいですか？')) return;
@@ -764,30 +784,57 @@ export default function TeacherDashboard({
                             {outcome === 'win' && <span style={{ marginLeft: 6, fontSize: 11 }}>◯勝ち</span>}
                             {outcome === 'loss' && <span style={{ marginLeft: 6, fontSize: 11 }}>●負け</span>}
                           </span>
-                          {resumableLiveGame && onResumeGame ? (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {resumableLiveGame && onResumeGame ? (
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  if (resumableLiveGame.status === 'finished' &&
+                                      !confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')) return;
+                                  onResumeGame(resumableLiveGame.id);
+                                  setHistoryStudent(null);
+                                }}
+                                style={{
+                                  background: 'var(--color-accent)',
+                                  border: '1px solid #8a7554',
+                                  color: 'var(--color-ground)',
+                                  fontSize: 11,
+                                  fontWeight: 'bold',
+                                  padding: '1px 8px',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                再開
+                              </button>
+                            ) : (
+                              <span style={{ color: 'var(--color-accent-text)', fontSize: 11 }}>検討を開始する</span>
+                            )}
                             <button
+                              type="button"
+                              title="この棋譜を削除"
+                              aria-label={`${game.date}の棋譜を削除`}
+                              disabled={deletingHistoryGameId === game.id}
                               onClick={e => {
                                 e.stopPropagation();
-                                if (resumableLiveGame.status === 'finished' &&
-                                    !confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')) return;
-                                onResumeGame(resumableLiveGame.id);
-                                setHistoryStudent(null);
+                                void handleDeleteHistoryGame(game);
                               }}
                               style={{
-                                background: 'var(--color-accent)',
-                                border: '1px solid #8a7554',
-                                color: 'var(--color-ground)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 3,
+                                border: '1px solid var(--color-line)',
+                                background: 'var(--color-ground)',
+                                color: 'var(--color-muted)',
                                 fontSize: 11,
-                                fontWeight: 'bold',
-                                padding: '1px 8px',
-                                cursor: 'pointer',
+                                padding: '1px 6px',
+                                cursor: deletingHistoryGameId === game.id ? 'wait' : 'pointer',
+                                opacity: deletingHistoryGameId === game.id ? 0.55 : 1,
                               }}
                             >
-                              再開
+                              <Trash2 size={12} aria-hidden="true" />
+                              削除
                             </button>
-                          ) : (
-                            <span style={{ color: 'var(--color-accent-text)', fontSize: 11 }}>検討を開始する</span>
-                          )}
+                          </span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-muted)', fontSize: 11 }}>
                           <span>対局日: {game.date}</span>

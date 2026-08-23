@@ -2,6 +2,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { studentMatchesPlayer, toStudentIdentity, playersMatchPair, resolvePlayerColor, stripSid, TEACHER_IDENTITY } from '../_shared/identity.ts'
 import { exportLiveGameToSgf, formatTokyoSgfDate } from '../_shared/sgf.ts'
 import { restoreClockForTimeout, startClock, timedOutColorFromResult } from '../_shared/clock.ts'
+import { NEW_GAME_BLOCKING_STATUSES, shouldCloseLiveGameWhenDeletingHistory } from '../_shared/game_lifecycle.ts'
 import { versionResponse } from '../_shared/version.ts'
 
 const corsHeaders = {
@@ -11,7 +12,7 @@ const corsHeaders = {
 }
 
 interface ActionBody {
-  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all' | 'request_undo' | 'respond_undo' | 'list_active_for_players'
+  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'delete_saved_game' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all' | 'request_undo' | 'respond_undo' | 'list_active_for_players'
   game_id?: string
   params?: any
 }
@@ -125,7 +126,7 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey)
 
   // 1. 権限検証用のゲーム取得 (create 時以外)
-  if (action !== 'create' && game_id) {
+  if (action !== 'create' && action !== 'delete_saved_game' && game_id) {
     const { data: game, error: gameErr } = await supabase
       .from('go_school_live_games')
       .select('black_player, white_player')
@@ -191,7 +192,8 @@ Deno.serve(async (req) => {
         .from('go_school_live_games')
         .select('id, black_player, white_player')
         .eq('classroom_id', classroom_id)
-        .in('status', ['playing', 'scoring', 'interrupted'])
+        // 中断局は過去局として再開可能なまま残すが、新規対局の開始は妨げない。
+        .in('status', [...NEW_GAME_BLOCKING_STATUSES])
 
       if (activeGamesError) throw activeGamesError
       const duplicate = (activeGames ?? []).find((game: any) =>
@@ -232,6 +234,48 @@ Deno.serve(async (req) => {
 
       if (error) throw error
       return json({ ok: true })
+    }
+
+    if (action === 'delete_saved_game') {
+      if (!isTeacher && !isServiceRole) {
+        return json({ error: 'Forbidden: Only teachers can delete saved games' }, 403)
+      }
+      if (!game_id) {
+        return json({ error: 'Missing game_id for delete_saved_game' }, 400)
+      }
+
+      // 削除対象が中断局なら、履歴だけ消してホームに再開待ちを残さない。
+      const { data: correspondingLiveGame, error: liveGameError } = await supabase
+        .from('go_school_live_games')
+        .select('id, status')
+        .eq('id', game_id)
+        .maybeSingle()
+      if (liveGameError) throw liveGameError
+
+      if (shouldCloseLiveGameWhenDeletingHistory(correspondingLiveGame?.status)) {
+        const { error: finishInterruptedError } = await supabase
+          .from('go_school_live_games')
+          .update({
+            status: 'finished',
+            result: '取消',
+            undo_request: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', game_id)
+          .eq('status', 'interrupted')
+        if (finishInterruptedError) throw finishInterruptedError
+      }
+
+      const { error: deleteHistoryError } = await supabase
+        .from('go_school_games')
+        .delete()
+        .eq('id', game_id)
+      if (deleteHistoryError) throw deleteHistoryError
+
+      return json({
+        ok: true,
+        interrupted_game_closed: shouldCloseLiveGameWhenDeletingHistory(correspondingLiveGame?.status),
+      })
     }
 
     if (action === 'update_dead_stones') {
