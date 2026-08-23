@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import type { Student, Classroom } from '../../types/classroom';
+import { normalizeStudentTypes } from '../../types/classroom';
 import {
   deleteStudent,
   deleteStudents,
@@ -19,6 +20,7 @@ import ClassroomSettingsDialog from './ClassroomSettingsDialog';
 interface ClassroomManagerProps {
   students: Student[];
   classrooms: Classroom[];
+  studentTypes: string[];
   onLaunchClassroom: (classroomId: string) => void;
   onOpenSettings: () => void;
   onOpenStudentManager: () => void;
@@ -34,11 +36,10 @@ const RANKS = [
   '11K', '12K', '13K', '14K', '15K', '20K', '25K', '30K',
 ];
 const GRADES = ['', '小1', '小2', '小3', '小4', '小5', '小6', '中1', '中2', '中3', '高1', '高2', '高3', '大学', '大人'];
-const TYPES = ['', 'ネット生', '教室生', 'ネット教室生', '大人会員', '家族', '体験', 'プロ志望', '元生徒', 'Jネット生', 'スポット', 'ネット道場生', '道場生'];
-
 export default function ClassroomManager({
   students,
   classrooms,
+  studentTypes,
   onLaunchClassroom,
   onOpenSettings,
   onReloadData,
@@ -129,6 +130,7 @@ export default function ClassroomManager({
   // 生徒フォーム
   const emptyForm: Student = { id: '', name: '', rank: '', internalRating: '', type: '', grade: '', country: '', birthdate: '' };
   const [form, setForm] = useState<Student>(emptyForm);
+  const studentTypeOptions = normalizeStudentTypes([...studentTypes, form.type]);
 
   const startAddStudent = () => {
     setForm({ ...emptyForm, id: `S${Date.now()}` });
@@ -486,7 +488,8 @@ export default function ClassroomManager({
                     </FormField>
                     <FormField label="種別" width={120}>
                       <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={inputStyle}>
-                        {TYPES.map(t => <option key={t} value={t}>{t || '--'}</option>)}
+                        <option value="">--</option>
+                        {studentTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </FormField>
                     <FormField label="生年月日" width={130}>
@@ -628,6 +631,7 @@ export default function ClassroomManager({
         <ClassroomSettingsDialog
           classroom={editingClassroom}
           allStudents={students}
+          studentTypes={studentTypes}
           onSave={async () => {
             setEditingClassroom(null);
             await onReloadData();

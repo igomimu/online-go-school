@@ -1,18 +1,31 @@
 import { useState } from 'react';
-import type { Student, Classroom, RankDisplay } from '../../types/classroom';
-import { DEFAULT_RANK_DISPLAY } from '../../types/classroom';
-import { upsertClassroom } from '../../utils/classroomStore';
+import type { Student, Classroom, RankDisplay, StudentTypeDraft } from '../../types/classroom';
+import { DEFAULT_RANK_DISPLAY, normalizeStudentTypes } from '../../types/classroom';
+import { replaceStudentTypes, upsertClassroom } from '../../utils/classroomStore';
 
 interface ClassroomSettingsDialogProps {
   classroom: Classroom;
   allStudents: Student[];
+  studentTypes: string[];
   onSave: () => void | Promise<void>;
   onClose: () => void;
 }
 
+const smallButtonStyle: React.CSSProperties = {
+  width: 22,
+  height: 22,
+  padding: 0,
+  border: '1px solid var(--color-line)',
+  background: 'var(--color-raised)',
+  color: 'var(--color-ink)',
+  cursor: 'pointer',
+  fontSize: 11,
+};
+
 export default function ClassroomSettingsDialog({
   classroom,
   allStudents,
+  studentTypes,
   onSave,
   onClose,
 }: ClassroomSettingsDialogProps) {
@@ -22,6 +35,9 @@ export default function ClassroomSettingsDialog({
   const [seatCount, setSeatCount] = useState(classroom.maxCapacity);
   const [rankDisplay, setRankDisplay] = useState<RankDisplay>(classroom.rankDisplay ?? DEFAULT_RANK_DISPLAY);
   const [name, setName] = useState(classroom.name);
+  const [studentTypeDrafts, setStudentTypeDrafts] = useState<StudentTypeDraft[]>(
+    studentTypes.map(type => ({ originalName: type, name: type })),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -65,10 +81,45 @@ export default function ClassroomSettingsDialog({
     setEnrolledIds(next);
   };
 
+  const updateStudentType = (index: number, value: string) => {
+    setStudentTypeDrafts(prev => prev.map((entry, i) => i === index ? { ...entry, name: value } : entry));
+  };
+
+  const moveStudentType = (index: number, direction: -1 | 1) => {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= studentTypeDrafts.length) return;
+    setStudentTypeDrafts(prev => {
+      const next = [...prev];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  };
+
+  const removeStudentType = (index: number) => {
+    const target = studentTypeDrafts[index];
+    if (target.originalName && allStudents.some(student => student.type === target.originalName)) {
+      const count = allStudents.filter(student => student.type === target.originalName).length;
+      setError(`「${target.originalName}」は${count}名が使用中です。名称変更するか、先に生徒の区分を変更してください。`);
+      return;
+    }
+    setError('');
+    setStudentTypeDrafts(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSave = async () => {
+    const normalizedNames = normalizeStudentTypes(studentTypeDrafts.map(entry => entry.name));
+    if (normalizedNames.length === 0) {
+      setError('生徒区分を1つ以上入力してください');
+      return;
+    }
+    if (normalizedNames.length !== studentTypeDrafts.length) {
+      setError('空欄または同じ名前の生徒区分があります');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
+      await replaceStudentTypes(studentTypeDrafts);
       await upsertClassroom({
         ...classroom,
         name: name.trim() || classroom.name,
@@ -182,6 +233,49 @@ export default function ClassroomSettingsDialog({
               <option value="rating">ランク（R12）</option>
             </select>
           </div>
+
+          {/* 生徒プロフィールの共通区分。複数教室に所属しても同じ名称を使う。 */}
+          <section style={{ border: '1px solid var(--color-line)', marginBottom: 12 }}>
+            <div style={{
+              display: 'flex', alignItems: 'baseline', gap: 8, padding: '5px 8px',
+              background: 'var(--color-raised)', borderBottom: '1px solid var(--color-line)',
+            }}>
+              <strong>生徒区分</strong>
+              <span style={{ color: 'var(--color-muted)', fontSize: 10 }}>全教室共通・名称変更は設定済みの生徒にも反映</span>
+            </div>
+            <div
+              data-testid="student-type-editor"
+              style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, padding: 8 }}
+            >
+              {studentTypeDrafts.map((entry, index) => (
+                <div key={`${entry.originalName ?? 'new'}-${index}`} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <span style={{ width: 20, textAlign: 'right', color: 'var(--color-muted)', fontSize: 10 }}>{index + 1}</span>
+                  <input
+                    aria-label={`生徒区分 ${index + 1}`}
+                    value={entry.name}
+                    onChange={event => updateStudentType(index, event.target.value)}
+                    style={{
+                      minWidth: 0, flex: 1, padding: '3px 5px', fontSize: 11,
+                      border: '1px solid var(--color-field-line)', background: 'var(--color-ground)',
+                    }}
+                  />
+                  <button type="button" aria-label={`${entry.name || index + 1}を上へ`} onClick={() => moveStudentType(index, -1)} disabled={index === 0} style={smallButtonStyle}>↑</button>
+                  <button type="button" aria-label={`${entry.name || index + 1}を下へ`} onClick={() => moveStudentType(index, 1)} disabled={index === studentTypeDrafts.length - 1} style={smallButtonStyle}>↓</button>
+                  <button type="button" aria-label={`${entry.name || index + 1}を削除`} onClick={() => removeStudentType(index)} style={{ ...smallButtonStyle, color: 'var(--color-alert-text)' }}>×</button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setStudentTypeDrafts(prev => [...prev, { originalName: null, name: '' }])}
+                style={{
+                  gridColumn: '1 / -1', padding: '4px 8px', border: '1px solid var(--color-line)',
+                  background: 'var(--color-raised)', color: 'var(--color-ink)', cursor: 'pointer', fontSize: 11,
+                }}
+              >
+                ＋ 区分を追加
+              </button>
+            </div>
+          </section>
 
           {/* 在籍生・その他 デュアルリスト */}
           <div style={{ display: 'flex', gap: 8 }}>

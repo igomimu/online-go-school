@@ -26,6 +26,37 @@ export interface Classroom {
   rosterToken?: string;
 }
 
+// 生徒区分は生徒プロフィールの共通属性。複数教室に所属しても同じ選択肢を使う。
+export const DEFAULT_STUDENT_TYPES = [
+  'ネット生',
+  '教室生',
+  'ネット教室生',
+  '大人会員',
+  '家族',
+  '体験',
+  'プロ志望',
+  '元生徒',
+  'Jネット生',
+  'スポット',
+  'ネット道場生',
+  '道場生',
+] as const;
+
+export interface StudentTypeDraft {
+  originalName: string | null;
+  name: string;
+}
+
+export function normalizeStudentTypes(types: readonly string[]): string[] {
+  const seen = new Set<string>();
+  return types.flatMap(type => {
+    const name = type.trim();
+    if (!name || seen.has(name)) return [];
+    seen.add(name);
+    return [name];
+  });
+}
+
 // === igocampus strType → 表示名 ===
 export const STUDENT_TYPE_MAP: Record<string, string> = {
   '0': '',

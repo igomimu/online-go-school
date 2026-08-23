@@ -35,6 +35,7 @@ interface TeacherDashboardProps {
   localIdentity: string;
   students: Student[];
   classrooms: Classroom[];
+  studentTypes: string[];
   selectedClassroomId: string | null;
   onSelectClassroom: (id: string | null) => void;
   games: GameSession[];
@@ -81,6 +82,7 @@ export default function TeacherDashboard({
   localIdentity,
   students,
   classrooms,
+  studentTypes,
   selectedClassroomId,
   onSelectClassroom,
   games,
@@ -650,6 +652,7 @@ export default function TeacherDashboard({
         <ClassroomSettingsDialog
           classroom={editingClassroom}
           allStudents={students}
+          studentTypes={studentTypes}
           onSave={() => {
             setEditingClassroom(null);
             void onReloadData();
@@ -671,6 +674,7 @@ export default function TeacherDashboard({
       {editingStudentInfo && (
         <StudentEditDialog
           student={editingStudentInfo}
+          studentTypes={studentTypes}
           onClose={() => setEditingStudentInfo(null)}
           onSaved={onReloadData}
         />

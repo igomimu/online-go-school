@@ -1,20 +1,19 @@
 import { useState } from 'react';
 import type { Student } from '../../types/classroom';
-import { RANK_OPTIONS, RATING_OPTIONS, normalizeRank } from '../../types/classroom';
+import { RANK_OPTIONS, RATING_OPTIONS, normalizeRank, normalizeStudentTypes } from '../../types/classroom';
 import { upsertStudent } from '../../utils/classroomStore';
 import { resolveGrade } from '../../utils/gradeCalc';
 
 interface StudentEditDialogProps {
   student: Student;
+  studentTypes: string[];
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 }
 
 const GRADES = ['', '小1', '小2', '小3', '小4', '小5', '小6', '中1', '中2', '中3', '高1', '高2', '高3', '大学', '大人'];
-const TYPES = ['', 'ネット生', '教室生', 'ネット教室生', '大人会員', '家族', '体験', 'プロ志望', '元生徒', 'Jネット生', 'スポット', 'ネット道場生', '道場生'];
-
 // 保存先は online 専用の go_school_students（dojo-app の students には触れない）。
-export default function StudentEditDialog({ student, onClose, onSaved }: StudentEditDialogProps) {
+export default function StudentEditDialog({ student, studentTypes, onClose, onSaved }: StudentEditDialogProps) {
   const [form, setForm] = useState<Student>({
     ...student,
     studentCode: student.studentCode || student.id,
@@ -22,6 +21,7 @@ export default function StudentEditDialog({ student, onClose, onSaved }: Student
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const typeOptions = normalizeStudentTypes([...studentTypes, form.type]);
 
   const handleSave = async () => {
     const nextId = (form.studentCode || form.id || '').trim();
@@ -123,7 +123,8 @@ export default function StudentEditDialog({ student, onClose, onSaved }: Student
           <div>
             <label style={label}>生徒種別</label>
             <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={field}>
-              {TYPES.map(t => <option key={t} value={t}>{t || '未設定'}</option>)}
+              <option value="">未設定</option>
+              {typeOptions.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           <div>

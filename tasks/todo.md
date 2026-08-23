@@ -350,6 +350,19 @@
 - 2026-07-18: 本番DBに残っていた `test-class-*` / `wiring-*` / `debugfull-*` / `verify-*` / `single-*` / `reconnect-*` の未終了E2E対局59件と、教室レコードがなくE2E専用生徒1010だけが参加していた孤立 `CLS001` 中断局1件、対応する残存テスト教室2件を削除。実教室 `CLS20160919347` は清掃前から未終了0件で、1001/1002の直近局はいずれも正常終局済みだったため変更していない。
 - 再発防止: `e2e/security.spec.ts` に `afterAll` 清掃を追加し、`teardownSupabaseRoster` が対局削除・生徒紐付け解除のエラーを黙殺しないよう修正。Playwrightの古い `.bin` リンクもnpm版へ戻した。
 - 検証: OS defunct 0件、重複開発サーバー0件、LiveKitルーム0件、自動テスト由来の未終了対局0件・テスト教室0件。`BASE_URL=https://online.mimura15.jp npx playwright test e2e/security.spec.ts --project=chromium --reporter=line` 3/3 passed、実行後も残骸0件、`npm run build` 成功。
+
+## 2026-08-23: 生徒区分名の編集
+
+- [x] 全教室共通の生徒区分マスターをSupabaseへ追加する
+- [x] 教室設定から区分名の追加・変更・削除・並べ替えをできるようにする
+- [x] 区分名の変更を、その区分が設定済みの生徒へ同時に反映する
+- [x] 生徒の追加・編集画面を共通区分マスターへ切り替える
+- [x] 関連テスト・全体テスト・ビルド・本番反映を検証する
+
+## レビュー結果
+- 生徒区分を全教室共通のマスターとして追加。教室設定から追加・名称変更・並べ替え・削除ができる。使用中の区分は削除を止め、名称変更時は該当生徒のプロフィールも同じDBトランザクションで更新する。
+- 生徒管理ページと教室ホームの生徒編集ダイアログは、固定配列ではなく共通マスターを参照する。マスター外の旧区分も選択肢から消さず移行できる。
+- 検証: 対象11テスト、Vitest 69 files / 644 tests、ESLint、production buildが成功。本番DBで初期区分12件、RLS、名称変更RPC、migration履歴を確認し、RPCのトランザクション試験もロールバック付きで成功した。アプリ内ブラウザは接続先が検出されなかったため、画面操作はDOMテストで名称変更・使用中削除の防止まで確認した。
 - 2026-07-18: 1001/1002をログインさせて講師が2名相手に対局を始めたが1局だけになる問題を調査。実教室 `CLS20160919347` の直近DBでは、作成された対局は `sid:1002 vs teacher` が2回で、`sid:1001 vs teacher` は新規作成されていなかった。原因候補として、手動対局作成ダイアログが開始後に閉じず、別生徒から開き直しても内部stateが最初の `initialBlackPlayer` のまま残る挙動を修正。開始後は閉じ、作成中は二重押し不可にした。さらに `manage_game_action` create で同一教室・同じ2人の進行中対局を409で拒否する保険を追加。
 - 検証: 関連Vitest 22/22 passed、Deno identity shared test 4 suites/12 steps passed、`deno check manage_game_action` 成功、`npm run build` 成功、`npx vitest run --testTimeout=10000` 392/392 passed。本番Edgeで同じ `sid:1002 vs teacher` の2回作成を実測し、1回目200・2回目409を確認後、検証用対局を強制終局で清掃。Supabase `manage_game_action` と Vercel production `dpl_7PuABgJGiGe7LxHveEjbRVtCcvrK` を本番反映。実教室の進行中対局は最終確認で0件。
 - 2026-07-18: 教師ホームの進行中碁盤一覧が `liveRowToSession` の空盤プレースホルダを表示していたため、`useLiveBoards` のライブ着手スナップショットを `GameSession` へ合成して実盤面・手数・手番が出るようにした。別ウィンドウ対局盤は `?mode=game` でも名簿を再読込し、対局者欄を `sid:<id>` や `teacher` ではなく生徒名・講師表示名で出すようにした。

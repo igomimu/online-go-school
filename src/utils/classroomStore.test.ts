@@ -5,10 +5,12 @@ import {
   loadCachedRoster,
   loadClassrooms,
   loadStudents,
+  replaceStudentTypes,
   updateClassroomRankDisplay,
   upsertStudent,
 } from './classroomStore';
 import type { Student, Classroom } from '../types/classroom';
+import { DEFAULT_STUDENT_TYPES } from '../types/classroom';
 
 vi.mock('./liveGameApi', () => ({
   getSupabase: vi.fn(),
@@ -52,6 +54,7 @@ describe('名簿キャッシュ', () => {
     expect(loadCachedRoster()).toEqual({
       students: [testStudent],
       classrooms: [testClassroom],
+      studentTypes: [...DEFAULT_STUDENT_TYPES],
     });
   });
 
@@ -88,6 +91,36 @@ describe('授業中の棋力表示保存', () => {
     expect(from).toHaveBeenCalledWith('go_school_classrooms');
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ rank_display: 'rating' }));
     expect(eq).toHaveBeenCalledWith('id', 'CLS001');
+  });
+});
+
+describe('生徒区分マスター保存', () => {
+  it('元の名称と新しい名称・表示順をRPCへ渡す', async () => {
+    const rpc = vi.fn(async () => ({ error: null }));
+    vi.mocked(getSupabase).mockReturnValue({ rpc } as never);
+
+    await replaceStudentTypes([
+      { originalName: 'ネット生', name: 'オンライン生' },
+      { originalName: null, name: '短期生' },
+    ]);
+
+    expect(rpc).toHaveBeenCalledWith('replace_go_school_student_types', {
+      p_entries: [
+        { original_name: 'ネット生', name: 'オンライン生', position: 0 },
+        { original_name: null, name: '短期生', position: 1 },
+      ],
+    });
+  });
+
+  it('空欄や重複名はRPCを呼ばず拒否する', async () => {
+    const rpc = vi.fn();
+    vi.mocked(getSupabase).mockReturnValue({ rpc } as never);
+
+    await expect(replaceStudentTypes([
+      { originalName: 'ネット生', name: '同じ' },
+      { originalName: '教室生', name: '同じ' },
+    ])).rejects.toThrow('空欄または同じ名前');
+    expect(rpc).not.toHaveBeenCalled();
   });
 });
 

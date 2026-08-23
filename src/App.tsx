@@ -26,7 +26,7 @@ import {
   initUnloadInterruptAuthCache,
   interruptGameOnUnload,
 } from './utils/unloadInterrupt';
-import { fetchRoster, loadStudents, loadClassrooms } from './utils/classroomStore';
+import { fetchRoster, loadStudents, loadClassrooms, loadStudentTypes } from './utils/classroomStore';
 import { fetchMyClassroomRoster } from './utils/studentRoster';
 import { saveAccount, supabaseSignInStudent, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } from './utils/authStore';
 
@@ -242,6 +242,7 @@ function App() {
   // 生徒・教室データ
   const [students, setStudents] = useState<Student[]>(() => loadStudents());
   const [classrooms, setClassrooms] = useState<Classroom[]>(() => loadClassrooms());
+  const [studentTypes, setStudentTypes] = useState<string[]>(() => loadStudentTypes());
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [showStudentManager, setShowStudentManager] = useState(false);
 
@@ -264,10 +265,12 @@ function App() {
       const roster = await fetchRoster();
       setStudents(roster.students);
       setClassrooms(roster.classrooms);
+      setStudentTypes(roster.studentTypes);
     } catch (err) {
       console.error('[Classroom roster] fetch failed, using local cache:', err);
       setStudents(loadStudents());
       setClassrooms(loadClassrooms());
+      setStudentTypes(loadStudentTypes());
     }
   }, []);
 
@@ -1689,6 +1692,7 @@ function App() {
         <ClassroomManager
           students={students}
           classrooms={classrooms}
+          studentTypes={studentTypes}
           onLaunchClassroom={(launchClassroomId) => {
             if (!livekitUrl) {
               setShowSettings(true);
@@ -1831,6 +1835,7 @@ function App() {
             localIdentity={classroomRef.current?.localIdentity ?? ''}
             students={students}
             classrooms={classrooms}
+            studentTypes={studentTypes}
             selectedClassroomId={selectedClassroomId}
             onSelectClassroom={setSelectedClassroomId}
             games={games}

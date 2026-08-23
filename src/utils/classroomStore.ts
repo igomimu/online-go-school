@@ -1,5 +1,5 @@
-import type { Student, Classroom, RankDisplay } from '../types/classroom';
-import { DEFAULT_RANK_DISPLAY } from '../types/classroom';
+import type { Student, Classroom, RankDisplay, StudentTypeDraft } from '../types/classroom';
+import { DEFAULT_RANK_DISPLAY, DEFAULT_STUDENT_TYPES, normalizeStudentTypes } from '../types/classroom';
 import { getSupabase } from './liveGameApi';
 import { isGuestTeacher } from './authStore';
 
@@ -8,6 +8,7 @@ export const DEMO_CLASSROOM_ID = 'DEMO01';
 
 const STUDENTS_KEY = 'go-school-students';
 const CLASSROOMS_KEY = 'go-school-classrooms';
+const STUDENT_TYPES_KEY = 'go-school-student-types';
 
 type GoSchoolStudentRow = {
   login_id: string;
@@ -36,9 +37,15 @@ type GoSchoolMembershipRow = {
   classroom_position: number | null;
 };
 
+type GoSchoolStudentTypeRow = {
+  name: string;
+  display_order: number;
+};
+
 export interface ClassroomRoster {
   students: Student[];
   classrooms: Classroom[];
+  studentTypes: string[];
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -53,6 +60,7 @@ function readJson<T>(key: string, fallback: T): T {
 function cacheRoster(roster: ClassroomRoster): void {
   localStorage.setItem(STUDENTS_KEY, JSON.stringify(roster.students));
   localStorage.setItem(CLASSROOMS_KEY, JSON.stringify(roster.classrooms));
+  localStorage.setItem(STUDENT_TYPES_KEY, JSON.stringify(roster.studentTypes));
 }
 
 function normalizeStudent(student: Student): Student {
@@ -125,6 +133,7 @@ function buildRoster(
   studentRows: GoSchoolStudentRow[],
   classroomRows: GoSchoolClassroomRow[],
   membershipRows: GoSchoolMembershipRow[],
+  studentTypeRows: GoSchoolStudentTypeRow[],
 ): ClassroomRoster {
   // ゲスト（デモ見学）先生にはデモ教室とその所属生徒だけを見せる。
   // 名簿・教室セレクタ・生徒一覧はすべてこの roster 由来なので、ここで絞れば実データは出ない。
@@ -135,20 +144,21 @@ function buildRoster(
     studentRows = studentRows.filter(row => demoStudentIds.has(row.login_id));
     membershipRows = membershipRows.filter(row => row.classroom_id === DEMO_CLASSROOM_ID);
     classroomRows = classroomRows.filter(row => row.id === DEMO_CLASSROOM_ID);
-    return buildRosterRows(studentRows, classroomRows, membershipRows);
+    return buildRosterRows(studentRows, classroomRows, membershipRows, studentTypeRows);
   }
 
   const allowedId = e2eAllowedClassroomId();
   classroomRows = classroomRows.filter(row => (allowedId !== null && row.id === allowedId) || !isTestClassroom(row.id, row.name));
   const visibleClassroomIds = new Set(classroomRows.map(row => row.id));
   membershipRows = membershipRows.filter(row => visibleClassroomIds.has(row.classroom_id));
-  return buildRosterRows(studentRows, classroomRows, membershipRows);
+  return buildRosterRows(studentRows, classroomRows, membershipRows, studentTypeRows);
 }
 
 function buildRosterRows(
   studentRows: GoSchoolStudentRow[],
   classroomRows: GoSchoolClassroomRow[],
   membershipRows: GoSchoolMembershipRow[],
+  studentTypeRows: GoSchoolStudentTypeRow[],
 ): ClassroomRoster {
   const students = studentRows
     .map(toStudent)
@@ -185,7 +195,17 @@ function buildRosterRows(
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'ja'));
 
-  return { students, classrooms };
+  const configuredTypes = studentTypeRows
+    .sort((a, b) => a.display_order - b.display_order)
+    .map(row => row.name);
+  // 移行前などマスター外の値も選択肢から消さず、既存生徒を編集可能に保つ。
+  const assignedTypes = students.map(student => student.type);
+  const studentTypes = normalizeStudentTypes([
+    ...(configuredTypes.length > 0 ? configuredTypes : DEFAULT_STUDENT_TYPES),
+    ...assignedTypes,
+  ]);
+
+  return { students, classrooms, studentTypes };
 }
 
 function hasRosterData(roster: ClassroomRoster): boolean {
@@ -202,8 +222,12 @@ export function loadClassrooms(): Classroom[] {
   return readJson<Classroom[]>(CLASSROOMS_KEY, []);
 }
 
+export function loadStudentTypes(): string[] {
+  return normalizeStudentTypes(readJson<string[]>(STUDENT_TYPES_KEY, [...DEFAULT_STUDENT_TYPES]));
+}
+
 export function loadCachedRoster(): ClassroomRoster {
-  return { students: loadStudents(), classrooms: loadClassrooms() };
+  return { students: loadStudents(), classrooms: loadClassrooms(), studentTypes: loadStudentTypes() };
 }
 
 // 重複登録を自動検知して排除するクリーンアップヘルパー
@@ -227,6 +251,7 @@ export async function fetchRoster(): Promise<ClassroomRoster> {
     { data: studentRows, error: studentsError },
     { data: classroomRows, error: classroomsError },
     { data: membershipRows, error: membershipsError },
+    { data: studentTypeRows, error: studentTypesError },
   ] = await Promise.all([
     supabase
       .from('go_school_students')
@@ -239,16 +264,22 @@ export async function fetchRoster(): Promise<ClassroomRoster> {
     supabase
       .from('go_school_classroom_memberships')
       .select('classroom_id,student_login_id,classroom_position'),
+    supabase
+      .from('go_school_student_types')
+      .select('name,display_order')
+      .order('display_order', { ascending: true }),
   ]);
 
   if (studentsError) throw new Error(studentsError.message);
   if (classroomsError) throw new Error(classroomsError.message);
   if (membershipsError) throw new Error(membershipsError.message);
+  if (studentTypesError) throw new Error(studentTypesError.message);
 
   const roster = buildRoster(
     (studentRows ?? []) as GoSchoolStudentRow[],
     (classroomRows ?? []) as GoSchoolClassroomRow[],
     (membershipRows ?? []) as GoSchoolMembershipRow[],
+    (studentTypeRows ?? []) as GoSchoolStudentTypeRow[],
   );
 
   // サーバーが空でローカルに名簿がある場合は、ローカルを正として返す。
@@ -347,6 +378,25 @@ export async function upsertStudents(students: Student[]): Promise<void> {
   const { error } = await getSupabase()
     .from('go_school_students')
     .upsert(rows, { onConflict: 'login_id' });
+  if (error) throw new Error(error.message);
+}
+
+export async function replaceStudentTypes(entries: StudentTypeDraft[]): Promise<void> {
+  const normalized = entries.map(entry => ({
+    originalName: entry.originalName,
+    name: entry.name.trim(),
+  }));
+  const names = normalizeStudentTypes(normalized.map(entry => entry.name));
+  if (names.length === 0) throw new Error('生徒区分を1つ以上入力してください');
+  if (names.length !== normalized.length) throw new Error('空欄または同じ名前の生徒区分があります');
+
+  const { error } = await getSupabase().rpc('replace_go_school_student_types', {
+    p_entries: normalized.map((entry, position) => ({
+      original_name: entry.originalName,
+      name: entry.name,
+      position,
+    })),
+  });
   if (error) throw new Error(error.message);
 }
 
@@ -475,7 +525,11 @@ export async function importAll(students: Student[], classrooms: Classroom[]): P
     if (error) throw new Error(error.message);
   }
 
-  cacheRoster({ students: students.map(normalizeStudent), classrooms: cleanedClassrooms });
+  cacheRoster({
+    students: students.map(normalizeStudent),
+    classrooms: cleanedClassrooms,
+    studentTypes: loadStudentTypes(),
+  });
 }
 
 export async function migrateCachedRosterToSupabase(): Promise<ClassroomRoster> {
