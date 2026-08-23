@@ -268,11 +268,18 @@
 
 ## 2026-08-23: 開始済み対局の取消・中断局の残留解消
 
-- [ ] 先生ホームの生徒行から進行中対局を取り消せるようにする
-- [ ] 中断局にも「再開」と「取消」を並べ、不要な局を解除できるようにする
-- [ ] 取消は講師専用とし、途中保存された中断棋譜も履歴から削除する
-- [ ] Realtime不調時も取消後の一覧を再取得して表示を消す
-- [ ] 関連テスト・全体テスト・本番反映を検証する
+- [x] 先生ホームの生徒行から進行中対局を取り消せるようにする
+- [x] 中断局にも「再開」と「取消」を並べ、不要な局を解除できるようにする
+- [x] 取消は講師専用とし、途中保存された中断棋譜も履歴から削除する
+- [x] Realtime不調時も取消後の一覧を再取得して表示を消す
+- [x] 関連テスト・全体テスト・本番反映を検証する
+
+## レビュー結果
+- 先生ホームの「対局操作」列に取消を追加。進行中は「中断／取消」、中断中は「再開／取消」を表示する。
+- 取消時は確認後に対局を終了扱いにし、中断時に保存済みの同一ID棋譜も削除する。生徒セッションからの取消はEdge Functionで403拒否する。
+- 取消成功後に対局一覧を明示的に再取得するため、Realtimeイベントを受け損ねてもホーム表示から消える。
+- 検証: StudentTable 9/9、Vitest 64 files / 617 tests、ESLint、production build、`deno check manage_game_action` がすべて成功。本番で検証用中断局と棋譜を作成し、取消後に `status=finished / result=取消 / historyCount=0` を確認して検証データを削除した。
+- 本番反映: Supabase `manage_game_action` と Vercel production `eae3901`。
 - 2026-07-18: 本番DBに残っていた `test-class-*` / `wiring-*` / `debugfull-*` / `verify-*` / `single-*` / `reconnect-*` の未終了E2E対局59件と、教室レコードがなくE2E専用生徒1010だけが参加していた孤立 `CLS001` 中断局1件、対応する残存テスト教室2件を削除。実教室 `CLS20160919347` は清掃前から未終了0件で、1001/1002の直近局はいずれも正常終局済みだったため変更していない。
 - 再発防止: `e2e/security.spec.ts` に `afterAll` 清掃を追加し、`teardownSupabaseRoster` が対局削除・生徒紐付け解除のエラーを黙殺しないよう修正。Playwrightの古い `.bin` リンクもnpm版へ戻した。
 - 検証: OS defunct 0件、重複開発サーバー0件、LiveKitルーム0件、自動テスト由来の未終了対局0件・テスト教室0件。`BASE_URL=https://online.mimura15.jp npx playwright test e2e/security.spec.ts --project=chromium --reporter=line` 3/3 passed、実行後も残骸0件、`npm run build` 成功。
