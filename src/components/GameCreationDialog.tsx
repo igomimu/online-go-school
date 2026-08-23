@@ -22,7 +22,7 @@ interface GameCreationDialogProps {
     clock?: GameClock;
   }) => void | Promise<void>;
   registeredStudents?: Student[];  // 登録済み生徒データ（棋力表示用）
-  initialBlackPlayer?: string;     // 生徒一覧から「対局」を押した生徒を黒番に初期選択
+  initialBlackPlayer?: string;     // 生徒一覧から「作成」を押した生徒を黒番に初期選択
   /** ニギリを引いた（対局者の画面にも同じ抽選を出すため、押した時点で呼ばれる） */
   onNigiriDraw?: (blackPlayer: string, whitePlayer: string) => void;
 }

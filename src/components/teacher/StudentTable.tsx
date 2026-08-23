@@ -56,6 +56,8 @@ interface StudentTableProps {
   sharingTargets?: SharingTargets;
   onToggleSharing?: (identity: string) => void;
   onSelectStudent?: (identity: string) => void;
+  /** この生徒を選択済みにして対局作成画面を開く */
+  onCreateGame?: (identity: string) => void;
   /** 棋力の見せ方（教室ごと）。段級=「初段」/ ランク=「R12」 */
   rankDisplay?: RankDisplay;
   onOpenHistory?: (student: Student) => void;
@@ -77,6 +79,7 @@ export default function StudentTable({
   sharingTargets = null,
   onToggleSharing,
   onSelectStudent,
+  onCreateGame,
   rankDisplay = DEFAULT_RANK_DISPLAY,
   onOpenHistory,
   onInterruptGame,
@@ -95,7 +98,7 @@ export default function StudentTable({
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 46 }}>状態</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 92 }}>接続</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 58 }}>検討</th>
-            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 96 }}>対局操作</th>
+            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 144 }}>対局操作</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 56 }}>棋譜</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 50 }}>編集</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 52 }}>順序</th>
@@ -116,6 +119,7 @@ export default function StudentTable({
             const canCancel = row.game?.status === 'playing'
               || row.game?.status === 'scoring'
               || row.game?.status === 'interrupted';
+            const canCreate = row.isConnected && !canInterrupt;
             // 接続中は面を一段持ち上げ、先頭（アクティブ）行だけ榧を薄く敷く
             const bgColor = row.isConnected
               ? (i === 0 ? 'color-mix(in oklab, var(--color-accent) 16%, var(--color-surface))' : 'var(--color-raised)')
@@ -194,9 +198,23 @@ export default function StudentTable({
                   )}
                 </td>
 
-                {/* 操作。盤を開く操作は中央の碁盤クリックへ一本化し、ここには状態変更だけを置く。 */}
+                {/* 対局の作成・状態変更。作成は押した生徒を黒番に選択した状態で開く。 */}
                 <td className="px-2 py-1.5 border-b border-line text-center font-medium">
-                  <div className="flex items-center justify-center gap-1">
+                  <div className="flex items-center justify-center gap-1 whitespace-nowrap">
+                    {canCreate && onCreateGame && (
+                      <button
+                        type="button"
+                        data-testid={`create-game-${row.student?.id || row.identity}`}
+                        className="rounded border border-accent/50 bg-accent px-2 py-0.5 text-accent-ink hover:bg-accent/85"
+                        style={{ fontSize: 10.5, fontWeight: 700 }}
+                        onClick={e => {
+                          e.stopPropagation();
+                          onCreateGame(row.identity);
+                        }}
+                      >
+                        作成
+                      </button>
+                    )}
                     {canInterrupt && row.game && onInterruptGame && (
                       <button
                         type="button"

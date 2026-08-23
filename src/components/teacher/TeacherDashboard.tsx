@@ -48,7 +48,7 @@ interface TeacherDashboardProps {
   classroom?: ClassroomLiveKit | null;
   videoElements: Map<string, HTMLVideoElement>;
   studentJoinInfo: string;
-  onCreateGame: () => void;
+  onCreateGame: (initialPlayer?: string) => void;
   onStartLecture: () => void;
   onLoadSgf: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onDisconnect: () => void;
@@ -477,6 +477,7 @@ export default function TeacherDashboard({
           onToggleMic={onToggleMic}
           sharingTargets={sharingTargets}
           onToggleSharing={onToggleSharing}
+          onCreateGame={onCreateGame}
           onOpenHistory={handleOpenHistory}
           onInterruptGame={gameId => { void handleInterruptGame(gameId); }}
           onResumeGame={onResumeGame}
@@ -615,7 +616,7 @@ export default function TeacherDashboard({
         studentJoinInfo={studentJoinInfo}
         classroomId={selectedClassroomId}
         classroomName={selectedClassroom?.name}
-        onCreateGame={onCreateGame}
+        onCreateGame={() => onCreateGame()}
         onStartLecture={onStartLecture}
         onLoadSgf={onLoadSgf}
         onDisconnect={onDisconnect}

@@ -65,6 +65,59 @@ describe('StudentTable', () => {
     expect(onInterruptGame).toHaveBeenCalledWith('game-1');
   });
 
+  it('接続中の生徒行から、その生徒を選択して対局を作成できる', () => {
+    const onCreateGame = vi.fn();
+    render(
+      <StudentTable
+        participants={[participant]}
+        students={[student]}
+        games={[]}
+        audioPermissions={{}}
+        localIdentity="teacher"
+        onToggleHear={vi.fn()}
+        onToggleMic={vi.fn()}
+        onCreateGame={onCreateGame}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '作成' }));
+    expect(onCreateGame).toHaveBeenCalledWith('sid:S001');
+  });
+
+  it('進行中の生徒には作成ボタンを表示しない', () => {
+    render(
+      <StudentTable
+        participants={[participant]}
+        students={[student]}
+        games={[game]}
+        audioPermissions={{}}
+        localIdentity="teacher"
+        onToggleHear={vi.fn()}
+        onToggleMic={vi.fn()}
+        onCreateGame={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: '作成' })).not.toBeInTheDocument();
+  });
+
+  it('未接続の生徒には作成ボタンを表示しない', () => {
+    render(
+      <StudentTable
+        participants={[]}
+        students={[student]}
+        games={[]}
+        audioPermissions={{}}
+        localIdentity="teacher"
+        onToggleHear={vi.fn()}
+        onToggleMic={vi.fn()}
+        onCreateGame={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: '作成' })).not.toBeInTheDocument();
+  });
+
   it('同じ名前でも別IDの対局は混ぜない', () => {
     render(
       <StudentTable
@@ -177,7 +230,8 @@ describe('StudentTable', () => {
     expect(onCancelGame).toHaveBeenCalledWith('game-1');
   });
 
-  it('中断局には再開と取消の両方を表示する', () => {
+  it('中断局には新規作成・再開・取消をすべて表示する', () => {
+    const onCreateGame = vi.fn();
     const onResumeGame = vi.fn();
     const onCancelGame = vi.fn();
     render(
@@ -189,11 +243,14 @@ describe('StudentTable', () => {
         localIdentity="teacher"
         onToggleHear={vi.fn()}
         onToggleMic={vi.fn()}
+        onCreateGame={onCreateGame}
         onResumeGame={onResumeGame}
         onCancelGame={onCancelGame}
       />,
     );
 
+    fireEvent.click(screen.getByRole('button', { name: '作成' }));
+    expect(onCreateGame).toHaveBeenCalledWith('sid:S001');
     expect(screen.getByRole('button', { name: '再開' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '取消' }));
     expect(onCancelGame).toHaveBeenCalledWith('game-1');

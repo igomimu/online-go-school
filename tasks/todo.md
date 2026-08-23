@@ -295,6 +295,18 @@
 - 新規対局の重複判定は `playing / scoring` のみに変更し、過去の `interrupted` が残っていても同じ対局者で新しい局を開始できる。
 - 検証: Deno lifecycle test 2 steps、`deno check manage_game_action`、ESLint、production build、Vitest 64 files / 617 testsが成功。本番で「中断局あり→同一対局者の新規局作成」「生徒削除403」「講師削除→中断局取消・履歴0件」を実測し、検証データを削除した。
 - 本番反映: Supabase `manage_game_action`、Vercel production `2683c41`。
+
+## 2026-08-23: 生徒行からの対局作成
+
+- [x] ホーム画面の生徒行「対局操作」に「作成」ボタンを追加する
+- [x] 押した生徒を対局者として選択済みの状態で対局作成画面を開く
+- [x] 進行中は非表示、中断局が残る接続中生徒には表示する
+- [x] 関連テスト・全体テスト・ビルド・本番反映を検証する
+
+## レビュー結果
+- 接続中で進行中の対局がない生徒には、「検討」の右隣にある「対局操作」列の先頭へ「作成」を表示する。押した生徒は対局作成画面の黒番に選択済みとなり、白番は講師になる。
+- 中断局・時間切れ局が残る生徒は「作成」と「再開」を選べる。進行中または未接続の生徒には「作成」を表示しない。
+- 対象テスト28件、Vitest 64 files / 620 tests、ESLint、production buildが成功。アプリ内ブラウザはIAB接続先が検出されず、実画面操作の代わりにDOMテストで状態別表示と選択identityの引継ぎを確認した。
 - 2026-07-18: 本番DBに残っていた `test-class-*` / `wiring-*` / `debugfull-*` / `verify-*` / `single-*` / `reconnect-*` の未終了E2E対局59件と、教室レコードがなくE2E専用生徒1010だけが参加していた孤立 `CLS001` 中断局1件、対応する残存テスト教室2件を削除。実教室 `CLS20160919347` は清掃前から未終了0件で、1001/1002の直近局はいずれも正常終局済みだったため変更していない。
 - 再発防止: `e2e/security.spec.ts` に `afterAll` 清掃を追加し、`teardownSupabaseRoster` が対局削除・生徒紐付け解除のエラーを黙殺しないよう修正。Playwrightの古い `.bin` リンクもnpm版へ戻した。
 - 検証: OS defunct 0件、重複開発サーバー0件、LiveKitルーム0件、自動テスト由来の未終了対局0件・テスト教室0件。`BASE_URL=https://online.mimura15.jp npx playwright test e2e/security.spec.ts --project=chromium --reporter=line` 3/3 passed、実行後も残骸0件、`npm run build` 成功。
