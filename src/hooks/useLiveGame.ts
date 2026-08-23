@@ -3,7 +3,14 @@ import type { StoneColor, BoardState } from '../components/GoBoard';
 import { createEmptyBoard, checkCapture, boardHash, isLegalMove } from '../utils/gameLogic';
 import { getHandicapStones } from '../utils/handicapStones';
 import { studentMatchesPlayer, isTeacherIdentity } from '../utils/identityUtils';
-import { getByoyomiAnnouncement, speakByoyomi } from '../utils/byoyomiVoice';
+import {
+  getByoyomiAnnouncement,
+  getNhkAnnouncement,
+  getNhkConsiderationAnnouncement,
+  getNhkContinuationAnnouncement,
+  getNhkTimeUpAnnouncement,
+  speakByoyomi,
+} from '../utils/byoyomiVoice';
 import { formatResultSpeech } from '../utils/scoring';
 import { switchClock } from './useGameClock';
 import type { GameClock } from '../types/game';
@@ -696,6 +703,68 @@ export function useLiveGame(
       let newTimeLeft = timeLeft - elapsed;
       let newByoyomiLeft = byoyomiLeft;
       let newInByoyomi = inByoyomi ?? false;
+
+      if (prev.timeSystem === 'NHK') {
+        let inConsideration = isBlackTurn
+          ? !!prev.blackInConsideration
+          : !!prev.whiteInConsideration;
+
+        if (newTimeLeft <= 0) {
+          if (newByoyomiLeft > 0) {
+            const phrase = inConsideration
+              ? getNhkContinuationAnnouncement(newByoyomiLeft)
+              : getNhkConsiderationAnnouncement(prev.byoyomiPeriods, newByoyomiLeft - 1);
+            newByoyomiLeft -= 1;
+            const transitionKey = `${derived.currentColor}:nhk-transition:${inConsideration ? 'continue' : 'enter'}:${newByoyomiLeft}`;
+            if (lastByoyomiSpeakRef.current !== transitionKey) {
+              lastByoyomiSpeakRef.current = transitionKey;
+              speakByoyomi(phrase);
+            }
+            newTimeLeft = prev.considerationSeconds ?? 60;
+            inConsideration = true;
+          } else {
+            speakByoyomi(getNhkTimeUpAnnouncement(derived.currentColor));
+            clearInterval(timer);
+            handleLocalTimeUp(derived.currentColor);
+            commit({
+              ...prev,
+              lastTickTime: now,
+              ...(isBlackTurn
+                ? { blackTimeLeft: 0, blackByoyomiLeft: 0 }
+                : { whiteTimeLeft: 0, whiteByoyomiLeft: 0 }),
+            });
+            return;
+          }
+        } else {
+          const duration = inConsideration ? (prev.considerationSeconds ?? 60) : prev.byoyomiSeconds;
+          const elapsedSec = Math.round(duration - newTimeLeft);
+          const phrase = getNhkAnnouncement(elapsedSec, newByoyomiLeft, inConsideration);
+          const key = `${derived.currentColor}:nhk:${inConsideration ? 'consideration' : 'main'}:${newByoyomiLeft}:${elapsedSec}`;
+          if (phrase && lastByoyomiSpeakRef.current !== key) {
+            lastByoyomiSpeakRef.current = key;
+            speakByoyomi(phrase);
+          }
+        }
+
+        commit({
+          ...prev,
+          lastTickTime: now,
+          ...(isBlackTurn
+            ? {
+                blackTimeLeft: newTimeLeft,
+                blackByoyomiLeft: newByoyomiLeft,
+                blackInByoyomi: true,
+                blackInConsideration: inConsideration,
+              }
+            : {
+                whiteTimeLeft: newTimeLeft,
+                whiteByoyomiLeft: newByoyomiLeft,
+                whiteInByoyomi: true,
+                whiteInConsideration: inConsideration,
+              }),
+        });
+        return;
+      }
 
       if (newTimeLeft <= 0) {
         if (!newInByoyomi) {

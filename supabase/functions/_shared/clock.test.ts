@@ -66,6 +66,23 @@ describe('restoreClockForTimeout', () => {
     expect(restored.whiteTimeLeft).toBe(60);
   });
 
+  it('NHK杯方式は30秒へ戻し、考慮時間外から再開する', () => {
+    const clock = baseClock({
+      timeSystem: 'NHK',
+      mainTimeSeconds: 0,
+      byoyomiSeconds: 30,
+      byoyomiPeriods: 4,
+      considerationSeconds: 60,
+      blackTimeLeft: 0,
+      blackByoyomiLeft: 0,
+      blackInConsideration: true,
+    });
+    const restored = restoreClockForTimeout(clock, 'W+T')!;
+    expect(restored.blackTimeLeft).toBe(30);
+    expect(restored.blackByoyomiLeft).toBe(4);
+    expect(restored.blackInConsideration).toBe(false);
+  });
+
   it('時間切れ以外の終局では時計に触れない', () => {
     const clock = baseClock();
     expect(restoreClockForTimeout(clock, 'B+R')).toEqual(clock);

@@ -1,16 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowUpDown, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { X } from 'lucide-react';
 import type { Student } from '../types/classroom';
-import { suggestHandicap } from '../types/classroom';
 import { findStudentByIdentity, getDisplayName } from '../utils/identityUtils';
 import type { GameClock } from '../types/game';
-import type { TimeSettings } from '../hooks/useGameClock';
-import { DEFAULT_TIME_SETTINGS, timeSettingsToClock } from '../hooks/useGameClock';
-import TimeControlPicker from './TimeControlPicker';
+import { createNhkClock, timeSettingsToClock } from '../hooks/useGameClock';
 import NigiriDraw from './NigiriDraw';
 
 interface GameCreationDialogProps {
-  students: string[];  // 利用可能な生徒名一覧（LiveKit identity）
+  students: string[];
   teacherName: string;
   onClose: () => void;
   onCreate: (opts: {
@@ -21,32 +18,23 @@ interface GameCreationDialogProps {
     komi: number;
     clock?: GameClock;
   }) => void | Promise<void>;
-  registeredStudents?: Student[];  // 登録済み生徒データ（棋力表示用）
-  initialBlackPlayer?: string;     // 生徒一覧から「作成」を押した生徒を黒番に初期選択
-  /** ニギリを引いた（対局者の画面にも同じ抽選を出すため、押した時点で呼ばれる） */
+  registeredStudents?: Student[];
+  /** 生徒一覧の「新規」を押した生徒。相手の初期値にする。 */
+  initialBlackPlayer?: string;
   onNigiriDraw?: (blackPlayer: string, whitePlayer: string) => void;
 }
 
-const BOARD_SIZES = [19, 13, 9];
+const BOARD_SIZES = [19, 17, 15, 13, 11, 9, 7] as const;
+const HANDICAP_OPTIONS = [0, 2, 3, 4, 5, 6, 7, 8, 9] as const;
+const KOMI_OPTIONS = [6.5, 5.5, 4.5, 3.5, 2.5, 1.5, 0.5, -0.5, -1.5, -2.5, -3.5, -4.5, -5.5, -6.5, -7.5] as const;
+const MINUTE_OPTIONS = Array.from({ length: 61 }, (_, i) => i);
+const BYOYOMI_PERIOD_OPTIONS = Array.from({ length: 11 }, (_, i) => i);
+const BYOYOMI_SECONDS_OPTIONS = [10, 20, 30, 40, 50, 60] as const;
+const NHK_CONSIDERATION_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1);
 
-/**
- * 手合割。互先 → 定先 → 2子 → 3子 … の順に重くなる（2026-08-05 三村さん指定）。
- * 定先は置石ゼロでコミだけ落とす手合なので、置石の数だけでは表せない。
- * コミは互先6目半／定先・置碁は半目（`suggestHandicap` の規則に合わせている）。
- */
-type HandicapChoice = { key: string; label: string; handicap: number; komi: number };
-const HANDICAP_CHOICES: HandicapChoice[] = [
-  { key: 'even', label: '互先', handicap: 0, komi: 6.5 },
-  { key: 'sen', label: '定先', handicap: 0, komi: 0.5 },
-  // 1子は意味をなさないため選択肢から除く
-  ...[2, 3, 4, 5, 6, 7, 8, 9].map(h => ({ key: String(h), label: `${h}子`, handicap: h, komi: 0.5 })),
-];
+type PlayerColor = 'BLACK' | 'WHITE';
 
-/** 今の置石・コミがどの手合割にあたるか（コミを手で書き換えても破綻しないよう毎回導く） */
-function currentHandicapKey(handicap: number, komi: number): string {
-  if (handicap > 0) return String(handicap);
-  return komi >= 1 ? 'even' : 'sen';
-}
+const selectClassName = 'bg-ink/5 text-ink border border-field-line rounded-md px-3 py-2 focus:outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-50';
 
 export default function GameCreationDialog({
   students,
@@ -57,104 +45,104 @@ export default function GameCreationDialog({
   initialBlackPlayer,
   onNigiriDraw,
 }: GameCreationDialogProps) {
-  // 「先生」も含めたプレイヤー候補
-  const allPlayers = [teacherName, ...students];
+  const uniqueStudents = useMemo(() => Array.from(new Set(students)), [students]);
+  const initialStudent = initialBlackPlayer || uniqueStudents[0] || '';
 
-  const [blackPlayer, setBlackPlayer] = useState(initialBlackPlayer || students[0] || teacherName);
-  const [whitePlayer, setWhitePlayer] = useState(
-    initialBlackPlayer
-      ? teacherName
-      : students.length > 1 ? students[1] : teacherName,
-  );
+  const [primaryStudent, setPrimaryStudent] = useState(initialStudent);
+  const [opponentPlayer, setOpponentPlayer] = useState(initialStudent);
+  const [selfColor, setSelfColor] = useState<PlayerColor>('WHITE');
+  const [studentVsStudent, setStudentVsStudent] = useState(false);
   const [boardSize, setBoardSize] = useState(19);
   const [handicap, setHandicap] = useState(0);
   const [komi, setKomi] = useState(6.5);
-  const [timeSettings, setTimeSettings] = useState<TimeSettings>(DEFAULT_TIME_SETTINGS);
+  const [customKomi, setCustomKomi] = useState('6.5');
+  const [customKomiEnabled, setCustomKomiEnabled] = useState(false);
+  const [timeLimitEnabled, setTimeLimitEnabled] = useState(true);
+  const [nhkStyle, setNhkStyle] = useState(false);
+  const [mainMinutes, setMainMinutes] = useState(30);
+  const [byoyomiPeriods, setByoyomiPeriods] = useState(0);
+  const [byoyomiSeconds, setByoyomiSeconds] = useState(30);
+  const [nhkConsiderationPeriods, setNhkConsiderationPeriods] = useState(1);
   const [submitting, setSubmitting] = useState(false);
-  // ニギリで黒白を入れ替えたことを示す（下の自動提案を1回だけ見送るため）
-  const nigiriSwapRef = useRef(false);
 
   useEffect(() => {
     if (!initialBlackPlayer) return;
-    setBlackPlayer(initialBlackPlayer);
-    setWhitePlayer(teacherName);
-  }, [initialBlackPlayer, teacherName]);
-
-  // ダイアログ開口後に生徒が参加したケースへの保険:
-  // 初期値が teacherName 固定のままで students propが埋まった瞬間、自動で生徒を選択し直す。
-  // ユーザーが既に選択済みの値は上書きしない。
-  useEffect(() => {
-    if (students.length > 0 && blackPlayer === teacherName && whitePlayer === teacherName) {
-      setBlackPlayer(students[0]);
-      if (students.length > 1) setWhitePlayer(students[1]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [students, teacherName]);
-
-  // identity から登録生徒を検索
-  const getRank = (identity: string): string => {
-    return findStudentByIdentity(identity, registeredStudents)?.rank || '';
-  };
-
-  // identity → 表示名
-  const displayName = (identity: string): string => {
-    if (identity === teacherName) return getDisplayName(identity, registeredStudents);
-    return getDisplayName(identity, registeredStudents);
-  };
-
-  // 棋力差から置き石を自動提案。黒番/白番を選び直した時のみ発動し、
-  // ユーザーが置石・コミを手動変更した後は上書きしない
-  // （registeredStudentsの参照が再レンダリングごとに変わり、無関係な更新で
-  //   手動設定を勝手に上書きしてしまうバグがあった）。
-  const [handicapTouched, setHandicapTouched] = useState(false);
+    setPrimaryStudent(initialBlackPlayer);
+    setOpponentPlayer(current => {
+      if (!studentVsStudent) return initialBlackPlayer;
+      return current !== initialBlackPlayer
+        ? current
+        : uniqueStudents.find(student => student !== initialBlackPlayer) || '';
+    });
+  }, [initialBlackPlayer, studentVsStudent, uniqueStudents]);
 
   useEffect(() => {
-    // ニギリでの入れ替えは「対局者を選び直した」わけではないので、提案をやり直さない
-    if (nigiriSwapRef.current) {
-      nigiriSwapRef.current = false;
+    if (uniqueStudents.length === 0) {
+      setPrimaryStudent('');
+      setOpponentPlayer('');
+      setStudentVsStudent(false);
       return;
     }
-    setHandicapTouched(false);
-  }, [blackPlayer, whitePlayer]);
+    setPrimaryStudent(current => uniqueStudents.includes(current) ? current : uniqueStudents[0]);
+    setOpponentPlayer(current => {
+      if (uniqueStudents.includes(current) && (!studentVsStudent || current !== primaryStudent)) return current;
+      return uniqueStudents.find(student => !studentVsStudent || student !== primaryStudent) || '';
+    });
+  }, [uniqueStudents, studentVsStudent, primaryStudent]);
 
-  useEffect(() => {
-    if (handicapTouched) return;
-    const bRank = getRank(blackPlayer);
-    const wRank = getRank(whitePlayer);
-    if (bRank && wRank) {
-      const suggestion = suggestHandicap(bRank, wRank);
-      setHandicap(suggestion.handicap);
-      setKomi(suggestion.komi);
+  const getRank = (identity: string): string => findStudentByIdentity(identity, registeredStudents)?.rank || '';
+  const displayName = (identity: string): string => getDisplayName(identity, registeredStudents);
+
+  const selfPlayer = studentVsStudent ? primaryStudent : teacherName;
+  const opponentOptions = studentVsStudent
+    ? uniqueStudents.filter(student => student !== selfPlayer)
+    : uniqueStudents;
+  const blackPlayer = selfColor === 'BLACK' ? selfPlayer : opponentPlayer;
+  const whitePlayer = selfColor === 'WHITE' ? selfPlayer : opponentPlayer;
+  const customKomiNumber = Number(customKomi);
+  const komiIsValid = !customKomiEnabled
+    || (customKomi.trim() !== '' && Number.isFinite(customKomiNumber));
+  const playersAreValid = !!selfPlayer && !!opponentPlayer && selfPlayer !== opponentPlayer;
+
+  const handleStudentVsStudentChange = (checked: boolean) => {
+    setStudentVsStudent(checked);
+    if (checked) {
+      const selected = primaryStudent || opponentPlayer || uniqueStudents[0] || '';
+      setPrimaryStudent(selected);
+      if (opponentPlayer === selected) {
+        setOpponentPlayer(uniqueStudents.find(student => student !== selected) || '');
+      }
+    } else {
+      setOpponentPlayer(primaryStudent || uniqueStudents[0] || '');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blackPlayer, whitePlayer, registeredStudents, handicapTouched]);
-
-  const selectedHandicapKey = currentHandicapKey(handicap, komi);
-
-  // ニギリで黒番が決まったら、その通りに黒白を入れ替える。
-  // 入れ替えで棋力差の自動提案が走ると、せっかく選んだ互先が上書きされるので止める。
-  const applyNigiriResult = useCallback((black: string) => {
-    const white = black === blackPlayer ? whitePlayer : blackPlayer;
-    if (black !== blackPlayer) nigiriSwapRef.current = true;
-    setBlackPlayer(black);
-    setWhitePlayer(white);
-    setHandicapTouched(true);
-  }, [blackPlayer, whitePlayer]);
-
-  const swapPlayers = () => {
-    nigiriSwapRef.current = true;
-    setBlackPlayer(whitePlayer);
-    setWhitePlayer(blackPlayer);
-    // 黒白だけを入れ替える操作なので、講師が選んだ手合割は維持する。
-    setHandicapTouched(true);
   };
 
+  const applyNigiriResult = useCallback((black: string) => {
+    setSelfColor(black === selfPlayer ? 'BLACK' : 'WHITE');
+  }, [selfPlayer]);
+
   const handleSubmit = async () => {
-    if (submitting || blackPlayer === whitePlayer) return;
+    if (submitting || !playersAreValid || !komiIsValid) return;
     setSubmitting(true);
-    const clock = timeSettingsToClock(timeSettings);
+    const clock = !timeLimitEnabled
+      ? undefined
+      : nhkStyle
+        ? createNhkClock(nhkConsiderationPeriods)
+        : timeSettingsToClock({
+            mainMinutes,
+            byoyomiEnabled: byoyomiPeriods > 0,
+            byoyomiSeconds,
+            byoyomiPeriods,
+          });
     try {
-      await onCreate({ blackPlayer, whitePlayer, boardSize, handicap, komi, clock });
+      await onCreate({
+        blackPlayer,
+        whitePlayer,
+        boardSize,
+        handicap,
+        komi: customKomiEnabled ? customKomiNumber : komi,
+        clock,
+      });
       onClose();
     } finally {
       setSubmitting(false);
@@ -162,165 +150,238 @@ export default function GameCreationDialog({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      {/* 縦が足りない画面（ノートPCの1366×768など）で「対局開始」が画面の外に出ないよう、
-          パネル自体を収めて中でスクロールさせる。手合割にニギリが加わって背が伸びた 2026-08-05 */}
-      <div className="glass-panel p-6 w-full max-w-md space-y-5 max-h-[92dvh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-3">
+      <div className="glass-panel p-5 sm:p-6 w-full max-w-xl space-y-4 max-h-[94dvh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold">対局作成</h2>
-          <button onClick={onClose} className="text-muted hover:text-ink">
+          <button type="button" aria-label="閉じる" onClick={onClose} className="text-muted hover:text-ink">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* 黒番 */}
         <div>
-          <label className="block text-sm text-muted mb-1">
-            黒番
-            {getRank(blackPlayer) && (
-              <span className="ml-2 px-1.5 py-0.5 rounded bg-raised text-muted text-xs font-mono">
-                {getRank(blackPlayer)}
-              </span>
-            )}
-          </label>
+          <label htmlFor="board-size-select" className="block text-sm text-muted mb-1">碁盤サイズ</label>
           <select
-            data-testid="black-player-select"
-            value={blackPlayer}
-            onChange={e => setBlackPlayer(e.target.value)}
-            className="w-full bg-ink/5 text-ink border border-field-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
+            id="board-size-select"
+            data-testid="board-size-select"
+            value={boardSize}
+            onChange={event => setBoardSize(Number(event.target.value))}
+            className={`${selectClassName} w-full`}
           >
-            {allPlayers.map(p => {
-              const rank = getRank(p);
-              return (
-                <option key={p} value={p} className="bg-raised text-ink">
-                  {displayName(p)}{p === teacherName ? '（先生）' : ''}{rank ? ` [${rank}]` : ''}
-                </option>
-              );
-            })}
+            {BOARD_SIZES.map(size => <option key={size} value={size}>{size}x{size}</option>)}
           </select>
         </div>
 
-        <button
-          type="button"
-          data-testid="swap-players-button"
-          onClick={swapPlayers}
-          disabled={blackPlayer === whitePlayer}
-          className="mx-auto flex items-center gap-1.5 rounded-md border border-field-line bg-raised px-3 py-1.5 text-sm font-medium text-ink transition-colors duration-150 hover:bg-ink/10 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <ArrowUpDown className="h-4 w-4" aria-hidden="true" />
-          黒白を入れ替える
-        </button>
+        <section className="space-y-3 border-y border-line py-4" aria-label="対局者">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+            <div>
+              <div className="text-sm text-muted mb-1">対局者（自分）</div>
+              <div data-testid="self-player-name" className="font-semibold text-ink">
+                {selfPlayer ? displayName(selfPlayer) : '生徒を選択してください'}
+                {getRank(selfPlayer) && <span className="ml-2 text-xs text-muted">{getRank(selfPlayer)}</span>}
+              </div>
+            </div>
+            <div className="flex items-center gap-4" role="radiogroup" aria-label="自分の石の色">
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="self-color"
+                  value="BLACK"
+                  checked={selfColor === 'BLACK'}
+                  onChange={() => setSelfColor('BLACK')}
+                />
+                <span className="inline-block h-3.5 w-3.5 rounded-full bg-black border border-black" aria-hidden="true" />
+                黒
+              </label>
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="self-color"
+                  value="WHITE"
+                  checked={selfColor === 'WHITE'}
+                  onChange={() => setSelfColor('WHITE')}
+                />
+                <span className="inline-block h-3.5 w-3.5 rounded-full bg-white border border-ink" aria-hidden="true" />
+                白
+              </label>
+            </div>
+          </div>
 
-        {/* 白番 */}
-        <div>
-          <label className="block text-sm text-muted mb-1">
-            白番
-            {getRank(whitePlayer) && (
-              <span className="ml-2 px-1.5 py-0.5 rounded bg-raised text-muted text-xs font-mono">
-                {getRank(whitePlayer)}
-              </span>
-            )}
+          <label className={`flex items-center gap-2 text-sm ${uniqueStudents.length < 2 ? 'text-muted' : 'cursor-pointer'}`}>
+            <input
+              type="checkbox"
+              data-testid="student-vs-student-checkbox"
+              checked={studentVsStudent}
+              disabled={uniqueStudents.length < 2}
+              onChange={event => handleStudentVsStudentChange(event.target.checked)}
+            />
+            生徒同士対局
           </label>
-          <select
-            data-testid="white-player-select"
-            value={whitePlayer}
-            onChange={e => setWhitePlayer(e.target.value)}
-            className="w-full bg-ink/5 text-ink border border-field-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
-          >
-            {allPlayers.map(p => {
-              const rank = getRank(p);
-              return (
-                <option key={p} value={p} className="bg-raised text-ink">
-                  {displayName(p)}{p === teacherName ? '（先生）' : ''}{rank ? ` [${rank}]` : ''}
+
+          <div>
+            <label htmlFor="opponent-player-select" className="block text-sm text-muted mb-1">
+              対局者（相手） <span className="text-ink">{selfColor === 'WHITE' ? '● 黒' : '○ 白'}</span>
+            </label>
+            <select
+              id="opponent-player-select"
+              data-testid="opponent-player-select"
+              value={opponentPlayer}
+              disabled={opponentOptions.length === 0}
+              onChange={event => setOpponentPlayer(event.target.value)}
+              className={`${selectClassName} w-full`}
+            >
+              {opponentOptions.length === 0 && <option value="">接続中の生徒がいません</option>}
+              {opponentOptions.map(player => (
+                <option key={player} value={player}>
+                  {displayName(player)}{getRank(player) ? ` [${getRank(player)}]` : ''}
                 </option>
-              );
-            })}
-          </select>
+              ))}
+            </select>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="handicap-select" className="block text-sm text-muted mb-1">置き石</label>
+            <select
+              id="handicap-select"
+              data-testid="handicap-select"
+              value={handicap}
+              onChange={event => setHandicap(Number(event.target.value))}
+              className={`${selectClassName} w-full`}
+            >
+              {HANDICAP_OPTIONS.map(value => <option key={value} value={value}>{value}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="komi-select" className="block text-sm text-muted mb-1">コミ</label>
+            <select
+              id="komi-select"
+              data-testid="komi-select"
+              value={customKomiEnabled ? 'other' : String(komi)}
+              onChange={event => {
+                if (event.target.value === 'other') {
+                  setCustomKomiEnabled(true);
+                  setCustomKomi(String(komi));
+                } else {
+                  setCustomKomiEnabled(false);
+                  setKomi(Number(event.target.value));
+                }
+              }}
+              className={`${selectClassName} w-full`}
+            >
+              {KOMI_OPTIONS.map(value => <option key={value} value={value}>{value}</option>)}
+              <option value="other">その他</option>
+            </select>
+          </div>
         </div>
 
-        {blackPlayer === whitePlayer && (
-          <p className="text-alert-text text-sm">黒と白に同じプレイヤーは選べません</p>
+        {customKomiEnabled && (
+          <div>
+            <label htmlFor="custom-komi-input" className="block text-sm text-muted mb-1">コミ（自由入力）</label>
+            <input
+              id="custom-komi-input"
+              data-testid="custom-komi-input"
+              type="number"
+              step="0.5"
+              value={customKomi}
+              onChange={event => setCustomKomi(event.target.value)}
+              className={`${selectClassName} w-full`}
+            />
+            {!komiIsValid && <p className="mt-1 text-xs text-alert-text">コミを数値で入力してください</p>}
+          </div>
         )}
 
-        {/* 碁盤サイズ */}
-        <div>
-          <label className="block text-sm text-muted mb-1">碁盤サイズ</label>
-          <div className="flex gap-2">
-            {BOARD_SIZES.map(size => (
-              <button
-                key={size}
-                onClick={() => setBoardSize(size)}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-                  boardSize === size
-                    ? 'bg-accent text-accent-ink'
-                    : 'bg-ink/5 hover:bg-ink/10'
-                }`}
-              >
-                {size}路
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 手合割 */}
-        <div>
-          <label className="block text-sm text-muted mb-1">手合割</label>
-          {/* 10個あるので5列×2段。flex-wrap だと2段目だけ間延びして見える */}
-          <div className="grid grid-cols-5 gap-2">
-            {HANDICAP_CHOICES.map(choice => (
-              <button
-                key={choice.key}
-                data-testid={`handicap-${choice.key}`}
-                onClick={() => {
-                  setHandicap(choice.handicap);
-                  setKomi(choice.komi);
-                  setHandicapTouched(true);
-                }}
-                className={`py-2 rounded-lg text-sm font-medium transition-all ${
-                  selectedHandicapKey === choice.key
-                    ? 'bg-accent text-accent-ink'
-                    : 'bg-ink/5 hover:bg-ink/10'
-                }`}
-              >
-                {choice.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ニギリ（互先のときだけ）。押すと黒番をその場で決める */}
-        {selectedHandicapKey === 'even' && blackPlayer !== whitePlayer && (
+        {handicap === 0 && playersAreValid && (
           <NigiriDraw
-            key={[blackPlayer, whitePlayer].slice().sort().join('|')}
-            candidates={[blackPlayer, whitePlayer]}
+            key={[selfPlayer, opponentPlayer].slice().sort().join('|')}
+            candidates={[selfPlayer, opponentPlayer]}
             displayName={displayName}
             onDrawStart={onNigiriDraw}
             onDecided={applyNigiriResult}
           />
         )}
 
-        {/* コミ */}
-        <div>
-          <label className="block text-sm text-muted mb-1">コミ</label>
-          <input
-            type="number"
-            value={komi}
-            step={0.5}
-            onChange={e => { setKomi(parseFloat(e.target.value) || 0); setHandicapTouched(true); }}
-            className="w-full bg-ink/5 border border-field-line rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
-          />
-        </div>
+        <section className="space-y-3 border-t border-line pt-4" aria-label="時間設定">
+          <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
+            <input
+              type="checkbox"
+              data-testid="time-limit-checkbox"
+              checked={timeLimitEnabled}
+              onChange={event => setTimeLimitEnabled(event.target.checked)}
+            />
+            時間制限
+          </label>
 
-        {/* 対局時計（持ち時間を項目ごとに自由設定） */}
-        <div>
-          <label className="block text-sm text-muted mb-2">対局時計</label>
-          <TimeControlPicker variant="dark" value={timeSettings} onChange={setTimeSettings} />
-        </div>
+          <fieldset disabled={!timeLimitEnabled} className={`space-y-3 transition-opacity ${timeLimitEnabled ? '' : 'opacity-35'}`}>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                data-testid="nhk-style-checkbox"
+                checked={nhkStyle}
+                onChange={event => setNhkStyle(event.target.checked)}
+              />
+              NHK杯方式
+            </label>
+
+            {nhkStyle ? (
+              <div className="flex items-center gap-2 text-sm">
+                <label htmlFor="nhk-consideration-select">考慮時間（分）</label>
+                <select
+                  id="nhk-consideration-select"
+                  data-testid="nhk-consideration-select"
+                  value={nhkConsiderationPeriods}
+                  onChange={event => setNhkConsiderationPeriods(Number(event.target.value))}
+                  className={selectClassName}
+                >
+                  {NHK_CONSIDERATION_OPTIONS.map(value => <option key={value} value={value}>{value}</option>)}
+                </select>
+                <span className="text-xs text-muted">1手30秒・考慮時間は1回60秒</span>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span>持ち時間</span>
+                <select
+                  aria-label="持ち時間（分）"
+                  value={mainMinutes}
+                  onChange={event => setMainMinutes(Number(event.target.value))}
+                  className={selectClassName}
+                >
+                  {MINUTE_OPTIONS.map(value => <option key={value} value={value}>{value}</option>)}
+                </select>
+                <span>分</span>
+                <span className="text-muted">＋</span>
+                <span>秒読み回数</span>
+                <select
+                  aria-label="秒読み回数"
+                  value={byoyomiPeriods}
+                  onChange={event => setByoyomiPeriods(Number(event.target.value))}
+                  className={selectClassName}
+                >
+                  {BYOYOMI_PERIOD_OPTIONS.map(value => <option key={value} value={value}>{value}</option>)}
+                </select>
+                <span>回 × 秒読み</span>
+                <select
+                  aria-label="秒読み（秒/手）"
+                  value={byoyomiSeconds}
+                  onChange={event => setByoyomiSeconds(Number(event.target.value))}
+                  className={selectClassName}
+                >
+                  {BYOYOMI_SECONDS_OPTIONS.map(value => <option key={value} value={value}>{value}</option>)}
+                </select>
+                <span>秒/手</span>
+              </div>
+            )}
+          </fieldset>
+        </section>
+
+        {!playersAreValid && <p className="text-alert-text text-sm">対局する生徒を選択してください</p>}
 
         <button
+          type="button"
           data-testid="create-game-button"
           onClick={handleSubmit}
-          disabled={submitting || blackPlayer === whitePlayer}
+          disabled={submitting || !playersAreValid || !komiIsValid}
           className="premium-button w-full disabled:opacity-30"
         >
           {submitting ? '作成中...' : '対局開始'}

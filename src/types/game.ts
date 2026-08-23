@@ -2,15 +2,19 @@ import type { BoardState, StoneColor } from '../components/GoBoard';
 
 // === 対局セッション ===
 export interface GameClock {
+  timeSystem?: 'STANDARD' | 'NHK'; // 省略時は従来の持ち時間＋秒読み
   mainTimeSeconds: number;     // 持ち時間（秒）
   byoyomiSeconds: number;      // 秒読み（秒）
   byoyomiPeriods: number;      // 秒読み回数
+  considerationSeconds?: number; // NHK杯方式の考慮時間（1回60秒）
   blackTimeLeft: number;       // 黒残り時間（秒）
   whiteTimeLeft: number;       // 白残り時間（秒）
   blackByoyomiLeft: number;    // 黒秒読み残り回数
   whiteByoyomiLeft: number;    // 白秒読み残り回数
   blackInByoyomi?: boolean;    // 黒が秒読みに入っているか（持ち時間切れ）
   whiteInByoyomi?: boolean;    // 白が秒読みに入っているか
+  blackInConsideration?: boolean; // 黒がNHK杯方式の考慮時間中か
+  whiteInConsideration?: boolean; // 白がNHK杯方式の考慮時間中か
   lastTickTime: number | null; // 最後のtick時刻（ms）
 }
 
@@ -18,7 +22,7 @@ export interface GameSession {
   id: string;
   blackPlayer: string;     // identity
   whitePlayer: string;
-  boardSize: number;        // 9, 13, 19
+  boardSize: number;        // 7〜19の奇数路盤
   handicap: number;         // 0-9
   komi: number;             // 6.5等
   status: 'playing' | 'scoring' | 'finished' | 'interrupted';

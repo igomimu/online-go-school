@@ -58,8 +58,8 @@ describe('StudentTable', () => {
 
     const row = screen.getByText('たろう').closest('tr');
     expect(row).not.toBeNull();
-    expect(screen.getByRole('columnheader', { name: '対局操作' })).toBeInTheDocument();
-    expect(screen.queryByRole('columnheader', { name: '対局' })).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '対局' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '対局操作' })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: '詳細' })).not.toBeInTheDocument();
     fireEvent.click(within(row!).getByRole('button', { name: '中断' }));
     expect(onInterruptGame).toHaveBeenCalledWith('game-1');
@@ -80,7 +80,7 @@ describe('StudentTable', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '作成' }));
+    fireEvent.click(screen.getByRole('button', { name: '新規' }));
     expect(onCreateGame).toHaveBeenCalledWith('sid:S001');
   });
 
@@ -98,7 +98,7 @@ describe('StudentTable', () => {
       />,
     );
 
-    expect(screen.queryByRole('button', { name: '作成' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '新規' })).not.toBeInTheDocument();
   });
 
   it('未接続の生徒には作成ボタンを表示しない', () => {
@@ -115,7 +115,7 @@ describe('StudentTable', () => {
       />,
     );
 
-    expect(screen.queryByRole('button', { name: '作成' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '新規' })).not.toBeInTheDocument();
   });
 
   it('同じ名前でも別IDの対局は混ぜない', () => {
@@ -249,7 +249,7 @@ describe('StudentTable', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '作成' }));
+    fireEvent.click(screen.getByRole('button', { name: '新規' }));
     expect(onCreateGame).toHaveBeenCalledWith('sid:S001');
     expect(screen.getByRole('button', { name: '再開' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '取消' }));

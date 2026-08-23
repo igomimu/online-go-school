@@ -98,7 +98,7 @@ export default function StudentTable({
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 46 }}>状態</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 92 }}>接続</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 58 }}>検討</th>
-            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 144 }}>対局操作</th>
+            <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 144 }}>対局</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 56 }}>棋譜</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 50 }}>編集</th>
             <th className="px-2 py-1.5 border-b border-line text-center font-medium" style={{ width: 52 }}>順序</th>
@@ -212,7 +212,7 @@ export default function StudentTable({
                           onCreateGame(row.identity);
                         }}
                       >
-                        作成
+                        新規
                       </button>
                     )}
                     {canInterrupt && row.game && onInterruptGame && (

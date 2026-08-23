@@ -301,14 +301,19 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     const timeLeft = isBlack ? clock.blackTimeLeft : clock.whiteTimeLeft;
     const byoyomiLeft = isBlack ? clock.blackByoyomiLeft : clock.whiteByoyomiLeft;
     const isByoyomi = isBlack ? !!clock.blackInByoyomi : !!clock.whiteInByoyomi;
+    const isConsideration = isBlack ? !!clock.blackInConsideration : !!clock.whiteInConsideration;
+    const isNhk = clock.timeSystem === 'NHK';
     const isTeacherSide = teacherColor === color;
     const isLow = timeLeft <= 10 && timeLeft > 0;
     const highlight = (isLow || isByoyomi) && !isTeacherSide;
     // 音声は「10秒、20秒…」と経過時間を読むため、文字も同じ向きで0→B秒と増やす。
     // 内部の timeLeft は時間切れ判定に使う残り秒なので、表示時だけ経過秒へ変換する。
+    const activePeriodSeconds = isNhk && isConsideration
+      ? (clock.considerationSeconds ?? 60)
+      : clock.byoyomiSeconds;
     const byoyomiElapsed = Math.min(
-      clock.byoyomiSeconds,
-      Math.max(0, Math.floor(clock.byoyomiSeconds - timeLeft)),
+      activePeriodSeconds,
+      Math.max(0, Math.floor(activePeriodSeconds - timeLeft)),
     );
     return (
       <span
@@ -324,7 +329,9 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
         </span>
         {isByoyomi && (
           <span className="block text-[10px] font-normal">
-            秒読み 残{isTeacherSide ? '∞' : byoyomiLeft}
+            {isNhk
+              ? `${isConsideration ? '考慮時間' : '30秒'} 残${isTeacherSide ? '∞' : byoyomiLeft}`
+              : `秒読み 残${isTeacherSide ? '∞' : byoyomiLeft}`}
           </span>
         )}
       </span>

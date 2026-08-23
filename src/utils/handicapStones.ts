@@ -44,60 +44,24 @@ export function getHandicapStones(boardSize: number, handicap: number): Point[] 
 }
 
 function getHandicapPoints(boardSize: number): HandicapPoints | null {
-  // 星の位置に基づいた置石配置
-  if (boardSize === 19) {
-    return {
-      corners: [
-        { x: 16, y: 16 },  // 右下
-        { x: 4, y: 4 },    // 左上
-        { x: 16, y: 4 },   // 右上
-        { x: 4, y: 16 },   // 左下
-      ],
-      sides: [
-        { x: 16, y: 10 },  // 右辺
-        { x: 4, y: 10 },   // 左辺
-        { x: 10, y: 4 },   // 上辺
-        { x: 10, y: 16 },  // 下辺
-      ],
-      center: { x: 10, y: 10 },
-    };
-  }
-
-  if (boardSize === 13) {
-    return {
-      corners: [
-        { x: 10, y: 10 },
-        { x: 4, y: 4 },
-        { x: 10, y: 4 },
-        { x: 4, y: 10 },
-      ],
-      sides: [
-        { x: 10, y: 7 },
-        { x: 4, y: 7 },
-        { x: 7, y: 4 },
-        { x: 7, y: 10 },
-      ],
-      center: { x: 7, y: 7 },
-    };
-  }
-
-  if (boardSize === 9) {
-    return {
-      corners: [
-        { x: 7, y: 7 },
-        { x: 3, y: 3 },
-        { x: 7, y: 3 },
-        { x: 3, y: 7 },
-      ],
-      sides: [
-        { x: 7, y: 5 },
-        { x: 3, y: 5 },
-        { x: 5, y: 3 },
-        { x: 5, y: 7 },
-      ],
-      center: { x: 5, y: 5 },
-    };
-  }
-
-  return null;
+  if (![19, 17, 15, 13, 11, 9, 7].includes(boardSize)) return null;
+  // 13路以上は4線、9・11路は3線、7路は2線を星の基準にする。
+  const low = boardSize >= 13 ? 4 : boardSize >= 9 ? 3 : 2;
+  const high = boardSize - low + 1;
+  const mid = Math.ceil(boardSize / 2);
+  return {
+    corners: [
+      { x: high, y: high },
+      { x: low, y: low },
+      { x: high, y: low },
+      { x: low, y: high },
+    ],
+    sides: [
+      { x: high, y: mid },
+      { x: low, y: mid },
+      { x: mid, y: low },
+      { x: mid, y: high },
+    ],
+    center: { x: mid, y: mid },
+  };
 }

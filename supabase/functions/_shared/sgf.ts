@@ -25,7 +25,7 @@ function escapeSgfValue(value: string): string {
 function handicapStones(boardSize: number, handicap: number): Array<{ x: number; y: number }> {
   if (handicap < 2) return [];
 
-  const low = boardSize === 9 ? 3 : 4;
+  const low = boardSize >= 13 ? 4 : boardSize >= 9 ? 3 : 2;
   const high = boardSize - low + 1;
   const mid = Math.ceil(boardSize / 2);
 

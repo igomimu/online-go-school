@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { createClock, switchClock } from './useGameClock';
-import type { GameClock } from '../types/game';
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { createClock, createNhkClock, switchClock, useGameClockTick } from './useGameClock';
+import type { GameClock, GameSession } from '../types/game';
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('createClock', () => {
   it('持ち時間ありは inByoyomi=false で開始', () => {
@@ -20,6 +25,84 @@ describe('createClock', () => {
 
   it('持ち時間0・秒読み0は undefined', () => {
     expect(createClock(0, 0, 0)).toBeUndefined();
+  });
+});
+
+describe('NHK杯方式', () => {
+  it('毎手30秒・考慮時間60秒を指定回数ぶん持って開始する', () => {
+    const clock = createNhkClock(4);
+    expect(clock.timeSystem).toBe('NHK');
+    expect(clock.blackTimeLeft).toBe(30);
+    expect(clock.blackByoyomiLeft).toBe(4);
+    expect(clock.considerationSeconds).toBe(60);
+    expect(clock.blackInConsideration).toBe(false);
+  });
+
+  it('着手後は考慮時間中でも次の手の30秒へ戻す', () => {
+    const clock = createNhkClock(4);
+    const next = switchClock({
+      ...clock,
+      blackTimeLeft: 42,
+      blackByoyomiLeft: 3,
+      blackInConsideration: true,
+    }, 'BLACK');
+    expect(next.blackTimeLeft).toBe(30);
+    expect(next.blackByoyomiLeft).toBe(3);
+    expect(next.blackInConsideration).toBe(false);
+  });
+
+  it('30秒を使うと考慮時間を1回消費して60秒へ切り替える', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-23T00:00:00Z'));
+    const updateGameClock = vi.fn();
+    const onTimeUp = vi.fn();
+    const clock = {
+      ...createNhkClock(2),
+      blackTimeLeft: 1,
+      lastTickTime: Date.now() - 2_000,
+    };
+    const game = {
+      id: 'game-1',
+      status: 'playing',
+      currentColor: 'BLACK',
+      clock,
+    } as GameSession;
+
+    renderHook(() => useGameClockTick([game], updateGameClock, onTimeUp));
+    act(() => vi.advanceTimersByTime(1_000));
+
+    expect(onTimeUp).not.toHaveBeenCalled();
+    expect(updateGameClock).toHaveBeenCalledWith('game-1', expect.objectContaining({
+      blackTimeLeft: 60,
+      blackByoyomiLeft: 1,
+      blackInConsideration: true,
+    }));
+  });
+
+  it('最後の考慮時間を使い切ると時間切れになる', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-23T00:00:00Z'));
+    const updateGameClock = vi.fn();
+    const onTimeUp = vi.fn();
+    const clock = {
+      ...createNhkClock(1),
+      blackTimeLeft: 1,
+      blackByoyomiLeft: 0,
+      blackInConsideration: true,
+      lastTickTime: Date.now() - 2_000,
+    };
+    const game = {
+      id: 'game-1',
+      status: 'playing',
+      currentColor: 'BLACK',
+      clock,
+    } as GameSession;
+
+    renderHook(() => useGameClockTick([game], updateGameClock, onTimeUp));
+    act(() => vi.advanceTimersByTime(1_000));
+
+    expect(onTimeUp).toHaveBeenCalledWith('game-1', 'BLACK');
+    expect(updateGameClock).not.toHaveBeenCalled();
   });
 });
 

@@ -7,7 +7,8 @@
 //      残り2回以上=「残りN回です」／残り1回になる=「最後の考慮時間です」
 //      （「入りました」はTTSが「いりました」と誤読するため使わない）
 //
-// NHK杯方式（30秒秒読み＋考慮時間60秒×10）は別モードとして後日追加する。
+// NHK杯方式は毎手30秒。考慮時間が残っていれば30秒で60秒の考慮時間へ入り、
+// 残っていなければ21〜30秒を「1」〜「10」と読む。
 
 /**
  * 秒読み中の各整数秒で読み上げる語句を返す（無ければ null）。
@@ -51,6 +52,51 @@ export function getByoyomiAnnouncement(
     return '時間切れ負けです'; // 念のため（本来 isFinal 側で処理）
   }
   return null;
+}
+
+/** NHK杯方式の通常30秒または60秒考慮時間で読む語句。 */
+export function getNhkAnnouncement(
+  elapsed: number,
+  considerationsLeft: number,
+  inConsideration: boolean,
+): string | null {
+  const duration = inConsideration ? 60 : 30;
+  const e = Math.floor(elapsed);
+  if (e < 1 || e > duration) return null;
+
+  if (!inConsideration) {
+    if (e === 10 || e === 20) return `${e}秒`;
+    if (considerationsLeft > 0) {
+      if (e === 25 || e === 28) return `${e}秒`;
+      return null;
+    }
+    if (e >= 21) return String(e - 20);
+    return null;
+  }
+
+  if (e === 30 || e === 40 || e === 50) return `${e}秒`;
+  if (considerationsLeft > 0) {
+    if (e === 55 || e === 58) return `${e}秒`;
+    return null;
+  }
+  if (e >= 51) return String(e - 50);
+  return null;
+}
+
+/** 考慮時間へ入った瞬間の案内。remaining は今回分を除いた残数。 */
+export function getNhkConsiderationAnnouncement(total: number, remaining: number): string {
+  const current = Math.max(1, total - remaining);
+  return `${current}回目の考慮時間に入りました。残り${remaining}回です。`;
+}
+
+/** 60秒の考慮時間を使い切り、次の考慮時間へ続くときの案内。 */
+export function getNhkContinuationAnnouncement(remaining: number): string {
+  return `残り${Math.max(0, remaining)}回です。`;
+}
+
+/** 最後の考慮時間を使い切ったときの案内。 */
+export function getNhkTimeUpAnnouncement(color: 'BLACK' | 'WHITE'): string {
+  return `${color === 'BLACK' ? '黒' : '白'}の時間切れ負けです`;
 }
 
 let voiceEnabled = true;

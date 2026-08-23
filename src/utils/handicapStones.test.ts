@@ -78,9 +78,11 @@ describe('getHandicapStones', () => {
     ]);
   });
 
-  it('未対応の盤面サイズは空配列', () => {
-    expect(getHandicapStones(7, 2)).toEqual([]);
-    expect(getHandicapStones(15, 2)).toEqual([]);
+  it('追加した7・11・15・17路でも置石を配置する', () => {
+    expect(getHandicapStones(7, 2)).toEqual([{ x: 6, y: 2 }, { x: 2, y: 6 }]);
+    expect(getHandicapStones(11, 2)).toEqual([{ x: 9, y: 3 }, { x: 3, y: 9 }]);
+    expect(getHandicapStones(15, 2)).toEqual([{ x: 12, y: 4 }, { x: 4, y: 12 }]);
+    expect(getHandicapStones(17, 2)).toEqual([{ x: 14, y: 4 }, { x: 4, y: 14 }]);
   });
 
   it('19路 6子置石は天元を使わず右辺・左辺の星で左右対称（右3・左3）', () => {

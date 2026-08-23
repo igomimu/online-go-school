@@ -18,6 +18,7 @@ export function createClock(mainTime: number, byoyomi: number, periods: number):
   const startInByoyomi = mainTime === 0 && byoyomi > 0;
   const startTime = startInByoyomi ? byoyomi : mainTime;
   return {
+    timeSystem: 'STANDARD',
     mainTimeSeconds: mainTime,
     byoyomiSeconds: byoyomi,
     byoyomiPeriods: periods,
@@ -27,6 +28,27 @@ export function createClock(mainTime: number, byoyomi: number, periods: number):
     whiteByoyomiLeft: periods,
     blackInByoyomi: startInByoyomi,
     whiteInByoyomi: startInByoyomi,
+    lastTickTime: null,
+  };
+}
+
+/** NHK杯方式: 毎手30秒、使える考慮時間は1回60秒。 */
+export function createNhkClock(considerationPeriods: number): GameClock {
+  const periods = Math.min(10, Math.max(1, Math.floor(considerationPeriods || 1)));
+  return {
+    timeSystem: 'NHK',
+    mainTimeSeconds: 0,
+    byoyomiSeconds: 30,
+    byoyomiPeriods: periods,
+    considerationSeconds: 60,
+    blackTimeLeft: 30,
+    whiteTimeLeft: 30,
+    blackByoyomiLeft: periods,
+    whiteByoyomiLeft: periods,
+    blackInByoyomi: true,
+    whiteInByoyomi: true,
+    blackInConsideration: false,
+    whiteInConsideration: false,
     lastTickTime: null,
   };
 }
@@ -103,6 +125,42 @@ export function useGameClockTick(
       let newByoyomiLeft = byoyomiLeft;
       let newInByoyomi = inByoyomi ?? false;
 
+      if (game.clock.timeSystem === 'NHK') {
+        let inConsideration = isBlack
+          ? !!game.clock.blackInConsideration
+          : !!game.clock.whiteInConsideration;
+
+        if (newTimeLeft <= 0) {
+          if (newByoyomiLeft > 0) {
+            newByoyomiLeft -= 1;
+            newTimeLeft = game.clock.considerationSeconds ?? 60;
+            inConsideration = true;
+          } else {
+            onTimeUp(game.id, game.currentColor);
+            continue;
+          }
+        }
+
+        updateGameClock(game.id, {
+          ...game.clock,
+          lastTickTime: now,
+          ...(isBlack
+            ? {
+                blackTimeLeft: newTimeLeft,
+                blackByoyomiLeft: newByoyomiLeft,
+                blackInByoyomi: true,
+                blackInConsideration: inConsideration,
+              }
+            : {
+                whiteTimeLeft: newTimeLeft,
+                whiteByoyomiLeft: newByoyomiLeft,
+                whiteInByoyomi: true,
+                whiteInConsideration: inConsideration,
+              }),
+        });
+        continue;
+      }
+
       if (newTimeLeft <= 0) {
         if (!newInByoyomi) {
           // 持ち時間切れ
@@ -160,6 +218,15 @@ export function useGameClockTick(
 export function switchClock(clock: GameClock, color: 'BLACK' | 'WHITE'): GameClock {
   const now = Date.now();
   const isBlack = color === 'BLACK';
+  if (clock.timeSystem === 'NHK') {
+    return {
+      ...clock,
+      lastTickTime: now,
+      ...(isBlack
+        ? { blackTimeLeft: 30, blackInByoyomi: true, blackInConsideration: false }
+        : { whiteTimeLeft: 30, whiteInByoyomi: true, whiteInConsideration: false }),
+    };
+  }
   const moverInByoyomi = isBlack ? clock.blackInByoyomi : clock.whiteInByoyomi;
 
   // 着手した側: 秒読み中は各手ごとに満タン（B秒）へ戻す。

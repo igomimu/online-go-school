@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getByoyomiAnnouncement, speakByoyomi, resetByoyomiVoiceState } from './byoyomiVoice';
+import {
+  getByoyomiAnnouncement,
+  getNhkAnnouncement,
+  getNhkConsiderationAnnouncement,
+  getNhkContinuationAnnouncement,
+  getNhkTimeUpAnnouncement,
+  speakByoyomi,
+  resetByoyomiVoiceState,
+} from './byoyomiVoice';
 
 describe('getByoyomiAnnouncement', () => {
   describe('30秒・最後の回（periodsLeft=1）', () => {
@@ -77,6 +85,59 @@ describe('getByoyomiAnnouncement', () => {
     expect(getByoyomiAnnouncement(30, 0, 1)).toBeNull();
     expect(getByoyomiAnnouncement(30, 31, 1)).toBeNull();
     expect(getByoyomiAnnouncement(0, 5, 1)).toBeNull();
+  });
+});
+
+describe('NHK杯方式の読み上げ', () => {
+  it('考慮時間が残る30秒では10・20・25・28秒を読む', () => {
+    const f = (elapsed: number) => getNhkAnnouncement(elapsed, 3, false);
+    expect(f(10)).toBe('10秒');
+    expect(f(20)).toBe('20秒');
+    expect(f(25)).toBe('25秒');
+    expect(f(28)).toBe('28秒');
+    expect(f(21)).toBeNull();
+  });
+
+  it('考慮時間がない30秒では10・20秒の後を1〜10と読む', () => {
+    const f = (elapsed: number) => getNhkAnnouncement(elapsed, 0, false);
+    expect(f(10)).toBe('10秒');
+    expect(f(20)).toBe('20秒');
+    expect(f(21)).toBe('1');
+    expect(f(29)).toBe('9');
+    expect(f(30)).toBe('10');
+  });
+
+  it('考慮時間へ入った回数と残数を案内する', () => {
+    expect(getNhkConsiderationAnnouncement(4, 3)).toBe('1回目の考慮時間に入りました。残り3回です。');
+    expect(getNhkConsiderationAnnouncement(4, 1)).toBe('3回目の考慮時間に入りました。残り1回です。');
+  });
+
+  it('最後の60秒考慮時間は終盤を1〜10と読む', () => {
+    const f = (elapsed: number) => getNhkAnnouncement(elapsed, 0, true);
+    expect(f(30)).toBe('30秒');
+    expect(f(50)).toBe('50秒');
+    expect(f(51)).toBe('1');
+    expect(f(60)).toBe('10');
+  });
+
+  it('次が残る60秒考慮時間は30・40・50・55・58秒を読む', () => {
+    const f = (elapsed: number) => getNhkAnnouncement(elapsed, 2, true);
+    expect(f(30)).toBe('30秒');
+    expect(f(40)).toBe('40秒');
+    expect(f(50)).toBe('50秒');
+    expect(f(55)).toBe('55秒');
+    expect(f(58)).toBe('58秒');
+    expect(f(51)).toBeNull();
+  });
+
+  it('考慮時間が残る場合は残数だけを案内して次の60秒へ続ける', () => {
+    expect(getNhkContinuationAnnouncement(3)).toBe('残り3回です。');
+    expect(getNhkContinuationAnnouncement(1)).toBe('残り1回です。');
+  });
+
+  it('最後は手番の色を付けて時間切れ負けを案内する', () => {
+    expect(getNhkTimeUpAnnouncement('BLACK')).toBe('黒の時間切れ負けです');
+    expect(getNhkTimeUpAnnouncement('WHITE')).toBe('白の時間切れ負けです');
   });
 });
 

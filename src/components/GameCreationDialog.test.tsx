@@ -1,192 +1,169 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import GameCreationDialog from './GameCreationDialog';
 
 describe('GameCreationDialog', () => {
   const defaultProps = {
     students: ['たろう', 'はなこ', 'じろう'],
-    teacherName: '三村先生',
+    teacherName: '三村智保',
     onClose: vi.fn(),
     onCreate: vi.fn(),
   };
 
-  it('ダイアログのタイトルを表示', () => {
+  it('碁盤サイズを最上部のドロップダウンから7種類選べる', () => {
     render(<GameCreationDialog {...defaultProps} />);
-    expect(screen.getByText('対局作成')).toBeTruthy();
+    const boardSelect = screen.getByTestId('board-size-select');
+    expect(within(boardSelect).getAllByRole('option').map(option => option.textContent)).toEqual([
+      '19x19', '17x17', '15x15', '13x13', '11x11', '9x9', '7x7',
+    ]);
+    fireEvent.change(boardSelect, { target: { value: '7' } });
+    expect((boardSelect as HTMLSelectElement).value).toBe('7');
   });
 
-  it('生徒と先生がプレイヤー候補に表示される', () => {
-    render(<GameCreationDialog {...defaultProps} />);
-    const options = screen.getAllByRole('option');
-    const names = options.map(o => o.textContent);
-    expect(names).toContain('三村先生（先生）');
-    expect(names).toContain('たろう');
-    expect(names).toContain('はなこ');
-  });
-
-  it('碁盤サイズ選択ボタン', () => {
-    render(<GameCreationDialog {...defaultProps} />);
-    expect(screen.getByText('19路')).toBeTruthy();
-    expect(screen.getByText('13路')).toBeTruthy();
-    expect(screen.getByText('9路')).toBeTruthy();
-  });
-
-  it('閉じるボタン', () => {
-    const onClose = vi.fn();
-    render(<GameCreationDialog {...defaultProps} onClose={onClose} />);
-    // X ボタンをクリック（lucide-reactのXアイコンを含むbutton）
-    const buttons = screen.getAllByRole('button');
-    const closeBtn = buttons.find(b => b.querySelector('.lucide-x'));
-    if (closeBtn) fireEvent.click(closeBtn);
-    expect(onClose).toHaveBeenCalled();
-  });
-
-  it('対局開始ボタンでonCreateが呼ばれ、作成後に閉じる', async () => {
+  it('初期状態は講師が白、最初の生徒が黒で30分の時間制限になる', async () => {
     const onCreate = vi.fn();
-    const onClose = vi.fn();
-    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} onClose={onClose} />);
-    // デフォルト: black=たろう, white=はなこ（異なるので有効）
-    fireEvent.click(screen.getByText('対局開始'));
-    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        blackPlayer: 'たろう',
-        whitePlayer: 'はなこ',
-        boardSize: 19,
-        handicap: 0,
-        komi: 6.5,
-      })
-    ));
-    expect(onClose).toHaveBeenCalled();
+    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
+
+    expect(screen.getByTestId('self-player-name')).toHaveTextContent('三村智保');
+    expect(screen.getByRole('radio', { name: '白' })).toBeChecked();
+    expect(screen.getByTestId('opponent-player-select')).toHaveValue('たろう');
+    expect(screen.getByTestId('time-limit-checkbox')).toBeChecked();
+    expect(screen.getByTestId('nhk-style-checkbox')).not.toBeChecked();
+    expect(screen.getByRole('combobox', { name: '持ち時間（分）' })).toHaveValue('30');
+    expect(screen.getByRole('combobox', { name: '秒読み回数' })).toHaveValue('0');
+    expect(screen.getByRole('combobox', { name: '秒読み（秒/手）' })).toHaveValue('30');
+
+    fireEvent.click(screen.getByTestId('create-game-button'));
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
+      blackPlayer: 'たろう',
+      whitePlayer: '三村智保',
+      boardSize: 19,
+      handicap: 0,
+      komi: 6.5,
+      clock: expect.objectContaining({
+        timeSystem: 'STANDARD',
+        mainTimeSeconds: 1800,
+        byoyomiPeriods: 0,
+      }),
+    })));
   });
 
-  it('initialBlackPlayerが変わったら選択中の生徒を更新する', () => {
+  it('生徒行から渡された生徒を相手の初期値として更新する', () => {
     const { rerender } = render(
       <GameCreationDialog {...defaultProps} students={['sid:1001', 'sid:1002']} teacherName="teacher" initialBlackPlayer="sid:1001" />,
     );
-    expect((screen.getByTestId('black-player-select') as HTMLSelectElement).value).toBe('sid:1001');
+    expect(screen.getByTestId('opponent-player-select')).toHaveValue('sid:1001');
 
     rerender(
       <GameCreationDialog {...defaultProps} students={['sid:1001', 'sid:1002']} teacherName="teacher" initialBlackPlayer="sid:1002" />,
     );
-
-    expect((screen.getByTestId('black-player-select') as HTMLSelectElement).value).toBe('sid:1002');
-    expect((screen.getByTestId('white-player-select') as HTMLSelectElement).value).toBe('teacher');
+    expect(screen.getByTestId('opponent-player-select')).toHaveValue('sid:1002');
   });
 
-  it('黒白を入れ替えるボタンで対局者だけを交換し、手合割を維持する', async () => {
+  it('黒白入替ボタンは表示せず、自分の黒白ラジオで対局者を入れ替える', async () => {
     const onCreate = vi.fn();
     render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
+    expect(screen.queryByText('黒白を入れ替える')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('handicap-3'));
-    fireEvent.click(screen.getByTestId('swap-players-button'));
+    fireEvent.click(screen.getByRole('radio', { name: '黒' }));
+    fireEvent.click(screen.getByTestId('create-game-button'));
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
+      blackPlayer: '三村智保',
+      whitePlayer: 'たろう',
+    })));
+  });
 
-    expect((screen.getByTestId('black-player-select') as HTMLSelectElement).value).toBe('はなこ');
-    expect((screen.getByTestId('white-player-select') as HTMLSelectElement).value).toBe('たろう');
-    fireEvent.click(screen.getByText('対局開始'));
-    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        blackPlayer: 'はなこ',
-        whitePlayer: 'たろう',
-        handicap: 3,
-        komi: 0.5,
+  it('生徒同士対局では最初に選んだ生徒を自分側へ移し、別の生徒を相手にする', async () => {
+    const onCreate = vi.fn();
+    render(<GameCreationDialog {...defaultProps} initialBlackPlayer="はなこ" onCreate={onCreate} />);
+
+    fireEvent.click(screen.getByTestId('student-vs-student-checkbox'));
+    expect(screen.getByTestId('self-player-name')).toHaveTextContent('はなこ');
+    expect(screen.getByTestId('opponent-player-select')).not.toHaveValue('はなこ');
+    fireEvent.click(screen.getByTestId('create-game-button'));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
+      blackPlayer: 'たろう',
+      whitePlayer: 'はなこ',
+    })));
+  });
+
+  it('置き石とコミの指定範囲をドロップダウンで選べる', () => {
+    render(<GameCreationDialog {...defaultProps} />);
+    const handicap = screen.getByTestId('handicap-select');
+    expect(within(handicap).getAllByRole('option').map(option => option.textContent)).toEqual([
+      '0', '2', '3', '4', '5', '6', '7', '8', '9',
+    ]);
+    const komi = screen.getByTestId('komi-select');
+    expect((komi as HTMLSelectElement).value).toBe('6.5');
+    expect(within(komi).getByRole('option', { name: '-7.5' })).toBeInTheDocument();
+    expect(within(komi).getByRole('option', { name: 'その他' })).toBeInTheDocument();
+  });
+
+  it('コミの「その他」では自由入力した値を使う', async () => {
+    const onCreate = vi.fn();
+    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
+    fireEvent.change(screen.getByTestId('komi-select'), { target: { value: 'other' } });
+    fireEvent.change(screen.getByTestId('custom-komi-input'), { target: { value: '-10.5' } });
+    fireEvent.click(screen.getByTestId('create-game-button'));
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ komi: -10.5 })));
+  });
+
+  it('時間制限をオフにすると時間欄が無効になり、時計なしで作成する', async () => {
+    const onCreate = vi.fn();
+    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
+    fireEvent.click(screen.getByTestId('time-limit-checkbox'));
+    expect(screen.getByTestId('nhk-style-checkbox')).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: '持ち時間（分）' })).toBeDisabled();
+    fireEvent.click(screen.getByTestId('create-game-button'));
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ clock: undefined })));
+  });
+
+  it('NHK杯方式では通常時間欄を考慮時間1〜10分だけの選択へ切り替える', async () => {
+    const onCreate = vi.fn();
+    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
+    fireEvent.click(screen.getByTestId('nhk-style-checkbox'));
+
+    expect(screen.queryByRole('combobox', { name: '持ち時間（分）' })).not.toBeInTheDocument();
+    const consideration = screen.getByTestId('nhk-consideration-select');
+    expect(within(consideration).getAllByRole('option').map(option => option.textContent)).toEqual([
+      '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
+    ]);
+    fireEvent.change(consideration, { target: { value: '4' } });
+    fireEvent.click(screen.getByTestId('create-game-button'));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
+      clock: expect.objectContaining({
+        timeSystem: 'NHK',
+        byoyomiSeconds: 30,
+        byoyomiPeriods: 4,
+        considerationSeconds: 60,
+        blackTimeLeft: 30,
       }),
-    ));
+    })));
   });
 
-  it('黒白入替ボタンは黒番と白番の選択欄の間にある', () => {
-    render(<GameCreationDialog {...defaultProps} />);
-    const black = screen.getByTestId('black-player-select');
-    const swap = screen.getByTestId('swap-players-button');
-    const white = screen.getByTestId('white-player-select');
-
-    expect(black.compareDocumentPosition(swap) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(swap.compareDocumentPosition(white) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it('同じプレイヤーを選ぶとエラーメッセージ', () => {
-    render(<GameCreationDialog {...defaultProps} students={['たろう']} />);
-    // students=[たろう]だけだと、black=たろう, white=三村先生（異なる）
-    // 白をたろうに変更
-    const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[1], { target: { value: 'たろう' } });
-    expect(screen.getByText('黒と白に同じプレイヤーは選べません')).toBeTruthy();
-  });
-
-  it('同じプレイヤーだと対局開始ボタンが無効', () => {
-    render(<GameCreationDialog {...defaultProps} students={['たろう']} />);
-    const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[1], { target: { value: 'たろう' } });
-    const startBtn = screen.getByText('対局開始');
-    expect((startBtn as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it('手合割は互先→定先→2子→…9子の順に並ぶ', () => {
-    render(<GameCreationDialog {...defaultProps} />);
-    const labels = ['互先', '定先', '2子', '3子', '9子'];
-    labels.forEach(l => expect(screen.getByText(l)).toBeTruthy());
-    // 1子は無い
-    expect(screen.queryByText('1子')).toBeNull();
-  });
-
-  it('定先を選ぶとコミが0.5になる', async () => {
-    const onCreate = vi.fn();
-    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
-    fireEvent.click(screen.getByTestId('handicap-sen'));
-    fireEvent.click(screen.getByText('対局開始'));
-    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ handicap: 0, komi: 0.5 }),
-    ));
-  });
-
-  it('互先はコミ6.5、置石は0のまま', async () => {
-    const onCreate = vi.fn();
-    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
-    fireEvent.click(screen.getByTestId('handicap-sen'));
-    fireEvent.click(screen.getByTestId('handicap-even'));
-    fireEvent.click(screen.getByText('対局開始'));
-    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ handicap: 0, komi: 6.5 }),
-    ));
-  });
-
-  it('置石を選ぶとコミは0.5', async () => {
-    const onCreate = vi.fn();
-    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
-    fireEvent.click(screen.getByTestId('handicap-3'));
-    fireEvent.click(screen.getByText('対局開始'));
-    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ handicap: 3, komi: 0.5 }),
-    ));
-  });
-
-  it('ニギリは互先のときだけ出る', () => {
-    render(<GameCreationDialog {...defaultProps} />);
-    expect(screen.getByTestId('nigiri-button')).toBeTruthy();
-    fireEvent.click(screen.getByTestId('handicap-3'));
-    expect(screen.queryByTestId('nigiri-button')).toBeNull();
-  });
-
-  it('ニギリを押すと黒番が決まり、片方は必ず黒になる', async () => {
+  it('ニギリの結果を自分の黒白ラジオへ反映する', async () => {
     vi.useFakeTimers();
     try {
-      render(<GameCreationDialog {...defaultProps} students={['たろう', 'はなこ']} />);
-      const before = {
-        black: (screen.getByTestId('black-player-select') as HTMLSelectElement).value,
-        white: (screen.getByTestId('white-player-select') as HTMLSelectElement).value,
-      };
+      render(<GameCreationDialog {...defaultProps} students={['たろう']} />);
       fireEvent.click(screen.getByTestId('nigiri-button'));
       await act(async () => { vi.advanceTimersByTime(3000); });
-
-      const result = screen.getByTestId('nigiri-result').textContent ?? '';
-      const black = (screen.getByTestId('black-player-select') as HTMLSelectElement).value;
-      const white = (screen.getByTestId('white-player-select') as HTMLSelectElement).value;
-      // 決まった側が黒番の選択に入り、二人の顔ぶれは変わらない
-      expect(result).toContain('の黒番');
-      expect([before.black, before.white]).toContain(black);
-      expect([before.black, before.white]).toContain(white);
-      expect(black).not.toBe(white);
+      expect(screen.getByRole('radio', { name: '黒' }).getAttribute('checked') !== null
+        || screen.getByRole('radio', { name: '白' }).getAttribute('checked') !== null).toBe(true);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('作成処理中は二重送信しない', async () => {
+    let resolveCreate!: () => void;
+    const onCreate = vi.fn(() => new Promise<void>(resolve => { resolveCreate = resolve; }));
+    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
+    const button = screen.getByTestId('create-game-button');
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    await act(async () => { resolveCreate(); });
   });
 });

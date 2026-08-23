@@ -64,4 +64,22 @@ describe('exportLiveGameToSgf', () => {
 
     assertStringIncludes(sgf, 'AB[gc][cg][gg]');
   });
+
+  it('7路盤でも盤の大きさに合った置石をSGF生成する', () => {
+    const sgf = exportLiveGameToSgf(
+      {
+        board_size: 7,
+        handicap: 2,
+        komi: 0,
+        black_player: 'Black',
+        white_player: 'White',
+      },
+      [],
+      '',
+      '2026-07-07',
+    );
+
+    assertStringIncludes(sgf, 'SZ[7]');
+    assertStringIncludes(sgf, 'AB[fb][bf]');
+  });
 });

@@ -2,15 +2,19 @@
 // Deno Edge Function と Vitest の双方から import される（外部依存なし）。
 
 export interface StoredClock {
+  timeSystem?: 'STANDARD' | 'NHK'
   mainTimeSeconds: number
   byoyomiSeconds: number
   byoyomiPeriods: number
+  considerationSeconds?: number
   blackTimeLeft: number
   whiteTimeLeft: number
   blackByoyomiLeft: number
   whiteByoyomiLeft: number
   blackInByoyomi?: boolean
   whiteInByoyomi?: boolean
+  blackInConsideration?: boolean
+  whiteInConsideration?: boolean
   lastTickTime: number | null
 }
 
@@ -45,9 +49,22 @@ export function restoreClockForTimeout(
   const timeLeft = useByoyomi ? clock.byoyomiSeconds : Math.max(clock.mainTimeSeconds ?? 0, 60)
   const byoyomiLeft = useByoyomi ? clock.byoyomiPeriods : (clock.byoyomiPeriods ?? 0)
 
+  const isNhk = clock.timeSystem === 'NHK'
   return timedOut === 'BLACK'
-    ? { ...clock, blackTimeLeft: timeLeft, blackByoyomiLeft: byoyomiLeft, blackInByoyomi: useByoyomi }
-    : { ...clock, whiteTimeLeft: timeLeft, whiteByoyomiLeft: byoyomiLeft, whiteInByoyomi: useByoyomi }
+    ? {
+        ...clock,
+        blackTimeLeft: timeLeft,
+        blackByoyomiLeft: byoyomiLeft,
+        blackInByoyomi: useByoyomi,
+        ...(isNhk ? { blackInConsideration: false } : {}),
+      }
+    : {
+        ...clock,
+        whiteTimeLeft: timeLeft,
+        whiteByoyomiLeft: byoyomiLeft,
+        whiteInByoyomi: useByoyomi,
+        ...(isNhk ? { whiteInConsideration: false } : {}),
+      }
 }
 
 /** 一時停止していた時計を、再開操作の瞬間から進める。 */
