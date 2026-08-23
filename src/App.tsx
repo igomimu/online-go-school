@@ -58,11 +58,14 @@ import type { ChatMessagePayload } from './types/chat';
 import type { AiAnalysisSyncPayload } from './types/ai';
 import { resolveEffectiveViewMode } from './utils/viewMode';
 import { applyMediaIntent, loadMediaIntent, saveMediaIntent, type MediaIntent } from './utils/mediaIntent';
+import {
+  buildTeacherGameWindowUrl,
+  showCreatedGameInTeacherWindow,
+  TEACHER_GAME_WINDOW_NAME,
+} from './utils/teacherGameWindow';
 
 import { Settings } from 'lucide-react';
 
-// 講師専用の対局別ウィンドウの固定名。同名指定によりwindow.openが既存ウィンドウを再利用・前面化する。
-const TEACHER_GAME_WINDOW_NAME = 'teacher-game-window';
 // 講師専用の検討別ウィンドウ。中身は本体からポータルで描く（PopupPortal 参照）。
 const TEACHER_REVIEW_WINDOW_NAME = 'teacher-review-window';
 
@@ -1115,11 +1118,18 @@ function App() {
   };
 
   // 講師専用の対局別ウィンドウを開く/前面化する（固定ウィンドウ名により、既存ウィンドウがあれば再利用される）。
-  const openTeacherGameWindow = useCallback((classroomId: string) => {
+  const openTeacherGameWindow = useCallback((classroomId: string, gameId?: string): Window | null => {
     const identity = classroomRef.current?.localIdentity ?? TEACHER_IDENTITY;
-    const url = `${window.location.origin}${window.location.pathname}?mode=game&role=TEACHER&teacherClassroomId=${encodeURIComponent(classroomId)}&identity=${encodeURIComponent(identity)}`;
+    const url = buildTeacherGameWindowUrl(
+      window.location.origin,
+      window.location.pathname,
+      classroomId,
+      identity,
+      gameId,
+    );
     const win = window.open(url, TEACHER_GAME_WINDOW_NAME, 'width=700,height=800,menubar=no,toolbar=no,location=no,status=no');
     win?.focus();
+    return win;
   }, []);
 
   // ニギリを対局者の画面にも出す。視覚効果は本来この人たちのためのもの（2026-08-05 三村さん）。
@@ -1148,10 +1158,28 @@ function App() {
     // 全画面の対局盤に埋め込むと対局追加など他の操作ができなくなるため、
     // 講師の対局は面数に関わらず別ウィンドウに一本化する（2026-07-14 三村さん指示、07-15 別ウィンドウ方式へ再設計）。
     const me = classroomRef.current?.localIdentity ?? userName;
-    if (selectedClassroomId && (identityMatchesPlayer(me, opts.blackPlayer) || identityMatchesPlayer(me, opts.whitePlayer))) {
-      openTeacherGameWindow(selectedClassroomId);
+    const teacherIsParticipant = selectedClassroomId
+      && (identityMatchesPlayer(me, opts.blackPlayer) || identityMatchesPlayer(me, opts.whitePlayer));
+    const teacherGameWindow = teacherIsParticipant && selectedClassroomId
+      ? openTeacherGameWindow(selectedClassroomId)
+      : null;
+    const createdGame = await liveGameList.createGame(opts);
+    // 別ウィンドウは作成前に開くため、初回fetchとRealtime購読の間にINSERTを取り逃すことがある。
+    // 作成完了後のIDをURLで直接渡して読み直し、初手のUPDATEを待たず空盤を表示する。
+    if (createdGame && teacherGameWindow && selectedClassroomId) {
+      const directUrl = buildTeacherGameWindowUrl(
+        window.location.origin,
+        window.location.pathname,
+        selectedClassroomId,
+        me,
+        createdGame.id,
+      );
+      try {
+        showCreatedGameInTeacherWindow(teacherGameWindow, directUrl);
+      } catch {
+        window.open(directUrl, TEACHER_GAME_WINDOW_NAME)?.focus();
+      }
     }
-    await liveGameList.createGame(opts);
     setShowGameCreation(false);
     setInitialGameCreationPlayer(undefined);
   };
@@ -1438,6 +1466,7 @@ function App() {
   const paramClassroomId = params.get('teacherClassroomId');
   const paramIdentity = params.get('identity');
   const paramRole = params.get('role');
+  const paramTeacherGameId = params.get('teacherGameId');
 
   // 講師用: 教師が持つ全対局をこのウィンドウ単体で購読し、常に1盤だけ表示（手番になるたびに自動切替）。
   // fixed inset-0 で #root の padding(2rem) をバイパスし、ウィンドウのビューポートに正確に一致させる
@@ -1450,6 +1479,7 @@ function App() {
           classroomId={paramClassroomId}
           teacherIdentity={decodeURIComponent(paramIdentity)}
           students={students}
+          initialGameId={paramTeacherGameId ?? undefined}
         />
         </ErrorBoundary>
       </div>

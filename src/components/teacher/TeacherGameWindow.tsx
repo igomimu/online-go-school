@@ -21,6 +21,7 @@ interface TeacherGameWindowProps {
   classroomId: string;
   teacherIdentity: string;
   students: Student[];
+  initialGameId?: string;
 }
 
 /**
@@ -33,9 +34,10 @@ export default function TeacherGameWindow({
   classroomId,
   teacherIdentity,
   students,
+  initialGameId,
 }: TeacherGameWindowProps) {
-  const { games } = useLiveGameList(classroomId);
-  const [activeSimulGameId, setActiveSimulGameId] = useState<string | null>(null);
+  const { games, loading: gameListLoading } = useLiveGameList(classroomId);
+  const [activeSimulGameId, setActiveSimulGameId] = useState<string | null>(initialGameId ?? null);
   const [showList, setShowList] = useState(false);
 
   // 教室ホームで見つけた知らせ（時間切れ・接続切れ）をこちらにも出す。
@@ -87,14 +89,15 @@ export default function TeacherGameWindow({
   // 表示する盤のID。中断・終局盤は一覧から明示的に選んだ場合だけ表示し、
   // 自動選択では手番の盤→進行中の盤へフォールバックする。
   const selectionValid = activeSimulGameId !== null && sessions.some(s => s.game.id === activeSimulGameId);
-  const resolvedActiveId = selectionValid
+  const directSelectionPending = gameListLoading && activeSimulGameId === initialGameId;
+  const resolvedActiveId = selectionValid || directSelectionPending
     ? activeSimulGameId
     : getDefaultActiveGameId(sessions, teacherIdentity);
 
   // フォールバックした選択はレンダー中に確定させてスティッキーにする
   // （対局追加などで games の並びが変わっても表示中の盤が入れ替わらないように）。
   // レンダー中のstate調整はReact公式パターン（effect内のsetStateは使わない）。
-  if (!selectionValid && activeSimulGameId !== resolvedActiveId) {
+  if (!selectionValid && !directSelectionPending && activeSimulGameId !== resolvedActiveId) {
     setActiveSimulGameId(resolvedActiveId);
   }
 

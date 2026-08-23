@@ -5,12 +5,13 @@ import TeacherGameWindow from './TeacherGameWindow';
 
 const testState = vi.hoisted(() => ({
   games: [] as LiveGameRow[],
+  loading: false,
 }));
 
 vi.mock('../../hooks/useLiveGameList', () => ({
   useLiveGameList: () => ({
     games: testState.games,
-    loading: false,
+    loading: testState.loading,
     error: null,
     finishedGameEvent: null,
     createGame: vi.fn(),
@@ -75,6 +76,7 @@ function game(id: string, status: LiveGameRow['status']): LiveGameRow {
 describe('TeacherGameWindow の新規対局表示', () => {
   beforeEach(() => {
     testState.games = [];
+    testState.loading = false;
   });
 
   it('新規局を初手前に表示し、終局後は古い中断局へ戻らない', () => {
@@ -102,5 +104,34 @@ describe('TeacherGameWindow の新規対局表示', () => {
 
     expect(screen.queryByTestId('game-board')).not.toBeInTheDocument();
     expect(screen.getByText(/中断局は「一覧」から再開できます/)).toBeInTheDocument();
+  });
+
+  it('Realtime INSERTを取り逃してもURLで渡された新規IDを初手前に表示する', () => {
+    const oldInterrupted = game('old-interrupted', 'interrupted');
+    testState.games = [oldInterrupted];
+    testState.loading = true;
+    const view = render(
+      <TeacherGameWindow
+        classroomId="class-1"
+        teacherIdentity="teacher"
+        students={[]}
+        initialGameId="new-playing"
+      />,
+    );
+
+    expect(screen.getByTestId('game-board')).toHaveTextContent('new-playing');
+
+    testState.loading = false;
+    testState.games = [game('new-playing', 'playing'), oldInterrupted];
+    view.rerender(
+      <TeacherGameWindow
+        classroomId="class-1"
+        teacherIdentity="teacher"
+        students={[]}
+        initialGameId="new-playing"
+      />,
+    );
+
+    expect(screen.getByTestId('game-board')).toHaveTextContent('new-playing');
   });
 });
