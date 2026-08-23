@@ -315,12 +315,12 @@
 - [x] 講師対生徒・生徒同士を黒白ラジオと相手選択で設定できるようにする
 - [x] 置き石・コミをドロップダウン化し、コミの「その他」入力を追加する
 - [x] 時間制限とNHK杯方式を指定範囲のドロップダウンで設定できるようにする
-- [ ] 関連テスト・全体テスト・ビルド・本番反映を検証する
+- [x] 関連テスト・全体テスト・ビルド・本番反映を検証する
 
 ## レビュー結果
 - 対局作成画面を指定順に再構成し、通常時計と「1手30秒＋60秒考慮時間」のNHK杯時計を別モードにした。
 - NHK杯の音声は、最初の30秒、継続する60秒、最後の60秒を分け、最終回は黒・白を付けて時間切れを案内する。
-- Vitest 64 files / 626 tests、Deno共有処理5 suites / 16 steps、TypeScript、ESLint、production buildが成功。本番反映はコミット後に確認する。
+- Vitest 64 files / 626 tests、Deno共有処理5 suites / 16 steps、TypeScript、ESLint、production buildが成功。Web本番でコミット `a107af9` と新しい対局作成UIの配信を確認し、Supabase `manage_game_action` v52を本番反映した。
 - 2026-07-18: 本番DBに残っていた `test-class-*` / `wiring-*` / `debugfull-*` / `verify-*` / `single-*` / `reconnect-*` の未終了E2E対局59件と、教室レコードがなくE2E専用生徒1010だけが参加していた孤立 `CLS001` 中断局1件、対応する残存テスト教室2件を削除。実教室 `CLS20160919347` は清掃前から未終了0件で、1001/1002の直近局はいずれも正常終局済みだったため変更していない。
 - 再発防止: `e2e/security.spec.ts` に `afterAll` 清掃を追加し、`teardownSupabaseRoster` が対局削除・生徒紐付け解除のエラーを黙殺しないよう修正。Playwrightの古い `.bin` リンクもnpm版へ戻した。
 - 検証: OS defunct 0件、重複開発サーバー0件、LiveKitルーム0件、自動テスト由来の未終了対局0件・テスト教室0件。`BASE_URL=https://online.mimura15.jp npx playwright test e2e/security.spec.ts --project=chromium --reporter=line` 3/3 passed、実行後も残骸0件、`npm run build` 成功。
