@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import VideoTiles from './VideoTiles';
 import type { ParticipantInfo } from '../utils/classroomLiveKit';
+import { saveMirrorLocalVideo } from '../utils/mediaDevices';
 
 const participants: ParticipantInfo[] = [
   { identity: 'teacher', name: '三村九段', isSpeaking: false, audioEnabled: true, videoEnabled: true },
@@ -207,7 +208,11 @@ describe('VideoTiles', () => {
 });
 
 describe('自分の映像の向き', () => {
-  it('自分の映像も鏡像にしない（生徒に届いているのと同じ向きで見る）', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('既定では鏡像にしない（生徒に届いているのと同じ向きで見る）', () => {
     const { container } = render(
       <VideoTiles
         videoElements={new Map([['teacher', videoEl()]])}
@@ -219,7 +224,22 @@ describe('自分の映像の向き', () => {
     expect(container.innerHTML).not.toContain('scale-x-[-1]');
   });
 
-  it('小さい並びでも鏡像にしない', () => {
+  it('設定を入れると自分の映像だけ鏡像になる', () => {
+    saveMirrorLocalVideo(true);
+    const { container } = render(
+      <VideoTiles
+        videoElements={new Map([['teacher', videoEl()], ['sid:1004', videoEl()]])}
+        localIdentity="teacher"
+        participants={[participant('teacher', '三村九段'), participant('sid:1004', '金子 大地')]}
+        variant="classroom"
+      />
+    );
+    // 自分の1枚だけに掛かる（生徒の映像には掛からない）
+    expect(container.innerHTML.split('scale-x-[-1]').length - 1).toBe(1);
+  });
+
+  it('小さい並びでも設定に従う', () => {
+    saveMirrorLocalVideo(true);
     const { container } = render(
       <VideoTiles
         videoElements={new Map([['teacher', videoEl()]])}
@@ -227,6 +247,6 @@ describe('自分の映像の向き', () => {
         participants={[participant('teacher', '三村九段')]}
       />
     );
-    expect(container.innerHTML).not.toContain('scale-x-[-1]');
+    expect(container.innerHTML).toContain('scale-x-[-1]');
   });
 });

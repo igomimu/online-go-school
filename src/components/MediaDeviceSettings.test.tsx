@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import MediaDeviceSettings from './MediaDeviceSettings';
 import type { ClassroomLiveKit } from '../utils/classroomLiveKit';
+import { getMirrorLocalVideo } from '../utils/mediaDevices';
 
 const DEVICES: MediaDeviceInfo[] = [
   { deviceId: 'mic-a', kind: 'audioinput', label: 'ヤマハ AG03', groupId: 'g1' } as MediaDeviceInfo,
@@ -88,5 +89,24 @@ describe('MediaDeviceSettings', () => {
     await waitFor(() =>
       expect(screen.getByText(/一度オンにすると出ます/)).toBeInTheDocument()
     );
+  });
+});
+
+describe('自分の映像の左右反転', () => {
+  it('既定は切、入れると端末に残る', async () => {
+    localStorage.clear();
+    render(<MediaDeviceSettings classroom={null} />);
+    fireEvent.click(screen.getByRole('button', { name: '音声・映像の設定' }));
+
+    const toggle = await screen.findByTestId('mirror-local-video') as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+
+    fireEvent.click(toggle);
+    expect(getMirrorLocalVideo()).toBe(true);
+    expect((screen.getByTestId('mirror-local-video') as HTMLInputElement).checked).toBe(true);
+
+    // もう一度で戻る
+    fireEvent.click(screen.getByTestId('mirror-local-video'));
+    expect(getMirrorLocalVideo()).toBe(false);
   });
 });

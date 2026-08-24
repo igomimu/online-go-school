@@ -8,9 +8,11 @@ import {
   listDevices,
   needsPermissionForLabels,
   saveDeviceId,
+  saveMirrorLocalVideo,
   type DeviceKind,
   type MediaDeviceChoice,
 } from '../utils/mediaDevices';
+import { useMirrorLocalVideo } from '../hooks/useMirrorLocalVideo';
 
 interface Props {
   classroom: ClassroomLiveKit | null;
@@ -38,6 +40,7 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
   });
   const [needsPermission, setNeedsPermission] = useState(false);
   const [error, setError] = useState('');
+  const mirrorLocalVideo = useMirrorLocalVideo();
 
   const reload = useCallback(async () => {
     try {
@@ -155,6 +158,24 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
 
               {renderRow('audioinput')}
               {renderRow('videoinput')}
+
+              {/* 自分の映像の向き。生徒に届くのは常に実像で、ここは手元の見え方だけを変える */}
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  data-testid="mirror-local-video"
+                  checked={mirrorLocalVideo}
+                  onChange={(e) => saveMirrorLocalVideo(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  自分の映像を左右反転して見る
+                  <span className="block text-xs text-muted">
+                    鏡と同じ向きになり、顔を映して位置を合わせるときに扱いやすくなります。
+                    碁盤や本を映すときは切ったままにしてください。生徒側の見え方は変わりません。
+                  </span>
+                </span>
+              </label>
 
               {error && <p className="text-xs text-alert-text">{error}</p>}
 

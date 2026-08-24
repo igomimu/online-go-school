@@ -44,6 +44,39 @@ export function saveDeviceId(kind: DeviceKind, deviceId: string | null): void {
 }
 
 /**
+ * 自分の映像を左右反転して見るかどうか（端末ごと）。
+ *
+ * 既定は反転しない。生徒に届いているのは実像なので、碁盤や本を映したときに
+ * 講師の画面だけ左右が逆になるのを避ける。顔を映して位置を合わせたいときは
+ * 鏡と同じ向きのほうが扱いやすいので、設定で戻せるようにしてある。
+ */
+const MIRROR_KEY = 'go-school-mirror-local-video';
+/** 設定の変更を、同じ画面の映像タイルへ知らせる合図 */
+export const MIRROR_EVENT = 'go-school:mirror-local-video';
+
+export function getMirrorLocalVideo(): boolean {
+  try {
+    return localStorage.getItem(MIRROR_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function saveMirrorLocalVideo(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(MIRROR_KEY, '1');
+    else localStorage.removeItem(MIRROR_KEY);
+  } catch {
+    // 保存できなくても、今つないでいる間は切替が効いている
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(MIRROR_EVENT, { detail: on }));
+  } catch {
+    // イベントを出せない環境では次に画面を開いたときから効く
+  }
+}
+
+/**
  * つながっている機器の一覧。
  * 名前（label）は、一度でもマイク・カメラの許可を出すまで空で返る仕様なので、
  * 空のときは呼び出し側で「一度オンにしてください」と案内する。

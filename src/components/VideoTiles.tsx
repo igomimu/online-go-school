@@ -3,6 +3,7 @@ import { Maximize2, MicOff, VideoOff } from 'lucide-react';
 import type { ParticipantInfo } from '../utils/classroomLiveKit';
 import type { Student } from '../types/classroom';
 import { resolvePlayerName } from '../utils/identityUtils';
+import { useMirrorLocalVideo } from '../hooks/useMirrorLocalVideo';
 
 interface VideoTilesProps {
   videoElements: Map<string, HTMLVideoElement>;
@@ -51,6 +52,7 @@ function VideoTile({
   label,
   videoElement,
   isLocal,
+  mirror,
   variant,
   classroomTileHeight,
   cameraOn,
@@ -59,6 +61,8 @@ function VideoTile({
   label: string;
   videoElement: HTMLVideoElement;
   isLocal: boolean;
+  /** 自分の映像を鏡像で見る（設定で切り替える。既定は実像） */
+  mirror: boolean;
   variant: 'compact' | 'classroom';
   classroomTileHeight?: number;
   cameraOn: boolean;
@@ -99,10 +103,10 @@ function VideoTile({
       >
         <div
           ref={containerRef}
-          // 自分の映像も鏡像にしない。生徒に届いているのは実像なので、
-          // 碁盤や本を映したときに講師の画面だけ左右が逆になるのを避ける
-          // （三村さんの指示 2026-08-24）。
-          className="absolute inset-0 [&>video]:w-full [&>video]:h-full [&>video]:object-contain"
+          // 既定では自分の映像も鏡像にしない。生徒に届いているのは実像なので、
+          // 碁盤や本を映したときに講師の画面だけ左右が逆になるのを避ける。
+          // 顔を映して位置を合わせたいときのために、設定で鏡像に戻せる。
+          className={`absolute inset-0 [&>video]:w-full [&>video]:h-full [&>video]:object-contain ${isLocal && mirror ? '[&>video]:scale-x-[-1]' : ''}`}
         />
         {!cameraOn && <CameraOffCover variant="classroom" />}
         {!micOn && <MicOffBadge variant="classroom" />}
@@ -127,7 +131,7 @@ function VideoTile({
       <div className="relative h-[90px] w-[120px]">
         <div
           ref={containerRef}
-          className="h-full w-full overflow-hidden rounded-lg bg-black/30 [&>video]:h-full [&>video]:w-full [&>video]:rounded-lg [&>video]:object-cover"
+          className={`h-full w-full overflow-hidden rounded-lg bg-black/30 [&>video]:h-full [&>video]:w-full [&>video]:rounded-lg [&>video]:object-cover ${isLocal && mirror ? '[&>video]:scale-x-[-1]' : ''}`}
         />
         {!cameraOn && <CameraOffCover variant="compact" />}
         {!micOn && <MicOffBadge variant="compact" />}
@@ -163,6 +167,9 @@ export default function VideoTiles({
   classroomTileHeight,
   isCameraEnabled,
 }: VideoTilesProps) {
+  // フックは早い return より前で呼ぶ
+  const mirrorLocalVideo = useMirrorLocalVideo();
+
   if (videoElements.size === 0) return null;
 
   // 一度もカメラを点けていないと自分の映像は存在しない。他の人が映っているときだけ枠を置く
@@ -212,6 +219,7 @@ export default function VideoTiles({
               label={labelFor(identity)}
               videoElement={element}
               isLocal={identity === localIdentity}
+              mirror={mirrorLocalVideo}
               variant={variant}
               classroomTileHeight={classroomTileHeight}
               cameraOn={cameraOn}
