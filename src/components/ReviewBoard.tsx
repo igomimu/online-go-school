@@ -673,6 +673,9 @@ export default function ReviewBoard({
                 title="画像・SGFの書き出し"
               >
                 <Menu className="w-3.5 h-3.5" />
+                {/* アイコンだけだと見つけてもらえない（三村さんの指摘 2026-08-24）。
+                    狭い画面はヘッダーを1行に保つためアイコンのみに戻す。 */}
+                <span className="hidden sm:inline">書き出し</span>
               </button>
               {showExportMenu && (
                 <>
