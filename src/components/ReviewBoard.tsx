@@ -1,8 +1,10 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import GoBoard from './GoBoard';
-import type { AnalysisOverlay, Drawing, Marker, PvStone } from './GoBoard';
+import type { AnalysisOverlay, Drawing, Marker, NumberMode, PvStone } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
-import { getMainPath, removeNode } from '../utils/treeUtilsV2';
+import { getMainPath, removeNode, withBranchNumbers } from '../utils/treeUtilsV2';
+import { generateSGFTree } from '../utils/sgfUtils';
+import { copyBoardToClipboard, copySgfToClipboard, downloadBoardAsPNG, downloadSgf } from '../utils/boardExport';
 import { playReviewMove } from '../utils/reviewMove';
 import { isSharingTarget, toggleSharingTarget, type SharingTargets } from '../utils/sharingTargets';
 import { findNearestDrawingIndex } from '../utils/drawingUtils';
@@ -11,7 +13,7 @@ import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';
 import { fromGtpCoord } from '../utils/katagoClient';
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2, Eye, EyeOff } from 'lucide-react';
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2, Eye, EyeOff, Menu } from 'lucide-react';
 import { getDisplayName } from '../utils/identityUtils';
 import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
 import { useAiAnalysis } from '../hooks/useAiAnalysis';
@@ -48,6 +50,10 @@ interface ReviewBoardProps {
    * AI は付けない（三村さんの指示 2026-08-13）。盤は誰にも配信しない。
    */
   selfReview?: boolean;
+
+  /** 石の手番号の見せ方。先生が切り替え、生徒の盤にも同じ値が配られる */
+  numberMode?: NumberMode;
+  onNumberModeChange?: (mode: NumberMode) => void;
 
   // チャット
   registeredStudents?: Student[];
@@ -118,6 +124,8 @@ export default function ReviewBoard({
   canPlay,
   onStudentMove,
   selfReview = false,
+  numberMode = 'off',
+  onNumberModeChange,
   registeredStudents,
   chatMessages,
   onChatSend,
@@ -136,10 +144,31 @@ export default function ReviewBoard({
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const drawLastCell = useRef<{ x: number; y: number } | null>(null);
   const [showCandidates, setShowCandidates] = useState(true);
+  // 石に出す手番号。Pocket KataGo と同じく off→全→分 の循環（M キー）
+  const cycleNumberMode = useCallback(() => {
+    onNumberModeChange?.(numberMode === 'off' ? 'all' : numberMode === 'all' ? 'branch' : 'off');
+  }, [numberMode, onNumberModeChange]);
+
+  // 盤の書き出し（画像・SGF）。操作は Pocket KataGo に合わせる
+  const boardSvgRef = useRef<SVGSVGElement>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  // 「コピーしました」を数秒だけ出す。押しても何も起きないように見えるのを防ぐ
+  const [exportMsg, setExportMsg] = useState<string | null>(null);
+  const exportMsgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashExportMsg = useCallback((text: string) => {
+    setExportMsg(text);
+    if (exportMsgTimer.current) clearTimeout(exportMsgTimer.current);
+    exportMsgTimer.current = setTimeout(() => setExportMsg(null), 2500);
+  }, []);
+  useEffect(() => () => { if (exportMsgTimer.current) clearTimeout(exportMsgTimer.current); }, []);
   const [toolMode, setToolMode] = useState<'play' | 'circle' | 'triangle' | 'square' | 'cross' | 'alpha' | 'num' | 'eraser'>('play');
   const [hoveredCandidate, setHoveredCandidate] = useState<{ nodeId: string; rank: number } | null>(null);
 
-  const boardState = currentNode.board;
+  const boardState = useMemo(
+    // 生徒の同期盤は親を持たないので、先生が振った番号入りの盤をそのまま使う
+    () => (numberMode === 'branch' && currentNode.parent ? withBranchNumbers(currentNode) : currentNode.board),
+    [currentNode, numberMode]
+  );
   const nodeMarkers = currentNode.markers;
 
   // AI候補手のハイライト座標（1-indexed）。対象nodeが変わったら表示しない
@@ -197,6 +226,35 @@ export default function ReviewBoard({
     sendToTargets({ type: 'DRAW_UPDATE', payload: updated });
   }, [canEdit, drawings, sendToTargets]);
 
+  // 検討中の局面を SGF にする。分岐（変化手順）も含めて丸ごと書き出す
+  const buildSgf = useCallback(() => generateSGFTree(rootNode, boardSize, { komi: String(komi) }), [rootNode, boardSize, komi]);
+
+  const handleCopySgf = useCallback(async () => {
+    const ok = await copySgfToClipboard(buildSgf(), hostWindow);
+    flashExportMsg(ok ? 'SGFをコピーしました' : 'コピーできませんでした');
+  }, [buildSgf, flashExportMsg, hostWindow]);
+
+  const handleSaveSgf = useCallback(() => {
+    downloadSgf(buildSgf(), hostWindow);
+    flashExportMsg('SGFを保存しました');
+  }, [buildSgf, flashExportMsg, hostWindow]);
+
+  const handleCopyImage = useCallback(async () => {
+    if (!boardSvgRef.current) return;
+    const ok = await copyBoardToClipboard(boardSvgRef.current);
+    flashExportMsg(ok ? '画像をコピーしました' : 'コピーできませんでした');
+  }, [flashExportMsg]);
+
+  const handleSaveImage = useCallback(async () => {
+    if (!boardSvgRef.current) return;
+    try {
+      await downloadBoardAsPNG(boardSvgRef.current);
+      flashExportMsg('画像を保存しました');
+    } catch {
+      flashExportMsg('保存できませんでした');
+    }
+  }, [flashExportMsg]);
+
   // キーボードショートカット（pokekata踏襲）。チャット等の入力中は無効化する。
   useEffect(() => {
     if (!canEdit) return;
@@ -210,14 +268,19 @@ export default function ReviewBoard({
       else if (e.key === 'End') { e.preventDefault(); goLast(); }
       else if (e.key === 'Delete') { e.preventDefault(); handleUndo(); }
       else if (ctrl && e.key === 'z') { e.preventDefault(); handleUndo(); }
+      // 書き出しは Pocket KataGo と同じ割り当て（Ctrl+C=SGF / Ctrl+S=SGF保存 / Ctrl+F=画像コピー）
+      else if (ctrl && e.key === 'c') { e.preventDefault(); void handleCopySgf(); }
+      else if (ctrl && e.key === 's') { e.preventDefault(); handleSaveSgf(); }
+      else if (ctrl && e.key === 'f') { e.preventDefault(); void handleCopyImage(); }
       // 候補手の表示切替はAIの機能なので先生だけ
       else if (isTeacher && !ctrl && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setShowCandidates(prev => !prev); }
+      else if (!ctrl && (e.key === 'm' || e.key === 'M')) { e.preventDefault(); cycleNumberMode(); }
       else if (e.key === 'Escape') { setToolMode('play'); setDrawMode('off'); }
     };
     // 別ウィンドウに描かれているときは、そのウィンドウに張らないとキーが効かない
     hostWindow.addEventListener('keydown', handleKeyDown);
     return () => hostWindow.removeEventListener('keydown', handleKeyDown);
-  }, [canEdit, isTeacher, handleUndo, goBack, goForward, goToRoot, goLast, hostWindow]);
+  }, [canEdit, isTeacher, handleUndo, goBack, goForward, goToRoot, goLast, hostWindow, cycleNumberMode, handleCopySgf, handleSaveSgf, handleCopyImage]);
 
   // 描画ハンドラ
   const handleDrawDragStart = useCallback((x: number, y: number) => {
@@ -586,6 +649,46 @@ export default function ReviewBoard({
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            {/* 書き出しメニュー。中身と操作は Pocket KataGo と同じ */}
+            <div className="relative">
+              <button
+                data-testid="export-menu"
+                onClick={() => setShowExportMenu(v => !v)}
+                aria-expanded={showExportMenu}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-raised hover:bg-line border border-line text-ink rounded-lg text-xs font-semibold transition-all"
+                title="画像・SGFの書き出し"
+              >
+                <Menu className="w-3.5 h-3.5" />
+              </button>
+              {showExportMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                  <div className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-line bg-raised py-1 shadow-2xl">
+                    <button
+                      data-testid="copy-image"
+                      onClick={() => { setShowExportMenu(false); void handleCopyImage(); }}
+                      className="flex w-full items-center px-3 py-2 text-sm text-ink hover:bg-ink/10"
+                    >画像をコピー<span className="ml-auto text-[10px] text-muted">Ctrl+F</span></button>
+                    <button
+                      data-testid="save-image"
+                      onClick={() => { setShowExportMenu(false); void handleSaveImage(); }}
+                      className="flex w-full items-center px-3 py-2 text-sm text-ink hover:bg-ink/10"
+                    >画像を保存</button>
+                    <div className="border-t border-line my-1" />
+                    <button
+                      data-testid="copy-sgf"
+                      onClick={() => { setShowExportMenu(false); void handleCopySgf(); }}
+                      className="flex w-full items-center px-3 py-2 text-sm text-ink hover:bg-ink/10"
+                    >SGFをコピー<span className="ml-auto text-[10px] text-muted">Ctrl+C</span></button>
+                    <button
+                      data-testid="save-sgf"
+                      onClick={() => { setShowExportMenu(false); handleSaveSgf(); }}
+                      className="flex w-full items-center px-3 py-2 text-sm text-ink hover:bg-ink/10"
+                    >SGFを保存<span className="ml-auto text-[10px] text-muted">Ctrl+S</span></button>
+                  </div>
+                </>
+              )}
+            </div>
             <button
               onClick={() => setIsMaximized(!isMaximized)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 bg-raised hover:bg-line border border-line text-ink hover:text-ink rounded-lg text-xs font-semibold whitespace-nowrap transition-all"
@@ -606,14 +709,20 @@ export default function ReviewBoard({
           </div>
         </div>
 
+        {exportMsg && (
+          <div data-testid="export-message" className="glass-panel px-3 py-1.5 text-xs text-accent-text">{exportMsg}</div>
+        )}
+
         {/* 碁盤: 高さは親(flex-1 min-h-0)の実際の余りに追従させる。
             固定の calc(100dvh - Nrem) だと、ナビ・ツール列のぶんだけ碁盤が大きくなり、
             PCでは下のボタン列に重なり、スマホでは画面からはみ出して見切れる
             （対局盤で同じ問題を解決済みの方式に揃えた 2026-08-01）。 */}
         <div className="glass-panel p-2 sm:p-4 flex justify-center items-center shadow-2xl overflow-hidden lg:flex-1 lg:min-h-0">
           <GoBoard
+            ref={boardSvgRef}
             boardState={boardState}
             boardSize={boardSize}
+            numberMode={numberMode}
             className="w-full max-w-full lg:!w-auto lg:h-full"
             maxHeight="100%"
             markers={markers}
@@ -800,6 +909,26 @@ export default function ReviewBoard({
                   <Trash2 className="w-4 h-4" />
                 </button>
               )}
+
+              <div className="w-px h-5 bg-raised mx-1" />
+
+              {/* 石の手番号。Pocket KataGo と同じ 123→全→分 の循環（M キー）。
+                  「分」は棋譜の続きに置いた検討の手だけに 1 から番号を振る。 */}
+              <button
+                data-testid="cycle-number-mode"
+                onClick={cycleNumberMode}
+                aria-pressed={numberMode !== 'off'}
+                className={`px-2.5 py-2 rounded-lg border text-xs font-bold transition-all ${
+                  numberMode !== 'off' ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
+                }`}
+                title={
+                  numberMode === 'off' ? '手番号を出す (M)'
+                    : numberMode === 'all' ? '全部の石に手数を表示中 (M で変化手順だけに)'
+                    : '変化手順の石だけ番号を表示中 (M で消す)'
+                }
+              >
+                {numberMode === 'off' ? '123' : numberMode === 'all' ? '全' : '分'}
+              </button>
 
               {/* 候補手はAIの機能なので、生徒の自分用検討には出さない（三村さんの指示 2026-08-13） */}
               {isTeacher && (

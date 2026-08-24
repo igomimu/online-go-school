@@ -397,3 +397,118 @@ describe('ReviewBoard', () => {
     });
   });
 });
+
+describe('ReviewBoard 手番号の切替', () => {
+  it('123→全→分 の順に切り替わる（Pocket KataGo と同じ循環）', () => {
+    const { root } = makeTree();
+    const onChange = vi.fn();
+    const props = {
+      rootNode: root,
+      currentNode: root,
+      boardSize: 9,
+      onSetCurrentNode: vi.fn(),
+      isTeacher: true,
+      classroomRef: mockClassroomRef as never,
+      onNumberModeChange: onChange,
+    };
+
+    const { rerender } = render(<ReviewBoard {...props} numberMode="off" />);
+    fireEvent.click(screen.getByTestId('cycle-number-mode'));
+    expect(onChange).toHaveBeenLastCalledWith('all');
+
+    rerender(<ReviewBoard {...props} numberMode="all" />);
+    fireEvent.click(screen.getByTestId('cycle-number-mode'));
+    expect(onChange).toHaveBeenLastCalledWith('branch');
+
+    rerender(<ReviewBoard {...props} numberMode="branch" />);
+    fireEvent.click(screen.getByTestId('cycle-number-mode'));
+    expect(onChange).toHaveBeenLastCalledWith('off');
+    cleanup();
+  });
+
+  it('「分」では検討で置いた手だけに番号が出る', () => {
+    // 棋譜の1手目(5,5) → 検討で2手目(3,3)
+    const { root, child } = makeTree();
+    child.fromRecord = true;
+    const grandChild = child.children[0];
+
+    const { container } = render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={grandChild}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+        numberMode="branch"
+      />
+    );
+    const texts = Array.from(container.querySelectorAll('[data-stone] text')).map(t => t.textContent);
+    expect(texts).toEqual(['1']); // 棋譜の手には出ず、検討の手だけが 1
+    cleanup();
+  });
+
+  it('「全」では全部の石に通し手数が出る', () => {
+    const { root, child } = makeTree();
+    const grandChild = child.children[0];
+    const { container } = render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={grandChild}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+        numberMode="all"
+      />
+    );
+    const texts = Array.from(container.querySelectorAll('[data-stone] text')).map(t => t.textContent).sort();
+    expect(texts).toEqual(['1', '2']);
+    cleanup();
+  });
+});
+
+describe('ReviewBoard の書き出し', () => {
+  it('メニューからSGFをコピーできる', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    const { root, child } = makeTree();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={child}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+    fireEvent.click(screen.getByTestId('export-menu'));
+    fireEvent.click(screen.getByTestId('copy-sgf'));
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(writeText.mock.calls[0][0]).toContain('(;GM[1]FF[4]SZ[9]');
+    expect(writeText.mock.calls[0][0]).toContain(';B[ee]');
+    cleanup();
+  });
+
+  it('メニューに画像とSGFの4項目が出る', () => {
+    const { root } = makeTree();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+    fireEvent.click(screen.getByTestId('export-menu'));
+    expect(screen.getByTestId('copy-image')).toBeInTheDocument();
+    expect(screen.getByTestId('save-image')).toBeInTheDocument();
+    expect(screen.getByTestId('copy-sgf')).toBeInTheDocument();
+    expect(screen.getByTestId('save-sgf')).toBeInTheDocument();
+    cleanup();
+  });
+});

@@ -15,7 +15,15 @@ export type StoneColor = 'BLACK' | 'WHITE';
 export interface Stone {
     color: StoneColor;
     number?: number;
+    /** 変化手順に入ってから振り直した番号（numberMode='branch' のときだけ使う） */
+    branchNumber?: number;
 }
+
+/**
+ * 石に出す手番号の見せ方。Pocket KataGo と同じ 3 段。
+ * off = 数字なし / all = 通し手数 / branch = 変化手順だけ 1 から振り直す
+ */
+export type NumberMode = 'off' | 'all' | 'branch';
 
 export type BoardState = (Stone | null)[][];
 
@@ -58,7 +66,9 @@ export interface GoBoardProps {
 
     viewRange?: ViewRange;
     showCoordinates?: boolean;
+    /** @deprecated numberMode を使う（true は numberMode='all' と同じ） */
     showNumbers?: boolean;
+    numberMode?: NumberMode;
     isMonochrome?: boolean;
 
     // Interactions
@@ -104,6 +114,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     viewRange,
     showCoordinates = false,
     showNumbers = false,
+    numberMode,
     isMonochrome = false,
     onCellClick,
     onCellRightClick,
@@ -128,6 +139,9 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
 }, ref) => {
     const CELL_SIZE = 40;
     const MARGIN = 40;
+
+    // numberMode を指定しない旧来の呼び出し（showNumbers）も動かす
+    const effectiveNumberMode: NumberMode = numberMode ?? (showNumbers ? 'all' : 'off');
 
     // useMemo の依存に出せるよう、毎レンダー新しい物体を作らない
     // （素の派生値のままだと viewBox の memo が毎回作り直しになる）
@@ -263,9 +277,28 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 cells.push(
                     <g key={`s-group-${x}-${y}`} data-stone={`${x}-${y}`} className="pointer-events-none" filter="url(#stoneShadow)">
                         <circle cx={cx} cy={cy} r={STONE_RADIUS} fill={isBlack ? "url(#stoneBlack)" : "url(#stoneWhite)"} stroke={isBlack ? "#000000" : "#3a3a3a"} strokeWidth={isBlack ? 2 : 1.5} />
-                        {showNumbers && stone.number && (
-                            <text x={cx} y={cy} dy=".35em" textAnchor="middle" fill={isBlack ? "#FFFFFF" : "#000000"} fontSize={FONT_SIZE} fontWeight="bold">{stone.number}</text>
-                        )}
+                        {(() => {
+                            // 変化手順モードでは、変化に入ってからの石だけに番号が付く
+                            const shown = effectiveNumberMode === 'all'
+                                ? stone.number
+                                : effectiveNumberMode === 'branch'
+                                    ? stone.branchNumber
+                                    : undefined;
+                            if (!shown) return null;
+                            // 3桁は石からはみ出すので字を詰める（Pocket KataGo と同じ）
+                            const text = String(shown);
+                            const isLong = text.length >= 3;
+                            return (
+                                <text
+                                    x={cx} y={cy} dy=".35em"
+                                    textAnchor="middle"
+                                    fill={isBlack ? "#FFFFFF" : "#000000"}
+                                    fontSize={isLong ? CELL_SIZE * 0.42 : FONT_SIZE}
+                                    fontWeight={isLong ? "600" : "bold"}
+                                    letterSpacing={isLong ? "-0.5" : undefined}
+                                >{text}</text>
+                            );
+                        })()}
                     </g>
                 );
             }

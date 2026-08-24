@@ -246,3 +246,37 @@ export const convertSgfToGameTree = (
 
     return gameNode;
 };
+
+/**
+ * 変化手順の石だけに 1 から番号を振り直した盤面を返す。
+ *
+ * 起点は「読み込んだ棋譜（fromRecord）ではない最初の手」。
+ * 三村囲碁オンラインの検討では、棋譜を最後まで並べた続きに講師が手を置く場面が多く、
+ * 「第1変化以外の枝に入ったら」という判定（Pocket KataGo の自動検出）では
+ * その手順に番号が付かないため、棋譜かどうかで切る（三村さんの指定 2026-08-24）。
+ *
+ * 取られて別の石が乗った場所には番号を出さない（現在そこにある石の手数と照合する）。
+ */
+export const withBranchNumbers = (node: GameNode): BoardState => {
+    const path: GameNode[] = [];
+    for (let n: GameNode | null = node; n && n.parent; n = n.parent) path.unshift(n);
+
+    const startIdx = path.findIndex(n => !n.fromRecord);
+    if (startIdx < 0) return node.board;
+
+    // 「その手が置いた石の手数」→「変化の中での番号」
+    const branchOf = new Map<string, number>();
+    for (let i = startIdx; i < path.length; i++) {
+        const move = path[i].move;
+        if (!move) continue; // パス
+        // ノードの nextNumber は次の手の番号なので、その手自身は -1
+        branchOf.set(`${move.x},${move.y},${path[i].nextNumber - 1}`, i - startIdx + 1);
+    }
+    if (branchOf.size === 0) return node.board;
+
+    return node.board.map((row, y) => row.map((stone, x) => {
+        if (!stone || stone.number == null) return stone;
+        const branchNumber = branchOf.get(`${x + 1},${y + 1},${stone.number}`);
+        return branchNumber ? { ...stone, branchNumber } : stone;
+    }));
+};

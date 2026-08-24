@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { Drawing } from './components/GoBoard';
+import type { Drawing, NumberMode } from './components/GoBoard';
 import type { GameNode } from './utils/treeUtilsV2';
-import { convertSgfToGameTree } from './utils/treeUtilsV2';
+import { convertSgfToGameTree, withBranchNumbers } from './utils/treeUtilsV2';
 import { parseSGFTree } from './utils/sgfUtils';
 import { playReviewMove } from './utils/reviewMove';
 import {
@@ -75,16 +75,18 @@ function reviewKomiFromSgf(value: string | undefined, fallback = 6.5): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function reviewBoardUpdatePayload(node: GameNode, boardSize: number) {
+function reviewBoardUpdatePayload(node: GameNode, boardSize: number, numberMode: NumberMode = 'off') {
   const nextColor = node.move
     ? (node.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
     : 'BLACK';
   return {
-    boardState: node.board,
+    // 生徒の盤は親を持たない写しなので、変化手順の番号は先生側で振ってから配る
+    boardState: numberMode === 'branch' ? withBranchNumbers(node) : node.board,
     boardSize,
     nextColor,
     markers: node.markers,
     moveNumber: node.move ? node.nextNumber - 1 : 0,
+    numberMode,
   };
 }
 
@@ -196,6 +198,10 @@ function App() {
   const myLiveGameIdRef = useRef<string | null>(null);
   // 検討中に盤へ打てる生徒（先生が保持する正本）。既定は誰も打てない
   const [reviewMovePermissions, setReviewMovePermissions] = useState<string[]>([]);
+  // 検討盤の手番号表示（off/全/分）。先生が切り替え、生徒の盤にも同じ見え方で配る
+  const [reviewNumberMode, setReviewNumberMode] = useState<NumberMode>('off');
+  const reviewNumberModeRef = useRef<NumberMode>('off');
+  useEffect(() => { reviewNumberModeRef.current = reviewNumberMode; }, [reviewNumberMode]);
   // 生徒が自分の棋譜履歴を開いた検討かどうか。先生が配信した検討は先生の操作に
   // 追従させるが、自分で開いた棋譜は自分で並べられないと見るだけになってしまう。
   const [reviewIsOwn, setReviewIsOwn] = useState(false);
@@ -445,8 +451,11 @@ function App() {
             nextColor: 'BLACK' | 'WHITE';
             markers: GameNode['markers'];
             moveNumber: number;
+            numberMode?: NumberMode;
           };
           if (!Array.isArray(p.boardState) || typeof p.boardSize !== 'number') return;
+          // 先生が切り替えた手番号の見せ方に、生徒の盤も合わせる
+          setReviewNumberMode(p.numberMode ?? 'off');
           const dummyNode: GameNode = {
             id: `synced-${p.moveNumber ?? 0}`,
             parent: null,
@@ -859,9 +868,10 @@ function App() {
     // 「配信先の生徒」で絞れるようにする。空なら全員（以前は常に全員へ送っていた）
     void classroomRef.current.sendToOrAll({
       type: 'BOARD_UPDATE',
-      payload: reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize),
+      payload: reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize, reviewNumberMode),
     }, reviewTargetStudentsRef.current);
-  }, [reviewCurrentNode, role, viewMode, reviewBoardSize]);
+    // 手番号の切替も盤の見え方なので、同じ経路で配り直す
+  }, [reviewCurrentNode, role, viewMode, reviewBoardSize, reviewNumberMode]);
 
   // 検討モード: 着手権限を生徒へ配る。
   // 許可を外された生徒にも届く必要があるので、配信先の絞り込みとは別に必ず全員へ送る。
@@ -912,7 +922,7 @@ function App() {
         }, added);
         await room.sendTo({
           type: 'BOARD_UPDATE',
-          payload: reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize),
+          payload: reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize, reviewNumberModeRef.current),
         }, added);
         await room.sendTo({
           type: 'REVIEW_PERMISSIONS',
@@ -1951,6 +1961,8 @@ function App() {
           const reviewBoard = (
             <ErrorBoundary label="検討画面">
               <ReviewBoard
+                numberMode={reviewNumberMode}
+                onNumberModeChange={setReviewNumberMode}
                 rootNode={reviewRootNode}
                 currentNode={reviewCurrentNode}
                 boardSize={reviewBoardSize}

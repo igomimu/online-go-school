@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createNode, findNode, getPath, addMove, getMainPath, recalculateBoards, convertSgfToGameTree, removeNode, isRemovableNode } from './treeUtilsV2';
+import { createNode, findNode, getPath, addMove, getMainPath, recalculateBoards, convertSgfToGameTree, removeNode, isRemovableNode, withBranchNumbers } from './treeUtilsV2';
+import type { BoardState } from '../components/GoBoard';
 import { createEmptyBoard } from './gameLogic';
 import type { SgfTreeNode } from './sgfUtils';
 
@@ -268,4 +269,51 @@ describe('convertSgfToGameTree', () => {
     expect(node.board[4][4]?.color).toBe('BLACK');  // ee = (5,5)
     expect(node.board[6][6]?.color).toBe('WHITE');  // gg = (7,7)
   });
+});
+
+describe('withBranchNumbers', () => {
+    const empty = (size: number) => Array.from({ length: size }, () => Array(size).fill(null)) as BoardState;
+
+    it('棋譜の手には番号を振らず、検討で置いた手から1,2,3…と振る', () => {
+        // 棋譜: 1手目(5,5)黒 → 2手目(3,3)白。そのあと検討で 3手目(7,7)黒、4手目(2,7)白
+        const root = createNode(null, empty(9), 1, 'BLACK', 9);
+        const b1 = empty(9);
+        b1[4][4] = { color: 'BLACK', number: 1 };
+        const n1 = addMove(root, b1, 2, 'BLACK', 9, { x: 5, y: 5, color: 'BLACK' });
+        n1.fromRecord = true;
+        const b2 = b1.map(r => [...r]);
+        b2[2][2] = { color: 'WHITE', number: 2 };
+        const n2 = addMove(n1, b2, 3, 'WHITE', 9, { x: 3, y: 3, color: 'WHITE' });
+        n2.fromRecord = true;
+        const b3 = b2.map(r => [...r]);
+        b3[6][6] = { color: 'BLACK', number: 3 };
+        const n3 = addMove(n2, b3, 4, 'BLACK', 9, { x: 7, y: 7, color: 'BLACK' });
+        const b4 = b3.map(r => [...r]);
+        b4[6][1] = { color: 'WHITE', number: 4 };
+        const n4 = addMove(n3, b4, 5, 'WHITE', 9, { x: 2, y: 7, color: 'WHITE' });
+
+        const board = withBranchNumbers(n4);
+        expect(board[4][4]?.branchNumber).toBeUndefined(); // 棋譜の手
+        expect(board[2][2]?.branchNumber).toBeUndefined(); // 棋譜の手
+        expect(board[6][6]?.branchNumber).toBe(1);         // 検討の1手目
+        expect(board[6][1]?.branchNumber).toBe(2);         // 検討の2手目
+    });
+
+    it('全部が棋譜の手なら番号を振らない', () => {
+        const root = createNode(null, empty(9), 1, 'BLACK', 9);
+        const b1 = empty(9);
+        b1[4][4] = { color: 'BLACK', number: 1 };
+        const n1 = addMove(root, b1, 2, 'BLACK', 9, { x: 5, y: 5, color: 'BLACK' });
+        n1.fromRecord = true;
+        expect(withBranchNumbers(n1)).toBe(n1.board);
+    });
+
+    it('元の盤面は書き換えない', () => {
+        const root = createNode(null, empty(9), 1, 'BLACK', 9);
+        const b1 = empty(9);
+        b1[4][4] = { color: 'BLACK', number: 1 };
+        const n1 = addMove(root, b1, 2, 'BLACK', 9, { x: 5, y: 5, color: 'BLACK' });
+        withBranchNumbers(n1);
+        expect(n1.board[4][4]?.branchNumber).toBeUndefined();
+    });
 });
