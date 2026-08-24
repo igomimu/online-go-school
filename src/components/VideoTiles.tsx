@@ -99,7 +99,10 @@ function VideoTile({
       >
         <div
           ref={containerRef}
-          className={`absolute inset-0 [&>video]:w-full [&>video]:h-full [&>video]:object-contain ${isLocal ? '[&>video]:scale-x-[-1]' : ''}`}
+          // 自分の映像も鏡像にしない。生徒に届いているのは実像なので、
+          // 碁盤や本を映したときに講師の画面だけ左右が逆になるのを避ける
+          // （三村さんの指示 2026-08-24）。
+          className="absolute inset-0 [&>video]:w-full [&>video]:h-full [&>video]:object-contain"
         />
         {!cameraOn && <CameraOffCover variant="classroom" />}
         {!micOn && <MicOffBadge variant="classroom" />}
@@ -124,7 +127,7 @@ function VideoTile({
       <div className="relative h-[90px] w-[120px]">
         <div
           ref={containerRef}
-          className={`h-full w-full overflow-hidden rounded-lg bg-black/30 [&>video]:h-full [&>video]:w-full [&>video]:rounded-lg [&>video]:object-cover ${isLocal ? '[&>video]:scale-x-[-1]' : ''}`}
+          className="h-full w-full overflow-hidden rounded-lg bg-black/30 [&>video]:h-full [&>video]:w-full [&>video]:rounded-lg [&>video]:object-cover"
         />
         {!cameraOn && <CameraOffCover variant="compact" />}
         {!micOn && <MicOffBadge variant="compact" />}

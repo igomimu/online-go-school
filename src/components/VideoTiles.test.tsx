@@ -205,3 +205,28 @@ describe('VideoTiles', () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe('自分の映像の向き', () => {
+  it('自分の映像も鏡像にしない（生徒に届いているのと同じ向きで見る）', () => {
+    const { container } = render(
+      <VideoTiles
+        videoElements={new Map([['teacher', videoEl()]])}
+        localIdentity="teacher"
+        participants={[participant('teacher', '三村九段')]}
+        variant="classroom"
+      />
+    );
+    expect(container.innerHTML).not.toContain('scale-x-[-1]');
+  });
+
+  it('小さい並びでも鏡像にしない', () => {
+    const { container } = render(
+      <VideoTiles
+        videoElements={new Map([['teacher', videoEl()]])}
+        localIdentity="teacher"
+        participants={[participant('teacher', '三村九段')]}
+      />
+    );
+    expect(container.innerHTML).not.toContain('scale-x-[-1]');
+  });
+});
