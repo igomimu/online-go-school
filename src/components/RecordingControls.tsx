@@ -1,8 +1,14 @@
 import { useScreenRecorder } from '../hooks/useScreenRecorder';
 import { Video, Square, Download, RotateCcw } from 'lucide-react';
+import type { ClassroomLiveKit } from '../utils/classroomLiveKit';
 
-export default function RecordingControls() {
-  const recorder = useScreenRecorder();
+interface RecordingControlsProps {
+  /** 録画に混ぜる声（自分のマイク＋生徒）の取り出しに使う */
+  classroom?: ClassroomLiveKit | null;
+}
+
+export default function RecordingControls({ classroom }: RecordingControlsProps) {
+  const recorder = useScreenRecorder(classroom);
 
   const formatDuration = (s: number) => {
     const m = Math.floor(s / 60);
@@ -12,6 +18,10 @@ export default function RecordingControls() {
 
   return (
     <div className="flex items-center gap-2">
+      {recorder.error && (
+        <span className="text-xs text-alert-text">{recorder.error}</span>
+      )}
+
       {recorder.state === 'idle' && (
         <button
           onClick={() => recorder.startRecording()}
@@ -26,6 +36,15 @@ export default function RecordingControls() {
         <>
           <span className="text-xs text-alert-text animate-pulse font-mono">
             ● {formatDuration(recorder.duration)}
+          </span>
+          {/* 声が1つも入っていなければ無音の動画ができる。90分録ってから気づくのを防ぐ */}
+          <span
+            className={`text-xs ${recorder.voiceCount === 0 ? 'text-alert-text' : 'text-muted'}`}
+            title={recorder.voiceCount === 0
+              ? '声が録れていません。マイクが切れていないか確かめてください'
+              : '録音している声の数（自分＋生徒）'}
+          >
+            {recorder.voiceCount === 0 ? '声なし' : `声 ${recorder.voiceCount}`}
           </span>
           <button
             onClick={recorder.stopRecording}

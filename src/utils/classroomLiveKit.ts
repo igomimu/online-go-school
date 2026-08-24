@@ -97,6 +97,8 @@ export class ClassroomLiveKit {
   private _videoElements = new Map<string, HTMLVideoElement>();
   private _audioElements = new Map<string, HTMLAudioElement>();
   onVideoTrackChanged?: (info: VideoTrackInfo) => void;
+  /** 録画中に音声トラックが増減したときに知らせる（録画に途中参加の生徒の声を混ぜるため） */
+  onAudioTracksChanged?: () => void;
 
   constructor() {
     this.room = new Room({
@@ -157,6 +159,7 @@ export class ClassroomLiveKit {
         el.id = `audio-${participant.identity}`;
         document.body.appendChild(el);
         this._audioElements.set(participant.identity, el);
+        this.onAudioTracksChanged?.();
       }
       if (track.kind === Track.Kind.Video) {
         const el = track.attach() as HTMLVideoElement;
@@ -178,6 +181,7 @@ export class ClassroomLiveKit {
       track.detach().forEach(el => el.remove());
       if (track.kind === Track.Kind.Audio) {
         this._audioElements.delete(participant.identity);
+        this.onAudioTracksChanged?.();
       }
       if (track.kind === Track.Kind.Video) {
         this._videoElements.delete(participant.identity);
@@ -204,6 +208,9 @@ export class ClassroomLiveKit {
           isLocal: true,
         });
       }
+      if (track && track.kind === Track.Kind.Audio) {
+        this.onAudioTracksChanged?.();
+      }
       // 自分のマイク・カメラを初めて点けたときは publish であって unmute ではないので、
       // TrackUnmuted は飛ばない。ここで知らせないと参加者一覧の自分だけ「切」のまま残る
       this.notifyParticipantsChanged();
@@ -222,6 +229,9 @@ export class ClassroomLiveKit {
           element: null,
           isLocal: true,
         });
+      }
+      if (track && track.kind === Track.Kind.Audio) {
+        this.onAudioTracksChanged?.();
       }
       this.notifyParticipantsChanged();
     });
@@ -286,6 +296,30 @@ export class ClassroomLiveKit {
     });
 
     return list;
+  }
+
+  /**
+   * 録画用に、いま鳴っている音声トラックを集める（自分のマイク＋購読中の生徒の声）。
+   *
+   * 画面録画の getDisplayMedia は「スピーカーから鳴っている音」しか拾えず、
+   * 自分の声はスピーカーから出ないので講師の解説が入らない。LiveKit が持っている
+   * トラックから直接集めれば、共有ダイアログのチェックの有無にも左右されない。
+   */
+  collectAudioTracks(): MediaStreamTrack[] {
+    const tracks: MediaStreamTrack[] = [];
+
+    const mic = this.room.localParticipant
+      ?.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
+    if (mic) tracks.push(mic);
+
+    this.room.remoteParticipants.forEach((p) => {
+      p.audioTrackPublications.forEach((pub) => {
+        const t = pub.track?.mediaStreamTrack;
+        if (t) tracks.push(t);
+      });
+    });
+
+    return tracks;
   }
 
   // リモート参加者の名前一覧（先生を除く）

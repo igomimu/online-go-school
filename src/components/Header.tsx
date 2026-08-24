@@ -174,7 +174,7 @@ export default function Header({
         )}
         <div className="flex shrink-0 items-center gap-1">
           {isConnected && <MediaDeviceSettings classroom={classroom ?? null} iconOnly />}
-          {role === 'TEACHER' && isConnected && <RecordingControls />}
+          {role === 'TEACHER' && isConnected && <RecordingControls classroom={classroom} />}
           <ThemeToggle />
           {pwaInstall.shouldShowInstall && (
             <button
