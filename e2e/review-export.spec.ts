@@ -67,6 +67,41 @@ test.describe('検討盤の手番号と書き出し', () => {
     await expect(stoneNumbers()).toHaveCount(3);
   });
 
+  test('L キーで、今いる手を1として番号を振り直せる', async () => {
+    await loginAsTeacher(page);
+    await openClassroomAndConnect(page);
+    // 棋譜の手が3手。本手順どおりに進んだ手には、指定しないと分番号は付かない
+    const review = await loadSgfForReview(page, '(;FF[4]GM[1]SZ[9];B[ee];W[cc];B[gg])');
+    await expect(review.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
+    await review.keyboard.press('End');
+    await expect(review.getByText('3手目')).toBeVisible({ timeout: 10_000 });
+
+    const board = review.getByTestId('go-board');
+    const stoneNumbers = () => board.locator('[data-stone] text');
+    const shownNumbers = async () => (await stoneNumbers().allTextContents()).sort();
+
+    // 「分」にしても、棋譜どおりの手だけなので番号は出ない
+    await review.getByTestId('cycle-number-mode').click();
+    await review.getByTestId('cycle-number-mode').click();
+    await expect(stoneNumbers()).toHaveCount(0);
+
+    // 2手目まで戻って L → その手が 1 になり、進めると 2 が続く
+    await review.keyboard.press('ArrowLeft');
+    await expect(review.getByText('2手目')).toBeVisible({ timeout: 5_000 });
+    await review.keyboard.press('l');
+    await expect(stoneNumbers()).toHaveCount(1);
+    expect(await shownNumbers()).toEqual(['1']);
+
+    await review.keyboard.press('ArrowRight');
+    await expect(review.getByText('3手目')).toBeVisible({ timeout: 5_000 });
+    expect(await shownNumbers()).toEqual(['1', '2']);
+
+    // 「ここから1」ボタンでも同じ操作ができ、もう一度押すと解除される
+    await review.keyboard.press('ArrowLeft');
+    await review.getByTestId('branch-start-here').click();
+    await expect(stoneNumbers()).toHaveCount(0);
+  });
+
   test('メニューから画像を保存でき、SGFがクリップボードに入る', async () => {
     await loginAsTeacher(page);
     await openClassroomAndConnect(page);

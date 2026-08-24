@@ -75,13 +75,13 @@ function reviewKomiFromSgf(value: string | undefined, fallback = 6.5): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function reviewBoardUpdatePayload(node: GameNode, boardSize: number, numberMode: NumberMode = 'off') {
+function reviewBoardUpdatePayload(node: GameNode, boardSize: number, numberMode: NumberMode = 'off', branchStartId: string | null = null) {
   const nextColor = node.move
     ? (node.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
     : 'BLACK';
   return {
     // 生徒の盤は親を持たない写しなので、変化手順の番号は先生側で振ってから配る
-    boardState: numberMode === 'branch' ? withBranchNumbers(node) : node.board,
+    boardState: numberMode === 'branch' ? withBranchNumbers(node, branchStartId) : node.board,
     boardSize,
     nextColor,
     markers: node.markers,
@@ -202,6 +202,10 @@ function App() {
   const [reviewNumberMode, setReviewNumberMode] = useState<NumberMode>('off');
   const reviewNumberModeRef = useRef<NumberMode>('off');
   useEffect(() => { reviewNumberModeRef.current = reviewNumberMode; }, [reviewNumberMode]);
+  // 「分」の起点。講師が L キー（または「ここから」）で決めた手を 1 にする
+  const [reviewBranchStartId, setReviewBranchStartId] = useState<string | null>(null);
+  const reviewBranchStartIdRef = useRef<string | null>(null);
+  useEffect(() => { reviewBranchStartIdRef.current = reviewBranchStartId; }, [reviewBranchStartId]);
   // 生徒が自分の棋譜履歴を開いた検討かどうか。先生が配信した検討は先生の操作に
   // 追従させるが、自分で開いた棋譜は自分で並べられないと見るだけになってしまう。
   const [reviewIsOwn, setReviewIsOwn] = useState(false);
@@ -868,10 +872,10 @@ function App() {
     // 「配信先の生徒」で絞れるようにする。空なら全員（以前は常に全員へ送っていた）
     void classroomRef.current.sendToOrAll({
       type: 'BOARD_UPDATE',
-      payload: reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize, reviewNumberMode),
+      payload: reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize, reviewNumberMode, reviewBranchStartId),
     }, reviewTargetStudentsRef.current);
     // 手番号の切替も盤の見え方なので、同じ経路で配り直す
-  }, [reviewCurrentNode, role, viewMode, reviewBoardSize, reviewNumberMode]);
+  }, [reviewCurrentNode, role, viewMode, reviewBoardSize, reviewNumberMode, reviewBranchStartId]);
 
   // 検討モード: 着手権限を生徒へ配る。
   // 許可を外された生徒にも届く必要があるので、配信先の絞り込みとは別に必ず全員へ送る。
@@ -922,7 +926,7 @@ function App() {
         }, added);
         await room.sendTo({
           type: 'BOARD_UPDATE',
-          payload: reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize, reviewNumberModeRef.current),
+          payload: reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize, reviewNumberModeRef.current, reviewBranchStartIdRef.current),
         }, added);
         await room.sendTo({
           type: 'REVIEW_PERMISSIONS',
@@ -1234,6 +1238,7 @@ function App() {
       reviewSourceSgfRef.current = content;
       // 検討を開き直したら着手の許可は持ち越さない
       setReviewMovePermissions([]);
+      setReviewBranchStartId(null);
       setReviewIsOwn(false); // 先生がSGFを読み込んで配信する検討
       setViewMode('review');
 
@@ -1261,6 +1266,7 @@ function App() {
       reviewSourceSgfRef.current = game.sgf;
       // 検討を開き直したら着手の許可は持ち越さない
       setReviewMovePermissions([]);
+      setReviewBranchStartId(null);
       // 生徒が自分の履歴から開いた棋譜は本人の端末内だけの検討。
       // 先生と同じ操作で並べられるようにする（AIは付けない）。
       setReviewIsOwn(role === 'STUDENT');
@@ -1963,6 +1969,12 @@ function App() {
               <ReviewBoard
                 numberMode={reviewNumberMode}
                 onNumberModeChange={setReviewNumberMode}
+                branchStartId={reviewBranchStartId}
+                onToggleBranchStart={(nodeId) => {
+                  // 同じ手をもう一度指すと解除。指した手が「1」になる
+                  setReviewBranchStartId(prev => (prev === nodeId ? null : nodeId));
+                  setReviewNumberMode('branch');
+                }}
                 rootNode={reviewRootNode}
                 currentNode={reviewCurrentNode}
                 boardSize={reviewBoardSize}

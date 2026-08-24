@@ -250,18 +250,22 @@ export const convertSgfToGameTree = (
 /**
  * 変化手順の石だけに 1 から番号を振り直した盤面を返す。
  *
- * 起点は「読み込んだ棋譜（fromRecord）ではない最初の手」。
- * 三村囲碁オンラインの検討では、棋譜を最後まで並べた続きに講師が手を置く場面が多く、
- * 「第1変化以外の枝に入ったら」という判定（Pocket KataGo の自動検出）では
- * その手順に番号が付かないため、棋譜かどうかで切る（三村さんの指定 2026-08-24）。
+ * 起点は2通り。
+ * 1. `startNodeId` を渡したとき: その手が 1 になる（Pocket KataGo の L キーと同じ、
+ *    講師が「ここから並べ直す」と決めた地点）。空の盤に並べていく検討では
+ *    どの手も棋譜ではないため、この手動指定がないと通し番号と同じ見え方になる。
+ * 2. 渡さないとき: 「読み込んだ棋譜（fromRecord）ではない最初の手」。棋譜を最後まで
+ *    並べた続きに講師が置いた手順に、そのまま番号が付く（三村さんの指定 2026-08-24）。
  *
  * 取られて別の石が乗った場所には番号を出さない（現在そこにある石の手数と照合する）。
  */
-export const withBranchNumbers = (node: GameNode): BoardState => {
+export const withBranchNumbers = (node: GameNode, startNodeId?: string | null): BoardState => {
     const path: GameNode[] = [];
     for (let n: GameNode | null = node; n && n.parent; n = n.parent) path.unshift(n);
 
-    const startIdx = path.findIndex(n => !n.fromRecord);
+    // 手動の起点が今の手順の上に無ければ（別の変化へ移ったなど）自動判定に戻す
+    const manualIdx = startNodeId ? path.findIndex(n => n.id === startNodeId) : -1;
+    const startIdx = manualIdx >= 0 ? manualIdx : path.findIndex(n => !n.fromRecord);
     if (startIdx < 0) return node.board;
 
     // 「その手が置いた石の手数」→「変化の中での番号」

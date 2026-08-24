@@ -317,3 +317,42 @@ describe('withBranchNumbers', () => {
         expect(n1.board[4][4]?.branchNumber).toBeUndefined();
     });
 });
+
+describe('withBranchNumbers の起点指定（L キー相当）', () => {
+    const empty = (size: number) => Array.from({ length: size }, () => Array(size).fill(null)) as BoardState;
+
+    // 棋譜どおりに 3手進んだ局面。手動指定が無ければ番号は付かない
+    function recordedThreeMoves() {
+        const root = createNode(null, empty(9), 1, 'BLACK', 9);
+        const coords: [number, number][] = [[5, 5], [3, 3], [7, 7]];
+        let parent = root;
+        let board = empty(9);
+        const nodes = coords.map(([x, y], i) => {
+            board = board.map(r => [...r]);
+            board[y - 1][x - 1] = { color: i % 2 === 0 ? 'BLACK' : 'WHITE', number: i + 1 };
+            const n = addMove(parent, board, i + 2, i % 2 === 0 ? 'BLACK' : 'WHITE', 9,
+                { x, y, color: i % 2 === 0 ? 'BLACK' : 'WHITE' });
+            n.fromRecord = true;
+            parent = n;
+            return n;
+        });
+        return { root, nodes };
+    }
+
+    it('本手順どおりに進んだ手でも、起点に指定すればそこから1,2,3…と振れる', () => {
+        const { nodes } = recordedThreeMoves();
+        // 指定なし: 棋譜だけなので番号は付かない
+        expect(withBranchNumbers(nodes[2])).toBe(nodes[2].board);
+
+        // 2手目(3,3)を起点にすると、そこが 1、3手目(7,7)が 2
+        const board = withBranchNumbers(nodes[2], nodes[1].id);
+        expect(board[4][4]?.branchNumber).toBeUndefined(); // 1手目は起点より前
+        expect(board[2][2]?.branchNumber).toBe(1);
+        expect(board[6][6]?.branchNumber).toBe(2);
+    });
+
+    it('指定した手が今の手順の上に無ければ、棋譜かどうかの判定に戻る', () => {
+        const { nodes } = recordedThreeMoves();
+        expect(withBranchNumbers(nodes[2], 'no-such-node')).toBe(nodes[2].board);
+    });
+});

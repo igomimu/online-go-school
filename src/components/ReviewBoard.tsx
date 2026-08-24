@@ -54,6 +54,9 @@ interface ReviewBoardProps {
   /** 石の手番号の見せ方。先生が切り替え、生徒の盤にも同じ値が配られる */
   numberMode?: NumberMode;
   onNumberModeChange?: (mode: NumberMode) => void;
+  /** 「分」で 1 から数え直す起点の手（L キー / 「ここから」ボタンで決める） */
+  branchStartId?: string | null;
+  onToggleBranchStart?: (nodeId: string) => void;
 
   // チャット
   registeredStudents?: Student[];
@@ -126,6 +129,8 @@ export default function ReviewBoard({
   selfReview = false,
   numberMode = 'off',
   onNumberModeChange,
+  branchStartId = null,
+  onToggleBranchStart,
   registeredStudents,
   chatMessages,
   onChatSend,
@@ -149,6 +154,13 @@ export default function ReviewBoard({
     onNumberModeChange?.(numberMode === 'off' ? 'all' : numberMode === 'all' ? 'branch' : 'off');
   }, [numberMode, onNumberModeChange]);
 
+  // 今いる手を「1」にする（もう一度で解除）。Pocket KataGo の L キーと同じ
+  const toggleBranchStart = useCallback(() => {
+    if (!currentNode.parent) return; // 0手目は起点にできない
+    onToggleBranchStart?.(currentNode.id);
+  }, [currentNode, onToggleBranchStart]);
+  const branchStartIsHere = branchStartId !== null && branchStartId === currentNode.id;
+
   // 盤の書き出し（画像・SGF）。操作は Pocket KataGo に合わせる
   const boardSvgRef = useRef<SVGSVGElement>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -166,8 +178,8 @@ export default function ReviewBoard({
 
   const boardState = useMemo(
     // 生徒の同期盤は親を持たないので、先生が振った番号入りの盤をそのまま使う
-    () => (numberMode === 'branch' && currentNode.parent ? withBranchNumbers(currentNode) : currentNode.board),
-    [currentNode, numberMode]
+    () => (numberMode === 'branch' && currentNode.parent ? withBranchNumbers(currentNode, branchStartId) : currentNode.board),
+    [currentNode, numberMode, branchStartId]
   );
   const nodeMarkers = currentNode.markers;
 
@@ -275,12 +287,14 @@ export default function ReviewBoard({
       // 候補手の表示切替はAIの機能なので先生だけ
       else if (isTeacher && !ctrl && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setShowCandidates(prev => !prev); }
       else if (!ctrl && (e.key === 'm' || e.key === 'M')) { e.preventDefault(); cycleNumberMode(); }
+      // 今の手から 1,2,3… と振り直す（Pocket KataGo と同じ L キー）
+      else if (!ctrl && (e.key === 'l' || e.key === 'L')) { e.preventDefault(); toggleBranchStart(); }
       else if (e.key === 'Escape') { setToolMode('play'); setDrawMode('off'); }
     };
     // 別ウィンドウに描かれているときは、そのウィンドウに張らないとキーが効かない
     hostWindow.addEventListener('keydown', handleKeyDown);
     return () => hostWindow.removeEventListener('keydown', handleKeyDown);
-  }, [canEdit, isTeacher, handleUndo, goBack, goForward, goToRoot, goLast, hostWindow, cycleNumberMode, handleCopySgf, handleSaveSgf, handleCopyImage]);
+  }, [canEdit, isTeacher, handleUndo, goBack, goForward, goToRoot, goLast, hostWindow, cycleNumberMode, toggleBranchStart, handleCopySgf, handleSaveSgf, handleCopyImage]);
 
   // 描画ハンドラ
   const handleDrawDragStart = useCallback((x: number, y: number) => {
@@ -928,6 +942,23 @@ export default function ReviewBoard({
                 }
               >
                 {numberMode === 'off' ? '123' : numberMode === 'all' ? '全' : '分'}
+              </button>
+
+              {/* 今並べている手を 1 にする。空の盤に並べる検討では、これが無いと
+                  「分」が通し番号と同じ見え方になる（三村さんの指摘 2026-08-24）。 */}
+              <button
+                data-testid="branch-start-here"
+                onClick={toggleBranchStart}
+                disabled={!currentNode.parent}
+                aria-pressed={branchStartIsHere}
+                className={`px-2.5 py-2 rounded-lg border text-xs font-bold transition-all disabled:opacity-30 ${
+                  branchStartIsHere ? 'bg-accent border-accent text-accent-ink' : 'bg-raised border-line text-muted hover:text-ink'
+                }`}
+                title={branchStartIsHere
+                  ? 'この手からの番号付けをやめる (L)'
+                  : 'この手を1として、ここから番号を振る (L)'}
+              >
+                ここから1
               </button>
 
               {/* 候補手はAIの機能なので、生徒の自分用検討には出さない（三村さんの指示 2026-08-13） */}
