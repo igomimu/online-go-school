@@ -102,17 +102,31 @@ export async function resolveMeetingId(
 }
 
 /**
- * 参加者を足して、そのまま接続に使える authToken を受け取る。
+ * 参加者のトークンを返す。既に居る人は作り直さず、トークンだけ出し直す。
  *
  * custom_participant_id には LiveKit と同じ identity を入れる。
  * アプリ側は identity をキーに名簿と突き合わせているので、ここを変えると
  * 誰の映像か分からなくなる。
+ *
+ * 🔴 入り直すたびに participant を作ると、同じ人の記録が meeting に溜まる。
+ * 在室確認は「まだ出ていない参加者」を見るので、古い記録が残ると先生が
+ * 居ないのに居ることになりかねない。作るのは初回だけにする。
  */
 export async function issueParticipantToken(
   cfg: RealtimeKitConfig,
   meetingId: string,
   opts: { identity: string; username?: string; isTeacher: boolean },
 ): Promise<string> {
+  const existingId = await findParticipantId(cfg, meetingId, opts.identity);
+  if (existingId) {
+    const refreshed = await callRealtimeKit<{ token: string }>(
+      cfg,
+      `/meetings/${meetingId}/participants/${existingId}/token`,
+      { method: 'POST' },
+    );
+    if (refreshed?.token) return refreshed.token;
+  }
+
   const participant = await callRealtimeKit<{ token: string }>(
     cfg,
     `/meetings/${meetingId}/participants`,
@@ -126,6 +140,30 @@ export async function issueParticipantToken(
     },
   );
   return participant.token;
+}
+
+/** その meeting に、この identity の参加者が既に登録されているか */
+async function findParticipantId(
+  cfg: RealtimeKitConfig,
+  meetingId: string,
+  identity: string,
+): Promise<string | null> {
+  try {
+    const result = await callRealtimeKit<{ participants?: Array<{
+      id?: string;
+      custom_participant_id?: string;
+    }> } | null>(
+      cfg,
+      `/meetings/${meetingId}/participants?search=${encodeURIComponent(identity)}&per_page=100`,
+    );
+    const hit = (result?.participants ?? []).find(
+      p => p.custom_participant_id === identity,
+    );
+    return hit?.id ?? null;
+  } catch {
+    // 探せなかったら新しく作る側に倒す（入れないより作りすぎのほうがまし）
+    return null;
+  }
 }
 
 /**
