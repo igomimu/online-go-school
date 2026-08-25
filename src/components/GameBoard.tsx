@@ -677,11 +677,6 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
             <div className="text-center text-sm font-bold text-ink mb-2">
               整地モード {canScore ? '— 死んでいる石をクリックしてください' : '— 整地中です'}
             </div>
-            {deadStoneDraftLoading && (
-              <div data-testid="dead-stone-draft-loading" className="text-center text-xs text-muted mb-2">
-                AIが死石の下書きを作っています…
-              </div>
-            )}
             <div className="flex justify-center gap-8 text-sm">
               <div className="text-center">
                 <div className="text-muted">黒</div>

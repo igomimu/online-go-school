@@ -416,13 +416,13 @@ describe('GameBoard', () => {
     expect(mockDraftDeadStones).toHaveBeenCalledTimes(1);
   });
 
-  it('下書きを作っている間はその旨を出し、二度押させない', () => {
+  it('下書きを作っている間は二度押させない（作業中の説明文は出さない）', () => {
     const game = scoringGameWithStone();
     setupMock({ game, deadStoneDraftLoading: true });
     render(<GameBoard gameId="game-1" myIdentity="たろう" />);
 
-    expect(screen.getByTestId('dead-stone-draft-loading')).toBeInTheDocument();
     expect(screen.getByTestId('draft-dead-stones')).toBeDisabled();
+    expect(screen.queryByText(/AIが死石の下書き/)).not.toBeInTheDocument();
   });
 
   it('観戦している生徒にはAIの下書きボタンを出さない', () => {
