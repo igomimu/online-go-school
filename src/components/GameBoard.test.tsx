@@ -416,12 +416,14 @@ describe('GameBoard', () => {
     expect(mockDraftDeadStones).toHaveBeenCalledTimes(1);
   });
 
-  it('下書きを作っている間は二度押させない（作業中の説明文は出さない）', () => {
+  it('計算中は「地合いの計算中…」を出し、二度押させない', () => {
     const game = scoringGameWithStone();
     setupMock({ game, deadStoneDraftLoading: true });
     render(<GameBoard gameId="game-1" myIdentity="たろう" />);
 
+    expect(screen.getByTestId('dead-stone-draft-loading')).toHaveTextContent('地合いの計算中');
     expect(screen.getByTestId('draft-dead-stones')).toBeDisabled();
+    // AIの作業であることは出さない（三村さんの指示）
     expect(screen.queryByText(/AIが死石の下書き/)).not.toBeInTheDocument();
   });
 
