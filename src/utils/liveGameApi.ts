@@ -324,6 +324,45 @@ export async function deleteSavedGame(gameId: string): Promise<void> {
   await executeGameAction('delete_saved_game', gameId);
 }
 
+export interface BulkDeleteResult {
+  deleted: string[];
+  failed: { id: string; error: string }[];
+}
+
+/**
+ * 保存棋譜をまとめて削除する（講師専用）。
+ * 1件ずつ delete_saved_game を呼ぶので、中断局の解除など1件削除と同じ扱いになる。
+ * 途中で1件失敗しても残りは続け、消せた分と消せなかった分を返す。
+ * まとめて消したのに「どこまで消えたか分からない」状態を残さないため。
+ */
+export async function deleteSavedGames(
+  gameIds: string[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<BulkDeleteResult> {
+  const total = gameIds.length;
+  const deleted: string[] = [];
+  const failed: { id: string; error: string }[] = [];
+  // 1件ずつ順に投げると数十件で待たされるので、少しだけ並べて投げる。
+  const CONCURRENCY = 4;
+  let cursor = 0;
+
+  const worker = async () => {
+    while (cursor < total) {
+      const gameId = gameIds[cursor++];
+      try {
+        await deleteSavedGame(gameId);
+        deleted.push(gameId);
+      } catch (err) {
+        failed.push({ id: gameId, error: err instanceof Error ? err.message : String(err) });
+      }
+      onProgress?.(deleted.length + failed.length, total);
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, total) }, () => worker()));
+  return { deleted, failed };
+}
+
 export async function interruptGame(gameId: string): Promise<void> {
   await executeGameAction('interrupt', gameId);
 }

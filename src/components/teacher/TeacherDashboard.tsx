@@ -6,7 +6,7 @@ import type { Student, Classroom, RankDisplay } from '../../types/classroom';
 import { DEFAULT_RANK_DISPLAY } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
 import { identityMatchesPlayer, parseIdentity, resolvePlayerName, stripSid, studentIdentityCandidates } from '../../utils/identityUtils';
-import { deleteSavedGame, fetchActiveLiveGamesForPlayers, finishGame, getSupabase, interruptGame, liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
+import { deleteSavedGame, deleteSavedGames, fetchActiveLiveGamesForPlayers, finishGame, getSupabase, interruptGame, liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
 import { loadSavedGamesForStudent } from '../../utils/savedGames';
 import { isTimeoutResult } from '../../utils/scoring';
 
@@ -137,9 +137,13 @@ export default function TeacherDashboard({
   const [historyGames, setHistoryGames] = useState<SavedGame[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [deletingHistoryGameId, setDeletingHistoryGameId] = useState<string | null>(null);
+  // まとめて消すための選択。テスト対局が溜まると1件ずつでは片付かない
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteProgress, setBulkDeleteProgress] = useState<{ done: number; total: number } | null>(null);
 
   const handleOpenHistory = useCallback(async (student: Student) => {
     setHistoryStudent(student);
+    setSelectedHistoryIds(new Set());
     setLoadingHistory(true);
     try {
       const list = await loadSavedGamesForStudent(student.name, student.id);
@@ -350,6 +354,12 @@ export default function TeacherDashboard({
     try {
       await deleteSavedGame(game.id);
       setHistoryGames(prev => prev.filter(saved => saved.id !== game.id));
+      setSelectedHistoryIds(prev => {
+        if (!prev.has(game.id)) return prev;
+        const next = new Set(prev);
+        next.delete(game.id);
+        return next;
+      });
       await onReloadGames?.();
     } catch (err) {
       alert(`棋譜の削除に失敗しました: ${err}`);
@@ -357,6 +367,50 @@ export default function TeacherDashboard({
       setDeletingHistoryGameId(null);
     }
   }, [onReloadGames]);
+
+  const toggleHistorySelection = useCallback((gameId: string) => {
+    setSelectedHistoryIds(prev => {
+      const next = new Set(prev);
+      if (next.has(gameId)) next.delete(gameId);
+      else next.add(gameId);
+      return next;
+    });
+  }, []);
+
+  const toggleAllHistorySelection = useCallback(() => {
+    setSelectedHistoryIds(prev => (
+      prev.size === historyGames.length ? new Set() : new Set(historyGames.map(game => game.id))
+    ));
+  }, [historyGames]);
+
+  const handleDeleteSelectedHistoryGames = useCallback(async () => {
+    const targets = historyGames.filter(game => selectedHistoryIds.has(game.id));
+    if (targets.length === 0) return;
+
+    const interruptedCount = targets.filter(game => game.result === '中断').length;
+    const interruptedNote = interruptedCount > 0
+      ? `\nうち中断局が${interruptedCount}局あります。再開できなくなり、ホームの表示からも消えます。`
+      : '';
+    if (!confirm(`選択した${targets.length}件の棋譜を削除しますか？${interruptedNote}`)) return;
+
+    setBulkDeleteProgress({ done: 0, total: targets.length });
+    try {
+      const { deleted, failed } = await deleteSavedGames(
+        targets.map(game => game.id),
+        (done, total) => setBulkDeleteProgress({ done, total }),
+      );
+      const deletedIds = new Set(deleted);
+      setHistoryGames(prev => prev.filter(saved => !deletedIds.has(saved.id)));
+      // 消せなかった分だけ選択に残す。もう一度押せばそれだけを試せる
+      setSelectedHistoryIds(new Set(failed.map(f => f.id)));
+      await onReloadGames?.();
+      if (failed.length > 0) {
+        alert(`${deleted.length}件を削除しました。${failed.length}件は削除できませんでした: ${failed[0].error}`);
+      }
+    } finally {
+      setBulkDeleteProgress(null);
+    }
+  }, [historyGames, selectedHistoryIds, onReloadGames]);
 
   const handleCancelGame = useCallback(async (gameId: string) => {
     if (!confirm('この対局を取り消します。\n中断中の記録を含め、棋譜履歴には残りません。よろしいですか？')) return;
@@ -737,6 +791,53 @@ export default function TeacherDashboard({
                 <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--color-muted)' }}>保存された棋譜履歴はありません。</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {/* まとめて選んで消す。1件ずつでは片付かない数のテスト対局が溜まる */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    paddingBottom: 6,
+                    borderBottom: '1px solid var(--color-line)',
+                  }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedHistoryIds.size === historyGames.length && historyGames.length > 0}
+                        onChange={toggleAllHistorySelection}
+                        aria-label="すべての棋譜を選ぶ"
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <span>すべて選ぶ（{historyGames.length}件）</span>
+                    </label>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {bulkDeleteProgress && (
+                        <span style={{ color: 'var(--color-muted)', fontSize: 11 }}>
+                          {bulkDeleteProgress.done}/{bulkDeleteProgress.total}件を削除中…
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        disabled={selectedHistoryIds.size === 0 || bulkDeleteProgress !== null}
+                        onClick={() => { void handleDeleteSelectedHistoryGames(); }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          border: '1px solid var(--color-line)',
+                          background: 'var(--color-ground)',
+                          color: selectedHistoryIds.size === 0 ? 'var(--color-muted)' : 'var(--color-alert-text)',
+                          fontSize: 11,
+                          padding: '2px 8px',
+                          cursor: selectedHistoryIds.size === 0 || bulkDeleteProgress !== null ? 'not-allowed' : 'pointer',
+                          opacity: selectedHistoryIds.size === 0 || bulkDeleteProgress !== null ? 0.55 : 1,
+                        }}
+                      >
+                        <Trash2 size={12} aria-hidden="true" />
+                        選んだ{selectedHistoryIds.size}件を削除
+                      </button>
+                    </span>
+                  </div>
                   {historyGames.map(game => {
                     // 中断だけでなく、時間切れで終わった対局も講師なら再開できる（回線トラブル救済）
                     const resumableLiveGame = games.find(g => g.id === game.id && (
@@ -784,10 +885,20 @@ export default function TeacherDashboard({
                         onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-ground)'; }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', gap: 8 }}>
-                          <span style={{ color: playerColor }}>
-                            {resolvePlayerName(game.blackPlayer, allStudents)} (黒) vs {resolvePlayerName(game.whitePlayer, allStudents)} (白)
-                            {outcome === 'win' && <span style={{ marginLeft: 6, fontSize: 11 }}>◯勝ち</span>}
-                            {outcome === 'loss' && <span style={{ marginLeft: 6, fontSize: 11 }}>●負け</span>}
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedHistoryIds.has(game.id)}
+                              onClick={e => e.stopPropagation()}
+                              onChange={() => toggleHistorySelection(game.id)}
+                              aria-label={`${game.date}の棋譜を選ぶ`}
+                              style={{ cursor: 'pointer', flexShrink: 0 }}
+                            />
+                            <span style={{ color: playerColor }}>
+                              {resolvePlayerName(game.blackPlayer, allStudents)} (黒) vs {resolvePlayerName(game.whitePlayer, allStudents)} (白)
+                              {outcome === 'win' && <span style={{ marginLeft: 6, fontSize: 11 }}>◯勝ち</span>}
+                              {outcome === 'loss' && <span style={{ marginLeft: 6, fontSize: 11 }}>●負け</span>}
+                            </span>
                           </span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             {resumableLiveGame && onResumeGame ? (
@@ -818,7 +929,7 @@ export default function TeacherDashboard({
                               type="button"
                               title="この棋譜を削除"
                               aria-label={`${game.date}の棋譜を削除`}
-                              disabled={deletingHistoryGameId === game.id}
+                              disabled={deletingHistoryGameId === game.id || bulkDeleteProgress !== null}
                               onClick={e => {
                                 e.stopPropagation();
                                 void handleDeleteHistoryGame(game);
