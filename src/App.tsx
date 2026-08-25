@@ -841,13 +841,18 @@ function App() {
   // 先生が入るまで、生徒側は静かに待って自動で繋ぎ直す。
   // 待っている間に叩くのはトークンAPIだけで教室には繋がないので、参加者分を使わない。
   //
-  // 間隔は短めにしてある。RealtimeKit は先生が入ってからセッションが見えるまで
-  // 10秒ほどかかるので、20秒間隔だと先生が開いたのに生徒が待たされる時間が長い。
+  // 間隔は「先生が開いてから入れるまでの体感」と「サーバーを叩く回数」の兼ね合い。
+  // RealtimeKit は先生が入ってからセッションが見えるまで10秒ほどかかるので、
+  // 長くすると子どもが待たされる。回数のほうは api/realtimeKit.ts が答えを
+  // 数秒覚えるので、人数が増えても外へ出ていく問い合わせは増えない
+  // （🔴 覚えないと19名で Cloudflare API の 1,200回/5分 に当たり、
+  //  当たるとトークン発行ごと5分止まる）。人ごとに少しずらして山も作らない。
   useEffect(() => {
     if (!waitingForTeacher || role !== 'STUDENT' || !studentId) return;
+    const intervalMs = 4_000 + Math.floor(Math.random() * 2_000);
     const timer = setInterval(() => {
       void connectLiveKit('STUDENT', makeStudentIdentity(studentId));
-    }, 6_000);
+    }, intervalMs);
     return () => clearInterval(timer);
   }, [waitingForTeacher, role, studentId, connectLiveKit]);
 

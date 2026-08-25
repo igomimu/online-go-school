@@ -142,6 +142,24 @@ export async function issueParticipantToken(
   return participant.token;
 }
 
+/**
+ * 先生が居るかどうかの直近の答え。教室ごとに数秒だけ覚えておく。
+ *
+ * 🔴 これが無いと、待っている生徒の人数だけ Cloudflare API を叩く。
+ * 生徒19名が授業前に待機列へ並ぶと 5分あたり千回を超え、
+ * **1トークン 1,200回/5分の上限**に当たる。超えるとその後5分間、
+ * トークン発行を含む全ての呼び出しが 429 で止まる＝授業そのものが止まる。
+ *
+ * 覚える長さは「居る」と「まだ居ない」で変える。
+ * - 居る: 10秒。授業中はここを全員が通るので、長めにして問い合わせを減らす。
+ *   実害は「先生が抜けた直後の数秒だけ生徒が入れる」程度。
+ * - まだ居ない: 3秒。長くすると、先生が入ったのに生徒が待たされる時間が伸びる。
+ *   待機中の生徒が何人並んでも、外へ出ていく問い合わせは3秒に1回で足りる。
+ */
+const presenceCache = new Map<string, { present: boolean; at: number }>();
+const PRESENT_TTL_MS = 10_000;
+const ABSENT_TTL_MS = 3_000;
+
 /** その meeting に、この identity の参加者が既に登録されているか */
 async function findParticipantId(
   cfg: RealtimeKitConfig,
@@ -183,6 +201,21 @@ async function findParticipantId(
  * その間 生徒は「先生を待っています」の画面で自動的に入り直す。
  */
 export async function isTeacherInMeeting(
+  cfg: RealtimeKitConfig,
+  meetingId: string,
+): Promise<boolean> {
+  const cached = presenceCache.get(meetingId);
+  if (cached) {
+    const ttl = cached.present ? PRESENT_TTL_MS : ABSENT_TTL_MS;
+    if (Date.now() - cached.at < ttl) return cached.present;
+  }
+
+  const present = await lookUpTeacherPresence(cfg, meetingId);
+  presenceCache.set(meetingId, { present, at: Date.now() });
+  return present;
+}
+
+async function lookUpTeacherPresence(
   cfg: RealtimeKitConfig,
   meetingId: string,
 ): Promise<boolean> {

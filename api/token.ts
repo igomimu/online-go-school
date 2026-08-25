@@ -185,9 +185,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // 先生が教室を開いていないうちは、生徒にトークンを渡さない。
   // 繋がせてから切るのではなく最初から繋がせないので、参加者分を1分も使わない。
+  //
+  // 🔴 聞けなかったときは「まだ」と答える（通さない）。
+  // 以前は通していたが、生徒側は数秒ごとに自分から入り直すので、
+  // 待たせる害は「あと数秒」で済む。一方で通してしまうと、門番が壊れている
+  // あいだ誰でも入れる。実際、RealtimeKit の 404/500 を例外にしていたとき
+  // 先生不在でも生徒が入れていた（2026-08-26 E2E で検出）。
   if (requesterIsStudent) {
+    let teacherPresent = false;
     try {
-      let teacherPresent: boolean;
       if (rtkConfig) {
         teacherPresent = await isTeacherInMeeting(rtkConfig, meetingId);
       } else {
@@ -198,15 +204,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         teacherPresent = await isTeacherInRoom(roomName, livekitHost, apiKey!, apiSecret!);
       }
-      if (!teacherPresent) {
-        return res.status(409).json({
-          error: '先生がまだ教室を開いていません',
-          reason: 'teacher_absent',
-        });
-      }
     } catch (err) {
-      // 基盤に聞けなかったときは通す。門番が壊れて授業が止まる方が害が大きい。
       console.error('[token-auth] teacher presence check failed:', err instanceof Error ? err.message : err);
+    }
+    if (!teacherPresent) {
+      return res.status(409).json({
+        error: '先生がまだ教室を開いていません',
+        reason: 'teacher_absent',
+      });
     }
   }
 
