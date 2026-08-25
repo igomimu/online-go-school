@@ -10,7 +10,7 @@ import {
   type SharingTargets,
 } from './utils/sharingTargets';
 import type { ClassroomRtc } from './utils/classroomRtc';
-import { createClassroomRtc } from './utils/rtcProvider';
+import { createClassroomRtc, needsServerUrl } from './utils/rtcProvider';
 import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './utils/classroomRtc';
 import type { ViewMode, AudioPermissions, SavedGame, RankDisplayPayload } from './types/game';
 import type { Student, Classroom, RankDisplay } from './types/classroom';
@@ -97,6 +97,8 @@ function App() {
 
   // LiveKit接続
   const [livekitUrl, setLivekitUrl] = useState(() => import.meta.env.VITE_LIVEKIT_URL || localStorage.getItem('lk-url') || '');
+  // RealtimeKit はトークンだけで繋がるので、URL が空でも入れる
+  const rtcReady = !needsServerUrl() || !!livekitUrl;
   const [roomName, setRoomName] = useState('go-classroom');
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [connectionError, setConnectionError] = useState('');
@@ -826,7 +828,7 @@ function App() {
   // 生徒自動接続
   useEffect(() => {
     if (role === 'STUDENT' && connectionState === ConnectionState.Disconnected && studentId && !studentAutoConnectRef.current) {
-      if (livekitUrl && roomName) {
+      if (rtcReady && roomName) {
         studentAutoConnectRef.current = true;
         connectLiveKit('STUDENT', makeStudentIdentity(studentId));
       }
@@ -834,15 +836,18 @@ function App() {
     if (role !== 'STUDENT') {
       studentAutoConnectRef.current = false;
     }
-  }, [role, connectionState, studentId, livekitUrl, roomName, connectLiveKit]);
+  }, [role, connectionState, studentId, rtcReady, roomName, connectLiveKit]);
 
   // 先生が入るまで、生徒側は静かに待って自動で繋ぎ直す。
-  // 待っている間に叩くのはトークンAPIだけで LiveKit には繋がないので、参加者分を使わない。
+  // 待っている間に叩くのはトークンAPIだけで教室には繋がないので、参加者分を使わない。
+  //
+  // 間隔は短めにしてある。RealtimeKit は先生が入ってからセッションが見えるまで
+  // 10秒ほどかかるので、20秒間隔だと先生が開いたのに生徒が待たされる時間が長い。
   useEffect(() => {
     if (!waitingForTeacher || role !== 'STUDENT' || !studentId) return;
     const timer = setInterval(() => {
       void connectLiveKit('STUDENT', makeStudentIdentity(studentId));
-    }, 20_000);
+    }, 6_000);
     return () => clearInterval(timer);
   }, [waitingForTeacher, role, studentId, connectLiveKit]);
 
@@ -1614,7 +1619,7 @@ function App() {
   }
 
   if (role === 'STUDENT' && connectionState !== ConnectionState.Connected) {
-    const hasCredentials = !!(livekitUrl && roomName);
+    const hasCredentials = !!(rtcReady && roomName);
 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-6">
@@ -1689,7 +1694,7 @@ function App() {
           classrooms={classrooms}
           studentTypes={studentTypes}
           onLaunchClassroom={(launchClassroomId) => {
-            if (!livekitUrl) {
+            if (!rtcReady) {
               setShowSettings(true);
               return;
             }

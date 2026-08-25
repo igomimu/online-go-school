@@ -13,14 +13,27 @@ LiveKit で映像音声＋データ通信、Supabase で対局状態を権威的
 
 ## アーキテクチャ
 - **Role**: `TEACHER`（ホスト） / `STUDENT`（ゲスト）
-- **Realtime transport**: LiveKit 一本化（旧 Agora + PeerJS は撤去済み）
-  - 映像音声、カーソル、描画、チャット、Board 更新メッセージをすべて LiveKit Room 経由で送受信
-  - `src/utils/classroomLiveKit.ts` が Room のラッパー
+- **Realtime transport**: 実装は2つあり、環境変数 `VITE_RTC_PROVIDER` / `RTC_PROVIDER` で選ぶ（既定 `livekit`）
+  - 映像音声、カーソル、描画、チャット、Board 更新メッセージをすべてこの経路で送受信
+  - `src/utils/classroomRtc.ts` … 型と `ClassroomRtc` インターフェース（アプリ側はこれだけを見る）
+  - `src/utils/classroomLiveKit.ts` … LiveKit Cloud 実装
+  - `src/utils/classroomRealtimeKit.ts` … Cloudflare RealtimeKit 実装
+  - `src/utils/rtcProvider.ts` … どちらを作るか決める
+  - **RealtimeKit で LiveKit と違うところ**（2026-08-26 実測）:
+    - **自分の送信が自分にも届く**。返事を返す作りだと無限に往復するので送り主を見て捨てる
+    - payload は平たいオブジェクトのみ → JSON 文字列に詰める（128KB まで到達を確認）
+    - 送信は既定で毎秒5回まで、超過は例外 → 入室時に 60回/秒へ引き上げ
+    - SDK の綴りが `noiseSupression`（p が1つ）。正しい綴りで書くと雑音抑制が効かない
+    - **誰も居ない meeting の `active-session` は 404**。例外にすると門番が fail-open で素通しになる
 - **Game authority**: Supabase 権威型
   - `live_games` / `live_moves` テーブル＋ Realtime で着手・時計・スコアリングを同期
   - `src/utils/liveGameApi.ts`, `src/hooks/useLiveGame.ts` が中核
   - メッセージ同期（旧 `BOARD_UPDATE` ブロードキャスト方式）は撤去され、Supabase row が真実
-- **Token発行**: Vercel Function `api/token.ts`（`livekit-server-sdk` で LiveKit JWT 発行）
+- **Token発行**: Vercel Function `api/token.ts`
+  - 認可（Supabase JWT / dojo-app 一時トークン）と先生の在室確認はここが持つ
+  - LiveKit のときは `livekit-server-sdk` で JWT を署名
+  - RealtimeKit のときは `api/realtimeKit.ts` 経由で meeting を用意して participant を足し、返ってきた authToken を渡す
+  - 教室 ↔ meeting の対応は `go_school_classrooms.realtime_meeting_id`（無ければ初回の入室時に作る）
 - **Auth**: 独自の localStorage ベース（`src/utils/authStore.ts`）
   - 生徒: `studentId + classroomId` でログイン
   - 先生: パスワード認証＋リセット機能あり
@@ -86,11 +99,18 @@ e2e/                                  # Playwright E2E（multi-user, multi-stude
 - pokekata との連携（Pocket KataGo で並べた局面をレッスンに持ち込む等、未設計）
 
 ## 環境変数（.env）
-- `VITE_LIVEKIT_URL`: LiveKit サーバー URL（例: `ws://172.25.188.94:7880`）
+- `VITE_RTC_PROVIDER`: `livekit`（既定） / `realtimekit`。**未設定なら LiveKit のまま動く**
+- `VITE_LIVEKIT_URL`: LiveKit サーバー URL（例: `ws://172.25.188.94:7880`）。RealtimeKit では不要
 - `VITE_LIVEKIT_API_KEY` / `VITE_LIVEKIT_API_SECRET`: 開発用フロント直発行用
 - `VITE_DOJO_SUPABASE_URL` / `VITE_DOJO_SUPABASE_KEY`: dojo Supabase接続
 - `VITE_KATAGO_SERVER_URL`: LEGION KataGoサーバー（例: `http://localhost:2718`）
-- Vercel デプロイ時のサーバー側: `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET`
+- Vercel デプロイ時のサーバー側:
+  - `RTC_PROVIDER`（フロントの `VITE_RTC_PROVIDER` と必ず揃える）
+  - LiveKit のとき: `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` / `LIVEKIT_URL`
+  - RealtimeKit のとき: `CLOUDFLARE_ACCOUNT_ID` / `REALTIMEKIT_APP_ID` / `CLOUDFLARE_REALTIME_TOKEN`
+- ローカル開発では `~/.secrets/cloudflare-realtime.env` を `scripts/dev-api-server.ts` が読む
+  （`RTC_PROVIDER=realtimekit npx tsx scripts/dev-api-server.ts` と
+  `VITE_RTC_PROVIDER=realtimekit npx vite` の2つを立てて検証する）
 
 ## UI/Design Standards
 → 詳細は `~/.claude/CLAUDE.md` の「UI/Design Standards」セクションを参照

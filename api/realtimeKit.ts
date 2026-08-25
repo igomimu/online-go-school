@@ -1,0 +1,170 @@
+/**
+ * Cloudflare RealtimeKit の REST API を叩く部分。
+ *
+ * LiveKit は「部屋名を決めてトークンを署名する」だけで済んだが、RealtimeKit は
+ *   1. 教室に対応する meeting を作る（UUID が振られるので教室と紐づけて覚える）
+ *   2. その meeting に participant を足すと authToken が返る
+ * という手順になる。参加者ごとにサーバーを1往復する。
+ */
+import { createClient } from '@supabase/supabase-js';
+
+const API_BASE = 'https://api.cloudflare.com/client/v4';
+
+/** 先生の identity（src/utils/identityUtils.ts の TEACHER_IDENTITY と同じ値） */
+export const TEACHER_IDENTITY = 'teacher';
+
+export interface RealtimeKitConfig {
+  accountId: string;
+  appId: string;
+  apiToken: string;
+}
+
+export function readRealtimeKitConfig(): RealtimeKitConfig | null {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const appId = process.env.REALTIMEKIT_APP_ID;
+  const apiToken = process.env.CLOUDFLARE_REALTIME_TOKEN;
+  if (!accountId || !appId || !apiToken) return null;
+  return { accountId, appId, apiToken };
+}
+
+function appUrl(cfg: RealtimeKitConfig, path: string): string {
+  return `${API_BASE}/accounts/${cfg.accountId}/realtime/kit/${cfg.appId}${path}`;
+}
+
+async function callRealtimeKit<T>(
+  cfg: RealtimeKitConfig,
+  path: string,
+  init?: { method?: string; body?: unknown; nullWhenNoSession?: boolean },
+): Promise<T> {
+  const res = await fetch(appUrl(cfg, path), {
+    method: init?.method ?? 'GET',
+    headers: {
+      'Authorization': `Bearer ${cfg.apiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: init?.body === undefined ? undefined : JSON.stringify(init.body),
+  });
+  // セッションがまだ無いとき 404、立ち上がりかけのとき 500 が返る（実測 2026-08-26）。
+  // 例外にすると呼び出し側の fail-open に落ちて、先生が居なくても生徒が入れてしまう。
+  if (init?.nullWhenNoSession && (res.status === 404 || res.status === 500)) return null as T;
+  const json = await res.json().catch(() => ({})) as { success?: boolean; data?: T; errors?: unknown };
+  if (!res.ok || json.success === false) {
+    throw new Error(`RealtimeKit ${path} が失敗しました (${res.status}): ${JSON.stringify(json.errors ?? {})}`);
+  }
+  return json.data as T;
+}
+
+/** roomName（go-<教室ID>）から教室IDを取り出す */
+export function classroomIdFromRoomName(roomName: string): string {
+  return roomName.startsWith('go-') ? roomName.slice('go-'.length) : roomName;
+}
+
+/**
+ * 教室に対応する meeting_id を返す。無ければ作って教室に書き戻す。
+ *
+ * 同時に2人が入ってきて二重に作られることがあるが、その場合も
+ * どちらか片方の ID に収束すれば同じ部屋に入れる。`is null` を条件にして
+ * 後から来たほうの書き込みを捨てている。
+ */
+export async function resolveMeetingId(
+  cfg: RealtimeKitConfig,
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  roomName: string,
+): Promise<string> {
+  const classroomId = classroomIdFromRoomName(roomName);
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  const { data: classroom, error } = await supabase
+    .from('go_school_classrooms')
+    .select('realtime_meeting_id')
+    .eq('id', classroomId)
+    .maybeSingle();
+
+  if (error) throw new Error(`教室の読み取りに失敗しました: ${error.message}`);
+  if (classroom?.realtime_meeting_id) return classroom.realtime_meeting_id;
+
+  const created = await callRealtimeKit<{ id: string }>(cfg, '/meetings', {
+    method: 'POST',
+    body: { title: roomName },
+  });
+
+  const { data: saved } = await supabase
+    .from('go_school_classrooms')
+    .update({ realtime_meeting_id: created.id })
+    .eq('id', classroomId)
+    .is('realtime_meeting_id', null)
+    .select('realtime_meeting_id')
+    .maybeSingle();
+
+  // 競争に負けたら、先に書かれたほうを使う（作ったばかりの meeting は捨てる）
+  return saved?.realtime_meeting_id ?? created.id;
+}
+
+/**
+ * 参加者を足して、そのまま接続に使える authToken を受け取る。
+ *
+ * custom_participant_id には LiveKit と同じ identity を入れる。
+ * アプリ側は identity をキーに名簿と突き合わせているので、ここを変えると
+ * 誰の映像か分からなくなる。
+ */
+export async function issueParticipantToken(
+  cfg: RealtimeKitConfig,
+  meetingId: string,
+  opts: { identity: string; username?: string; isTeacher: boolean },
+): Promise<string> {
+  const participant = await callRealtimeKit<{ token: string }>(
+    cfg,
+    `/meetings/${meetingId}/participants`,
+    {
+      method: 'POST',
+      body: {
+        name: opts.username ?? opts.identity,
+        preset_name: opts.isTeacher ? 'group_call_host' : 'group_call_participant',
+        custom_participant_id: opts.identity,
+      },
+    },
+  );
+  return participant.token;
+}
+
+/**
+ * その教室に先生が入っているか。
+ *
+ * 生徒だけで教室を使えないようにするための門番。繋がせてから切るのではなく
+ * 最初から繋がせないので、参加者分を1分も使わない。
+ *
+ * active-session は人数しか返さないので、セッションIDを取ってから
+ * 参加者を検索し、まだ出ていない（left_at が空）先生が居るかを見る。
+ *
+ * 🔴 誰も入っていない meeting の active-session は **404**、先生が入った直後の
+ * 立ち上がりかけは **500** を返す。これを例外にすると呼び出し側の fail-open に
+ * 落ちて、先生が居なくても生徒が入れてしまう（E2E の門番テストが落ちた 2026-08-26）。
+ *
+ * 🔴 先生が join してからセッションが見えるまで **約10秒** かかる（実測）。
+ * その間 生徒は「先生を待っています」の画面で自動的に入り直す。
+ */
+export async function isTeacherInMeeting(
+  cfg: RealtimeKitConfig,
+  meetingId: string,
+): Promise<boolean> {
+  const session = await callRealtimeKit<{ id?: string; status?: string } | null>(
+    cfg,
+    `/meetings/${meetingId}/active-session`,
+    { nullWhenNoSession: true },
+  );
+  if (!session?.id || session.status !== 'LIVE') return false;
+
+  const result = await callRealtimeKit<{ participants?: Array<{
+    custom_participant_id?: string;
+    left_at?: string | null;
+  }> }>(
+    cfg,
+    `/sessions/${session.id}/participants?search=${encodeURIComponent(TEACHER_IDENTITY)}&per_page=100`,
+  );
+
+  return (result?.participants ?? []).some(p =>
+    !p.left_at &&
+    (p.custom_participant_id ?? '').replace(/^sid:/, '') === TEACHER_IDENTITY,
+  );
+}

@@ -21,3 +21,12 @@ export function getRtcProvider(): RtcProvider {
 export function createClassroomRtc(provider: RtcProvider = getRtcProvider()): ClassroomRtc {
   return provider === 'realtimekit' ? new ClassroomRealtimeKit() : new ClassroomLiveKit();
 }
+
+/**
+ * 接続先の URL を人が設定する必要があるか。
+ * LiveKit はサーバーの URL を指定して繋ぐが、RealtimeKit はトークンだけで繋がるので
+ * 「URL が空だから入れない」という判定をしてはいけない。
+ */
+export function needsServerUrl(provider: RtcProvider = getRtcProvider()): boolean {
+  return provider === 'livekit';
+}

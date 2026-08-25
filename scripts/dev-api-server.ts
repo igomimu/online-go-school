@@ -43,6 +43,8 @@ loadEnvFile(path.resolve(process.cwd(), '.env.local'));
 loadEnvFile(path.join(process.env.HOME || '', '.secrets', 'supabase-dojo-service.env'));
 // ~/.secrets/online-go-school-katago.env (KATAGO_API_KEY for server-side use)
 loadEnvFile(path.join(process.env.HOME || '', '.secrets', 'online-go-school-katago.env'));
+// ~/.secrets/cloudflare-realtime.env (RealtimeKit の account_id / app_id / API トークン)
+loadEnvFile(path.join(process.env.HOME || '', '.secrets', 'cloudflare-realtime.env'));
 
 // --- dev 専用 env エイリアス ---
 // 本番(Vercel)では LIVEKIT_API_KEY 等の「VITE_ 接頭辞なし」サーバー側名を直接設定する。

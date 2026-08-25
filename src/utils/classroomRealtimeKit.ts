@@ -162,14 +162,15 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     });
 
     // 自分の映像・音声
+    //
+    // 🔴 カメラを切っても映像の枠は残す。LiveKit はトラックを消音にするだけで
+    // 黒い四角が残り、その上に「カメラ オフ」を被せる作りになっている。
+    // ここで枠ごと消すと、画面から自分のタイルが消えて札も出ない。
     meeting.self.on('videoUpdate', ({ videoEnabled, videoTrack }) => {
       const identity = this.localIdentity;
       if (videoEnabled && videoTrack) {
         const el = this.ensureVideoElement(identity, videoTrack);
         this.onVideoTrackChanged?.({ identity, element: el, isLocal: true });
-      } else {
-        this.removeVideoElement(identity);
-        this.onVideoTrackChanged?.({ identity, element: null, isLocal: true });
       }
       this.notifyParticipantsChanged();
     });
@@ -186,12 +187,10 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   private watchPeerMedia(p: RemotePeer) {
     const identity = this.identityOf(p);
     p.on('videoUpdate', ({ videoEnabled, videoTrack }) => {
+      // 切られても枠は残す（上に「カメラ オフ」が被る）。消すのは退室のとき
       if (videoEnabled && videoTrack) {
         const el = this.ensureVideoElement(identity, videoTrack);
         this.onVideoTrackChanged?.({ identity, element: el, isLocal: false });
-      } else {
-        this.removeVideoElement(identity);
-        this.onVideoTrackChanged?.({ identity, element: null, isLocal: false });
       }
       this.notifyParticipantsChanged();
     });
@@ -374,12 +373,17 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     }
   }
 
+  // 自分でマイク・カメラを操作したときは、イベント待ちにせずその場で知らせる。
+  // `videoUpdate` / `audioUpdate` が切ったときに飛ばないことがあり、
+  // 画面の「カメラ オフ」が被らないまま黒い四角が残る（2026-08-26 E2E で検出）。
   async enableMicrophone(): Promise<void> {
     await this.meeting?.self.enableAudio();
+    this.notifyParticipantsChanged();
   }
 
   async disableMicrophone(): Promise<void> {
     await this.meeting?.self.disableAudio();
+    this.notifyParticipantsChanged();
   }
 
   async toggleMicrophone(): Promise<boolean> {
@@ -391,10 +395,12 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
 
   async enableCamera(): Promise<void> {
     await this.meeting?.self.enableVideo();
+    this.notifyParticipantsChanged();
   }
 
   async disableCamera(): Promise<void> {
     await this.meeting?.self.disableVideo();
+    this.notifyParticipantsChanged();
   }
 
   async toggleCamera(): Promise<boolean> {

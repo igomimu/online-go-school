@@ -3,9 +3,23 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { identityBelongsToStudent } from './tokenAuth.js';
+import {
+  isTeacherInMeeting,
+  issueParticipantToken,
+  readRealtimeKitConfig,
+  resolveMeetingId,
+  TEACHER_IDENTITY,
+} from './realtimeKit.js';
 
-// 先生の LiveKit identity（src/utils/identityUtils.ts の TEACHER_IDENTITY と同じ値）
-const TEACHER_IDENTITY = 'teacher';
+/**
+ * どちらの基盤で教室を開くか。フロント側の VITE_RTC_PROVIDER と揃える。
+ * 既定は livekit。切り替えは Vercel の環境変数で行う。
+ */
+function rtcProvider(): 'livekit' | 'realtimekit' {
+  return (process.env.RTC_PROVIDER ?? '').toLowerCase() === 'realtimekit'
+    ? 'realtimekit'
+    : 'livekit';
+}
 
 /**
  * その教室に先生が入っているか、LiveKit に聞く。
@@ -52,13 +66,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const provider = rtcProvider();
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
   const supabaseUrl = process.env.VITE_DOJO_SUPABASE_URL || process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const anonKey = process.env.SUPABASE_ANON_KEY;
+  const rtkConfig = provider === 'realtimekit' ? readRealtimeKitConfig() : null;
 
-  if (!apiKey || !apiSecret || !supabaseUrl || !serviceRoleKey || !anonKey) {
+  if (!supabaseUrl || !serviceRoleKey || !anonKey) {
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+  if (provider === 'livekit' && (!apiKey || !apiSecret)) {
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+  if (provider === 'realtimekit' && !rtkConfig) {
     return res.status(500).json({ error: 'Server configuration error' });
   }
 
@@ -150,23 +172,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(403).json({ error: 'Forbidden: Unauthorized to join this room' });
   }
 
+  // RealtimeKit は教室ごとに meeting を持つ。先生の在室確認にも要るので先に引く。
+  let meetingId = '';
+  if (rtkConfig) {
+    try {
+      meetingId = await resolveMeetingId(rtkConfig, supabaseUrl, serviceRoleKey, roomName);
+    } catch (err) {
+      console.error('[token-auth] meeting resolve failed:', err instanceof Error ? err.message : err);
+      return res.status(500).json({ error: '教室を用意できませんでした' });
+    }
+  }
+
   // 先生が教室を開いていないうちは、生徒にトークンを渡さない。
   // 繋がせてから切るのではなく最初から繋がせないので、参加者分を1分も使わない。
   if (requesterIsStudent) {
-    const livekitHost = (process.env.LIVEKIT_URL || process.env.VITE_LIVEKIT_URL || '')
-      .replace(/^ws/, 'http');
-    if (!livekitHost) {
-      return res.status(500).json({ error: 'Server configuration error' });
-    }
     try {
-      if (!(await isTeacherInRoom(roomName, livekitHost, apiKey, apiSecret))) {
+      let teacherPresent: boolean;
+      if (rtkConfig) {
+        teacherPresent = await isTeacherInMeeting(rtkConfig, meetingId);
+      } else {
+        const livekitHost = (process.env.LIVEKIT_URL || process.env.VITE_LIVEKIT_URL || '')
+          .replace(/^ws/, 'http');
+        if (!livekitHost) {
+          return res.status(500).json({ error: 'Server configuration error' });
+        }
+        teacherPresent = await isTeacherInRoom(roomName, livekitHost, apiKey!, apiSecret!);
+      }
+      if (!teacherPresent) {
         return res.status(409).json({
           error: '先生がまだ教室を開いていません',
           reason: 'teacher_absent',
         });
       }
     } catch (err) {
-      // LiveKit に聞けなかったときは通す。門番が壊れて授業が止まる方が害が大きい。
+      // 基盤に聞けなかったときは通す。門番が壊れて授業が止まる方が害が大きい。
       console.error('[token-auth] teacher presence check failed:', err instanceof Error ? err.message : err);
     }
   }
@@ -193,8 +232,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  if (rtkConfig) {
+    try {
+      const rtkToken = await issueParticipantToken(rtkConfig, meetingId, {
+        identity,
+        username,
+        // 生徒でない要求は先生か保守。ホストの権限を渡す
+        isTeacher: !requesterIsStudent,
+      });
+      return res.status(200).json({ token: rtkToken });
+    } catch (err) {
+      console.error('[token-auth] RealtimeKit token failed:', err instanceof Error ? err.message : err);
+      return res.status(500).json({ error: '教室のトークンを発行できませんでした' });
+    }
+  }
+
   // LiveKit JWT 発行
-  const token = new AccessToken(apiKey, apiSecret, { identity, name: username });
+  const token = new AccessToken(apiKey!, apiSecret!, { identity, name: username });
   token.addGrant({
     room: roomName,
     roomJoin: true,
