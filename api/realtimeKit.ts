@@ -102,30 +102,25 @@ export async function resolveMeetingId(
 }
 
 /**
- * 参加者のトークンを返す。既に居る人は作り直さず、トークンだけ出し直す。
+ * 参加者を足して、そのまま接続に使える authToken を受け取る。
  *
  * custom_participant_id には LiveKit と同じ identity を入れる。
  * アプリ側は identity をキーに名簿と突き合わせているので、ここを変えると
  * 誰の映像か分からなくなる。
  *
- * 🔴 入り直すたびに participant を作ると、同じ人の記録が meeting に溜まる。
- * 在室確認は「まだ出ていない参加者」を見るので、古い記録が残ると先生が
- * 居ないのに居ることになりかねない。作るのは初回だけにする。
+ * 入り直すたびに記録は増えるが、その前に古い接続を切るので
+ * 在室確認（まだ出ていない人が居るか）は狂わない。
+ * 一度は「既存を探してトークンだけ出し直す」作りにしたが、
+ * 問い合わせが2回増えて入室が遅くなるうえ、重複接続そのものは防げなかった。
  */
 export async function issueParticipantToken(
   cfg: RealtimeKitConfig,
   meetingId: string,
   opts: { identity: string; username?: string; isTeacher: boolean },
 ): Promise<string> {
-  const existingId = await findParticipantId(cfg, meetingId, opts.identity);
-  if (existingId) {
-    const refreshed = await callRealtimeKit<{ token: string }>(
-      cfg,
-      `/meetings/${meetingId}/participants/${existingId}/token`,
-      { method: 'POST' },
-    );
-    if (refreshed?.token) return refreshed.token;
-  }
+  // 古い接続を切るのは生徒だけ。先生は検討を別ウィンドウで開くとき
+  // 同じ identity でもう一つ繋ぐので、切ると本体が落ちる。
+  if (!opts.isTeacher) await kickStaleConnection(cfg, meetingId, opts.identity);
 
   const participant = await callRealtimeKit<{ token: string }>(
     cfg,
@@ -160,27 +155,29 @@ const presenceCache = new Map<string, { present: boolean; at: number }>();
 const PRESENT_TTL_MS = 10_000;
 const ABSENT_TTL_MS = 3_000;
 
-/** その meeting に、この identity の参加者が既に登録されているか */
-async function findParticipantId(
+/**
+ * 同じ人の古い接続を切ってから入れる。
+ *
+ * 🔴 LiveKit は同じ identity で入り直すと古い接続を自分で切ってくれるが、
+ * RealtimeKit は切らずに両方つないだままにする。そのため入り直すたびに
+ * 参加者一覧に同じ生徒が増え、検討の配信先も分裂した（2026-08-26 実授業）。
+ * 繋ぎっぱなしの分だけ利用分数も食う。
+ *
+ * 切れなくても入室そのものは通す（入れないより二重のほうがまし）。
+ */
+async function kickStaleConnection(
   cfg: RealtimeKitConfig,
   meetingId: string,
   identity: string,
-): Promise<string | null> {
+): Promise<void> {
   try {
-    const result = await callRealtimeKit<{ participants?: Array<{
-      id?: string;
-      custom_participant_id?: string;
-    }> } | null>(
-      cfg,
-      `/meetings/${meetingId}/participants?search=${encodeURIComponent(identity)}&per_page=100`,
-    );
-    const hit = (result?.participants ?? []).find(
-      p => p.custom_participant_id === identity,
-    );
-    return hit?.id ?? null;
-  } catch {
-    // 探せなかったら新しく作る側に倒す（入れないより作りすぎのほうがまし）
-    return null;
+    await callRealtimeKit(cfg, `/meetings/${meetingId}/active-session/kick`, {
+      method: 'POST',
+      body: { custom_participant_ids: [identity] },
+      nullWhenNoSession: true,
+    });
+  } catch (err) {
+    console.warn('[token-auth] 古い接続を切れませんでした:', err instanceof Error ? err.message : err);
   }
 }
 
