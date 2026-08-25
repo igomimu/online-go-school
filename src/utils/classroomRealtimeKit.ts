@@ -39,9 +39,6 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   private handlers: ClassroomEventHandler = {};
   private _videoElements = new Map<string, HTMLVideoElement>();
   private _audioElements = new Map<string, HTMLAudioElement>();
-  /** RealtimeKit の peerId → アプリが使う identity（custom_participant_id） */
-  private identityByPeerId = new Map<string, string>();
-  private peerIdByIdentity = new Map<string, string>();
   private _state: ConnectionState = ConnectionState.Disconnected;
   /** 生徒側で「先生の声を止める」を効かせるための現在値 */
   private remoteAudioEnabled = true;
@@ -82,8 +79,8 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
 
     // 入室した時点で既に居る人はイベントが飛ばないので、ここで拾っておく
     meeting.participants.joined.toArray().forEach((p) => {
-      this.registerPeer(p);
       this.attachRemoteTracks(p);
+      this.watchPeerMedia(p);
     });
 
     this.setState(ConnectionState.Connected);
@@ -96,10 +93,11 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     this.handlers.onConnectionStateChanged?.(state);
   }
 
-  private registerPeer(p: RemotePeer) {
-    const identity = this.identityOf(p);
-    this.identityByPeerId.set(p.id, identity);
-    this.peerIdByIdentity.set(identity, p.id);
+  /** peerId から identity を引く。覚えず、そのつど今の参加者を見る */
+  private identityOfPeerId(peerId: string): string {
+    const hit = (this.meeting?.participants.joined.toArray() ?? [])
+      .find((p) => p.id === peerId);
+    return hit ? this.identityOf(hit) : peerId;
   }
 
   /**
@@ -118,14 +116,13 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
       try {
         const raw = typeof payload.d === 'string' ? payload.d : 'null';
         const msg: ClassroomMessage = { type: type as ClassroomMessage['type'], payload: JSON.parse(raw) };
-        this.handlers.onMessage?.(msg, this.identityByPeerId.get(from) ?? from);
+        this.handlers.onMessage?.(msg, this.identityOfPeerId(from));
       } catch {
         // 壊れたデータは黙って捨てる（LiveKit 版と同じ）
       }
     });
 
     meeting.participants.joined.on('participantJoined', (p) => {
-      this.registerPeer(p);
       this.handlers.onParticipantJoined?.(this.identityOf(p), p.name);
       this.attachRemoteTracks(p);
       this.watchPeerMedia(p);
@@ -135,14 +132,12 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     meeting.participants.joined.on('participantLeft', (p) => {
       const identity = this.identityOf(p);
       this.detachRemote(identity);
-      this.identityByPeerId.delete(p.id);
-      this.peerIdByIdentity.delete(identity);
       this.handlers.onParticipantLeft?.(identity, p.name);
       this.notifyParticipantsChanged();
     });
 
     meeting.participants.on('activeSpeaker', ({ peerId }) => {
-      const identity = this.identityByPeerId.get(peerId);
+      const identity = this.identityOfPeerId(peerId);
       this.handlers.onActiveSpeakersChanged?.(identity ? [identity] : []);
     });
 
@@ -331,10 +326,18 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     await this.sendTo(msg, identities);
   }
 
+  /**
+   * 🔴 宛先は覚えたものを使わず、送るたびに今の参加者から引く。
+   *
+   * RealtimeKit の participantId は入り直すたびに変わる。入退室のイベントで
+   * 覚えておく作りにしていたら、生徒が入り直したあと古いIDへ送り続け、
+   * **先生の画面には入室して見えるのにメッセージだけ誰にも届かない**状態になった
+   * （2026-08-26 実授業で発覚。検討を閉じても生徒の画面に残り続けた）。
+   */
   async sendTo(msg: ClassroomMessage, identities: string[]): Promise<void> {
-    const participantIds = identities
-      .map((id) => this.peerIdByIdentity.get(id))
-      .filter((id): id is string => !!id);
+    const participantIds = (this.meeting?.participants.joined.toArray() ?? [])
+      .filter((p) => identities.includes(this.identityOf(p)))
+      .map((p) => p.id);
     if (participantIds.length === 0) return;
     await this.send(msg, participantIds);
   }
