@@ -110,7 +110,9 @@ function VideoTile({
         />
         {!cameraOn && <CameraOffCover variant="classroom" />}
         {!micOn && <MicOffBadge variant="classroom" />}
-        <span className="absolute inset-x-0 bottom-0 z-20 px-2 py-1 bg-black/70 text-xs text-white truncate">
+        {/* 名前の帯で映像を隠さない。背景は敷かず、白文字に濃い影を付けて
+            明るい映像の上でも読めるようにする。 */}
+        <span className="absolute inset-x-0 bottom-0 z-20 px-2 py-1 text-xs text-white truncate [text-shadow:0_1px_2px_rgba(0,0,0,0.95),0_0_5px_rgba(0,0,0,0.8)]">
           {displayLabel}
         </span>
         <button

@@ -55,6 +55,21 @@ describe('VideoTiles', () => {
     expect(screen.getByText('金子 大地')).toBeInTheDocument();
   });
 
+  it('名前の帯で映像を隠さない（背景を敷かず、影で読ませる）', () => {
+    render(
+      <VideoTiles
+        videoElements={new Map([['sid:1004', videoEl()]])}
+        localIdentity="teacher"
+        participants={participants}
+        variant="classroom"
+      />,
+    );
+
+    const label = screen.getByText('金子 大地');
+    expect(label.className).not.toMatch(/bg-black/);
+    expect(label.className).toMatch(/text-shadow/);
+  });
+
   it('全画面ボタンで選んだ参加者の映像だけを拡大する', () => {
     const studentVideo = document.createElement('video');
     const requestFullscreen = vi.fn().mockResolvedValue(undefined);
