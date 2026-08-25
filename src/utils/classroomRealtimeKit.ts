@@ -78,7 +78,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     await this.applySavedDevices();
 
     // 入室した時点で既に居る人はイベントが飛ばないので、ここで拾っておく
-    meeting.participants.joined.toArray().forEach((p) => {
+    this.remotePeers().forEach((p) => {
       this.attachRemoteTracks(p);
       this.watchPeerMedia(p);
     });
@@ -91,6 +91,21 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     if (this._state === state) return;
     this._state = state;
     this.handlers.onConnectionStateChanged?.(state);
+  }
+
+  /**
+   * 自分以外の参加者。
+   *
+   * 🔴 `participants.joined` に自分が入っていることがあり、そのまま並べると
+   * 参加者一覧に自分が2人出る（2026-08-26 実授業で発覚）。
+   * 含まれていても含まれていなくても正しくなるよう、必ずここで除く。
+   */
+  private remotePeers(): RemotePeer[] {
+    const me = this.meeting?.self.id;
+    const myIdentity = this.localIdentity;
+    return (this.meeting?.participants.joined.toArray() ?? []).filter(
+      (p) => p.id !== me && this.identityOf(p) !== myIdentity,
+    );
   }
 
   /** peerId から identity を引く。覚えず、そのつど今の参加者を見る */
@@ -175,7 +190,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
       this.notifyParticipantsChanged();
     });
 
-    meeting.participants.joined.toArray().forEach((p) => this.watchPeerMedia(p));
+    this.remotePeers().forEach((p) => this.watchPeerMedia(p));
   }
 
   /** 相手ごとの映像・音声の増減を追う */
@@ -288,7 +303,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
       videoEnabled: meeting.self.videoEnabled,
       name: meeting.self.name,
     }];
-    meeting.participants.joined.toArray().forEach((p) => {
+    this.remotePeers().forEach((p) => {
       list.push({
         identity: this.identityOf(p),
         isSpeaking: false,
@@ -301,11 +316,11 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   }
 
   get remoteIdentities(): string[] {
-    return (this.meeting?.participants.joined.toArray() ?? []).map((p) => this.identityOf(p));
+    return this.remotePeers().map((p) => this.identityOf(p));
   }
 
   get remoteParticipantCount(): number {
-    return this.meeting?.participants.joined.size ?? 0;
+    return this.remotePeers().length;
   }
 
   async broadcast(msg: ClassroomMessage): Promise<void> {
@@ -335,7 +350,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
    * （2026-08-26 実授業で発覚。検討を閉じても生徒の画面に残り続けた）。
    */
   async sendTo(msg: ClassroomMessage, identities: string[]): Promise<void> {
-    const participantIds = (this.meeting?.participants.joined.toArray() ?? [])
+    const participantIds = this.remotePeers()
       .filter((p) => identities.includes(this.identityOf(p)))
       .map((p) => p.id);
     if (participantIds.length === 0) return;
@@ -423,7 +438,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
 
   setRemoteAudioEnabled(enabled: boolean): void {
     this.remoteAudioEnabled = enabled;
-    this.meeting?.participants.joined.toArray().forEach((p) => {
+    this.remotePeers().forEach((p) => {
       if (p.audioTrack) p.audioTrack.enabled = enabled;
     });
   }
@@ -441,7 +456,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     const tracks: MediaStreamTrack[] = [];
     const mic = this.meeting?.self.audioTrack;
     if (mic) tracks.push(mic);
-    this.meeting?.participants.joined.toArray().forEach((p) => {
+    this.remotePeers().forEach((p) => {
       if (p.audioTrack) tracks.push(p.audioTrack);
     });
     return tracks;
@@ -456,7 +471,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   }
 
   getAudioDebugInfo(): AudioDebugInfo {
-    const peers = this.meeting?.participants.joined.toArray() ?? [];
+    const peers = this.remotePeers();
     return {
       remoteCount: peers.length,
       localAudioTrackCount: this.meeting?.self.audioTrack ? 1 : 0,
