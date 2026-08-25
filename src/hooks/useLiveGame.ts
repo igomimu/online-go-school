@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { StoneColor, BoardState } from '../components/GoBoard';
 import { createEmptyBoard, checkCapture, boardHash, isLegalMove } from '../utils/gameLogic';
 import { getHandicapStones } from '../utils/handicapStones';
+import { fetchDeadStoneDraft } from '../utils/deadStoneDraft';
 import { studentMatchesPlayer, isTeacherIdentity } from '../utils/identityUtils';
 import {
   getByoyomiAnnouncement,
@@ -23,6 +24,7 @@ import {
   subscribeLiveGame,
   enterScoring as apiEnterScoring,
   updateDeadStones as apiUpdateDeadStones,
+  confirmScoring as apiConfirmScoring,
   finishGame as apiFinishGame,
   resetLiveGame as apiResetLiveGame,
   interruptGame as apiInterruptGame,
@@ -180,6 +182,15 @@ export interface UseLiveGameResult {
   enterScoring: () => Promise<void>;
   setDeadStones: (deadStones: string[]) => Promise<void>;
   finishWithResult: (result: string) => Promise<void>;
+  /**
+   * 整地を確定する。対局者は黒白が揃った時点で終局し、
+   * 講師は対局者が操作できないときの代行として単独で終局させられる。
+   */
+  confirmScoring: (result: string) => Promise<void>;
+  /** KataGo に死石の下書きを作らせる（決めるのは対局者。いつでも引き直せる） */
+  draftDeadStonesWithAi: () => Promise<void>;
+  /** 下書きを取りに行っている最中か */
+  deadStoneDraftLoading: boolean;
   resetGame: () => Promise<void>;
   /** 講師が対局を打ち掛けにし、棋譜履歴から後で再開できる状態にする */
   interruptGame: () => Promise<void>;
@@ -200,6 +211,7 @@ export function useLiveGame(
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [localClock, setLocalClock] = useState<GameClock | null>(null);
+  const [deadStoneDraftLoading, setDeadStoneDraftLoading] = useState(false);
   // interval コールバックが setState updater を介さず現在値を読むためのミラー
   // （読み上げ副作用を updater の外に出すため。updater は React が2回呼び直すことがある）
   const localClockRef = useRef<GameClock | null>(null);
@@ -636,6 +648,8 @@ export function useLiveGame(
       if (isSecondPass) {
         try {
           await apiEnterScoring(game.id);
+          // 下書きは待たない。整地の画面は先に出し、付いたら盤に反映される
+          void draftDeadStonesRef.current();
         } catch (e) {
           setError(String(e));
         }
@@ -985,11 +999,48 @@ export function useLiveGame(
     }
   }, [activeGame, classroom]);
 
+  /**
+   * KataGo に一度だけ聞いて、死石に下書きを付ける。
+   * 大手のネット碁と同じで、AIが出すのは下書き。違うところは対局者がクリックで直す。
+   * 分析に失敗しても整地はそのまま続けられる（下書きが付かないだけ）。
+   */
+  const draftDeadStonesWithAi = useCallback(async () => {
+    const game = activeGame;
+    if (!game) return;
+    setDeadStoneDraftLoading(true);
+    try {
+      const draft = await fetchDeadStoneDraft(game, moves, derived.boardState, derived.currentColor);
+      if (draft && draft.length > 0) {
+        await apiUpdateDeadStones(game.id, draft);
+      }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setDeadStoneDraftLoading(false);
+    }
+  }, [activeGame, moves, derived.boardState, derived.currentColor]);
+
+  // submitPass から呼ぶための最新版の入れ物（submitPass の方が先に定義されるため）
+  const draftDeadStonesRef = useRef(draftDeadStonesWithAi);
+  draftDeadStonesRef.current = draftDeadStonesWithAi;
+
   const setDeadStones = useCallback(
     async (deadStones: string[]) => {
       if (!activeGame) return;
       try {
         await apiUpdateDeadStones(activeGame.id, deadStones);
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [activeGame],
+  );
+
+  const confirmScoring = useCallback(
+    async (result: string) => {
+      if (!activeGame) return;
+      try {
+        await apiConfirmScoring(activeGame.id, result);
       } catch (e) {
         setError(String(e));
       }
@@ -1064,6 +1115,9 @@ export function useLiveGame(
     enterScoring: enterScoringFn,
     setDeadStones,
     finishWithResult,
+    confirmScoring,
+    draftDeadStonesWithAi,
+    deadStoneDraftLoading,
     resetGame,
     requestUndo: requestUndoFn,
     respondUndo: respondUndoFn,

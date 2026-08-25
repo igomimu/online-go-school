@@ -37,6 +37,8 @@ describe('GameBoard', () => {
   const mockSubmitResign = vi.fn();
   const mockSetDeadStones = vi.fn();
   const mockFinishWithResult = vi.fn();
+  const mockConfirmScoring = vi.fn();
+  const mockDraftDeadStones = vi.fn();
   const mockInterruptGame = vi.fn();
   const mockResumeGame = vi.fn();
 
@@ -68,6 +70,7 @@ describe('GameBoard', () => {
       komi: rawGame.komi,
       status: rawGame.status,
       scoring_dead_stones: scoringDeadStones,
+      scoring_confirmed: rawGame.scoring_confirmed ?? [],
       result: rawGame.result,
     } : null;
 
@@ -91,6 +94,9 @@ describe('GameBoard', () => {
       enterScoring: vi.fn(),
       setDeadStones: mockSetDeadStones,
       finishWithResult: mockFinishWithResult,
+      confirmScoring: mockConfirmScoring,
+      draftDeadStonesWithAi: mockDraftDeadStones,
+      deadStoneDraftLoading: false,
       resetGame: vi.fn(),
       interruptGame: mockInterruptGame,
       resumeGame: mockResumeGame,
@@ -326,6 +332,105 @@ describe('GameBoard', () => {
     );
     // 盤はロックされ、クリック可能なセルが存在しない
     expect(container.querySelector('[data-cell]')).toBeNull();
+  });
+
+  // ── 整地は対局者が行う（IGCと同じ。講師は操作できない子の代行） ──
+  function scoringGameWithStone(overrides: any = {}) {
+    const boardState = createEmptyBoard(9);
+    boardState[0][0] = { color: 'WHITE' };
+    return createMockGame({
+      blackPlayer: 'たろう',
+      whitePlayer: 'はなこ',
+      status: 'scoring',
+      boardState,
+      ...overrides,
+    });
+  }
+
+  it('対局者は整地中に死んでいる石をクリックして指定できる', () => {
+    const game = scoringGameWithStone();
+    setupMock({ game });
+    const { container } = render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+
+    expect(screen.getByText(/死んでいる石をクリック/)).toBeInTheDocument();
+    fireEvent.click(container.querySelectorAll('[data-cell]')[0]);
+    expect(mockSetDeadStones).toHaveBeenCalledWith(['1,1']);
+  });
+
+  it('観戦している生徒は死石を指定できず、確定も出さない', () => {
+    const game = scoringGameWithStone({ blackPlayer: 'ほかの子', whitePlayer: 'はなこ' });
+    setupMock({ game });
+    const { container } = render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+
+    // 触れる升そのものが無い（盤はロックされている）
+    expect(container.querySelector('[data-cell]')).toBeNull();
+    expect(mockSetDeadStones).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('confirm-scoring')).not.toBeInTheDocument();
+    expect(screen.getByText(/整地中です/)).toBeInTheDocument();
+  });
+
+  it('対局者が確定を押すと、数えた結果を添えて確定を送る', () => {
+    const game = scoringGameWithStone();
+    setupMock({ game });
+    render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+
+    fireEvent.click(screen.getByTestId('confirm-scoring'));
+    expect(mockConfirmScoring).toHaveBeenCalledTimes(1);
+    expect(mockConfirmScoring.mock.calls[0][0]).toMatch(/^(B\+|W\+|Draw)/);
+    expect(mockFinishWithResult).not.toHaveBeenCalled();
+  });
+
+  it('自分が確定したら相手待ちになり、二度は押せない', () => {
+    const game = scoringGameWithStone({ scoring_confirmed: ['BLACK'] });
+    setupMock({ game });
+    render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+
+    expect(screen.getByTestId('scoring-confirm-state')).toHaveTextContent('相手の確定を待っています');
+    expect(screen.getByTestId('confirm-scoring')).toBeDisabled();
+  });
+
+  it('相手が先に確定したら、その旨を出して自分の確定を促す', () => {
+    const game = scoringGameWithStone({ scoring_confirmed: ['WHITE'] });
+    setupMock({ game });
+    render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+
+    expect(screen.getByTestId('scoring-confirm-state')).toHaveTextContent('相手が確定しました');
+    expect(screen.getByTestId('confirm-scoring')).toBeEnabled();
+  });
+
+  it('対局者でない講師にも、代行のための確定と中断を出す', () => {
+    const game = scoringGameWithStone({ blackPlayer: '生徒A', whitePlayer: '生徒B' });
+    setupMock({ game });
+    render(<GameBoard gameId="game-1" myIdentity="先生" isTeacher />);
+
+    expect(screen.getByTestId('confirm-scoring')).toBeEnabled();
+    expect(screen.getByTestId('interrupt-game')).toBeInTheDocument();
+  });
+
+  it('整地では対局者がAIに死石の下書きを引き直させられる', () => {
+    const game = scoringGameWithStone();
+    setupMock({ game });
+    render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+
+    fireEvent.click(screen.getByTestId('draft-dead-stones'));
+    expect(mockDraftDeadStones).toHaveBeenCalledTimes(1);
+  });
+
+  it('下書きを作っている間はその旨を出し、二度押させない', () => {
+    const game = scoringGameWithStone();
+    setupMock({ game, deadStoneDraftLoading: true });
+    render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+
+    expect(screen.getByTestId('dead-stone-draft-loading')).toBeInTheDocument();
+    expect(screen.getByTestId('draft-dead-stones')).toBeDisabled();
+  });
+
+  it('観戦している生徒にはAIの下書きボタンを出さない', () => {
+    const game = scoringGameWithStone({ blackPlayer: 'ほかの子', whitePlayer: 'はなこ' });
+    setupMock({ game });
+    render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+
+    expect(screen.queryByTestId('draft-dead-stones')).not.toBeInTheDocument();
   });
 
   it('先生は整地中に描画モードで線を引けるが死石マーキングとは別動作になる', () => {

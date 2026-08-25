@@ -43,6 +43,8 @@ export function ensureRealtimeAuth(): Promise<void> {
   return realtimeAuthReady;
 }
 
+export type ScoringColor = 'BLACK' | 'WHITE';
+
 export interface UndoRequest {
   requested_by: string;
   requested_color: StoneColor;
@@ -61,6 +63,8 @@ export interface LiveGameRow {
   status: 'playing' | 'scoring' | 'finished' | 'interrupted';
   result: string | null;
   scoring_dead_stones: string[];
+  /** 整地の「確定」を押した対局者の色。黒白が揃った時点で終局する */
+  scoring_confirmed: ScoringColor[] | null;
   clock: GameClock | null;
   undo_request: UndoRequest | null;
   created_at: string;
@@ -151,7 +155,7 @@ async function getRoleAuthToken(sb: SupabaseClient): Promise<string | null> {
 }
 
 async function executeGameAction(
-  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'delete_saved_game' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all' | 'request_undo' | 'respond_undo' | 'list_active_for_players',
+  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'confirm_scoring' | 'finish' | 'delete_saved_game' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all' | 'request_undo' | 'respond_undo' | 'list_active_for_players',
   gameId?: string,
   params?: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
@@ -313,6 +317,23 @@ export async function enterScoring(gameId: string): Promise<void> {
 
 export async function updateDeadStones(gameId: string, deadStones: string[]): Promise<void> {
   await executeGameAction('update_dead_stones', gameId, { dead_stones: deadStones });
+}
+
+export interface ConfirmScoringResult {
+  confirmed: ScoringColor[];
+  finished: boolean;
+}
+
+/**
+ * 整地を確定する。対局者は黒白が揃った時点で終局し、
+ * 講師は対局者が操作できないときの代行として単独で終局させられる。
+ */
+export async function confirmScoring(gameId: string, result: string): Promise<ConfirmScoringResult> {
+  const res = await executeGameAction('confirm_scoring', gameId, { result });
+  return {
+    confirmed: Array.isArray(res.confirmed) ? res.confirmed as ScoringColor[] : [],
+    finished: res.finished === true,
+  };
 }
 
 export async function finishGame(gameId: string, result: string): Promise<void> {

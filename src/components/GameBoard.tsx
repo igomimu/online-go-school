@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import GoBoard from './GoBoard';
 import ZoomTapConfirm from './ZoomTapConfirm';
 import type { Drawing, Marker } from './GoBoard';
-import { Flag, SkipForward, Check, RefreshCw, Pause, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban, Triangle, MousePointerClick, Eye } from 'lucide-react';
+import { Flag, SkipForward, Check, RefreshCw, Pause, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban, Triangle, MousePointerClick, Eye, Sparkles } from 'lucide-react';
 import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, formatKomiLabel, isTimeoutResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
@@ -53,6 +53,9 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     submitResign,
     setDeadStones,
     finishWithResult,
+    confirmScoring,
+    draftDeadStonesWithAi,
+    deadStoneDraftLoading,
     resetGame,
     interruptGame,
     resumeGame,
@@ -81,6 +84,13 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
 
   const isScoring = game?.status === 'scoring';
   const undoRequest = game?.undo_request ?? null;
+  // 整地は対局者が行う。講師は、対局者が操作できないときの代行として同じことができる。
+  const canScore = isScoring && (isParticipant || !!isTeacher);
+  const scoringConfirmed = game?.scoring_confirmed ?? [];
+  const opponentColor = myColor === 'BLACK' ? 'WHITE' : myColor === 'WHITE' ? 'BLACK' : null;
+  // 自分が確定済みなら、相手が押すまで待つ（死石を触ると双方の確定は外れる）
+  const iConfirmedScoring = !!myColor && scoringConfirmed.includes(myColor);
+  const opponentConfirmedScoring = !!opponentColor && scoringConfirmed.includes(opponentColor);
   // 着手できるのは手番の対局者本人のみ。対局中の代打ちは（先生でも）一切不可。
   // 「待った」申請中は双方とも着手不可（サーバー側のsubmit_move 409ガードと二重の防御）。
   const canPlay = game?.status === 'playing' && isMyTurn && !undoRequest;
@@ -155,7 +165,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     async (x: number, y: number) => {
       if (!game) return;
       if (isScoring) {
-        if (!isTeacher) return;
+        if (!isParticipant && !isTeacher) return;
         const stone = boardState[y - 1]?.[x - 1];
         if (!stone) return;
         const group = findGroup(boardState, x - 1, y - 1, stone.color, game.board_size);
@@ -175,7 +185,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
       await submitMove(x, y);
       onMoveSubmitted?.();
     },
-    [game, isScoring, isTeacher, boardState, isMyTurn, submitMove, setDeadStones, onMoveSubmitted],
+    [game, isScoring, isTeacher, isParticipant, boardState, isMyTurn, submitMove, setDeadStones, onMoveSubmitted],
   );
 
   // スマホのタップミス対策: 対局中の自分の手番のみ、1回目のタップでは確定せず
@@ -216,8 +226,9 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   const handleScoringConfirm = useCallback(() => {
     if (!scoringResult) return;
     const resultStr = formatScoringResult(scoringResult);
-    finishWithResult(resultStr);
-  }, [scoringResult, finishWithResult]);
+    // 対局者は双方が押した時点で終局する。講師が押したときは代行として即終局。
+    void confirmScoring(resultStr);
+  }, [scoringResult, confirmScoring]);
 
   const handleInterruptClick = useCallback(async () => {
     if (!isTeacher) return;
@@ -574,7 +585,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
             isDrawing
               ? undefined
               : isScoring
-              ? isTeacher
+              ? canScore
                 ? handleBoardCellClick
                 : undefined
               : game.status === 'playing'
@@ -585,7 +596,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
             isDrawing
               ? false
               : isScoring
-              ? !isTeacher
+              ? !canScore
               : game.status !== 'playing' || !isMyTurn || !!undoRequest
           }
           onCellMouseEnter={canPlay && !isDrawing ? (x, y) => setGhostPos({ x, y }) : undefined}
@@ -664,8 +675,13 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
           <div className="glass-panel px-4 py-3">
             {/* 指示文なので生成りで読ませ、榧は結果と「確定」に取っておく */}
             <div className="text-center text-sm font-bold text-ink mb-2">
-              整地モード {isTeacher ? '— 死石をクリックしてマークしてください' : '— 先生が整地中です'}
+              整地モード {canScore ? '— 死んでいる石をクリックしてください' : '— 整地中です'}
             </div>
+            {deadStoneDraftLoading && (
+              <div data-testid="dead-stone-draft-loading" className="text-center text-xs text-muted mb-2">
+                AIが死石の下書きを作っています…
+              </div>
+            )}
             <div className="flex justify-center gap-8 text-sm">
               <div className="text-center">
                 <div className="text-muted">黒</div>
@@ -687,18 +703,44 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               </div>
             </div>
           </div>
-          {isTeacher && (
+          {/* どちらが確定したかは、押した後に何が起きるか分からなくならないよう常に出す */}
+          {scoringConfirmed.length > 0 && (
+            <div data-testid="scoring-confirm-state" className="text-center text-xs text-muted">
+              {iConfirmedScoring && !opponentConfirmedScoring
+                ? '確定しました。相手の確定を待っています。'
+                : opponentConfirmedScoring && !iConfirmedScoring
+                  ? '相手が確定しました。よければ「確定」を押してください。'
+                  : `${scoringConfirmed.includes('BLACK') ? '黒 確定済み' : '黒 まだ'} ・ ${scoringConfirmed.includes('WHITE') ? '白 確定済み' : '白 まだ'}`}
+            </div>
+          )}
+          {(canScore || isTeacher) && (
             <div className="flex justify-center gap-3">
-              <button onClick={handleScoringConfirm} className="premium-button flex items-center gap-2 text-sm">
-                <Check className="w-4 h-4" /> 確定
+              <button
+                data-testid="draft-dead-stones"
+                onClick={() => { void draftDeadStonesWithAi(); }}
+                disabled={deadStoneDraftLoading}
+                title="AIに死石の下書きを作らせます。違うところはクリックで直せます"
+                className="secondary-button flex items-center gap-2 text-sm disabled:opacity-55"
+              >
+                <Sparkles className="w-4 h-4" /> AIの下書き
               </button>
               <button
-                data-testid="interrupt-game"
-                onClick={handleInterruptClick}
-                className="secondary-button flex items-center gap-2 text-sm"
+                data-testid="confirm-scoring"
+                onClick={handleScoringConfirm}
+                disabled={iConfirmedScoring}
+                className="premium-button flex items-center gap-2 text-sm disabled:opacity-55"
               >
-                <Pause className="w-4 h-4" /> 中断
+                <Check className="w-4 h-4" /> {iConfirmedScoring ? '相手の確定待ち' : '確定'}
               </button>
+              {isTeacher && (
+                <button
+                  data-testid="interrupt-game"
+                  onClick={handleInterruptClick}
+                  className="secondary-button flex items-center gap-2 text-sm"
+                >
+                  <Pause className="w-4 h-4" /> 中断
+                </button>
+              )}
             </div>
           )}
         </div>

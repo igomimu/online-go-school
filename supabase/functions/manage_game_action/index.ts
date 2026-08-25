@@ -3,6 +3,7 @@ import { studentMatchesPlayer, toStudentIdentity, playersMatchPair, resolvePlaye
 import { exportLiveGameToSgf, formatTokyoSgfDate } from '../_shared/sgf.ts'
 import { restoreClockForTimeout, startClock, timedOutColorFromResult } from '../_shared/clock.ts'
 import { NEW_GAME_BLOCKING_STATUSES, shouldCloseLiveGameWhenDeletingHistory } from '../_shared/game_lifecycle.ts'
+import { applyScoringConfirmation } from '../_shared/scoring_confirm.ts'
 import { versionResponse } from '../_shared/version.ts'
 
 const corsHeaders = {
@@ -12,7 +13,7 @@ const corsHeaders = {
 }
 
 interface ActionBody {
-  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'finish' | 'delete_saved_game' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all' | 'request_undo' | 'respond_undo' | 'list_active_for_players'
+  action: 'create' | 'enter_scoring' | 'update_dead_stones' | 'confirm_scoring' | 'finish' | 'delete_saved_game' | 'update_clock' | 'reset' | 'resume' | 'interrupt' | 'interrupt_all' | 'request_undo' | 'respond_undo' | 'list_active_for_players'
   game_id?: string
   params?: any
 }
@@ -228,6 +229,7 @@ Deno.serve(async (req) => {
         .update({
           status: 'scoring',
           scoring_dead_stones: [],
+          scoring_confirmed: [],
           updated_at: new Date().toISOString(),
         })
         .eq('id', game_id)
@@ -284,12 +286,75 @@ Deno.serve(async (req) => {
         .from('go_school_live_games')
         .update({
           scoring_dead_stones: dead_stones ?? [],
+          // 死石が変わったら、前の盤面への同意は無効にする
+          scoring_confirmed: [],
           updated_at: new Date().toISOString(),
         })
         .eq('id', game_id)
 
       if (error) throw error
       return json({ ok: true })
+    }
+
+    // 整地の確定。対局者は黒白が揃った時点で終局する。
+    // 講師は、対局者が操作できないときの代行として単独で終局させられる。
+    if (action === 'confirm_scoring') {
+      const { result } = params || {}
+      if (!game_id) {
+        return json({ error: 'Missing game_id for confirm_scoring' }, 400)
+      }
+      if (!result) {
+        return json({ error: 'Missing result for confirm_scoring' }, 400)
+      }
+
+      const { data: gameToConfirm, error: confirmGameErr } = await supabase
+        .from('go_school_live_games')
+        .select('id, black_player, white_player, board_size, handicap, komi, status, scoring_confirmed')
+        .eq('id', game_id)
+        .single()
+
+      if (confirmGameErr) throw confirmGameErr
+      if (gameToConfirm.status !== 'scoring') {
+        return json({ error: 'Game is not in scoring' }, 409)
+      }
+
+      const callerColor = resolvePlayerColor(
+        { isTeacher, studentId: validatedStudentId },
+        gameToConfirm,
+      )
+      // 観戦している生徒に終局させない
+      if (!callerColor && !isTeacher && !isServiceRole) {
+        return json({ error: 'Forbidden: You are not a player of this game' }, 403)
+      }
+
+      const { confirmed, finished } = applyScoringConfirmation(
+        gameToConfirm.scoring_confirmed,
+        { color: callerColor, isTeacher: isTeacher || isServiceRole },
+      )
+
+      if (!finished) {
+        const { error: confirmErr } = await supabase
+          .from('go_school_live_games')
+          .update({ scoring_confirmed: confirmed, updated_at: new Date().toISOString() })
+          .eq('id', game_id)
+        if (confirmErr) throw confirmErr
+        return json({ ok: true, confirmed, finished: false })
+      }
+
+      const { error: finishErr } = await supabase
+        .from('go_school_live_games')
+        .update({
+          status: 'finished',
+          result,
+          scoring_confirmed: confirmed,
+          undo_request: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', game_id)
+      if (finishErr) throw finishErr
+
+      await saveGameHistory(supabase, gameToConfirm, result)
+      return json({ ok: true, confirmed, finished: true })
     }
 
     if (action === 'finish') {
