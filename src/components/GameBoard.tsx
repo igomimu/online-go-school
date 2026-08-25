@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import GoBoard from './GoBoard';
 import ZoomTapConfirm from './ZoomTapConfirm';
 import type { Drawing, Marker } from './GoBoard';
-import { Flag, SkipForward, Check, RefreshCw, Pause, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban, Triangle, MousePointerClick, Eye, Sparkles } from 'lucide-react';
+import { Flag, SkipForward, Check, RefreshCw, Pause, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban, Triangle, MousePointerClick, Eye, Calculator } from 'lucide-react';
 import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, formatKomiLabel, isTimeoutResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
@@ -719,10 +719,10 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                 data-testid="draft-dead-stones"
                 onClick={() => { void draftDeadStonesWithAi(); }}
                 disabled={deadStoneDraftLoading}
-                title="AIに死石の下書きを作らせます。違うところはクリックで直せます"
+                title="死んでいる石に印を付け直します。違うところはクリックで直せます"
                 className="secondary-button flex items-center gap-2 text-sm disabled:opacity-55"
               >
-                <Sparkles className="w-4 h-4" /> AIの下書き
+                <Calculator className="w-4 h-4" /> 地合いを計算
               </button>
               <button
                 data-testid="confirm-scoring"

@@ -407,7 +407,7 @@ describe('GameBoard', () => {
     expect(screen.getByTestId('interrupt-game')).toBeInTheDocument();
   });
 
-  it('整地では対局者がAIに死石の下書きを引き直させられる', () => {
+  it('整地では対局者が地合いを計算し直せる（死石の印を付け直す）', () => {
     const game = scoringGameWithStone();
     setupMock({ game });
     render(<GameBoard gameId="game-1" myIdentity="たろう" />);
@@ -423,8 +423,8 @@ describe('GameBoard', () => {
 
     expect(screen.getByTestId('dead-stone-draft-loading')).toHaveTextContent('地合いの計算中');
     expect(screen.getByTestId('draft-dead-stones')).toBeDisabled();
-    // AIの作業であることは出さない（三村さんの指示）
-    expect(screen.queryByText(/AIが死石の下書き/)).not.toBeInTheDocument();
+    // 結果判定の画面に「AI」とは書かない（三村さんの指示）
+    expect(screen.queryByText(/AI/)).not.toBeInTheDocument();
   });
 
   it('観戦している生徒にはAIの下書きボタンを出さない', () => {
