@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import ParticipantList from './ParticipantList';
-import type { ParticipantInfo } from '../utils/classroomLiveKit';
+import type { ParticipantInfo } from '../utils/classroomRtc';
 
 const participants: ParticipantInfo[] = [
   { identity: 'sid:teacher-uuid', name: '三村先生', isSpeaking: false, audioEnabled: true, videoEnabled: false },

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { GameSession, GameBoardUpdatePayload, GameCreatedPayload, GameEndedPayload, GameListSyncPayload, ScoringUpdatePayload } from '../types/game';
-import type { ClassroomMessage } from '../utils/classroomLiveKit';
+import type { ClassroomMessage } from '../utils/classroomRtc';
 import { identityMatchesPlayer } from '../utils/identityUtils';
 
 // --- 生徒側も対局データをlocalStorageにキャッシュ ---

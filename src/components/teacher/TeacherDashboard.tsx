@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { GameSession, AudioPermissions, SavedGame } from '../../types/game';
-import type { ParticipantInfo } from '../../utils/classroomLiveKit';
+import type { ConnectionState, ParticipantInfo } from '../../utils/classroomRtc';
 import type { Student, Classroom, RankDisplay } from '../../types/classroom';
 import { DEFAULT_RANK_DISPLAY } from '../../types/classroom';
 import type { ChatMessage } from '../../types/chat';
@@ -16,7 +16,7 @@ import ChatPanel from './ChatPanel';
 import MediaDeviceSettings from '../MediaDeviceSettings';
 import VerticalResizer from './VerticalResizer';
 import { useStoredHeight } from './useStoredHeight';
-import type { ClassroomLiveKit } from '../../utils/classroomLiveKit';
+import type { ClassroomRtc } from '../../utils/classroomRtc';
 import TeacherToolbar from './TeacherToolbar';
 import { buildRosterUrl } from '../../utils/classroomRoster';
 import VideoTiles from '../VideoTiles';
@@ -46,7 +46,7 @@ interface TeacherDashboardProps {
   chatMessages: ChatMessage[];
   onChatSend: (text: string, target: 'all' | string) => void;
   /** 使用マイク・カメラの切り替えに使う */
-  classroom?: ClassroomLiveKit | null;
+  classroom?: ClassroomRtc | null;
   videoElements: Map<string, HTMLVideoElement>;
   studentJoinInfo: string;
   onCreateGame: (initialPlayer?: string) => void;
@@ -56,7 +56,7 @@ interface TeacherDashboardProps {
   onReconnect: () => void;
   isReconnecting: boolean;
   /** 回線の状態。ツールバーの「回線復旧」を切断時だけ朱にするために使う */
-  connectionState?: import('livekit-client').ConnectionState;
+  connectionState?: ConnectionState;
   onOpenStudentManager: () => void;
   onReloadData: () => void | Promise<void>;
   /** 取消後、Realtimeが不調でもホームから確実に消すため対局一覧を再取得する。 */

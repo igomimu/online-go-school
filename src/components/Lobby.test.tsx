@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import Lobby from './Lobby';
 import { createEmptyBoard } from '../utils/gameLogic';
 import type { GameSession } from '../types/game';
-import type { ParticipantInfo } from '../utils/classroomLiveKit';
+import type { ParticipantInfo } from '../utils/classroomRtc';
 
 const mockParticipants: ParticipantInfo[] = [
   { identity: '三村先生', isSpeaking: false, audioEnabled: true, videoEnabled: false },

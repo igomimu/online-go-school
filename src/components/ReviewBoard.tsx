@@ -8,7 +8,7 @@ import { copyBoardToClipboard, copySgfToClipboard, downloadBoardAsPNG, downloadS
 import { playReviewMove } from '../utils/reviewMove';
 import { isSharingTarget, toggleSharingTarget, type SharingTargets } from '../utils/sharingTargets';
 import { findNearestDrawingIndex } from '../utils/drawingUtils';
-import type { ParticipantInfo, ClassroomLiveKit, ClassroomMessage } from '../utils/classroomLiveKit';
+import type { ParticipantInfo, ClassroomRtc, ClassroomMessage } from '../utils/classroomRtc';
 import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';
@@ -29,7 +29,7 @@ interface ReviewBoardProps {
   komi?: number;
   onSetCurrentNode: (node: GameNode) => void;
   isTeacher: boolean;
-  classroomRef: React.RefObject<ClassroomLiveKit | null>;
+  classroomRef: React.RefObject<ClassroomRtc | null>;
 
   // 先生用
   participants?: ParticipantInfo[];

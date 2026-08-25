@@ -1,10 +1,10 @@
 import { useScreenRecorder } from '../hooks/useScreenRecorder';
 import { Video, Square, Download, RotateCcw } from 'lucide-react';
-import type { ClassroomLiveKit } from '../utils/classroomLiveKit';
+import type { ClassroomRtc } from '../utils/classroomRtc';
 
 interface RecordingControlsProps {
   /** 録画に混ぜる声（自分のマイク＋生徒）の取り出しに使う */
-  classroom?: ClassroomLiveKit | null;
+  classroom?: ClassroomRtc | null;
 }
 
 export default function RecordingControls({ classroom }: RecordingControlsProps) {

@@ -11,7 +11,7 @@ import { useIsTouchDevice } from '../hooks/useIsTouchDevice';
 import { useIsPinchZoomed } from '../hooks/useIsPinchZoomed';
 import { getSupabase } from '../utils/liveGameApi';
 import { resolvePlayerName } from '../utils/identityUtils';
-import { ClassroomLiveKit } from '../utils/classroomLiveKit';
+import type { ClassroomRtc } from '../utils/classroomRtc';
 import { isStoneSoundEnabled, setStoneSoundEnabled, playStoneSound, playCaptureSound, unlockStoneSound, shouldPlayMoveSound } from '../utils/stoneSound';
 import { isLastMoveMarkerEnabled, setLastMoveMarkerEnabled, isTapConfirmEnabled, setTapConfirmEnabled } from '../utils/boardPrefs';
 import { useLastPointerType } from '../hooks/useLastPointerType';
@@ -23,7 +23,7 @@ interface GameBoardProps {
   isTeacher?: boolean;
   onBack?: () => void;
   onMoveSubmitted?: () => void;
-  classroom?: ClassroomLiveKit | null;
+  classroom?: ClassroomRtc | null;
   students?: Student[];  // 対局者名を解決するための名簿（IDは一切表示しない）
   syncedDrawings?: Drawing[];
 }

@@ -81,13 +81,13 @@ describe('ClassroomLiveKit', () => {
   // === 接続 ===
   describe('connect / disconnect', () => {
     it('connectでConnected状態になる', async () => {
-      await classroom.connect('wss://example.com', 'token');
+      await classroom.connect({ url: 'wss://example.com', token: 'token' });
       expect(classroom.isConnected).toBe(true);
       expect(classroom.connectionState).toBe('connected');
     });
 
     it('disconnectでDisconnected状態になる', async () => {
-      await classroom.connect('wss://example.com', 'token');
+      await classroom.connect({ url: 'wss://example.com', token: 'token' });
       await classroom.disconnect();
       expect(classroom.isConnected).toBe(false);
     });

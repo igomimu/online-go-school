@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import GoBoard from './GoBoard';
 import type { Drawing, Marker, StoneColor } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
-import type { ClassroomLiveKit, ParticipantInfo } from '../utils/classroomLiveKit';
+import type { ClassroomRtc, ParticipantInfo } from '../utils/classroomRtc';
 import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import { createNode, addMove, getMainPath, removeNode } from '../utils/treeUtilsV2';
@@ -22,7 +22,7 @@ import {
 
 interface LectureBoardProps {
   isTeacher: boolean;
-  classroomRef: React.RefObject<ClassroomLiveKit | null>;
+  classroomRef: React.RefObject<ClassroomRtc | null>;
   userName: string;
   onBack?: () => void;
   // 生徒がreview/lectureで受け取る同期データ

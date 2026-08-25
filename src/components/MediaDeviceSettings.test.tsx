@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import MediaDeviceSettings from './MediaDeviceSettings';
-import type { ClassroomLiveKit } from '../utils/classroomLiveKit';
+import type { ClassroomRtc } from '../utils/classroomRtc';
 import { getMirrorLocalVideo } from '../utils/mediaDevices';
 
 const DEVICES: MediaDeviceInfo[] = [
@@ -58,7 +58,7 @@ describe('MediaDeviceSettings', () => {
 
   it('選ぶと LiveKit を切り替え、端末に残す', async () => {
     const switchDevice = vi.fn().mockResolvedValue(undefined);
-    render(<MediaDeviceSettings classroom={{ switchDevice } as unknown as ClassroomLiveKit} />);
+    render(<MediaDeviceSettings classroom={{ switchDevice } as unknown as ClassroomRtc} />);
     fireEvent.click(screen.getByTestId('media-device-settings'));
     await waitFor(() => expect(screen.getByText('ヤマハ AG03')).toBeInTheDocument());
 
@@ -70,7 +70,7 @@ describe('MediaDeviceSettings', () => {
 
   it('切り替えに失敗したら黙らず理由を出す', async () => {
     const switchDevice = vi.fn().mockRejectedValue(new Error('使用中です'));
-    render(<MediaDeviceSettings classroom={{ switchDevice } as unknown as ClassroomLiveKit} />);
+    render(<MediaDeviceSettings classroom={{ switchDevice } as unknown as ClassroomRtc} />);
     fireEvent.click(screen.getByTestId('media-device-settings'));
     await waitFor(() => expect(screen.getByText('ヤマハ AG03')).toBeInTheDocument());
 

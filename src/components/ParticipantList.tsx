@@ -1,5 +1,5 @@
 import { Mic, MicOff } from 'lucide-react';
-import type { ParticipantInfo } from '../utils/classroomLiveKit';
+import type { ParticipantInfo } from '../utils/classroomRtc';
 
 interface ParticipantListProps {
   participants: ParticipantInfo[];

@@ -35,7 +35,7 @@ import {
   type LiveMoveRow,
   type SubmitMoveResult,
 } from '../utils/liveGameApi';
-import type { ClassroomLiveKit, ClassroomMessage } from '../utils/classroomLiveKit';
+import type { ClassroomRtc, ClassroomMessage } from '../utils/classroomRtc';
 import type { GameMovePayload, GameUndoRequestPayload, GameUndoResponsePayload } from '../types/game';
 
 export interface DerivedState {
@@ -204,7 +204,7 @@ export function useLiveGame(
   gameId: string | null,
   myIdentity: string,
   isTeacher: boolean = false,
-  classroom: ClassroomLiveKit | null = null,
+  classroom: ClassroomRtc | null = null,
 ): UseLiveGameResult {
   const [game, setGame] = useState<LiveGameRow | null>(null);
   const [moves, setMoves] = useState<LiveMoveRow[]>([]);

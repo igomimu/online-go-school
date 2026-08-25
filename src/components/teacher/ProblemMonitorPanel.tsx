@@ -1,4 +1,4 @@
-import type { ParticipantInfo } from '../../utils/classroomLiveKit';
+import type { ParticipantInfo } from '../../utils/classroomRtc';
 import type { Student } from '../../types/classroom';
 import type { Problem } from '../../types/problem';
 import GoBoard from '../GoBoard';

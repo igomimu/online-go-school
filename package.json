@@ -19,6 +19,7 @@
     "smoke:edge": "node scripts/smoke-edge-functions.js"
   },
   "dependencies": {
+    "@cloudflare/realtimekit": "^2.0.2",
     "@livekit/components-react": "^2.9.19",
     "@supabase/supabase-js": "^2.103.0",
     "@tailwindcss/vite": "^4.1.18",

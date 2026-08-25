@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import VideoTiles from './VideoTiles';
-import type { ParticipantInfo } from '../utils/classroomLiveKit';
+import type { ParticipantInfo } from '../utils/classroomRtc';
 import { saveMirrorLocalVideo } from '../utils/mediaDevices';
 
 const participants: ParticipantInfo[] = [

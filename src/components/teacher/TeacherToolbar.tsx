@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ConnectionState } from 'livekit-client';
+import { ConnectionState } from '../../utils/classroomRtc';
 
 interface TeacherToolbarProps {
   studentJoinInfo: string;

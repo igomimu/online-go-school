@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Maximize2, MicOff, VideoOff } from 'lucide-react';
-import type { ParticipantInfo } from '../utils/classroomLiveKit';
+import type { ParticipantInfo } from '../utils/classroomRtc';
 import type { Student } from '../types/classroom';
 import { resolvePlayerName } from '../utils/identityUtils';
 import { useMirrorLocalVideo } from '../hooks/useMirrorLocalVideo';

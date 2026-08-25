@@ -14,7 +14,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AudioPermissions } from '../types/game';
-import type { ClassroomMessage } from './classroomLiveKit';
+import type { ClassroomMessage } from './classroomRtc';
 
 // === ヘルパー: App.tsxの音声ロジックを再現 ===
 

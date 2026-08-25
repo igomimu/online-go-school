@@ -1,8 +1,8 @@
 import { useState, useCallback, useRef } from 'react';
 import type { ChatMessage, ChatMessagePayload } from '../types/chat';
-import type { ClassroomLiveKit, ClassroomMessage } from '../utils/classroomLiveKit';
+import type { ClassroomRtc, ClassroomMessage } from '../utils/classroomRtc';
 
-export function useChat(classroomRef: React.RefObject<ClassroomLiveKit | null>) {
+export function useChat(classroomRef: React.RefObject<ClassroomRtc | null>) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const isVisibleRef = useRef(true);

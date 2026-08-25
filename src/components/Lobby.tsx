@@ -1,7 +1,7 @@
 import { Copy, Check, Upload, Users, Plus, BookOpen, Link } from 'lucide-react';
 import { useState, useRef } from 'react';
 import type { GameSession, SavedGame } from '../types/game';
-import type { ParticipantInfo } from '../utils/classroomLiveKit';
+import type { ParticipantInfo } from '../utils/classroomRtc';
 import type { ParticipantLogEntry } from '../hooks/useParticipantLog';
 import type { Student, Classroom } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import type { ClassroomLiveKit } from '../utils/classroomLiveKit';
+import type { ClassroomRtc } from '../utils/classroomRtc';
 
 export type RecordingState = 'idle' | 'recording' | 'stopped';
 
@@ -23,7 +23,7 @@ function pickMimeType(): string {
  * LiveKit が持っている音声トラック（自分のマイク＋生徒の声）を AudioContext で
  * ひとつに混ぜて、映像と一緒に録る。
  */
-export function useScreenRecorder(classroom?: ClassroomLiveKit | null) {
+export function useScreenRecorder(classroom?: ClassroomRtc | null) {
   const [state, setState] = useState<RecordingState>('idle');
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
@@ -39,7 +39,7 @@ export function useScreenRecorder(classroom?: ClassroomLiveKit | null) {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const destRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const sourcesRef = useRef(new Map<MediaStreamTrack, MediaStreamAudioSourceNode>());
-  const classroomRef = useRef<ClassroomLiveKit | null | undefined>(classroom);
+  const classroomRef = useRef<ClassroomRtc | null | undefined>(classroom);
   useEffect(() => {
     classroomRef.current = classroom;
   }, [classroom]);

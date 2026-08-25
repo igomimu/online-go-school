@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useGameManager } from './useGameManager';
-import type { ClassroomLiveKit } from '../utils/classroomLiveKit';
+import type { ClassroomRtc } from '../utils/classroomRtc';
 
 // モックclassroomRef
 function createMockClassroom() {
   const mock = {
     broadcast: vi.fn(),
     sendTo: vi.fn(),
-  } as unknown as ClassroomLiveKit;
+  } as unknown as ClassroomRtc;
   const ref = { current: mock };
   return { mock, ref };
 }

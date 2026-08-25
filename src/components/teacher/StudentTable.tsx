@@ -1,5 +1,5 @@
 import { Video, Mic, MicOff, Volume2, VolumeX, Eye, EyeOff } from 'lucide-react';
-import type { ParticipantInfo } from '../../utils/classroomLiveKit';
+import type { ParticipantInfo } from '../../utils/classroomRtc';
 import type { Student } from '../../types/classroom';
 import type { GameSession, AudioPermissions } from '../../types/game';
 import { resolveGrade } from '../../utils/gradeCalc';

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { ChatMessage } from '../../types/chat';
-import type { ParticipantInfo } from '../../utils/classroomLiveKit';
+import type { ParticipantInfo } from '../../utils/classroomRtc';
 import type { Student } from '../../types/classroom';
 import { getDisplayName } from '../../utils/identityUtils';
 

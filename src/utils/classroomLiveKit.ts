@@ -5,93 +5,42 @@ import {
   RemoteTrack,
   RemoteTrackPublication,
   LocalTrackPublication,
-  ConnectionState,
   Track,
   type Participant,
 } from 'livekit-client';
-import type { BoardState, StoneColor, Marker } from '../components/GoBoard';
-import type { GameMessageType } from '../types/game';
 import { getSavedDeviceId } from './mediaDevices';
+import { ConnectionState, RELIABLE_TYPES } from './classroomRtc';
+import type {
+  AudioDebugInfo,
+  ClassroomConnectOptions,
+  ClassroomEventHandler,
+  ClassroomMessage,
+  ClassroomRtc,
+  ParticipantInfo,
+  VideoTrackInfo,
+} from './classroomRtc';
 
-export type Role = 'TEACHER' | 'STUDENT';
-
-export interface BoardUpdatePayload {
-  boardState: BoardState;
-  boardSize: number;
-  nextColor: StoneColor;
-  markers: Marker[];
-  moveNumber: number;
-}
-
-export interface CursorPayload {
-  x: number;
-  y: number;
-  identity: string;
-}
-
-export interface DrawingPayload {
-  fromX: number;
-  fromY: number;
-  toX: number;
-  toY: number;
-  type: 'line' | 'arrow';
-}
-
-// 既存 + 新規メッセージタイプ
-export type MessageType =
-  | 'BOARD_UPDATE'
-  | 'AI_ANALYSIS_UPDATE'
-  | 'CURSOR_MOVE'
-  | 'CURSOR_CLEAR'
-  | 'DRAW_UPDATE'
-  | 'DRAW_CLEAR'
-  | GameMessageType;
-
-export interface ClassroomMessage {
-  type: MessageType;
-  payload: unknown;
-}
-
-export interface ParticipantInfo {
-  identity: string;
-  isSpeaking: boolean;
-  audioEnabled: boolean;
-  videoEnabled: boolean;
-  name?: string;
-}
-
-export type ClassroomEventHandler = {
-  onMessage?: (msg: ClassroomMessage, sender?: string) => void;
-  // name は LiveKit 側の表示名。identity（sid:1000 など）は名簿と照合できないことがあるので、
-  // 人が読める名前を出したい側はこちらを使う
-  onParticipantJoined?: (identity: string, name?: string) => void;
-  onParticipantLeft?: (identity: string, name?: string) => void;
-  onParticipantsChanged?: (participants: ParticipantInfo[]) => void;
-  onConnectionStateChanged?: (state: ConnectionState) => void;
-  onReconnected?: () => void;
-  onActiveSpeakersChanged?: (speakers: string[]) => void;
-};
-
-export interface VideoTrackInfo {
-  identity: string;
-  element: HTMLVideoElement | null;
-  isLocal: boolean;
-}
+// 型は classroomRtc.ts が正本。ここからも読めるようにして既存の import を壊さない
+export type {
+  AudioDebugInfo,
+  BoardUpdatePayload,
+  ClassroomConnectOptions,
+  ClassroomEventHandler,
+  ClassroomMessage,
+  ClassroomRtc,
+  CursorPayload,
+  DrawingPayload,
+  MessageType,
+  ParticipantInfo,
+  Role,
+  VideoTrackInfo,
+} from './classroomRtc';
+export { ConnectionState } from './classroomRtc';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-// 信頼性が必要なメッセージタイプ
-// GAME_* は Supabase 権威型に移行済（2026-04-15）
-const RELIABLE_TYPES = new Set<string>([
-  'BOARD_UPDATE', 'AI_ANALYSIS_UPDATE', 'DRAW_UPDATE', 'DRAW_CLEAR',
-  'PROBLEM_ASSIGN', 'PROBLEM_RESULT',
-  'REVIEW_START', 'REVIEW_END', 'REVIEW_PERMISSIONS', 'REVIEW_STUDENT_MOVE',
-  'NIGIRI_DRAW',
-  'AUDIO_CONTROL', 'MEDIA_CONTROL', 'CHAT_MESSAGE', 'RANK_DISPLAY',
-]);
-
-export class ClassroomLiveKit {
+export class ClassroomLiveKit implements ClassroomRtc {
   room: Room;
   private handlers: ClassroomEventHandler = {};
   private _videoElements = new Map<string, HTMLVideoElement>();
@@ -137,8 +86,8 @@ export class ClassroomLiveKit {
       this.notifyParticipantsChanged();
     });
 
-    this.room.on(RoomEvent.ConnectionStateChanged, (state: ConnectionState) => {
-      this.handlers.onConnectionStateChanged?.(state);
+    this.room.on(RoomEvent.ConnectionStateChanged, (state) => {
+      this.handlers.onConnectionStateChanged?.(state as ConnectionState);
     });
 
     this.room.on(RoomEvent.Reconnected, () => {
@@ -244,7 +193,8 @@ export class ClassroomLiveKit {
     this.handlers = handlers;
   }
 
-  async connect(url: string, token: string): Promise<void> {
+  async connect({ url, token }: ClassroomConnectOptions): Promise<void> {
+    if (!url) throw new Error('LiveKit の接続先URLが設定されていません');
     await this.room.connect(url, token);
     await this.room.startAudio();
     // 「回線復旧」で Room を作り直しても、選んだマイク・カメラを使い続ける
@@ -260,11 +210,11 @@ export class ClassroomLiveKit {
   }
 
   get connectionState(): ConnectionState {
-    return this.room.state;
+    return this.room.state as ConnectionState;
   }
 
   get isConnected(): boolean {
-    return this.room.state === ConnectionState.Connected;
+    return (this.room.state as ConnectionState) === ConnectionState.Connected;
   }
 
   get localIdentity(): string {
@@ -443,6 +393,36 @@ export class ClassroomLiveKit {
 
   getVideoElements(): Map<string, HTMLVideoElement> {
     return new Map(this._videoElements);
+  }
+
+  /** 相手の声を鳴らすか止めるか。購読済みトラックの enabled を直接触る */
+  setRemoteAudioEnabled(enabled: boolean): void {
+    this.room.remoteParticipants.forEach((p) => {
+      p.audioTrackPublications.forEach((pub) => {
+        if (pub.track) pub.track.mediaStreamTrack.enabled = enabled;
+      });
+    });
+  }
+
+  /** ブラウザの自動再生制限を解除する。ユーザー操作の中から呼ぶ */
+  async startAudio(): Promise<void> {
+    await this.room.startAudio();
+  }
+
+  getAudioDebugInfo(): AudioDebugInfo {
+    const local = this.room.localParticipant;
+    const remoteAudioTracks: AudioDebugInfo['remoteAudioTracks'] = [];
+    this.room.remoteParticipants.forEach((p) => {
+      remoteAudioTracks.push({
+        identity: p.identity,
+        trackCount: p.audioTrackPublications.size,
+      });
+    });
+    return {
+      remoteCount: this.room.remoteParticipants.size,
+      localAudioTrackCount: local ? local.audioTrackPublications.size : 0,
+      remoteAudioTracks,
+    };
   }
 
   private notifyParticipantsChanged() {

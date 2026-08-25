@@ -10,7 +10,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AudioPermissions } from '../types/game';
-import type { ParticipantInfo, ClassroomMessage } from './classroomLiveKit';
+import type { ParticipantInfo, ClassroomMessage } from './classroomRtc';
 
 // === ヘルパー: App.tsxのビデオロジックを再現 ===
 

@@ -5,7 +5,7 @@ import { createNode } from '../utils/treeUtilsV2';
 import { createEmptyBoard } from '../utils/gameLogic';
 import { createRef } from 'react';
 
-// ClassroomLiveKitのモック
+// ClassroomRtcのモック
 const mockClassroomRef = createRef<{ broadcast: ReturnType<typeof vi.fn>, isConnected: boolean }>();
 
 describe('LectureBoard', () => {

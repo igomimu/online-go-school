@@ -1,5 +1,5 @@
 import type { ViewMode } from '../types/game';
-import type { Role } from './classroomLiveKit';
+import type { Role } from './classroomRtc';
 
 /**
  * 生徒に同期碁盤がある時は通常授業を自動表示するが、先生が明示的に開始した

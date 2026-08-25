@@ -1,5 +1,5 @@
 import { Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
-import type { ParticipantInfo } from '../utils/classroomLiveKit';
+import type { ParticipantInfo } from '../utils/classroomRtc';
 import type { AudioPermissions } from '../types/game';
 import { resolvePlayerName } from '../utils/identityUtils';
 

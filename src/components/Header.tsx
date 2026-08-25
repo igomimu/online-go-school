@@ -1,10 +1,10 @@
 import { Download, LogOut, Volume2, VolumeX, Mic, MicOff, Video, VideoOff } from 'lucide-react';
-import { ConnectionState } from 'livekit-client';
-import type { Role } from '../utils/classroomLiveKit';
+import { ConnectionState } from '../utils/classroomRtc';
+import type { Role } from '../utils/classroomRtc';
 import RecordingControls from './RecordingControls';
 import ThemeToggle from './ThemeToggle';
 import MediaDeviceSettings from './MediaDeviceSettings';
-import type { ClassroomLiveKit } from '../utils/classroomLiveKit';
+import type { ClassroomRtc } from '../utils/classroomRtc';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 
 interface HeaderProps {
@@ -22,7 +22,7 @@ interface HeaderProps {
   isSpeaking?: boolean;
   onDisconnect: () => void;
   /** 使用マイク・カメラの切り替えに使う */
-  classroom?: ClassroomLiveKit | null;
+  classroom?: ClassroomRtc | null;
 }
 
 export default function Header({

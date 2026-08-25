@@ -3,7 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import StudentTable from './StudentTable';
 import { createEmptyBoard } from '../../utils/gameLogic';
 import type { GameSession } from '../../types/game';
-import type { ParticipantInfo } from '../../utils/classroomLiveKit';
+import type { ParticipantInfo } from '../../utils/classroomRtc';
 import type { Student } from '../../types/classroom';
 
 const student: Student = {

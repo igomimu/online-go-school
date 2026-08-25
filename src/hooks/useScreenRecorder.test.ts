@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useScreenRecorder } from './useScreenRecorder';
-import type { ClassroomLiveKit } from '../utils/classroomLiveKit';
+import type { ClassroomRtc } from '../utils/classroomRtc';
 
 /** jsdom には MediaStream / MediaRecorder / AudioContext が無いので最小限を用意する */
 class FakeTrack {
@@ -56,14 +56,14 @@ class FakeAudioContext {
 
 let displayTrack: FakeTrack;
 let voices: FakeTrack[];
-let classroom: ClassroomLiveKit;
+let classroom: ClassroomRtc;
 let getDisplayMedia: ReturnType<typeof vi.fn>;
 
 function makeClassroom() {
   return {
     collectAudioTracks: () => voices,
     onAudioTracksChanged: undefined,
-  } as unknown as ClassroomLiveKit;
+  } as unknown as ClassroomRtc;
 }
 
 beforeEach(() => {

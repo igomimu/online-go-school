@@ -1,5 +1,5 @@
 import type { GameSession } from '../../types/game';
-import type { ParticipantInfo } from '../../utils/classroomLiveKit';
+import type { ParticipantInfo } from '../../utils/classroomRtc';
 import type { Student } from '../../types/classroom';
 import { anyIdentityMatchesPlayer, studentIdentityCandidates } from '../../utils/identityUtils';
 import GameThumbnail from '../GameThumbnail';

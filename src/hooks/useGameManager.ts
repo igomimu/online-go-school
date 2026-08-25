@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import type { GameSession, GameMove, GameMovePayload, GameBoardUpdatePayload, GameClock } from '../types/game';
-import type { ClassroomLiveKit, ClassroomMessage } from '../utils/classroomLiveKit';
+import type { ClassroomRtc, ClassroomMessage } from '../utils/classroomRtc';
 import type { StoneColor } from '../components/GoBoard';
 import { createEmptyBoard, checkCapture, isLegalMove, boardHash } from '../utils/gameLogic';
 import { getHandicapStones } from '../utils/handicapStones';
@@ -37,7 +37,7 @@ function restoreActiveGames(): GameSession[] {
 }
 
 // 先生用：対局管理ロジック
-export function useGameManager(classroomRef: React.RefObject<ClassroomLiveKit | null>) {
+export function useGameManager(classroomRef: React.RefObject<ClassroomRtc | null>) {
   const [games, setGames] = useState<GameSession[]>(() => restoreActiveGames());
   const gamesRef = useRef<GameSession[]>([]);
 

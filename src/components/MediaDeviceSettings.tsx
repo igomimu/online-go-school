@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Settings2, X } from 'lucide-react';
-import type { ClassroomLiveKit } from '../utils/classroomLiveKit';
+import type { ClassroomRtc } from '../utils/classroomRtc';
 import {
   DEVICE_LABEL,
   getSavedDeviceId,
@@ -15,7 +15,7 @@ import {
 import { useMirrorLocalVideo } from '../hooks/useMirrorLocalVideo';
 
 interface Props {
-  classroom: ClassroomLiveKit | null;
+  classroom: ClassroomRtc | null;
   /** ボタンの体裁を呼び出し側に合わせる */
   className?: string;
   /** 文字を出さずアイコンだけにする（ヘッダー用） */

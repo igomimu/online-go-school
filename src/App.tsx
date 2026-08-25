@@ -9,14 +9,15 @@ import {
   toggleSharingTarget,
   type SharingTargets,
 } from './utils/sharingTargets';
-import { ClassroomLiveKit } from './utils/classroomLiveKit';
-import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './utils/classroomLiveKit';
+import type { ClassroomRtc } from './utils/classroomRtc';
+import { createClassroomRtc } from './utils/rtcProvider';
+import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './utils/classroomRtc';
 import type { ViewMode, AudioPermissions, SavedGame, RankDisplayPayload } from './types/game';
 import type { Student, Classroom, RankDisplay } from './types/classroom';
 import { DEFAULT_RANK_DISPLAY } from './types/classroom';
 import { fetchToken, TeacherAbsentError } from './utils/livekitToken';
 import { getDisplayName, getTeacherDisplayName, identityMatchesPlayer, makeStudentIdentity, TEACHER_IDENTITY } from './utils/identityUtils';
-import { ConnectionState } from 'livekit-client';
+import { ConnectionState } from './utils/classroomRtc';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession, interruptAllGames, interruptGame, resumeLiveGame } from './utils/liveGameApi';
 import { isTimeoutResult, timedOutColorFromResult } from './utils/scoring';
@@ -145,7 +146,7 @@ function App() {
 
   // 入室のたびに、その人が前回どうしていたかを読み直してから当てる。
   // 再接続（onReconnected）でも同じ経路を通る。
-  const restoreMediaIntent = useCallback(async (classroom: ClassroomLiveKit, targetRole: Role) => {
+  const restoreMediaIntent = useCallback(async (classroom: ClassroomRtc, targetRole: Role) => {
     const desired = loadMediaIntent(
       targetRole,
       targetRole === 'STUDENT' ? mediaIntentScopeRef.current : undefined,
@@ -323,7 +324,7 @@ function App() {
     ?? classrooms.find(c => c.id === studentClassroomId)?.rankDisplay
     ?? DEFAULT_RANK_DISPLAY;
 
-  const classroomRef = useRef<ClassroomLiveKit | null>(null);
+  const classroomRef = useRef<ClassroomRtc | null>(null);
   // 教室への出入り。対局や検討へ移っても消えないよう、教室ホームではなくここで控える
   const { log: participantLog, record: recordParticipantEvent } = useParticipantLog();
 
@@ -402,16 +403,12 @@ function App() {
   const updateAudioDebug = useCallback(() => {
     if (!classroomRef.current) return;
     const audioEls = document.querySelectorAll('audio').length;
-    const remote = classroomRef.current.room.remoteParticipants.size;
-    const local = classroomRef.current.room.localParticipant;
-    const localAudio = local ? Array.from(local.audioTrackPublications.values()) : [];
-    const localInfo = `Local: ${localAudio.length}トラック`;
-    let trackInfo = '';
-    classroomRef.current.room.remoteParticipants.forEach((p) => {
-      const audioTracks = Array.from(p.audioTrackPublications.values());
-      trackInfo += `${p.identity}: ${audioTracks.length}; `;
-    });
-    setAudioDebug(`マイク: ${isMicEnabled ? 'ON' : 'OFF'}, ${localInfo}, Audio要素: ${audioEls}, リモート: ${remote}, [${trackInfo || 'なし'}]`);
+    const info = classroomRef.current.getAudioDebugInfo();
+    const localInfo = `Local: ${info.localAudioTrackCount}トラック`;
+    const trackInfo = info.remoteAudioTracks
+      .map(t => `${t.identity}: ${t.trackCount}; `)
+      .join('');
+    setAudioDebug(`マイク: ${isMicEnabled ? 'ON' : 'OFF'}, ${localInfo}, Audio要素: ${audioEls}, リモート: ${info.remoteCount}, [${trackInfo || 'なし'}]`);
   }, [isMicEnabled]);
 
   // オーディオデバッグタイマー
@@ -429,7 +426,7 @@ function App() {
     // 前回のマイク・カメラを読み出す先を、これから入る人に合わせる
     mediaIntentScopeRef.current = connectRole === 'STUDENT' ? (studentId ?? undefined) : undefined;
     classroomRef.current?.destroy();
-    const classroom = new ClassroomLiveKit();
+    const classroom = createClassroomRtc();
     classroomRef.current = classroom;
 
     classroom.setHandlers({
@@ -606,20 +603,8 @@ function App() {
         // 音声制御（生徒用）
         if (msg.type === 'AUDIO_CONTROL' && connectRole === 'STUDENT' && msg.payload) {
           const p = msg.payload as { canHear: boolean };
-          if (!p.canHear) {
-            // 先生の音声をミュート
-            classroomRef.current?.room.remoteParticipants.forEach(rp => {
-              rp.audioTrackPublications.forEach(pub => {
-                if (pub.track) pub.track.mediaStreamTrack.enabled = false;
-              });
-            });
-          } else {
-            classroomRef.current?.room.remoteParticipants.forEach(rp => {
-              rp.audioTrackPublications.forEach(pub => {
-                if (pub.track) pub.track.mediaStreamTrack.enabled = true;
-              });
-            });
-          }
+          // 先生の音声を止める / 鳴らす
+          classroomRef.current?.setRemoteAudioEnabled(p.canHear);
         }
 
         // 棋力の見せ方（生徒用）。講師が授業中に切り替えたら生徒の画面も合わせる
@@ -718,7 +703,7 @@ function App() {
             : getTeacherDisplayName(),
       });
 
-      await classroom.connect(livekitUrl, connectToken);
+      await classroom.connect({ url: livekitUrl, token: connectToken });
       await restoreMediaIntent(classroom, connectRole);
       setConnectionError('');
       setWaitingForTeacher(false);
@@ -984,13 +969,7 @@ function App() {
   const handleToggleMute = () => {
     setIsMuted(prev => {
       const next = !prev;
-      if (classroomRef.current?.room) {
-        classroomRef.current.room.remoteParticipants.forEach(p => {
-          p.audioTrackPublications.forEach(pub => {
-            if (pub.track) pub.track.mediaStreamTrack.enabled = !next;
-          });
-        });
-      }
+      classroomRef.current?.setRemoteAudioEnabled(!next);
       return next;
     });
   };
@@ -1073,7 +1052,7 @@ function App() {
       : (studentId ? makeStudentIdentity(studentId) : userName);
     setIsReconnecting(true);
     try {
-      // connectLiveKit が内部で旧 Room を destroy → new ClassroomLiveKit → connect する
+      // connectLiveKit が内部で旧 Room を destroy → new ClassroomRtc → connect する
       setParticipants([]);
       setVideoElements(new Map());
       await connectLiveKit(role, identity, roomName, selectedClassroomId ?? studentClassroomId ?? '');
@@ -1444,7 +1423,7 @@ function App() {
     if (!classroomRef.current || !classroomRef.current.isConnected) return;
     try {
       setAudioDebug(prev => prev + ' [先生音声状態リセット]');
-      await classroomRef.current.room.localParticipant.setMicrophoneEnabled(true);
+      await classroomRef.current.enableMicrophone();
       setIsMicEnabled(true);
       if (role) rememberMediaIntent(role, { mic: true });
       setIsMuted(false);
@@ -1823,7 +1802,7 @@ function App() {
           <button
             onClick={async () => {
               try {
-                await classroomRef.current?.room.startAudio();
+                await classroomRef.current?.startAudio();
                 document.querySelectorAll('audio').forEach(el => {
                   (el as HTMLAudioElement).muted = false;
                   (el as HTMLAudioElement).volume = 1;
