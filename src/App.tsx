@@ -11,6 +11,7 @@ import {
 } from './utils/sharingTargets';
 import type { ClassroomRtc } from './utils/classroomRtc';
 import { createClassroomRtc, needsServerUrl } from './utils/rtcProvider';
+import { useThrottledCursor } from './hooks/useThrottledCursor';
 import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './utils/classroomRtc';
 import type { ViewMode, AudioPermissions, SavedGame, RankDisplayPayload } from './types/game';
 import type { Student, Classroom, RankDisplay } from './types/classroom';
@@ -75,6 +76,9 @@ function reviewKomiFromSgf(value: string | undefined, fallback = 6.5): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
+
+/** 検討の盤を配る間隔。手を早送りしても最後の一枚は必ず届く */
+const REVIEW_BOARD_INTERVAL_MS = 120;
 
 function reviewBoardUpdatePayload(node: GameNode, boardSize: number, numberMode: NumberMode = 'off', branchStartId: string | null = null) {
   const nextColor = node.move
@@ -861,16 +865,25 @@ function App() {
   // 押しただけで手順が動いてしまうため、重複していたこちらを外した（2026-08-05）。
 
   // 検討モード: currentNode変更時に碁盤同期
+  //
+  // 🔴 手を続けて進めると、1手ごとに送っていては送信の上限に当たり、
+  // そこから先が生徒に一切届かなくなる（2026-08-26 実授業。30手打って生徒は15手で停止）。
+  // 盤面は差分ではなく「今の盤そのもの」を送っているので、途中を飛ばしても
+  // 最後の一枚が届けば生徒の画面は正しくなる。だから間引いてよい。
+  const sendReviewBoard = useCallback((payload: ReturnType<typeof reviewBoardUpdatePayload>) => {
+    void classroomRef.current?.sendToOrAll({ type: 'BOARD_UPDATE', payload }, reviewTargetStudentsRef.current);
+  }, []);
+  const reviewBoardThrottle = useThrottledCursor(sendReviewBoard, REVIEW_BOARD_INTERVAL_MS);
+
   useEffect(() => {
     if (role !== 'TEACHER' || viewMode !== 'review' || !reviewCurrentNode) return;
     if (!classroomRef.current?.isConnected) return;
     // 「配信先の生徒」で絞れるようにする。空なら全員（以前は常に全員へ送っていた）
-    void classroomRef.current.sendToOrAll({
-      type: 'BOARD_UPDATE',
-      payload: reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize, reviewNumberMode, reviewBranchStartId),
-    }, reviewTargetStudentsRef.current);
+    reviewBoardThrottle.push(
+      reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize, reviewNumberMode, reviewBranchStartId),
+    );
     // 手番号の切替も盤の見え方なので、同じ経路で配り直す
-  }, [reviewCurrentNode, role, viewMode, reviewBoardSize, reviewNumberMode, reviewBranchStartId]);
+  }, [reviewCurrentNode, role, viewMode, reviewBoardSize, reviewNumberMode, reviewBranchStartId, reviewBoardThrottle]);
 
   // 検討モード: 着手権限を生徒へ配る。
   // 許可を外された生徒にも届く必要があるので、配信先の絞り込みとは別に必ず全員へ送る。
