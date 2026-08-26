@@ -13,6 +13,7 @@ import type { ClassroomRtc } from './utils/classroomRtc';
 import { createClassroomRtc, needsServerUrl } from './utils/rtcProvider';
 import { useThrottledCursor } from './hooks/useThrottledCursor';
 import { useAppVersionCheck } from './hooks/useAppVersionCheck';
+import { useLatestFrame } from './hooks/useLatestFrame';
 import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './utils/classroomRtc';
 import type { ViewMode, AudioPermissions, SavedGame, RankDisplayPayload } from './types/game';
 import type { Student, Classroom, RankDisplay } from './types/classroom';
@@ -106,6 +107,10 @@ function App() {
   const rtcReady = !needsServerUrl() || !!livekitUrl;
   // 配信されている版とずれていないか（古いまま動くと直した不具合が出続ける）
   const appVersion = useAppVersionCheck();
+  // 🔴 先生がホイールで早送りすると盤面が毎秒何十枚も届く。19路の碁盤は
+  // 描き直しが重く、来るたびに描いていると生徒側が固まる（2026-08-26 実授業）。
+  // 途中の局面は見えなくてよいので、間隔ごとに最新の一枚だけを描く。
+  const [framedBoard, pushFrameBoard] = useLatestFrame<{ node: GameNode; size: number }>();
   const [roomName, setRoomName] = useState('go-classroom');
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [connectionError, setConnectionError] = useState('');
@@ -480,10 +485,7 @@ function App() {
               ? { x: 0, y: 0, color: p.nextColor === 'BLACK' ? 'WHITE' : 'BLACK' }
               : undefined,
           };
-          setSyncedBoardSize(p.boardSize);
-          setSyncedNode(dummyNode);
-          // 検討画面はreviewCurrentNodeを表示するため、授業用の同期盤面も同時に更新する。
-          setReviewCurrentNode(prev => prev ? dummyNode : prev);
+          pushFrameBoard({ node: dummyNode, size: p.boardSize });
         }
 
         // AI解析同期（生徒用）。KataGoへの問い合わせは先生端末だけで行う。
@@ -866,6 +868,15 @@ function App() {
   // 検討の矢印キーは ReviewBoard 側が扱う（Home/End/Delete も含めて一式そこにある）。
   // ここにも同じ処理があったが、検討を別ウィンドウに出すと本体（教室ホーム）で矢印を
   // 押しただけで手順が動いてしまうため、重複していたこちらを外した（2026-08-05）。
+
+  // 間引いて受け取った盤面を、実際の画面へ移す
+  useEffect(() => {
+    if (!framedBoard) return;
+    setSyncedBoardSize(framedBoard.size);
+    setSyncedNode(framedBoard.node);
+    // 検討画面は reviewCurrentNode を表示するため、授業用の同期盤面も同時に更新する
+    setReviewCurrentNode(prev => prev ? framedBoard.node : prev);
+  }, [framedBoard]);
 
   // 検討モード: currentNode変更時に碁盤同期
   //

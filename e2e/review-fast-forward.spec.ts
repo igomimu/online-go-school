@@ -75,6 +75,39 @@ test.describe('検討の早送り', () => {
     }).toPass({ timeout: 25_000 });
   });
 
+  test('マウスホイールで一気に進めても、生徒の盤が最後まで付いてくる', async () => {
+    const review = await loadSgfForReview(teacherPage, SGF_30);
+    await expect(review.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
+
+    // ホイールは矢印キーより桁違いに速い。人が勢いよく回したときに近い密度で送る
+    // 実機のホイールは一度の回転で大量のイベントが飛ぶ。間を置かずに送る
+    const board = review.getByTestId('go-board');
+    await board.hover();
+    for (let round = 0; round < 3; round++) {
+      for (let i = 0; i < 40; i++) {
+        await review.mouse.wheel(0, 100);
+      }
+      await review.waitForTimeout(50);
+    }
+
+    await expect(review.getByText('30手目')).toBeVisible({ timeout: 15_000 });
+
+    const studentBoard = studentPage.getByTestId('go-board');
+    await expect(studentBoard).toBeVisible({ timeout: 15_000 });
+    await expect(async () => {
+      const stones = await studentBoard.locator('[data-stone]').count();
+      expect(stones).toBe(30);
+    }).toPass({ timeout: 25_000 });
+
+    // 生徒側が固まっていないこと。この後の一手にも反応する
+    await review.getByTitle('一手戻る').click();
+    await expect(review.getByText('29手目')).toBeVisible({ timeout: 10_000 });
+    await expect(async () => {
+      const stones = await studentBoard.locator('[data-stone]').count();
+      expect(stones).toBe(29);
+    }).toPass({ timeout: 20_000 });
+  });
+
   test('ゲージを大きく動かしても、生徒の盤がその局面に揃う', async () => {
     const review = await loadSgfForReview(teacherPage, SGF_30);
     await expect(review.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
