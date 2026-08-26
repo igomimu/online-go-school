@@ -35,6 +35,15 @@ test.describe('検討の同期: 手を続けて進める', () => {
     await loginAsTeacher(teacherPage);
     await openClassroomAndConnect(teacherPage);
     await loginAsStudent(studentPage, { studentCode: TEST_STUDENT_A.code, classroomId });
+
+    teacherPage.on('console', (m) => {
+      const t = m.text();
+      if (/rtc|rate|limit|error|fail/i.test(t)) console.log(`[先生] ${t.slice(0, 200)}`);
+    });
+    studentPage.on('console', (m) => {
+      const t = m.text();
+      if (/rtc|rate|limit|error|fail/i.test(t)) console.log(`[生徒] ${t.slice(0, 200)}`);
+    });
   });
 
   test.afterEach(async () => {

@@ -24,6 +24,17 @@ type RemotePeer = Meeting['participants']['joined'] extends { get(id: string): i
 const RATE_LIMIT_PER_SEC = 60;
 
 /**
+ * 送信の間隔。上限（毎秒 RATE_LIMIT_PER_SEC 回）に対して半分以下に抑え、
+ * 何種類のメッセージが同時に飛んでも触れないようにする。
+ */
+const SEND_INTERVAL_MS = 40;
+
+/** 上限に当たってしまったときに、次を試すまで置く時間 */
+const RETRY_BACKOFF_MS = 1200;
+
+type QueuedMessage = { msg: ClassroomMessage; participantIds?: string[] };
+
+/**
  * Cloudflare RealtimeKit 版の教室。
  *
  * LiveKit 版と挙動が違って必ず引っかかる点が2つあるので、ここで吸収する:
@@ -357,7 +368,61 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     await this.send(msg, participantIds);
   }
 
-  private async send(msg: ClassroomMessage, participantIds?: string[]): Promise<void> {
+  /**
+   * 送信は必ずここを通し、まとめて上限の内側に収める。
+   *
+   * 🔴 種類ごとに間引くやり方では足りなかった（2026-08-26 実授業）。
+   * 検討中は盤面・カーソル・カーソル消去・AI分析が同時に飛び、それぞれは
+   * 控えめでも合計で上限を超える。超えた分は例外になり、そこから先が
+   * 生徒に一切届かなくなる。しかも先生側は何事もなく操作できてしまう。
+   *
+   * 一本の流れにして、
+   *  - 「最新だけ届けばよい」もの（盤面・カーソル）は、同じ宛先の古い要求を捨てる
+   *  - 「必ず届ける」もの（検討の開始終了、権限、チャットなど）は順に送る
+   *  - 一定の間隔でしか送らないので、種類がいくつ増えても上限に触れない
+   */
+  private latest = new Map<string, QueuedMessage>();
+  private mustDeliver: QueuedMessage[] = [];
+  private pumpTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastSentAt = 0;
+
+  private enqueue(msg: ClassroomMessage, participantIds?: string[]): void {
+    const item: QueuedMessage = { msg, participantIds };
+    if (RELIABLE_TYPES.has(msg.type)) {
+      this.mustDeliver.push(item);
+    } else {
+      // 同じ種類・同じ宛先なら、古いものは捨てて最新だけ残す
+      this.latest.set(`${msg.type}|${(participantIds ?? []).join(',')}`, item);
+    }
+    this.schedulePump();
+  }
+
+  private schedulePump(): void {
+    if (this.pumpTimer) return;
+    const wait = Math.max(0, SEND_INTERVAL_MS - (Date.now() - this.lastSentAt));
+    this.pumpTimer = setTimeout(() => {
+      this.pumpTimer = null;
+      void this.pump();
+    }, wait);
+  }
+
+  private async pump(): Promise<void> {
+    // 必ず届けるものを先に。次に、溜まっている最新の状態
+    const next = this.mustDeliver.shift() ?? this.takeLatest();
+    if (!next) return;
+    this.lastSentAt = Date.now();
+    await this.deliver(next.msg, next.participantIds);
+    if (this.mustDeliver.length > 0 || this.latest.size > 0) this.schedulePump();
+  }
+
+  private takeLatest(): QueuedMessage | undefined {
+    const first = this.latest.entries().next();
+    if (first.done) return undefined;
+    this.latest.delete(first.value[0]);
+    return first.value[1];
+  }
+
+  private async deliver(msg: ClassroomMessage, participantIds?: string[]): Promise<void> {
     const meeting = this.meeting;
     if (!meeting) return;
     const body = { d: JSON.stringify(msg.payload ?? null), from: meeting.self.id };
@@ -368,23 +433,21 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
         participantIds ? { participantIds } : undefined,
       );
     } catch (err) {
-      // 🔴 呼び出し側の多くは void で投げっぱなしにするので、ここで拾わないと
-      // 「ある時点から相手に何も届かない」が誰にも気づかれないまま進む。
-      // 落としてはいけない種類は、間を置いて一度だけ入れ直す。
+      // 呼び出し側の多くは void で投げっぱなしにするので、ここで拾わないと
+      // 「ある時点から相手に何も届かない」が誰にも気づかれないまま進む
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[rtc] ${msg.type} を送れませんでした:`, message);
-      if (!RELIABLE_TYPES.has(msg.type)) return;
-      await new Promise((r) => setTimeout(r, 1200));
-      try {
-        await meeting.participants.broadcastMessage(
-          msg.type,
-          body,
-          participantIds ? { participantIds } : undefined,
-        );
-      } catch (retryErr) {
-        console.error(`[rtc] ${msg.type} の送り直しも失敗:`, retryErr instanceof Error ? retryErr.message : retryErr);
+      // 落としてはいけないものは、間を置いて列の先頭に戻す
+      if (RELIABLE_TYPES.has(msg.type)) {
+        this.mustDeliver.unshift({ msg, participantIds });
+        this.lastSentAt = Date.now() + RETRY_BACKOFF_MS;
+        this.schedulePump();
       }
     }
+  }
+
+  private async send(msg: ClassroomMessage, participantIds?: string[]): Promise<void> {
+    this.enqueue(msg, participantIds);
   }
 
   async switchDevice(kind: 'audioinput' | 'videoinput', deviceId: string): Promise<void> {
@@ -506,6 +569,9 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   }
 
   destroy() {
+    if (this.pumpTimer) { clearTimeout(this.pumpTimer); this.pumpTimer = null; }
+    this.latest.clear();
+    this.mustDeliver.length = 0;
     this._videoElements.forEach((el) => { el.srcObject = null; el.remove(); });
     this._videoElements.clear();
     this._audioElements.forEach((el) => { el.srcObject = null; el.remove(); });
