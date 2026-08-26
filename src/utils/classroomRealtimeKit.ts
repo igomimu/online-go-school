@@ -32,6 +32,12 @@ const SEND_INTERVAL_MS = 40;
 /** 上限に当たってしまったときに、次を試すまで置く時間 */
 const RETRY_BACKOFF_MS = 1200;
 
+/**
+ * 「回線が不安定です」を出すまでの猶予。
+ * これより短い揺れは、利用者から見れば何も起きていないのと同じ。
+ */
+const UNSTABLE_GRACE_MS = 4000;
+
 type QueuedMessage = { msg: ClassroomMessage; participantIds?: string[] };
 
 /**
@@ -98,7 +104,27 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     this.notifyParticipantsChanged();
   }
 
+  /** 短い揺れを画面に出さないための猶予 */
+  private unstableTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private clearUnstableTimer() {
+    if (this.unstableTimer) {
+      clearTimeout(this.unstableTimer);
+      this.unstableTimer = null;
+    }
+  }
+
+  private reportUnstableAfterGrace(state: ConnectionState) {
+    if (this.unstableTimer) return;
+    this.unstableTimer = setTimeout(() => {
+      this.unstableTimer = null;
+      this.setState(state);
+    }, UNSTABLE_GRACE_MS);
+  }
+
   private setState(state: ConnectionState) {
+    // 落ち着いた状態が確定したら、様子見は取り消す
+    if (state === ConnectionState.Connected) this.clearUnstableTimer();
     if (this._state === state) return;
     this._state = state;
     this.handlers.onConnectionStateChanged?.(state);
@@ -176,10 +202,20 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
       this.setState(ConnectionState.Disconnected);
     });
 
+    // 🔴 RealtimeKit は socket の状態を細かく知らせてくる。そのまま画面へ流すと
+    // 一瞬の揺れでも「回線が不安定です」が出て、実際より頻繁に見える
+    // （2026-08-26 実授業。LiveKit はもっと落ち着いた通知だった）。
+    // つながり直しは少し様子を見てから伝える。すぐ戻れば何も出さない。
     meeting.meta.on('socketConnectionUpdate', ({ state }) => {
-      if (state === 'reconnecting') this.setState(ConnectionState.Reconnecting);
-      else if (state === 'connected') this.setState(ConnectionState.Connected);
-      else if (state === 'disconnected' || state === 'failed') this.setState(ConnectionState.Disconnected);
+      if (state === 'connected') {
+        this.clearUnstableTimer();
+        this.setState(ConnectionState.Connected);
+        return;
+      }
+      const next = state === 'reconnecting'
+        ? ConnectionState.Reconnecting
+        : ConnectionState.Disconnected;
+      this.reportUnstableAfterGrace(next);
     });
 
     // 自分の映像・音声
@@ -570,6 +606,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
 
   destroy() {
     if (this.pumpTimer) { clearTimeout(this.pumpTimer); this.pumpTimer = null; }
+    this.clearUnstableTimer();
     this.latest.clear();
     this.mustDeliver.length = 0;
     this._videoElements.forEach((el) => { el.srcObject = null; el.remove(); });
