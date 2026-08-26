@@ -166,4 +166,38 @@ describe('GameCreationDialog', () => {
     expect(onCreate).toHaveBeenCalledTimes(1);
     await act(async () => { resolveCreate(); });
   });
+
+  /**
+   * 2026-08-26 三村さんの要望: 置き石を選んだらコミは自動で 0.5 に。
+   * 互先でなければコミ 6.5 のままでは成立しないので、毎回直す手間が要っていた。
+   */
+  describe('置き石とコミの連動', () => {
+    it('置き石を選ぶと、コミが 0.5 になる', () => {
+      render(<GameCreationDialog {...defaultProps} />);
+      const komi = screen.getByTestId('komi-select') as HTMLSelectElement;
+      expect(komi.value).toBe('6.5');
+
+      fireEvent.change(screen.getByTestId('handicap-select'), { target: { value: '4' } });
+      expect((screen.getByTestId('komi-select') as HTMLSelectElement).value).toBe('0.5');
+    });
+
+    it('互先に戻すと、コミが 6.5 に戻る', () => {
+      render(<GameCreationDialog {...defaultProps} />);
+      fireEvent.change(screen.getByTestId('handicap-select'), { target: { value: '3' } });
+      expect((screen.getByTestId('komi-select') as HTMLSelectElement).value).toBe('0.5');
+
+      fireEvent.change(screen.getByTestId('handicap-select'), { target: { value: '0' } });
+      expect((screen.getByTestId('komi-select') as HTMLSelectElement).value).toBe('6.5');
+    });
+
+    it('コミを自由入力にしているときは、置き石を変えても触らない', () => {
+      render(<GameCreationDialog {...defaultProps} />);
+      fireEvent.change(screen.getByTestId('komi-select'), { target: { value: 'other' } });
+      const input = screen.getByTestId('custom-komi-input') as HTMLInputElement;
+      fireEvent.change(input, { target: { value: '2.5' } });
+
+      fireEvent.change(screen.getByTestId('handicap-select'), { target: { value: '5' } });
+      expect((screen.getByTestId('custom-komi-input') as HTMLInputElement).value).toBe('2.5');
+    });
+  });
 });

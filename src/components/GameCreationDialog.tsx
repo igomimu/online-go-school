@@ -27,6 +27,11 @@ interface GameCreationDialogProps {
 const BOARD_SIZES = [19, 17, 15, 13, 11, 9, 7] as const;
 const HANDICAP_OPTIONS = [0, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 const KOMI_OPTIONS = [6.5, 5.5, 4.5, 3.5, 2.5, 1.5, 0.5, -0.5, -1.5, -2.5, -3.5, -4.5, -5.5, -6.5, -7.5] as const;
+
+/** 互先のコミ */
+const EVEN_KOMI = 6.5;
+/** 置き石を置いたときのコミ（半目残し） */
+const HANDICAP_KOMI = 0.5;
 const MINUTE_OPTIONS = Array.from({ length: 61 }, (_, i) => i);
 const BYOYOMI_PERIOD_OPTIONS = Array.from({ length: 11 }, (_, i) => i);
 const BYOYOMI_SECONDS_OPTIONS = [10, 20, 30, 40, 50, 60] as const;
@@ -54,7 +59,7 @@ export default function GameCreationDialog({
   const [studentVsStudent, setStudentVsStudent] = useState(false);
   const [boardSize, setBoardSize] = useState(19);
   const [handicap, setHandicap] = useState(0);
-  const [komi, setKomi] = useState(6.5);
+  const [komi, setKomi] = useState(EVEN_KOMI);
   const [customKomi, setCustomKomi] = useState('6.5');
   const [customKomiEnabled, setCustomKomiEnabled] = useState(false);
   const [timeLimitEnabled, setTimeLimitEnabled] = useState(true);
@@ -247,7 +252,14 @@ export default function GameCreationDialog({
               id="handicap-select"
               data-testid="handicap-select"
               value={handicap}
-              onChange={event => setHandicap(Number(event.target.value))}
+              onChange={event => {
+                const next = Number(event.target.value);
+                setHandicap(next);
+                // 置き石を置いたらコミは半目、互先に戻したら 6目半。
+                // 毎回コミを直す手間を無くす（2026-08-26 三村さん）。
+                // 自由入力を選んでいるときは、その値を尊重して触らない
+                if (!customKomiEnabled) setKomi(next > 0 ? HANDICAP_KOMI : EVEN_KOMI);
+              }}
               className={`${selectClassName} w-full`}
             >
               {HANDICAP_OPTIONS.map(value => <option key={value} value={value}>{value}</option>)}

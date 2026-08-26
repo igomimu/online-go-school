@@ -11,22 +11,18 @@ interface UseAiAnalysisOptions {
   active?: boolean;
 }
 
-/** KataGoの「次に打つ側」基準の応答を、画面表示用の黒基準へ統一する。 */
-export function normalizeAiResultForBlack(
-  result: AiAnalysisResult,
-  toPlay: 'BLACK' | 'WHITE',
-): AiAnalysisResult {
-  if (toPlay === 'BLACK') return result;
-  return {
-    ...result,
-    winrate: 100 - result.winrate,
-    scoreLead: -result.scoreLead,
-    topMoves: result.topMoves.map(move => ({
-      ...move,
-      winrate: 100 - move.winrate,
-      scoreLead: -move.scoreLead,
-    })),
-  };
+/**
+ * KataGo の勝率・目数差は「次に打つ側」から見た値で返る。画面もその向きのまま出す。
+ * 黒が10目良い局面なら、黒番では +10、白番では -10。手番の側から見た有利不利を
+ * 読むのが対局者の感覚に合う（2026-08-26 三村さんの指示）。
+ *
+ * 一時期ここで黒基準へ揃えていたが（9e1619d）、それだと白番のとき候補手の数字が
+ * 相手から見た値になり、どちらが有利なのか読み取れなくなる。変換はしない。
+ *
+ * 勝率グラフだけは手番ごとに折れ線が跳ねると読めないので、描画の直前に黒基準へ直す。
+ */
+export function toBlackWinrate(winrate: number, toPlay: 'BLACK' | 'WHITE'): number {
+  return toPlay === 'BLACK' ? winrate : 100 - winrate;
 }
 
 export function useAiAnalysis(
@@ -112,14 +108,14 @@ export function useAiAnalysis(
             activeController.signal,
           );
           if (activeController.signal.aborted) return;
-          const quickResult = normalizeAiResultForBlack(quickRawResult, parsed.toPlay);
+          const quickResult = quickRawResult;
           setResultState({ key: analysisKey, result: quickResult });
 
           let finalResult = quickResult;
           if (parsed.request.maxVisits > quickVisits) {
             const deepRawResult = await analyzePosition(parsed.request, activeController.signal);
             if (activeController.signal.aborted) return;
-            finalResult = normalizeAiResultForBlack(deepRawResult, parsed.toPlay);
+            finalResult = deepRawResult;
             setResultState({ key: analysisKey, result: finalResult });
           }
 
@@ -152,6 +148,7 @@ export function useAiAnalysis(
 
   return {
     result: resultState?.key === analysisKey ? resultState.result : null,
+    toPlay: inferredToPlay,
     isLoading: loadingKey === analysisKey,
     error: errorState?.key === analysisKey ? errorState.message : null,
     settings,

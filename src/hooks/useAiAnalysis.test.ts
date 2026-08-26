@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GameNode } from '../utils/treeUtilsV2';
-import { useAiAnalysis } from './useAiAnalysis';
+import { useAiAnalysis, toBlackWinrate } from './useAiAnalysis';
 
 const analyzePositionMock = vi.hoisted(() => vi.fn());
 
@@ -129,7 +129,13 @@ describe('useAiAnalysis', () => {
     expect(analyzePositionMock).not.toHaveBeenCalled();
   });
 
-  it('白番のKataGo応答を黒基準へ反転し、棋譜のコミと初期石を送る', async () => {
+  /**
+   * 2026-08-26: 8/15 の 9e1619d でここを「黒基準へ反転」させてしまい、白番の局面で
+   * 候補手の数字が相手から見た値になって、どちらが有利なのか読めなくなった。
+   * KataGo の値は手番の側から見たもので、そのまま出すのが正しい。
+   * 黒が10目良い局面なら、黒番では +10、白番では -10。
+   */
+  it('白番のKataGo応答を手番基準のまま返し、棋譜のコミと初期石を送る', async () => {
     analyzePositionMock.mockResolvedValue(result);
     const { result: hook } = renderHook(() => useAiAnalysis(node, [], {
       boardSize: 9,
@@ -152,10 +158,37 @@ describe('useAiAnalysis', () => {
       }),
       expect.any(AbortSignal),
     );
+    // 反転しない。白番なら「白から見て 52.3%・+1.2目」がそのまま出る
     expect(hook.current.result).toEqual(expect.objectContaining({
-      winrate: 47.7,
-      scoreLead: -1.2,
-      topMoves: [expect.objectContaining({ winrate: 46, scoreLead: -2.5 })],
+      winrate: 52.3,
+      scoreLead: 1.2,
+      topMoves: [expect.objectContaining({ winrate: 54, scoreLead: 2.5 })],
     }));
+    expect(hook.current.toPlay).toBe('WHITE');
+  });
+
+  it('黒番でも白番でも、返る値に手を加えない', async () => {
+    analyzePositionMock.mockResolvedValue(result);
+    const { result: hook } = renderHook(() => useAiAnalysis(node, [], {
+      boardSize: 9, komi: 6.5, toPlay: 'BLACK',
+    }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(hook.current.result).toEqual(expect.objectContaining({
+      winrate: 52.3,
+      scoreLead: 1.2,
+    }));
+    expect(hook.current.toPlay).toBe('BLACK');
+  });
+});
+
+/**
+ * 勝率グラフだけは黒基準。手番ごとに折れ線が反転すると形勢の推移が読めない。
+ */
+describe('toBlackWinrate', () => {
+  it('黒番はそのまま、白番は裏返す', () => {
+    expect(toBlackWinrate(62.3, 'BLACK')).toBe(62.3);
+    expect(toBlackWinrate(62.3, 'WHITE')).toBeCloseTo(37.7, 5);
   });
 });

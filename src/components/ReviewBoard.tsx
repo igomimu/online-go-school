@@ -26,7 +26,7 @@ import { fromGtpCoord } from '../utils/katagoClient';
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2, Eye, EyeOff, Menu } from 'lucide-react';
 import { getDisplayName } from '../utils/identityUtils';
 import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
-import { useAiAnalysis } from '../hooks/useAiAnalysis';
+import { useAiAnalysis, toBlackWinrate } from '../hooks/useAiAnalysis';
 import AiAnalysisPanel from './AiAnalysisPanel';
 import WinRateGraph from './WinRateGraph';
 import ChatPanel from './teacher/ChatPanel';
@@ -524,12 +524,15 @@ export default function ReviewBoard({
         result: aiAnalysis.result,
         isLoading: aiAnalysis.isLoading,
         error: aiAnalysis.error,
+        toPlay: aiToPlay,
       }
     : {
         enabled: syncedAiAnalysis?.enabled ?? false,
         result: syncedAiAnalysis?.result ?? null,
         isLoading: syncedAiAnalysis?.isLoading ?? false,
         error: syncedAiAnalysis?.error ?? null,
+        // 数字がどちらから見た値かは講師端末が決める。届いていなければ自分の盤から読む。
+        toPlay: syncedAiAnalysis?.toPlay ?? aiToPlay,
       };
 
   const localHoveredCandidateIndex = hoveredCandidate?.nodeId === currentNode.id
@@ -620,6 +623,7 @@ export default function ReviewBoard({
       error: aiAnalysis.settings.enabled ? aiAnalysis.error : null,
       hoveredCandidateRank: aiAnalysis.settings.enabled ? hoveredCandidateIndex : null,
       allowStudentInteraction: aiAnalysis.settings.allowStudentInteraction,
+      toPlay: aiToPlay,
       showCandidates,
     };
     sendToTargets({ type: 'AI_ANALYSIS_UPDATE', payload });
@@ -632,6 +636,7 @@ export default function ReviewBoard({
     aiAnalysis.settings.allowStudentInteraction,
     hoveredCandidateIndex,
     showCandidates,
+    aiToPlay,
     sharedAiResult,
     sendToTargets,
     participantCount, // 途中参加した生徒にも現在の結果を再送する
@@ -681,10 +686,15 @@ export default function ReviewBoard({
     }
     // Override with actual result for current node
     if (displayedAi.result) {
-      data.push({ moveNumber: currentMoveNumber, winrate: displayedAi.result.winrate });
+      // グラフの縦軸は黒の勝率で固定する。手番基準のままだと1手ごとに上下が
+      // 反転して、形勢がどちらへ動いたのか読めなくなる。
+      data.push({
+        moveNumber: currentMoveNumber,
+        winrate: toBlackWinrate(displayedAi.result.winrate, displayedAi.toPlay),
+      });
     }
     return data;
-  }, [displayedAi.enabled, displayedAi.result, rootNode, currentMoveNumber]);
+  }, [displayedAi.enabled, displayedAi.result, displayedAi.toPlay, rootNode, currentMoveNumber]);
 
   // 生徒選択
   const studentParticipants = useMemo(() => {
@@ -1162,6 +1172,7 @@ export default function ReviewBoard({
             onCandidateHover={isTeacher || allowStudentInteraction ? handleCandidateHover : undefined}
             readOnly={!isTeacher}
             allowCandidateInteraction={allowStudentInteraction}
+            toPlay={displayedAi.toPlay}
           />
           )}
 

@@ -13,6 +13,8 @@ interface AiAnalysisPanelProps {
   onCandidateHover?: (rank: number | null) => void;
   readOnly?: boolean;
   allowCandidateInteraction?: boolean;
+  /** 数字がどちらから見た値か。KataGo は手番side から見た値を返す。 */
+  toPlay?: 'BLACK' | 'WHITE';
 }
 
 export default function AiAnalysisPanel({
@@ -26,8 +28,15 @@ export default function AiAnalysisPanel({
   onCandidateHover,
   readOnly = false,
   allowCandidateInteraction = false,
+  toPlay = 'BLACK',
 }: AiAnalysisPanelProps) {
   const canInteractWithCandidates = !readOnly || allowCandidateInteraction;
+  // 勝率も目数差も手番の側から見た値。黒が10目良い局面は、黒番なら+10、白番なら-10。
+  const turnLabel = toPlay === 'BLACK' ? '黒番' : '白番';
+  const opponentLabel = toPlay === 'BLACK' ? '白' : '黒';
+  // バーは左が常に手番側。色は石の色のままにして、地と塗りを入れ替える。
+  const barTrack = toPlay === 'BLACK' ? '#f2efe6' : '#17150f';
+  const barFill = toPlay === 'BLACK' ? '#17150f' : '#f2efe6';
   return (
     <div className="glass-panel p-4 sm:p-5 space-y-4" data-testid="ai-analysis-panel">
       {/* Header */}
@@ -76,24 +85,24 @@ export default function AiAnalysisPanel({
           {/* Winrate bar */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
-              <span className="font-semibold text-ink">黒 {result.winrate.toFixed(1)}%</span>
-              <span className="font-semibold text-ink">白 {(100 - result.winrate).toFixed(1)}%</span>
+              <span className="font-semibold text-ink" data-testid="ai-winrate-turn">{turnLabel} {result.winrate.toFixed(1)}%</span>
+              <span className="font-semibold text-muted">{opponentLabel} {(100 - result.winrate).toFixed(1)}%</span>
             </div>
-            {/* 勝率バーは石の色そのままで読ませる。左（黒の取り分）が那智黒、残りが蛤の白。
+            {/* 勝率バーは石の色そのままで読ませる。左が手番の取り分で、手番の石の色で塗る。
                 地の明暗が変わっても石の色は変わらないので、役割トークンではなく石の色を直に置く。 */}
-            <div className="h-3 bg-[#f2efe6] rounded-full overflow-hidden border border-line">
+            <div className="h-3 rounded-full overflow-hidden border border-line" style={{ backgroundColor: barTrack }}>
               <div
-                className="h-full bg-[#17150f] transition-all duration-300"
-                style={{ width: `${result.winrate}%` }}
+                className="h-full transition-all duration-300"
+                style={{ width: `${result.winrate}%`, backgroundColor: barFill }}
               />
             </div>
           </div>
 
           {/* Score */}
           <div className="flex justify-between text-xs">
-            <span className="text-muted">目数差</span>
-            <span className="font-mono font-bold text-base text-ink">
-              {result.scoreLead > 0 ? `B+${result.scoreLead.toFixed(1)}` : `W+${Math.abs(result.scoreLead).toFixed(1)}`}
+            <span className="text-muted">目数差（{turnLabel}から見て）</span>
+            <span className="font-mono font-bold text-base text-ink" data-testid="ai-score-lead">
+              {result.scoreLead >= 0 ? '+' : ''}{result.scoreLead.toFixed(1)}目
             </span>
           </div>
 
