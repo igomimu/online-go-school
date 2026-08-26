@@ -94,3 +94,34 @@ describe('deriveLiveBoardSnapshots', () => {
     expect(hydrated[0].boardState[2][2]?.color).toBe('BLACK');
   });
 });
+
+/**
+ * 2026-08-26 の実授業で「対局中、ホーム画面の碁盤だけ盤面がズレていた」。
+ *
+ * このフックは最初の取得と Realtime の購読しか持っておらず、その二つの間に
+ * 打たれた手も、購読が切れている間の手も拾えなかった。対局盤のほうは games の
+ * 更新を合図にした再取得と3秒ごとの照合を持っていたので、ホーム画面でだけ出た。
+ */
+describe('手が欠けたときの盤', () => {
+  it('途中の一手が欠けると、取られたはずの石が盤に残る', () => {
+    // 黒が白一子を取る形。9路の隅で E1(白)を黒が囲む
+    const all = [
+      move({ move_number: 1, x: 5, y: 9, color: 'BLACK' }),   // E1
+      move({ move_number: 2, x: 4, y: 9, color: 'WHITE', player_id: 'teacher' }), // D1
+      move({ move_number: 3, x: 3, y: 9, color: 'BLACK' }),   // C1
+      move({ move_number: 4, x: 1, y: 1, color: 'WHITE', player_id: 'teacher' }),
+      move({ move_number: 5, x: 4, y: 8, color: 'BLACK' }),   // D2 → D1の白を取る
+    ];
+    const games = [game({ id: 'game-1', board_size: 9 })];
+
+    const complete = deriveLiveBoardSnapshots(games, all).get('game-1')!;
+    expect(complete.boardState[8][3]).toBeNull(); // D1の白は取られている
+
+    // 3手目が届かなかった場合、白は取られず盤に残ったままになる。
+    // 手数は最大の move_number から出すので正しいままで、盤だけが狂う。
+    // 「手数は合っているのに盤がズレている」という見え方になる
+    const missing = all.filter(m => m.move_number !== 3);
+    const broken = deriveLiveBoardSnapshots(games, missing).get('game-1')!;
+    expect(broken.boardState[8][3]?.color).toBe('WHITE');
+  });
+});
