@@ -104,6 +104,8 @@ function App() {
   const [livekitUrl, setLivekitUrl] = useState(() => import.meta.env.VITE_LIVEKIT_URL || localStorage.getItem('lk-url') || '');
   // RealtimeKit はトークンだけで繋がるので、URL が空でも入れる
   const rtcReady = !needsServerUrl() || !!livekitUrl;
+  // 配信されている版とずれていないか（古いまま動くと直した不具合が出続ける）
+  const appVersion = useAppVersionCheck();
   const [roomName, setRoomName] = useState('go-classroom');
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [connectionError, setConnectionError] = useState('');
@@ -1741,7 +1743,6 @@ function App() {
 
   // --- メイン教室ビュー ---
   const isConnected = connectionState === ConnectionState.Connected;
-  const appVersion = useAppVersionCheck();
 
   // 生徒が対局中なら自動的にゲーム画面に遷移
   const myIdentityForGame = classroomRef.current?.localIdentity || userName;
