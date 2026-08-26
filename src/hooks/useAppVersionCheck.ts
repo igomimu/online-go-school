@@ -25,8 +25,13 @@ export function useAppVersionCheck(): { updateAvailable: boolean; reload: () => 
         const data = await res.json() as { version?: string };
         const served = typeof data.version === 'string' ? data.version : '';
         if (!served) return;
-        // 自分のビルドと配信中の版が違えば、新しいものが出ている
-        if (alive && served !== __COMMIT_HASH__) setUpdateAvailable(true);
+        const mine = __COMMIT_HASH__;
+        // 🔴 version.json は40文字のフルハッシュ、アプリが持つのは7文字の短縮版。
+        // そのまま比べると必ず食い違い、読み込み直しても帯が出続ける（2026-08-26）。
+        // git が使えない環境では 'no-git' などが入るので、そのときは比べない。
+        if (!mine || mine === 'no-git' || mine === 'unknown') return;
+        const same = served.startsWith(mine) || mine.startsWith(served);
+        if (alive && !same) setUpdateAvailable(true);
       } catch {
         // 見に行けなくても、それ自体は知らせない（回線が細いだけのことがある）
       }
