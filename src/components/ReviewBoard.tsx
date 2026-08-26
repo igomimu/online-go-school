@@ -14,7 +14,7 @@ import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';
 import { fromGtpCoord } from '../utils/katagoClient';
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2, Eye, EyeOff, Menu } from 'lucide-react';
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2, Eye, EyeOff, Menu } from 'lucide-react';
 import { getDisplayName } from '../utils/identityUtils';
 import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
 import { useAiAnalysis } from '../hooks/useAiAnalysis';
@@ -413,6 +413,32 @@ export default function ReviewBoard({
 
   const currentMoveNumber = currentNode.move ? currentNode.nextNumber - 1 : 0;
 
+  /**
+   * いま見ている手順の全体。ここまで来た道（ルート→現在）と、
+   * この先の続き（主分岐）をつないだもの。
+   * 分岐に入っていても「今いる筋」がそのまま並ぶので、ゲージがずれない。
+   */
+  const timeline = useMemo(() => {
+    const behind: GameNode[] = [];
+    let back: GameNode | null = currentNode;
+    while (back) { behind.unshift(back); back = back.parent; }
+    const ahead: GameNode[] = [];
+    let fwd = currentNode;
+    while (fwd.children.length > 0) { fwd = fwd.children[0]; ahead.push(fwd); }
+    return { nodes: [...behind, ...ahead], index: behind.length - 1 };
+  }, [currentNode]);
+
+  /** ゲージや早送りで、手順の好きなところへ飛ぶ */
+  const goToIndex = useCallback((index: number) => {
+    const clamped = Math.max(0, Math.min(timeline.nodes.length - 1, index));
+    const target = timeline.nodes[clamped];
+    if (target) onSetCurrentNode(target);
+  }, [timeline, onSetCurrentNode]);
+
+  const jumpBy = useCallback((delta: number) => {
+    goToIndex(timeline.index + delta);
+  }, [goToIndex, timeline.index]);
+
   // 自動再生
   const autoReplay = useAutoReplay(currentNode, onSetCurrentNode);
 
@@ -779,16 +805,22 @@ export default function ReviewBoard({
           <div className="flex flex-col gap-2 sm:gap-3 w-full items-center">
             {/* ステップ移動 */}
             <div className="flex justify-center gap-2">
-              <button onClick={goToRoot} disabled={!currentNode.parent} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
+              <button onClick={goToRoot} disabled={!currentNode.parent} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="最初へ">
                 <ChevronFirst />
               </button>
-              <button onClick={goBack} disabled={!currentNode.parent} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
+              <button onClick={() => jumpBy(-10)} disabled={!currentNode.parent} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="10手戻る">
+                <ChevronsLeft />
+              </button>
+              <button onClick={goBack} disabled={!currentNode.parent} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="一手戻る">
                 <ChevronLeft />
               </button>
-              <button onClick={goForward} disabled={currentNode.children.length === 0} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
+              <button onClick={goForward} disabled={currentNode.children.length === 0} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="一手進む">
                 <ChevronRight />
               </button>
-              <button onClick={goLast} disabled={currentNode.children.length === 0} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30">
+              <button onClick={() => jumpBy(10)} disabled={currentNode.children.length === 0} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="10手進む">
+                <ChevronsRight />
+              </button>
+              <button onClick={goLast} disabled={currentNode.children.length === 0} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="最後へ">
                 <ChevronLast />
               </button>
               <div className="w-px h-8 bg-ink/8 mx-1 self-center" />
@@ -803,6 +835,25 @@ export default function ReviewBoard({
                 <Undo2 />
               </button>
             </div>
+
+            {/* 手順のゲージ。200手を超える棋譜でも、見たい場面まで一気に飛べる */}
+            {timeline.nodes.length > 1 && (
+              <div className="flex w-full items-center gap-2 px-1">
+                <span className="tabular text-xs text-muted whitespace-nowrap">
+                  {timeline.index}/{timeline.nodes.length - 1}
+                </span>
+                <input
+                  type="range"
+                  aria-label="手順の位置"
+                  data-testid="review-seek-bar"
+                  min={0}
+                  max={timeline.nodes.length - 1}
+                  value={timeline.index}
+                  onChange={(e) => goToIndex(Number(e.target.value))}
+                  className="h-2 w-full cursor-pointer appearance-none rounded-full bg-ink/10 accent-accent"
+                />
+              </div>
+            )}
 
             {/* アノテーション & 描画ツールバー */}
             <div className="flex flex-wrap justify-center items-center gap-1.5 p-2 bg-ground/60 border border-line rounded-xl max-w-full">

@@ -512,3 +512,94 @@ describe('ReviewBoard の書き出し', () => {
     cleanup();
   });
 });
+
+/**
+ * 200手を超える棋譜で、見たい場面まで一気に飛べること。
+ * 2026-08-26 三村さんの要望（Pocket KataGo と同じゲージと早送り）。
+ */
+describe('手順のゲージと早送り', () => {
+  function makeLongTree(moves: number) {
+    const root = createNode(null, createEmptyBoard(9), 1, 'BLACK', 9);
+    let node = root;
+    for (let i = 0; i < moves; i++) {
+      const board = createEmptyBoard(9);
+      board[i % 9][Math.floor(i / 9) % 9] = { color: i % 2 === 0 ? 'BLACK' : 'WHITE', number: i + 1 };
+      node = addMove(node, board, i + 2, i % 2 === 0 ? 'WHITE' : 'BLACK', 9, {
+        x: (i % 9) + 1, y: (Math.floor(i / 9) % 9) + 1, color: i % 2 === 0 ? 'BLACK' : 'WHITE',
+      });
+    }
+    return root;
+  }
+
+  it('ゲージを動かすと、その手数の局面へ飛ぶ', () => {
+    const root = makeLongTree(30);
+    const onSet = vi.fn();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={onSet}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+    const bar = screen.getByTestId('review-seek-bar') as HTMLInputElement;
+    expect(bar.max).toBe('30');
+
+    fireEvent.change(bar, { target: { value: '20' } });
+    expect(onSet).toHaveBeenCalledTimes(1);
+    // 20手目のノードが渡る（nextNumber は手数+1）
+    expect(onSet.mock.calls[0][0].nextNumber).toBe(21);
+  });
+
+  it('10手進むボタンで、10手先へ飛ぶ', () => {
+    const root = makeLongTree(30);
+    const onSet = vi.fn();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={onSet}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+    fireEvent.click(screen.getByTitle('10手進む'));
+    expect(onSet.mock.calls[0][0].nextNumber).toBe(11);
+  });
+
+  it('手順の終わりを超えて進もうとしても、最後で止まる', () => {
+    const root = makeLongTree(5);
+    const onSet = vi.fn();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={onSet}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+    fireEvent.click(screen.getByTitle('10手進む'));
+    // 5手しかないので5手目で止まる
+    expect(onSet.mock.calls[0][0].nextNumber).toBe(6);
+  });
+
+  it('手が1つも無ければゲージは出ない', () => {
+    const root = createNode(null, createEmptyBoard(9), 1, 'BLACK', 9);
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+    expect(screen.queryByTestId('review-seek-bar')).toBeNull();
+  });
+});
