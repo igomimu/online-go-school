@@ -191,40 +191,68 @@ export async function loadSgfForReview(
  * 対局作成ダイアログを開いて条件を入れ、対局開始をクリック
  * expectedPlayersCount: 先生+参加生徒数（先生1+生徒2なら3）
  */
+/**
+ * 対局作成ダイアログを開いて条件を入れ、対局開始をクリック。
+ *
+ * 2026-08-23 の `a107af9`「対局作成とNHK杯時計を再設計」でUIが変わり、
+ * このヘルパーは置き去りになっていた（碁盤サイズが「9路」ボタンから
+ * プルダウンへ、対局者は黒白2つの選択から「自分の色＋相手1人」へ）。
+ * そのため createGame を使う E2E 13本が丸ごと落ちたままだった（2026-08-26 に修理）。
+ *
+ * blackName / whiteName は「その名前がその色になる」という指定。
+ * 先生が入っていれば先生の色を、生徒同士なら「生徒同士対局」を使って組む。
+ */
 export async function createGame(
   page: Page,
   opts: {
     blackName: string;
     whiteName: string;
     boardSize?: 9 | 13 | 19;
+    /** 互換のため受け取るが、いまのUIでは使わない */
     expectedPlayersCount?: number;
     mainMinutes?: number; // 未指定ならDEFAULT_TIME_SETTINGS(持ち時間0分・秒読み30秒×1)のまま
   },
 ): Promise<void> {
-  const { blackName, whiteName, boardSize = 9, expectedPlayersCount = 2, mainMinutes } = opts;
+  const { blackName, whiteName, boardSize = 9, mainMinutes } = opts;
 
   await page.getByTestId('create-game-toolbar-button').click();
   await page.getByTestId('create-game-button').waitFor({ timeout: 5_000 });
 
-  // 碁盤サイズ選択
-  await page.getByRole('button', { name: `${boardSize}路`, exact: true }).click();
+  await page.getByTestId('board-size-select').selectOption(String(boardSize));
 
-  // プレイヤー選択肢が揃うまで待つ（ダイアログ生成タイミングのバグ検出）
-  const blackSelect = page.getByTestId('black-player-select');
-  await expect(blackSelect.locator('option')).toHaveCount(expectedPlayersCount, { timeout: 20_000 });
+  // 「自分」は先生（生徒同士対局にすると先頭の生徒に入れ替わる）。
+  // 🔴 自分が誰かを表示名の一致で判定してはいけない。呼び出し側は '先生' のような
+  // 呼び名を渡すが、画面には「三村九段」のような表示名が出る（2026-08-26）。
+  // 相手の候補に誰が居るかで決める。
+  const opponent = page.getByTestId('opponent-player-select');
+  await expect(opponent.locator('option')).not.toHaveCount(0, { timeout: 20_000 });
+  const optionsNow = await opponent.locator('option').allTextContents();
+  const hasBlack = optionsNow.some((o) => o.includes(blackName));
+  const hasWhite = optionsNow.some((o) => o.includes(whiteName));
 
-  const options = await blackSelect.locator('option').allTextContents();
-  const blackIdx = options.findIndex((o) => o.includes(blackName));
-  const whiteIdx = options.findIndex((o) => o.includes(whiteName));
-  if (blackIdx < 0) throw new Error(`黒番候補に "${blackName}" が見つからない: ${JSON.stringify(options)}`);
-  if (whiteIdx < 0) throw new Error(`白番候補に "${whiteName}" が見つからない: ${JSON.stringify(options)}`);
+  if (hasBlack && hasWhite) {
+    // 指定の2人が両方とも「相手」側に居る＝生徒同士の対局
+    await page.getByTestId('student-vs-student-checkbox').check();
+    await expect(opponent.locator('option')).not.toHaveCount(0, { timeout: 10_000 });
+  }
 
-  await blackSelect.selectOption({ index: blackIdx });
-  await page.getByTestId('white-player-select').selectOption({ index: whiteIdx });
+  // 相手側に居るほうが相手。自分はその反対の色になる
+  const opponentIsBlack = hasBlack && !(hasBlack && hasWhite);
+  const opponentName = opponentIsBlack ? blackName : whiteName;
+  const selfColor: 'BLACK' | 'WHITE' = opponentIsBlack ? 'WHITE' : 'BLACK';
+
+  await page.getByRole('radio', { name: selfColor === 'BLACK' ? '黒' : '白' }).check();
+
+  const finalOptions = await opponent.locator('option').allTextContents();
+  const idx = finalOptions.findIndex((o) => o.includes(opponentName));
+  if (idx < 0) {
+    throw new Error(`相手の候補に "${opponentName}" が見つからない: ${JSON.stringify(finalOptions)}`);
+  }
+  await opponent.selectOption({ index: idx });
 
   if (mainMinutes !== undefined) {
-    // number input はダイアログ内で コミ → 持ち時間（分） → 秒読みの回数 の順
-    await page.locator('input[type="number"]').nth(1).fill(String(mainMinutes));
+    await page.getByTestId('time-limit-checkbox').check().catch(() => {});
+    await page.locator('input[type="number"]').first().fill(String(mainMinutes));
   }
 
   // 対局開始
