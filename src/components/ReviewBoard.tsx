@@ -10,6 +10,9 @@ import { isSharingTarget, toggleSharingTarget, type SharingTargets } from '../ut
 import { findNearestDrawingIndex } from '../utils/drawingUtils';
 import type { ParticipantInfo, ClassroomRtc, ClassroomMessage } from '../utils/classroomRtc';
 import { useThrottledCursor } from '../hooks/useThrottledCursor';
+
+/** ホイールの回転を溜めてまとめる間隔。人が回している間は途切れなく続く */
+const WHEEL_BATCH_MS = 16;
 import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';
@@ -256,26 +259,31 @@ export default function ReviewBoard({
    * （2026-08-26 実授業。20手前後で止まり、以降なにも届かない。
    *  同じ経路のシークバーは1回で目的地へ飛ぶので最後まで届いていた）。
    *
-   * 溜めておいて、描画の1コマにつき1回だけまとめて動かす。
+   * 溜めておいて、ごく短い間隔で1回だけまとめて動かす。
    * 進む速さは変わらないまま、更新の回数だけが減る。
+   *
+   * 🔴 requestAnimationFrame は使えない。検討を別ウィンドウで開いていると
+   * 描画は背後の本体ウィンドウで動いており、ブラウザは非表示ウィンドウの
+   * 描画コマを止めるので、溜めた分が永久に実行されない
+   * （2026-08-26。ホイールがまったく効かなくなった）。
    */
   const wheelDebt = useRef(0);
-  const wheelFrame = useRef<number | null>(null);
+  const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
-    if (wheelFrame.current !== null) cancelAnimationFrame(wheelFrame.current);
+    if (wheelTimer.current !== null) clearTimeout(wheelTimer.current);
   }, []);
 
   const handleBoardWheel = useCallback((delta: number) => {
     if (!canEdit || delta === 0) return;
     wheelDebt.current += delta > 0 ? 1 : -1;
-    if (wheelFrame.current !== null) return;
-    wheelFrame.current = requestAnimationFrame(() => {
-      wheelFrame.current = null;
+    if (wheelTimer.current !== null) return;
+    wheelTimer.current = setTimeout(() => {
+      wheelTimer.current = null;
       const steps = wheelDebt.current;
       wheelDebt.current = 0;
       if (steps !== 0) jumpBy(steps);
-    });
+    }, WHEEL_BATCH_MS);
   }, [canEdit, jumpBy]);
 
   // 右クリックで、クリック位置に最も近い描画(線・矢印)を1つ消す（pokekata踏襲、石は対象外）

@@ -649,8 +649,8 @@ describe('ホイールの手順送り', () => {
     // まだ動かない（次の描画のコマまで溜める）
     expect(onSet).not.toHaveBeenCalled();
 
-    // 1コマ進むと、まとめて15手ぶん動く
-    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    // ごく短い間を置くと、まとめて15手ぶん動く
+    await new Promise((r) => setTimeout(r, 40));
     expect(onSet).toHaveBeenCalledTimes(1);
     expect(onSet.mock.calls[0][0].nextNumber).toBe(16);
   });
@@ -677,7 +677,7 @@ describe('ホイールの手順送り', () => {
     for (let i = 0; i < 3; i++) {
       fireEvent.wheel(board, { deltaY: -100 });
     }
-    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    await new Promise((r) => setTimeout(r, 40));
 
     expect(onSet).toHaveBeenCalledTimes(1);
     expect(onSet.mock.calls[0][0].nextNumber).toBe(8); // 10手目 → 7手目

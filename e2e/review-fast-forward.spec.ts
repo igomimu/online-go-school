@@ -108,6 +108,37 @@ test.describe('検討の早送り', () => {
     }).toPass({ timeout: 20_000 });
   });
 
+  test('シークバーで途中まで進めてからホイールを回しても、生徒が付いてくる', async () => {
+    const review = await loadSgfForReview(teacherPage, SGF_30);
+    await expect(review.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
+
+    // まずシークバーで10手目まで
+    await review.getByTestId('review-seek-bar').fill('10');
+    await expect(review.getByText('10手目')).toBeVisible({ timeout: 10_000 });
+
+    // そこからホイール。実機ではこの条件で5、6手で止まっていた
+    const board = review.getByTestId('go-board');
+    await board.hover();
+    for (let i = 0; i < 60; i++) {
+      await review.mouse.wheel(0, 100);
+    }
+
+    await expect(review.getByText('30手目')).toBeVisible({ timeout: 15_000 });
+
+    const studentBoard = studentPage.getByTestId('go-board');
+    await expect(async () => {
+      const stones = await studentBoard.locator('[data-stone]').count();
+      expect(stones).toBe(30);
+    }).toPass({ timeout: 25_000 });
+
+    // 止まっていないこと。この後の操作にも反応する
+    await review.getByTitle('一手戻る').click();
+    await expect(async () => {
+      const stones = await studentBoard.locator('[data-stone]').count();
+      expect(stones).toBe(29);
+    }).toPass({ timeout: 20_000 });
+  });
+
   test('ゲージを大きく動かしても、生徒の盤がその局面に揃う', async () => {
     const review = await loadSgfForReview(teacherPage, SGF_30);
     await expect(review.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
