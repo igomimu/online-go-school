@@ -19,9 +19,18 @@ type RemotePeer = Meeting['participants']['joined'] extends { get(id: string): i
 /**
  * 送信の頻度上限。既定は毎秒5回で、碁盤のカーソル共有（交点を跨ぐたびに送る）は
  * 簡単に超える。超えた分は握り潰されず例外になるので、最初に引き上げておく。
- * 実測では毎秒60回まで相手に届き、サーバー側の追加制限は出なかった（2026-08-26）。
+ *
+ * 🔴 第2引数は**秒**。ミリ秒だと思って 1000 を渡していたため、実際には
+ * 「1000秒(16分40秒)につき60回」になっていた。しかも固定窓なので、60通を
+ * 使い切った瞬間から16分間、送信が全部その場で例外になる
+ * （2026-08-26 実授業。検討で20〜25手進めると以降なにも届かなくなり、
+ *  リロードするまで回復しない。カウンタは SDK 内部に持たれていて
+ *  繋ぎ直しでは消えない）。
+ *
+ * 「毎秒60回まで通った」という実測も、固定窓の最初の60通を見ていただけだった。
  */
 const RATE_LIMIT_PER_SEC = 60;
+const RATE_LIMIT_WINDOW_SEC = 1;
 
 /**
  * 送信の間隔。上限（毎秒 RATE_LIMIT_PER_SEC 回）に対して半分以下に抑え、
@@ -90,7 +99,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     this.setupEventListeners(meeting);
 
     await meeting.join();
-    meeting.participants.updateRateLimits(RATE_LIMIT_PER_SEC, 1000);
+    meeting.participants.updateRateLimits(RATE_LIMIT_PER_SEC, RATE_LIMIT_WINDOW_SEC);
 
     // 「回線復旧」で作り直しても、選んだマイク・カメラを使い続ける
     await this.applySavedDevices();

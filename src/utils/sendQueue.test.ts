@@ -67,3 +67,27 @@ describe('送信に失敗したときの戻し先', () => {
     }
   });
 });
+
+/**
+ * 2026-08-26: `updateRateLimits(60, 1000)` の第2引数を「ミリ秒」だと思って
+ * いたが、SDK の実装は**秒**として扱う（内部で 1000 倍する）。そのため
+ * 「1000秒につき60回」になり、60通を使い切った時点から16分間、送信が
+ * 全部その場で例外になっていた。しかもカウンタは SDK 内部のクロージャに
+ * あるので、繋ぎ直しでは消えずリロードするまで回復しない。
+ *
+ * 実授業では、検討で20〜25手進めたところで生徒に何も届かなくなる形で出た。
+ * 単位の取り違えは目で追いにくいので、値そのものを縛っておく。
+ */
+describe('送信の頻度上限の設定', () => {
+  it('窓の長さは「秒」で渡す（1000 を渡すと16分の窓になる）', async () => {
+    const src = await import('node:fs').then((fs) =>
+      fs.readFileSync('src/utils/classroomRealtimeKit.ts', 'utf-8'),
+    );
+    // updateRateLimits の第2引数がリテラルの 1000 でないこと
+    expect(src).not.toMatch(/updateRateLimits\([^)]*,\s*1000\s*\)/);
+    // 秒として妥当な範囲の定数を使っていること
+    const m = src.match(/const RATE_LIMIT_WINDOW_SEC = (\d+);/);
+    expect(m).not.toBeNull();
+    expect(Number(m![1])).toBeLessThanOrEqual(5);
+  });
+});

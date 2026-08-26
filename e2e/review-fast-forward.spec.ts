@@ -25,9 +25,11 @@ test.describe('検討の早送り', () => {
   let teacherPage: Page;
   let studentPage: Page;
   let classroomId: string;
+  let sendErrors: string[];
 
   test.beforeEach(async ({ browser }) => {
     classroomId = generateClassroomId('ff');
+    sendErrors = [];
     teacherContext = await browser.newContext();
     studentContext = await browser.newContext();
     teacherPage = await teacherContext.newPage();
@@ -43,7 +45,11 @@ test.describe('検討の早送り', () => {
     await loginAsStudent(studentPage, { studentCode: TEST_STUDENT_A.code, classroomId });
 
     teacherPage.on('console', (m) => {
-      if (/\[rtc\]/.test(m.text())) console.log(`[先生] ${m.text().slice(0, 160)}`);
+      const t = m.text();
+      if (/\[rtc\]/.test(t)) {
+        console.log(`[先生] ${t.slice(0, 200)}`);
+        sendErrors.push(t);
+      }
     });
   });
 
@@ -51,6 +57,9 @@ test.describe('検討の早送り', () => {
     await teacherContext?.close();
     await studentContext?.close();
     if (classroomId) await teardownSupabaseRoster(classroomId);
+    // 🔴 送れなかったことが1度でもあれば失敗にする。
+    // 今日の遠回りの主因は、送信の失敗が誰にも見えなかったこと
+    expect(sendErrors, `送信に失敗した: ${sendErrors.join(' / ')}`).toEqual([]);
   });
 
   test('矢印キーで30手を早送りしても、生徒の盤が最後まで付いてくる', async () => {
@@ -137,6 +146,37 @@ test.describe('検討の早送り', () => {
       const stones = await studentBoard.locator('[data-stone]').count();
       expect(stones).toBe(29);
     }).toPass({ timeout: 20_000 });
+  });
+
+  test('盤の上でカーソルを動かしながら長く早送りしても、送信が止まらない', async () => {
+    const review = await loadSgfForReview(teacherPage, SGF_30);
+    await expect(review.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
+
+    // カーソル共有と盤面配信を同時に走らせ、送信の上限を使い切る量を流す。
+    // 上限の窓を取り違えていたときは、ここで60通を超えた時点から
+    // 以降ずっと例外になっていた
+    const board = review.getByTestId('go-board');
+    for (let round = 0; round < 6; round++) {
+      await board.hover({ position: { x: 60 + round * 15, y: 60 + round * 10 } });
+      await review.mouse.wheel(0, 100);
+      await review.mouse.wheel(0, 100);
+      await review.mouse.wheel(0, 100);
+      await review.mouse.wheel(0, -100);
+      await review.waitForTimeout(120);
+    }
+    // 端まで進めて戻す、を繰り返して総量を稼ぐ
+    for (let i = 0; i < 6; i++) {
+      await review.getByTestId('review-seek-bar').fill(String(i % 2 === 0 ? 30 : 5));
+      await review.waitForTimeout(120);
+    }
+    await review.getByTestId('review-seek-bar').fill('22');
+
+    await expect(review.getByText('22手目')).toBeVisible({ timeout: 15_000 });
+    const studentBoard = studentPage.getByTestId('go-board');
+    await expect(async () => {
+      const stones = await studentBoard.locator('[data-stone]').count();
+      expect(stones).toBe(22);
+    }).toPass({ timeout: 25_000 });
   });
 
   test('ゲージを大きく動かしても、生徒の盤がその局面に揃う', async () => {
