@@ -11,8 +11,14 @@ import { findNearestDrawingIndex } from '../utils/drawingUtils';
 import type { ParticipantInfo, ClassroomRtc, ClassroomMessage } from '../utils/classroomRtc';
 import { useThrottledCursor } from '../hooks/useThrottledCursor';
 
-/** ホイールの回転を溜めてまとめる間隔。人が回している間は途切れなく続く */
-const WHEEL_BATCH_MS = 16;
+/**
+ * ホイールの回転を溜めてまとめる間隔。
+ *
+ * 短すぎるとまとめる意味がない（16ms では毎秒60回も画面を更新することになり、
+ * 詰まりが解消しなかった 2026-08-26）。100ms なら1秒間に10回で、
+ * その間の回転はすべて1回の移動にまとまる。早送りの速さは変わらない。
+ */
+const WHEEL_BATCH_MS = 100;
 import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';

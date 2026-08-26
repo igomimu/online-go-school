@@ -482,8 +482,20 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
         message,
         pending: this.mustDeliver.length + this.latest.size,
       });
+      // 🔴 盤面のように「最新だけでよい」ものを、失敗したからといって
+      // 順番待ちの列へ移してはいけない。失敗が続くとそちらが積み上がり、
+      // 優先されるので新しい盤面が永久に送られなくなる
+      // （2026-08-26 実授業。25手前後で生徒の受信が止まった）。
+      // 同じ置き場へ戻し、次の更新が来ればそれに上書きされるに任せる。
+      if (LATEST_ONLY_TYPES.has(msg.type)) {
+        const key = `${msg.type}|${(participantIds ?? []).join(',')}`;
+        if (!this.latest.has(key)) this.latest.set(key, { msg, participantIds, retried: true });
+        this.lastSentAt = Date.now() + RETRY_BACKOFF_MS;
+        this.schedulePump();
+        return;
+      }
       // 落としてはいけないものは、間を置いて列の後ろへ回す。
-      // 🔴 先頭に戻すと、同じものが失敗し続けたとき列全体が止まる。
+      // 先頭に戻すと、同じものが失敗し続けたとき列全体が止まる。
       // 送り直しは1度だけ（retried 済みのものは捨てる）。
       if (RELIABLE_TYPES.has(msg.type) && !retried) {
         this.mustDeliver.push({ msg, participantIds, retried: true });

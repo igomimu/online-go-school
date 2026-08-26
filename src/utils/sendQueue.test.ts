@@ -38,3 +38,32 @@ describe('送信の振り分け', () => {
     expect(queued).toEqual([]);
   });
 });
+
+/**
+ * 2026-08-26 実授業: ホイールで早送りすると生徒の「受信 N手」が25あたりで
+ * 止まり、以降なにも届かなくなった。盤面を「最新だけ」の置き場に入れたのに、
+ * 送信に失敗したときの再送で「順番待ち」の列へ移していたため、失敗が続くと
+ * そちらが積み上がり、優先されて新しい盤面が永久に送られなくなっていた。
+ *
+ * 失敗しても順番待ちの列に入れてはいけない種類を、はっきりさせておく。
+ */
+describe('送信に失敗したときの戻し先', () => {
+  it('最新だけでよい種類は、順番待ちの列に入れてはいけない', () => {
+    // この2つの集合に同時に属するものは、失敗時の扱いを間違えやすい。
+    // 実装は LATEST_ONLY を先に見るので、必ずそちらへ戻ること
+    const both = [...LATEST_ONLY_TYPES].filter((t) => RELIABLE_TYPES.has(t));
+    // 盤面・AI分析・描画は両方に属している（LiveKit では reliable で送るため）
+    expect(both.length).toBeGreaterThan(0);
+    // どれも高い頻度で飛ぶので、順番待ちに積むと詰まる
+    for (const t of both) {
+      expect(LATEST_ONLY_TYPES.has(t)).toBe(true);
+    }
+  });
+
+  it('カーソルは順番待ちの列に属さない', () => {
+    for (const t of ['CURSOR_MOVE', 'CURSOR_CLEAR']) {
+      expect(LATEST_ONLY_TYPES.has(t)).toBe(true);
+      expect(RELIABLE_TYPES.has(t)).toBe(false);
+    }
+  });
+});
