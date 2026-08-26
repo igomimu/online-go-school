@@ -12,7 +12,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  */
 export const FRAME_INTERVAL_MS = 80;
 
-export function useLatestFrame<T>(intervalMs: number = FRAME_INTERVAL_MS): [T | null, (value: T) => void] {
+export function useLatestFrame<T>(
+  intervalMs: number = FRAME_INTERVAL_MS,
+): [T | null, (value: T) => void, () => void] {
   const [shown, setShown] = useState<T | null>(null);
   const pending = useRef<{ value: T } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,5 +44,18 @@ export function useLatestFrame<T>(intervalMs: number = FRAME_INTERVAL_MS): [T | 
     }
   }, [intervalMs]);
 
-  return [shown, push];
+  /**
+   * 溜めているものごと捨てる。
+   * 🔴 これが無いと、検討を閉じた直後に保留していた古い盤が遅れて現れる。
+   */
+  const clear = useCallback(() => {
+    pending.current = null;
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    setShown(null);
+  }, []);
+
+  return [shown, push, clear];
 }

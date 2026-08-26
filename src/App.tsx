@@ -110,7 +110,7 @@ function App() {
   // 🔴 先生がホイールで早送りすると盤面が毎秒何十枚も届く。19路の碁盤は
   // 描き直しが重く、来るたびに描いていると生徒側が固まる（2026-08-26 実授業）。
   // 途中の局面は見えなくてよいので、間隔ごとに最新の一枚だけを描く。
-  const [framedBoard, pushFrameBoard] = useLatestFrame<{ node: GameNode; size: number }>();
+  const [framedBoard, pushFrameBoard, clearFrameBoard] = useLatestFrame<{ node: GameNode; size: number }>();
   const [roomName, setRoomName] = useState('go-classroom');
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [connectionError, setConnectionError] = useState('');
@@ -606,6 +606,8 @@ function App() {
           setReviewCurrentNode(null);
           reviewSourceSgfRef.current = null;
           setReviewCanPlay(false);
+          // 溜めている盤も捨てる。残すと閉じた直後に遅れて現れる
+          clearFrameBoard();
           setSyncedNode(null);
           setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null, hoveredCandidateRank: null, allowStudentInteraction: false });
           setActiveProblem(null);
