@@ -12,6 +12,7 @@ import {
 import type { ClassroomRtc } from './utils/classroomRtc';
 import { createClassroomRtc, needsServerUrl } from './utils/rtcProvider';
 import { useThrottledCursor } from './hooks/useThrottledCursor';
+import { useAppVersionCheck } from './hooks/useAppVersionCheck';
 import type { Role, ClassroomMessage, ParticipantInfo, VideoTrackInfo } from './utils/classroomRtc';
 import type { ViewMode, AudioPermissions, SavedGame, RankDisplayPayload } from './types/game';
 import type { Student, Classroom, RankDisplay } from './types/classroom';
@@ -1740,6 +1741,7 @@ function App() {
 
   // --- メイン教室ビュー ---
   const isConnected = connectionState === ConnectionState.Connected;
+  const appVersion = useAppVersionCheck();
 
   // 生徒が対局中なら自動的にゲーム画面に遷移
   const myIdentityForGame = classroomRef.current?.localIdentity || userName;
@@ -1779,6 +1781,15 @@ function App() {
 
   return (
     <div className="flex flex-col gap-4 w-full h-screen overflow-hidden">
+      {/* 新しい版が出ているのに古いまま動いていると、直したはずの不具合が出続ける */}
+      {appVersion.updateAvailable && (
+        <div className="flex items-center justify-center gap-3 bg-accent/15 border-b border-accent/40 px-4 py-2 text-sm">
+          <span>新しい版が出ています。読み込み直すと最新になります。</span>
+          <button onClick={appVersion.reload} className="secondary-button px-3 py-1 text-xs">
+            今すぐ読み込み直す
+          </button>
+        </div>
+      )}
       {/* ヘッダー */}
       {!isBoardFocusMode && (
         <Header
