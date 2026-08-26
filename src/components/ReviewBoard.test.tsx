@@ -603,3 +603,83 @@ describe('手順のゲージと早送り', () => {
     expect(screen.queryByTestId('review-seek-bar')).toBeNull();
   });
 });
+
+/**
+ * 2026-08-26 実授業: マウスホイールで手順を送ると、20手前後（シークバーで
+ * 途中まで進めた後なら5、6手）で生徒への配信が止まり、以降なにも届かなく
+ * なった。同じ経路のシークバーは1回で目的地へ飛ぶので最後まで届いていた。
+ *
+ * ホイールは一度回すと大量のイベントが飛ぶ。1件ごとに一手進めると画面の
+ * 更新が積み上がって詰まる。溜めて、描画の1コマにつき1回だけ動かす。
+ */
+describe('ホイールの手順送り', () => {
+  function makeLongTree(moves: number) {
+    const root = createNode(null, createEmptyBoard(9), 1, 'BLACK', 9);
+    let node = root;
+    for (let i = 0; i < moves; i++) {
+      const board = createEmptyBoard(9);
+      board[i % 9][Math.floor(i / 9) % 9] = { color: i % 2 === 0 ? 'BLACK' : 'WHITE', number: i + 1 };
+      node = addMove(node, board, i + 2, i % 2 === 0 ? 'WHITE' : 'BLACK', 9, {
+        x: (i % 9) + 1, y: (Math.floor(i / 9) % 9) + 1, color: i % 2 === 0 ? 'BLACK' : 'WHITE',
+      });
+    }
+    return root;
+  }
+
+  it('ホイールを連続で回しても、手順の移動は1コマにつき1回にまとまる', async () => {
+    const root = makeLongTree(30);
+    const onSet = vi.fn();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={onSet}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+
+    const board = screen.getByTestId('go-board');
+    // 一度の回転で飛んでくる量（実機では十数件が一気に来る）
+    for (let i = 0; i < 15; i++) {
+      fireEvent.wheel(board, { deltaY: 100 });
+    }
+
+    // まだ動かない（次の描画のコマまで溜める）
+    expect(onSet).not.toHaveBeenCalled();
+
+    // 1コマ進むと、まとめて15手ぶん動く
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    expect(onSet).toHaveBeenCalledTimes(1);
+    expect(onSet.mock.calls[0][0].nextNumber).toBe(16);
+  });
+
+  it('上に回せば戻る', async () => {
+    const root = makeLongTree(30);
+    // 10手目から始める
+    let node = root;
+    for (let i = 0; i < 10; i++) node = node.children[0];
+
+    const onSet = vi.fn();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={node}
+        boardSize={9}
+        onSetCurrentNode={onSet}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+
+    const board = screen.getByTestId('go-board');
+    for (let i = 0; i < 3; i++) {
+      fireEvent.wheel(board, { deltaY: -100 });
+    }
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+
+    expect(onSet).toHaveBeenCalledTimes(1);
+    expect(onSet.mock.calls[0][0].nextNumber).toBe(8); // 10手目 → 7手目
+  });
+});

@@ -215,6 +215,32 @@ export default function ReviewBoard({
     onSetCurrentNode(curr);
   }, [currentNode, onSetCurrentNode]);
 
+  /**
+   * いま見ている手順の全体。ここまで来た道（ルート→現在）と、
+   * この先の続き（主分岐）をつないだもの。
+   * 分岐に入っていても「今いる筋」がそのまま並ぶので、ゲージがずれない。
+   */
+  const timeline = useMemo(() => {
+    const behind: GameNode[] = [];
+    let back: GameNode | null = currentNode;
+    while (back) { behind.unshift(back); back = back.parent; }
+    const ahead: GameNode[] = [];
+    let fwd = currentNode;
+    while (fwd.children.length > 0) { fwd = fwd.children[0]; ahead.push(fwd); }
+    return { nodes: [...behind, ...ahead], index: behind.length - 1 };
+  }, [currentNode]);
+
+  /** ゲージや早送りで、手順の好きなところへ飛ぶ */
+  const goToIndex = useCallback((index: number) => {
+    const clamped = Math.max(0, Math.min(timeline.nodes.length - 1, index));
+    const target = timeline.nodes[clamped];
+    if (target) onSetCurrentNode(target);
+  }, [timeline, onSetCurrentNode]);
+
+  const jumpBy = useCallback((delta: number) => {
+    goToIndex(timeline.index + delta);
+  }, [goToIndex, timeline.index]);
+
   // 直近の一手を取り消す（誤クリックで作った分岐をツリーから除去する）。
   // 読み込んだ棋譜の手は削除されず「一手戻る」だけになる（元手順を守る）。
   const handleUndo = useCallback(() => {
@@ -222,12 +248,35 @@ export default function ReviewBoard({
     if (parent) onSetCurrentNode(parent);
   }, [currentNode, onSetCurrentNode]);
 
-  // マウスホイールで手順送り/戻り（pokekata踏襲）
+  /**
+   * マウスホイールで手順送り/戻り（pokekata踏襲）。
+   *
+   * 🔴 ホイールは一度回すと大量のイベントが飛ぶ。1件ごとに一手進めると
+   * 画面の更新が積み上がって処理が詰まり、生徒への配信がそこで止まる
+   * （2026-08-26 実授業。20手前後で止まり、以降なにも届かない。
+   *  同じ経路のシークバーは1回で目的地へ飛ぶので最後まで届いていた）。
+   *
+   * 溜めておいて、描画の1コマにつき1回だけまとめて動かす。
+   * 進む速さは変わらないまま、更新の回数だけが減る。
+   */
+  const wheelDebt = useRef(0);
+  const wheelFrame = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (wheelFrame.current !== null) cancelAnimationFrame(wheelFrame.current);
+  }, []);
+
   const handleBoardWheel = useCallback((delta: number) => {
-    if (!canEdit) return;
-    if (delta > 0) goForward();
-    else if (delta < 0) goBack();
-  }, [canEdit, goForward, goBack]);
+    if (!canEdit || delta === 0) return;
+    wheelDebt.current += delta > 0 ? 1 : -1;
+    if (wheelFrame.current !== null) return;
+    wheelFrame.current = requestAnimationFrame(() => {
+      wheelFrame.current = null;
+      const steps = wheelDebt.current;
+      wheelDebt.current = 0;
+      if (steps !== 0) jumpBy(steps);
+    });
+  }, [canEdit, jumpBy]);
 
   // 右クリックで、クリック位置に最も近い描画(線・矢印)を1つ消す（pokekata踏襲、石は対象外）
   const handleCellRightClick = useCallback((x: number, y: number) => {
@@ -413,31 +462,6 @@ export default function ReviewBoard({
 
   const currentMoveNumber = currentNode.move ? currentNode.nextNumber - 1 : 0;
 
-  /**
-   * いま見ている手順の全体。ここまで来た道（ルート→現在）と、
-   * この先の続き（主分岐）をつないだもの。
-   * 分岐に入っていても「今いる筋」がそのまま並ぶので、ゲージがずれない。
-   */
-  const timeline = useMemo(() => {
-    const behind: GameNode[] = [];
-    let back: GameNode | null = currentNode;
-    while (back) { behind.unshift(back); back = back.parent; }
-    const ahead: GameNode[] = [];
-    let fwd = currentNode;
-    while (fwd.children.length > 0) { fwd = fwd.children[0]; ahead.push(fwd); }
-    return { nodes: [...behind, ...ahead], index: behind.length - 1 };
-  }, [currentNode]);
-
-  /** ゲージや早送りで、手順の好きなところへ飛ぶ */
-  const goToIndex = useCallback((index: number) => {
-    const clamped = Math.max(0, Math.min(timeline.nodes.length - 1, index));
-    const target = timeline.nodes[clamped];
-    if (target) onSetCurrentNode(target);
-  }, [timeline, onSetCurrentNode]);
-
-  const jumpBy = useCallback((delta: number) => {
-    goToIndex(timeline.index + delta);
-  }, [goToIndex, timeline.index]);
 
   // 自動再生
   const autoReplay = useAutoReplay(currentNode, onSetCurrentNode);
