@@ -9,6 +9,7 @@ import { playReviewMove } from '../utils/reviewMove';
 import { isSharingTarget, toggleSharingTarget, type SharingTargets } from '../utils/sharingTargets';
 import { findNearestDrawingIndex } from '../utils/drawingUtils';
 import type { ParticipantInfo, ClassroomRtc, ClassroomMessage } from '../utils/classroomRtc';
+import { useThrottledCursor } from '../hooks/useThrottledCursor';
 import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';
@@ -392,17 +393,23 @@ export default function ReviewBoard({
   }, [canEdit, canPlay, onStudentMove, boardState]);
 
   // カーソル共有
+  // カーソルは間引いて送る。交点をまたぐたびに送ると送信の上限に当たり、
+  // 超えた時点から先の配信が丸ごと止まる（2026-08-26 実授業）
+  const sendCursor = useCallback((pos: { x: number; y: number }) => {
+    sendToTargets({ type: 'CURSOR_MOVE', payload: pos });
+  }, [sendToTargets]);
+  const cursorThrottle = useThrottledCursor(sendCursor);
+
   const handleCellMouseEnter = useCallback((x: number, y: number) => {
-    if (isTeacher) {
-      sendToTargets({ type: 'CURSOR_MOVE', payload: { x, y } });
-    }
-  }, [isTeacher, sendToTargets]);
+    if (isTeacher) cursorThrottle.push({ x, y });
+  }, [isTeacher, cursorThrottle]);
 
   const handleCellMouseLeave = useCallback(() => {
-    if (isTeacher) {
-      sendToTargets({ type: 'CURSOR_CLEAR', payload: null });
-    }
-  }, [isTeacher, sendToTargets]);
+    if (!isTeacher) return;
+    // 消すほうは間引きに埋もれさせない
+    cursorThrottle.cancelPending();
+    sendToTargets({ type: 'CURSOR_CLEAR', payload: null });
+  }, [isTeacher, sendToTargets, cursorThrottle]);
 
   const currentMoveNumber = currentNode.move ? currentNode.nextNumber - 1 : 0;
 

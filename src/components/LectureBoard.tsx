@@ -6,6 +6,7 @@ import type { ClassroomRtc, ParticipantInfo } from '../utils/classroomRtc';
 import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import { createNode, addMove, getMainPath, removeNode } from '../utils/treeUtilsV2';
+import { useThrottledCursor } from '../hooks/useThrottledCursor';
 import { checkCapture, createEmptyBoard } from '../utils/gameLogic';
 import { parseSGFTree } from '../utils/sgfUtils';
 import type { SgfMetadata } from '../utils/sgfUtils';
@@ -367,17 +368,22 @@ export default function LectureBoard({
   }, [currentNode, classroomRef, broadcastBoard]);
 
   // カーソル
+  // カーソルは間引く（ReviewBoard と同じ理由）
+  const sendCursor = useCallback((pos: { x: number; y: number }) => {
+    void classroomRef.current?.broadcast({ type: 'CURSOR_MOVE', payload: pos });
+  }, [classroomRef]);
+  const cursorThrottle = useThrottledCursor(sendCursor);
+
   const handleCellMouseEnter = useCallback((x: number, y: number) => {
-    if (isTeacher) {
-      classroomRef.current?.broadcast({ type: 'CURSOR_MOVE', payload: { x, y } });
-    }
-  }, [isTeacher, classroomRef]);
+    if (isTeacher) cursorThrottle.push({ x, y });
+  }, [isTeacher, cursorThrottle]);
 
   const handleCellMouseLeave = useCallback(() => {
     if (isTeacher) {
+      cursorThrottle.cancelPending();
       classroomRef.current?.broadcast({ type: 'CURSOR_CLEAR', payload: null });
     }
-  }, [isTeacher, classroomRef]);
+  }, [isTeacher, classroomRef, cursorThrottle]);
 
   // カーソルマーカー（生徒用）
   const cursorMarkers: Marker[] = useMemo(() => {

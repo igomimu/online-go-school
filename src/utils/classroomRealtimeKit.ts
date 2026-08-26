@@ -1,6 +1,6 @@
 import RealtimeKitClient from '@cloudflare/realtimekit';
 import { getSavedDeviceId } from './mediaDevices';
-import { ConnectionState } from './classroomRtc';
+import { ConnectionState, RELIABLE_TYPES } from './classroomRtc';
 import type {
   AudioDebugInfo,
   ClassroomConnectOptions,
@@ -361,11 +361,30 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     const meeting = this.meeting;
     if (!meeting) return;
     const body = { d: JSON.stringify(msg.payload ?? null), from: meeting.self.id };
-    await meeting.participants.broadcastMessage(
-      msg.type,
-      body,
-      participantIds ? { participantIds } : undefined,
-    );
+    try {
+      await meeting.participants.broadcastMessage(
+        msg.type,
+        body,
+        participantIds ? { participantIds } : undefined,
+      );
+    } catch (err) {
+      // 🔴 呼び出し側の多くは void で投げっぱなしにするので、ここで拾わないと
+      // 「ある時点から相手に何も届かない」が誰にも気づかれないまま進む。
+      // 落としてはいけない種類は、間を置いて一度だけ入れ直す。
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[rtc] ${msg.type} を送れませんでした:`, message);
+      if (!RELIABLE_TYPES.has(msg.type)) return;
+      await new Promise((r) => setTimeout(r, 1200));
+      try {
+        await meeting.participants.broadcastMessage(
+          msg.type,
+          body,
+          participantIds ? { participantIds } : undefined,
+        );
+      } catch (retryErr) {
+        console.error(`[rtc] ${msg.type} の送り直しも失敗:`, retryErr instanceof Error ? retryErr.message : retryErr);
+      }
+    }
   }
 
   async switchDevice(kind: 'audioinput' | 'videoinput', deviceId: string): Promise<void> {
