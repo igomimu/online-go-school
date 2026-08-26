@@ -111,6 +111,11 @@ function App() {
   // 描き直しが重く、来るたびに描いていると生徒側が固まる（2026-08-26 実授業）。
   // 途中の局面は見えなくてよいので、間隔ごとに最新の一枚だけを描く。
   const [framedBoard, pushFrameBoard, clearFrameBoard] = useLatestFrame<{ node: GameNode; size: number }>();
+  // 送れなかったことを画面に出す。今までは失敗が誰にも見えず、
+  // 「届かない」の原因が送信側か受け取る側か切り分けられなかった（2026-08-26）
+  const [sendTrouble, setSendTrouble] = useState<{ type: string; message: string; pending: number; at: number } | null>(null);
+  // 生徒側で「いま何手目まで受け取ったか」。止まったときに送信側と受信側を分けるため
+  const [receivedMoveNo, setReceivedMoveNo] = useState<number | null>(null);
   const [roomName, setRoomName] = useState('go-classroom');
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [connectionError, setConnectionError] = useState('');
@@ -485,6 +490,7 @@ function App() {
               ? { x: 0, y: 0, color: p.nextColor === 'BLACK' ? 'WHITE' : 'BLACK' }
               : undefined,
           };
+          setReceivedMoveNo(p.moveNumber ?? 0);
           pushFrameBoard({ node: dummyNode, size: p.boardSize });
         }
 
@@ -687,6 +693,10 @@ function App() {
         setActiveSpeakers(speakers);
       },
     });
+
+    classroom.onSendError = (info) => {
+      setSendTrouble({ ...info, at: Date.now() });
+    };
 
     // ビデオトラック変更コールバック
     classroom.onVideoTrackChanged = (info: VideoTrackInfo) => {
@@ -1795,6 +1805,24 @@ function App() {
 
   return (
     <div className="flex flex-col gap-4 w-full h-screen overflow-hidden">
+      {/* 生徒が「いま何手目まで受け取ったか」。先生の手数と見比べれば、
+          止まったのが送る側か受け取る側か分かる */}
+      {role === 'STUDENT' && receivedMoveNo !== null && (
+        <div className="pointer-events-none fixed bottom-1 right-2 z-50 select-none font-mono text-[10px] text-muted/60">
+          受信 {receivedMoveNo}手
+        </div>
+      )}
+      {/* 送れなかったことを隠さない。原因の切り分けに要る */}
+      {sendTrouble && Date.now() - sendTrouble.at < 60_000 && (
+        <div className="flex items-center justify-center gap-3 bg-alert/15 border-b border-alert/40 px-4 py-2 text-xs">
+          <span>
+            {sendTrouble.type} を送れませんでした（待ち {sendTrouble.pending} 件）: {sendTrouble.message.slice(0, 80)}
+          </span>
+          <button onClick={() => setSendTrouble(null)} className="secondary-button px-2 py-0.5 text-[11px]">
+            閉じる
+          </button>
+        </div>
+      )}
       {/* 新しい版が出ているのに古いまま動いていると、直したはずの不具合が出続ける */}
       {appVersion.updateAvailable && (
         <div className="flex items-center justify-center gap-3 bg-accent/15 border-b border-accent/40 px-4 py-2 text-sm">

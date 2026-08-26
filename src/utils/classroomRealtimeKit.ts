@@ -62,6 +62,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
 
   onVideoTrackChanged?: (info: VideoTrackInfo) => void;
   onAudioTracksChanged?: () => void;
+  onSendError?: (info: { type: string; message: string; pending: number }) => void;
 
   setHandlers(handlers: ClassroomEventHandler) {
     this.handlers = handlers;
@@ -476,6 +477,11 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
       // 「ある時点から相手に何も届かない」が誰にも気づかれないまま進む
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[rtc] ${msg.type} を送れませんでした:`, message);
+      this.onSendError?.({
+        type: msg.type,
+        message,
+        pending: this.mustDeliver.length + this.latest.size,
+      });
       // 落としてはいけないものは、間を置いて列の後ろへ回す。
       // 🔴 先頭に戻すと、同じものが失敗し続けたとき列全体が止まる。
       // 送り直しは1度だけ（retried 済みのものは捨てる）。

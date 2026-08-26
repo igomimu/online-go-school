@@ -175,4 +175,13 @@ export interface ClassroomRtc {
   onVideoTrackChanged?: (info: VideoTrackInfo) => void;
   /** 録画中に音声トラックが増減したときに知らせる（途中参加の生徒の声を混ぜるため） */
   onAudioTracksChanged?: () => void;
+  /**
+   * 送れなかったことを画面に出すために知らせる。
+   *
+   * 🔴 送信の失敗は呼び出し側の多くが void で投げっぱなしにするので、
+   * 今まで誰にも見えなかった。「生徒に届かない」が起きたとき、
+   * 送信の問題なのか受け取る側の問題なのか切り分けられず遠回りした
+   * （2026-08-26）。
+   */
+  onSendError?: (info: { type: string; message: string; pending: number }) => void;
 }
