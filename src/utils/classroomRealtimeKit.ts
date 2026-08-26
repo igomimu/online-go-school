@@ -1,6 +1,6 @@
 import RealtimeKitClient from '@cloudflare/realtimekit';
 import { getSavedDeviceId } from './mediaDevices';
-import { ConnectionState, RELIABLE_TYPES } from './classroomRtc';
+import { ConnectionState, LATEST_ONLY_TYPES, RELIABLE_TYPES } from './classroomRtc';
 import type {
   AudioDebugInfo,
   ClassroomConnectOptions,
@@ -38,7 +38,7 @@ const RETRY_BACKOFF_MS = 1200;
  */
 const UNSTABLE_GRACE_MS = 4000;
 
-type QueuedMessage = { msg: ClassroomMessage; participantIds?: string[] };
+type QueuedMessage = { msg: ClassroomMessage; participantIds?: string[]; retried?: boolean };
 
 /**
  * Cloudflare RealtimeKit 版の教室。
@@ -424,10 +424,13 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
 
   private enqueue(msg: ClassroomMessage, participantIds?: string[]): void {
     const item: QueuedMessage = { msg, participantIds };
-    if (RELIABLE_TYPES.has(msg.type)) {
+    // 盤面やカーソルのように「そのときの状態」を送るものは、同じ種類・同じ宛先の
+    // 古い要求を捨てて最新だけ残す。順番に全部届ける必要はない
+    if (LATEST_ONLY_TYPES.has(msg.type)) {
+      this.latest.set(`${msg.type}|${(participantIds ?? []).join(',')}`, item);
+    } else if (RELIABLE_TYPES.has(msg.type)) {
       this.mustDeliver.push(item);
     } else {
-      // 同じ種類・同じ宛先なら、古いものは捨てて最新だけ残す
       this.latest.set(`${msg.type}|${(participantIds ?? []).join(',')}`, item);
     }
     this.schedulePump();
@@ -447,7 +450,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     const next = this.mustDeliver.shift() ?? this.takeLatest();
     if (!next) return;
     this.lastSentAt = Date.now();
-    await this.deliver(next.msg, next.participantIds);
+    await this.deliver(next.msg, next.participantIds, next.retried);
     if (this.mustDeliver.length > 0 || this.latest.size > 0) this.schedulePump();
   }
 
@@ -458,7 +461,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     return first.value[1];
   }
 
-  private async deliver(msg: ClassroomMessage, participantIds?: string[]): Promise<void> {
+  private async deliver(msg: ClassroomMessage, participantIds?: string[], retried = false): Promise<void> {
     const meeting = this.meeting;
     if (!meeting) return;
     const body = { d: JSON.stringify(msg.payload ?? null), from: meeting.self.id };
@@ -473,9 +476,11 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
       // 「ある時点から相手に何も届かない」が誰にも気づかれないまま進む
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[rtc] ${msg.type} を送れませんでした:`, message);
-      // 落としてはいけないものは、間を置いて列の先頭に戻す
-      if (RELIABLE_TYPES.has(msg.type)) {
-        this.mustDeliver.unshift({ msg, participantIds });
+      // 落としてはいけないものは、間を置いて列の後ろへ回す。
+      // 🔴 先頭に戻すと、同じものが失敗し続けたとき列全体が止まる。
+      // 送り直しは1度だけ（retried 済みのものは捨てる）。
+      if (RELIABLE_TYPES.has(msg.type) && !retried) {
+        this.mustDeliver.push({ msg, participantIds, retried: true });
         this.lastSentAt = Date.now() + RETRY_BACKOFF_MS;
         this.schedulePump();
       }

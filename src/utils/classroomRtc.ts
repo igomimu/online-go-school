@@ -101,6 +101,18 @@ export const RELIABLE_TYPES = new Set<string>([
   'AUDIO_CONTROL', 'MEDIA_CONTROL', 'CHAT_MESSAGE', 'RANK_DISPLAY',
 ]);
 
+/**
+ * 「そのときの状態」を送っているだけで、途中を飛ばしても最後の一枚が届けば
+ * 正しくなるメッセージ。順番に全部届ける必要はない。
+ *
+ * 🔴 これを「必ず届ける」側に入れていたため、早送りで大量に積まれ、
+ * 送信の上限に当たると先頭を送り直し続けて列が詰まり、以降のすべてが
+ * 止まった（2026-08-26 実授業。生徒側が完全に反応しなくなる）。
+ */
+export const LATEST_ONLY_TYPES = new Set<string>([
+  'BOARD_UPDATE', 'AI_ANALYSIS_UPDATE', 'CURSOR_MOVE', 'CURSOR_CLEAR', 'DRAW_UPDATE',
+]);
+
 /** 音声の状態を画面に出すための情報（デバッグ表示用） */
 export interface AudioDebugInfo {
   remoteCount: number;
