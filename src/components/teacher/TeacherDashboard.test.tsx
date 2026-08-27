@@ -54,7 +54,7 @@ const savedGame = (id: string, date: string, result = 'B+R'): SavedGame => ({
   sgf: '(;GM[1]SZ[19])',
 });
 
-function renderDashboard() {
+function renderDashboard(extra: Record<string, unknown> = {}) {
   return render(
     <TeacherDashboard
       participants={[]}
@@ -84,12 +84,13 @@ function renderDashboard() {
       onCreateGames={vi.fn()}
       onSelectSavedGame={vi.fn()}
       onOpenTeacherGameWindow={vi.fn()}
+      {...extra}
     />,
   );
 }
 
-async function openHistory() {
-  renderDashboard();
+async function openHistory(extra: Record<string, unknown> = {}) {
+  renderDashboard(extra);
   fireEvent.click(screen.getByText('履歴'));
   await waitFor(() => expect(screen.getByText(/棋譜履歴 -/)).toBeInTheDocument());
 }
@@ -148,5 +149,65 @@ describe('TeacherDashboard 棋譜履歴の一括削除', () => {
     await waitFor(() => expect(screen.getByText('選んだ1件を削除')).toBeInTheDocument());
     expect(screen.getByLabelText('2026-08-02の棋譜を選ぶ')).toBeChecked();
     expect(screen.getByLabelText('2026-08-03の棋譜を選ぶ')).not.toBeChecked();
+  });
+});
+
+
+/**
+ * 2026-08-27 仕様変更: 中断局は棋譜履歴の一件として扱う。
+ *
+ * 進行中の一覧（games）からは中断局を外したので、履歴の再開ボタンを games から
+ * 探していると出なくなる。履歴に添えた liveStatus で判定していることを縛る。
+ * 再開できるのは講師だけ（三村さん指定）。
+ */
+describe('棋譜履歴からの再開', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('中断中の棋譜には「中断中」と再開ボタンを出し、進行中の一覧が空でも再開できる', async () => {
+    api.loadSavedGamesForStudent.mockResolvedValue([
+      { ...savedGame('g-int', '2026-08-27', '中断'), liveStatus: 'interrupted' },
+    ]);
+    const onResumeGame = vi.fn();
+    // games は空。中断局はもう進行中の一覧に来ない
+    await openHistory({ onResumeGame });
+
+    expect(screen.getByText('中断中')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('再開'));
+    expect(onResumeGame).toHaveBeenCalledWith('g-int');
+  });
+
+  it('終局した棋譜には再開ボタンを出さない', async () => {
+    api.loadSavedGamesForStudent.mockResolvedValue([
+      { ...savedGame('g-done', '2026-08-27', 'B+R'), liveStatus: 'finished' },
+    ]);
+    await openHistory({ onResumeGame: vi.fn() });
+
+    expect(screen.queryByText('中断中')).not.toBeInTheDocument();
+    expect(screen.queryByText('再開')).not.toBeInTheDocument();
+    expect(screen.getByText('検討を開始する')).toBeInTheDocument();
+  });
+
+  it('時間切れで終わった棋譜は再開できる（回線トラブル救済）', async () => {
+    api.loadSavedGamesForStudent.mockResolvedValue([
+      { ...savedGame('g-timeout', '2026-08-27', 'B+T'), liveStatus: 'finished' },
+    ]);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const onResumeGame = vi.fn();
+    await openHistory({ onResumeGame });
+
+    fireEvent.click(screen.getByText('再開'));
+    expect(onResumeGame).toHaveBeenCalledWith('g-timeout');
+  });
+
+  it('どの棋譜にも削除ボタンがある', async () => {
+    api.loadSavedGamesForStudent.mockResolvedValue([
+      { ...savedGame('g-int', '2026-08-27', '中断'), liveStatus: 'interrupted' },
+      { ...savedGame('g-done', '2026-08-26', 'B+R'), liveStatus: 'finished' },
+    ]);
+    await openHistory({ onResumeGame: vi.fn() });
+
+    expect(screen.getAllByText('削除')).toHaveLength(2);
   });
 });

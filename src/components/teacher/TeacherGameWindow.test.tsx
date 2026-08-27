@@ -103,7 +103,7 @@ describe('TeacherGameWindow の新規対局表示', () => {
     );
 
     expect(screen.queryByTestId('game-board')).not.toBeInTheDocument();
-    expect(screen.getByText(/中断局は「一覧」から再開できます/)).toBeInTheDocument();
+    expect(screen.getByText(/中断した対局は、生徒一覧の「棋譜履歴」から再開できます/)).toBeInTheDocument();
   });
 
   it('Realtime INSERTを取り逃してもURLで渡された新規IDを初手前に表示する', () => {

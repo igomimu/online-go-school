@@ -208,12 +208,12 @@ export async function createGame(
     blackName: string;
     whiteName: string;
     boardSize?: 9 | 13 | 19;
-    /** 互換のため受け取るが、いまのUIでは使わない */
+    /** 先生を含む参加人数。候補がそろうまで待つのに使う */
     expectedPlayersCount?: number;
     mainMinutes?: number; // 未指定ならDEFAULT_TIME_SETTINGS(持ち時間0分・秒読み30秒×1)のまま
   },
 ): Promise<void> {
-  const { blackName, whiteName, boardSize = 9, mainMinutes } = opts;
+  const { blackName, whiteName, boardSize = 9, mainMinutes, expectedPlayersCount } = opts;
 
   await page.getByTestId('create-game-toolbar-button').click();
   await page.getByTestId('create-game-button').waitFor({ timeout: 5_000 });
@@ -226,6 +226,17 @@ export async function createGame(
   // 相手の候補に誰が居るかで決める。
   const opponent = page.getByTestId('opponent-player-select');
   await expect(opponent.locator('option')).not.toHaveCount(0, { timeout: 20_000 });
+
+  // 対局者の候補は RTC の参加者から作られる。生徒テーブルの「接続中」が先に立っても
+  // 参加者一覧がまだ揃っていないことがあり、片方の生徒が候補に出ないまま進んで
+  // 「相手の候補に見つからない」で落ちていた（2026-08-27）。
+  // 候補（自分を除く全員）が人数分そろうまで待つ。
+  if (expectedPlayersCount !== undefined) {
+    await expect
+      .poll(async () => await opponent.locator('option').count(), { timeout: 25_000 })
+      .toBeGreaterThanOrEqual(expectedPlayersCount - 1);
+  }
+
   const optionsNow = await opponent.locator('option').allTextContents();
   const hasBlack = optionsNow.some((o) => o.includes(blackName));
   const hasWhite = optionsNow.some((o) => o.includes(whiteName));

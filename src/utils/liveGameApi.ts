@@ -210,7 +210,9 @@ export async function fetchLiveGames(classroomId: string): Promise<LiveGameRow[]
     .from('go_school_live_games')
     .select('*')
     .eq('classroom_id', classroomId)
-    .in('status', ['playing', 'scoring', 'interrupted'])
+    // 中断局はここに出さない。棋譜履歴の一件として扱い、再開も削除も履歴から行う。
+    // 進行中の場所に置くと、生徒リストの碁盤に居座って新しい対局が埋もれる（2026-08-27）
+    .in('status', ['playing', 'scoring'])
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
   const active = (data ?? []) as LiveGameRow[];

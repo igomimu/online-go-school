@@ -55,6 +55,11 @@ export interface SavedGame {
   komi: number;
   result: string;
   sgf: string;
+  /**
+   * 対応する進行中テーブルの状態。履歴だけでは「再開できる中断局か」が分からないため添える。
+   * 中断局も棋譜履歴の一件として扱う（2026-08-27）。undefined は突き合わせをしていない場合。
+   */
+  liveStatus?: 'playing' | 'scoring' | 'finished' | 'interrupted';
 }
 
 // === 音声制御 ===

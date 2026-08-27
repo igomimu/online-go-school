@@ -173,8 +173,9 @@ describe('Lobby', () => {
     expect(onSelectGame).toHaveBeenCalledWith('game-sid');
   });
 
-  it('自分が参加中の中断対局に再開ボタンを表示する（生徒）', () => {
-    const onResumeGame = vi.fn();
+  // 2026-08-27 仕様変更: 中断局は棋譜履歴の一件として扱う。生徒のロビーには出さず、
+  // 再開は講師が生徒一覧の「棋譜履歴」から行う（三村さん指定: 再開は講師だけ）。
+  it('中断対局は生徒のロビーに出さない（再開は講師が履歴から行う）', () => {
     render(
       <Lobby
         role="STUDENT"
@@ -184,13 +185,13 @@ describe('Lobby', () => {
         games={[{ ...mockGame, status: 'interrupted', result: '中断' }]}
         studentJoinInfo=""
         onSelectGame={vi.fn()}
-        onResumeGame={onResumeGame}
+        onResumeGame={vi.fn()}
         myIdentity="たろう"
       />
     );
 
-    fireEvent.click(screen.getByText('対局を再開する'));
-    expect(onResumeGame).toHaveBeenCalledWith('game-1');
+    expect(screen.queryByText('対局を再開する')).not.toBeInTheDocument();
+    expect(screen.queryByText('中断された対局があります')).not.toBeInTheDocument();
   });
 
   it('「対局を作成」ボタンのクリック', () => {

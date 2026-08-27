@@ -104,11 +104,7 @@ export default function Lobby({
     (identityMatchesPlayer(myIdentity, g.blackPlayer) || identityMatchesPlayer(myIdentity, g.whitePlayer))
   );
 
-  // 自分が参加中の中断対局
-  const mySuspendedGame = games.find(g =>
-    g.status === 'interrupted' &&
-    (identityMatchesPlayer(myIdentity, g.blackPlayer) || identityMatchesPlayer(myIdentity, g.whitePlayer))
-  );
+  // 中断対局はここに出さない。棋譜履歴の一件として扱い、再開は講師が履歴から行う（2026-08-27）
 
   return (
     <div className="flex flex-col gap-6 w-full">
@@ -154,28 +150,6 @@ export default function Lobby({
                   className="premium-button text-sm"
                 >
                   碁盤を開く
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 中断された対局があれば再開ボタンを提示 */}
-        {mySuspendedGame && role === 'STUDENT' && !myGame && (
-          <div className="glass-panel border-l-2 border-l-nibi p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold">中断された対局があります</h3>
-                <p className="text-sm text-muted">
-                  {getDisplayName(mySuspendedGame.blackPlayer, students)} vs {getDisplayName(mySuspendedGame.whitePlayer, students)}（<span className="tabular">{mySuspendedGame.moveNumber}</span>手目）
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => onResumeGame?.(mySuspendedGame.id)}
-                  className="premium-button flex items-center gap-1.5 text-sm"
-                >
-                  対局を再開する
                 </button>
               </div>
             </div>

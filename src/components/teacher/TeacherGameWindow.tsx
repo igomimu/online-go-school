@@ -256,7 +256,7 @@ export default function TeacherGameWindow({
         </div>
       ) : (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, color: 'var(--color-muted)' }}>
-          進行中の対局がありません。中断局は「一覧」から再開できます。
+          進行中の対局がありません。中断した対局は、生徒一覧の「棋譜履歴」から再開できます。
         </div>
       )}
 

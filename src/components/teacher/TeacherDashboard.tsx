@@ -839,11 +839,12 @@ export default function TeacherDashboard({
                     </span>
                   </div>
                   {historyGames.map(game => {
-                    // 中断だけでなく、時間切れで終わった対局も講師なら再開できる（回線トラブル救済）
-                    const resumableLiveGame = games.find(g => g.id === game.id && (
-                      g.status === 'interrupted' ||
-                      (g.status === 'finished' && isTimeoutResult(g.result))
-                    ));
+                    // 中断だけでなく、時間切れで終わった対局も講師なら再開できる（回線トラブル救済）。
+                    // 中断局は進行中の一覧（games）に来なくなったので、履歴に添えた
+                    // liveStatus で判定する（2026-08-27）。
+                    const isInterrupted = game.liveStatus === 'interrupted';
+                    const isTimeoutFinished = game.liveStatus === 'finished' && isTimeoutResult(game.result);
+                    const resumable = isInterrupted || isTimeoutFinished;
                     // この生徒がその対局で黒か白か（保存値は sid:/uuid/コード/名前 いずれか）
                     const matchesHistoryStudent = (raw: string) => {
                       const v = stripSid(raw || '');
@@ -898,16 +899,26 @@ export default function TeacherDashboard({
                               {resolvePlayerName(game.blackPlayer, allStudents)} (黒) vs {resolvePlayerName(game.whitePlayer, allStudents)} (白)
                               {outcome === 'win' && <span style={{ marginLeft: 6, fontSize: 11 }}>◯勝ち</span>}
                               {outcome === 'loss' && <span style={{ marginLeft: 6, fontSize: 11 }}>●負け</span>}
+                              {isInterrupted && (
+                                <span style={{
+                                  marginLeft: 6,
+                                  fontSize: 11,
+                                  fontWeight: 'normal',
+                                  color: 'var(--color-accent-text)',
+                                  border: '1px solid var(--color-line)',
+                                  padding: '0 4px',
+                                }}>中断中</span>
+                              )}
                             </span>
                           </span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {resumableLiveGame && onResumeGame ? (
+                            {resumable && onResumeGame ? (
                               <button
                                 onClick={e => {
                                   e.stopPropagation();
-                                  if (resumableLiveGame.status === 'finished' &&
+                                  if (isTimeoutFinished &&
                                       !confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')) return;
-                                  onResumeGame(resumableLiveGame.id);
+                                  onResumeGame(game.id);
                                   setHistoryStudent(null);
                                 }}
                                 style={{

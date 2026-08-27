@@ -168,7 +168,8 @@ Deno.serve(async (req) => {
       const { data, error } = await supabase
         .from('go_school_live_games')
         .select('*')
-        .in('status', ['playing', 'scoring', 'interrupted'])
+        // 中断局は「講師一覧に出ていない対局」の警告に出さない。棋譜履歴で扱う（2026-08-27）
+        .in('status', ['playing', 'scoring'])
         .order('updated_at', { ascending: false })
 
       if (error) throw error

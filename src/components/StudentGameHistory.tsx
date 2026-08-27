@@ -62,6 +62,12 @@ export default function StudentGameHistory({
             >
               <span className="block font-medium">
                 {getDisplayName(game.blackPlayer, students)} vs {getDisplayName(game.whitePlayer, students)}
+                {/* 中断局も棋譜履歴の一件。生徒は並べ直せるが、再開は講師が行う（2026-08-27） */}
+                {game.liveStatus === 'interrupted' && (
+                  <span className="ml-2 rounded border border-line px-1 text-xs font-normal text-accent-text">
+                    中断中
+                  </span>
+                )}
               </span>
               <span className="tabular block text-xs text-muted">
                 {game.date} ・ {game.boardSize}路 ・ {game.result || '結果未入力'}

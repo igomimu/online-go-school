@@ -58,3 +58,52 @@ describe('StudentGameHistory', () => {
     expect(await screen.findByText('保存された棋譜はまだありません。')).toBeInTheDocument();
   });
 });
+
+/**
+ * 2026-08-27 仕様変更: 中断局も棋譜履歴の一件として並べる。
+ * 生徒は並べ直して検討できるが、再開は講師だけ（三村さん指定）。
+ */
+describe('中断した棋譜の見え方（生徒）', () => {
+  beforeEach(() => {
+    vi.mocked(loadSavedGamesForStudent).mockReset();
+  });
+
+  it('中断中の印は出すが、再開ボタンは出さない', async () => {
+    vi.mocked(loadSavedGamesForStudent).mockResolvedValue([
+      { ...game, id: 'game-int', result: '中断', liveStatus: 'interrupted' },
+    ]);
+
+    render(
+      <StudentGameHistory
+        studentId="sid:1001"
+        studentName="山田太郎"
+        students={[{ id: '1001', name: '山田太郎' }]}
+        onSelectGame={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('中断中')).toBeInTheDocument());
+    expect(screen.queryByText('再開')).not.toBeInTheDocument();
+    expect(screen.queryByText('対局を再開する')).not.toBeInTheDocument();
+  });
+
+  it('中断した棋譜も選べば検討で開ける', async () => {
+    vi.mocked(loadSavedGamesForStudent).mockResolvedValue([
+      { ...game, id: 'game-int', result: '中断', liveStatus: 'interrupted' },
+    ]);
+    const onSelectGame = vi.fn();
+
+    render(
+      <StudentGameHistory
+        studentId="sid:1001"
+        studentName="山田太郎"
+        students={[{ id: '1001', name: '山田太郎' }]}
+        onSelectGame={onSelectGame}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('中断中')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('中断中'));
+    expect(onSelectGame).toHaveBeenCalledWith(expect.objectContaining({ id: 'game-int' }));
+  });
+});

@@ -128,7 +128,7 @@ export async function loadSavedGamesForStudent(studentName: string, studentIdent
     return [];
   }
 
-  return data.map(row => ({
+  const games: SavedGame[] = data.map(row => ({
     id: row.id,
     date: row.date,
     blackPlayer: row.black_player,
@@ -139,4 +139,33 @@ export async function loadSavedGamesForStudent(studentName: string, studentIdent
     result: row.result,
     sgf: row.sgf,
   }));
+
+  return attachLiveStatus(sb, games);
+}
+
+/**
+ * 履歴の各局に、進行中テーブルの状態を添える。
+ *
+ * 中断局は棋譜履歴の一件として扱うが、「再開できるか」は go_school_games だけでは
+ * 分からない。ID は共通（中断時に upsert({ id: game.id }) で保存される）なので
+ * 突き合わせられる。
+ *
+ * ここが失敗しても履歴そのものは返す。再開ボタンが出ないだけに留める。
+ */
+async function attachLiveStatus(sb: NonNullable<ReturnType<typeof getSupabase>>, games: SavedGame[]): Promise<SavedGame[]> {
+  if (games.length === 0) return games;
+  try {
+    const { data, error } = await sb
+      .from('go_school_live_games')
+      .select('id, status')
+      .in('id', games.map(g => g.id));
+    if (error) throw new Error(error.message);
+    const statusById = new Map<string, SavedGame['liveStatus']>(
+      (data ?? []).map((row: { id: string; status: SavedGame['liveStatus'] }) => [row.id, row.status]),
+    );
+    return games.map(g => ({ ...g, liveStatus: statusById.get(g.id) }));
+  } catch (e) {
+    console.error('[loadSavedGamesForStudent] 対局状態の突き合わせに失敗:', e);
+    return games;
+  }
 }
