@@ -196,7 +196,29 @@ export async function teardownSupabaseRoster(classroomId: string): Promise<void>
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // 1. この教室での対局を削除
+    // 1. この教室での対局を削除。
+    // 🔴 着手を先に消さないと、対局の削除が外部キーで失敗して例外になり、
+    // 教室の削除まで到達しない。教室が残ると、テスト生徒が複数の教室に
+    // 所属した状態になり、EF の smoke test が「教室を選べ」(409) で落ちる。
+    // 握りつぶされるので長く気づかれなかった（2026-08-27）。
+    const { data: gameRows, error: gameIdsError } = await supabase
+      .from('go_school_live_games')
+      .select('id')
+      .eq('classroom_id', classroomId);
+    if (gameIdsError) {
+      throw new Error(`Failed to list live games: ${gameIdsError.message}`);
+    }
+    const gameIds = (gameRows ?? []).map((row: { id: string }) => row.id);
+    if (gameIds.length > 0) {
+      const { error: movesError } = await supabase
+        .from('go_school_live_moves')
+        .delete()
+        .in('game_id', gameIds);
+      if (movesError) {
+        throw new Error(`Failed to delete live moves: ${movesError.message}`);
+      }
+    }
+
     const { error: liveGamesError } = await supabase
       .from('go_school_live_games')
       .delete()
@@ -221,7 +243,8 @@ export async function teardownSupabaseRoster(classroomId: string): Promise<void>
       .eq('id', classroomId);
 
     if (error) {
-       console.warn(`[E2E Teardown Warning] Failed to delete classroom ${classroomId}: ${error.message}`);
+      // 教室が消えないと後続のテストと EF の smoke test を巻き込む。警告では見落とす
+      throw new Error(`Failed to delete classroom ${classroomId}: ${error.message}`);
     }
   } catch (err) {
     console.error(`[E2E Teardown Error] Failed to cleanup ${classroomId}:`, err);

@@ -489,8 +489,8 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
             </button>
           )}
           {/* 設定を間違えて始めた対局を、その場で取り消す（講師のみ）。
-              中断ではなく終了にする。中断だと生徒側に「再開」が出てしまい、
-              間違えた設定のまま再開できてしまうため。 */}
+              中断ではなく終了にする。中断は棋譜履歴に一件として残るが、
+              設定を間違えた対局は記録に残さず消したいため。 */}
           {isTeacher && (game.status === 'playing' || game.status === 'scoring') && (
             <button
               data-testid="cancel-game"

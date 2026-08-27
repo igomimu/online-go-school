@@ -1,5 +1,14 @@
 import { expect, type Page } from '@playwright/test';
 
+/** 生徒が入れるようになるまでの猶予。
+ *
+ * 門番は「先生がいま教室に居るか」を RTC の参加者一覧に問い合わせて決める。
+ * 先生が入った直後は在室がまだ伝わっておらず、生徒の画面は「準備中…」のまま
+ * 待たされる。teacher-gate の実測で、入れるまで 28 秒かかることがあった。
+ * 25 秒で諦めると、製品は正常なのにテストだけが落ちる（2026-08-27）。
+ */
+const STUDENT_ENTRY_TIMEOUT_MS = 60_000;
+
 /**
  * 生徒としてログイン → ロビー（待機 or 既存対局あり）まで到達。
  * 初回: 「先生が対局を作成するのをお待ちください」
@@ -20,20 +29,20 @@ export async function loginAsStudent(
   const result = await Promise.race([
     page
       .getByText('先生が対局を作成するのをお待ちください')
-      .waitFor({ timeout: 25_000 })
+      .waitFor({ timeout: STUDENT_ENTRY_TIMEOUT_MS })
       .then(() => 'lobby' as const),
     page
       .getByRole('heading', { name: '対局中', exact: true })
-      .waitFor({ timeout: 25_000 })
+      .waitFor({ timeout: STUDENT_ENTRY_TIMEOUT_MS })
       .then(() => 'in-game' as const),
     // 進行中対局があると自動で碁盤に直行する（2026-07-08 自動オープン機能）
     page
       .getByTestId('go-board')
-      .waitFor({ state: 'visible', timeout: 25_000 })
+      .waitFor({ state: 'visible', timeout: STUDENT_ENTRY_TIMEOUT_MS })
       .then(() => 'auto-opened-board' as const),
     page
       .getByText('接続に失敗しました')
-      .waitFor({ timeout: 25_000 })
+      .waitFor({ timeout: STUDENT_ENTRY_TIMEOUT_MS })
       .then(() => 'error' as const),
   ]);
 
