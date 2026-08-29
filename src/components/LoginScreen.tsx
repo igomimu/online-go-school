@@ -14,6 +14,7 @@ import {
 } from '../utils/authStore';
 import type { SavedAccount } from '../utils/authStore';
 import { usePwaInstall } from '../hooks/usePwaInstall';
+import { installCopy } from '../utils/installCopy';
 import { fetchClassroomRoster, type ClassroomRoster } from '../utils/classroomRoster';
 import { getTeacherDisplayName, setTeacherDisplayName } from '../utils/identityUtils';
 
@@ -294,7 +295,7 @@ export default function LoginScreen({
               className="secondary-button w-full flex items-center justify-center gap-2 text-sm mt-4"
             >
               <Download className="w-4 h-4" />
-              {pwaInstall.isIos && !pwaInstall.canInstall ? 'ホーム画面に追加' : 'アプリをインストール'}
+              {installCopy().action}
             </button>
           )}
 
@@ -508,7 +509,7 @@ export default function LoginScreen({
             className="flex items-center gap-1.5 text-sm text-muted hover:text-ink"
           >
             <Download className="w-3.5 h-3.5" />
-            {pwaInstall.isIos && !pwaInstall.canInstall ? 'ホーム画面に追加' : 'アプリをインストール'}
+            {installCopy().action}
           </button>
         )}
       </div>

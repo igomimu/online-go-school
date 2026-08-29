@@ -6,6 +6,7 @@ import ThemeToggle from './ThemeToggle';
 import MediaDeviceSettings from './MediaDeviceSettings';
 import type { ClassroomRtc } from '../utils/classroomRtc';
 import { usePwaInstall } from '../hooks/usePwaInstall';
+import { installCopy } from '../utils/installCopy';
 
 interface HeaderProps {
   role: Role;
@@ -180,10 +181,10 @@ export default function Header({
             <button
               onClick={handleInstallClick}
               className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-accent/35 bg-accent/12 px-3 py-1.5 text-xs text-accent-text transition-colors duration-150 hover:bg-accent/18"
-              title={pwaInstall.isIos && !pwaInstall.canInstall ? 'ホーム画面に追加' : 'アプリをインストール'}
+              title={installCopy().action}
             >
               <Download className="h-4 w-4" />
-              インストール
+              {installCopy().short}
             </button>
           )}
           <button

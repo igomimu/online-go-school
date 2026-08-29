@@ -7,6 +7,7 @@ import type { Student, Classroom } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import { findStudentByIdentity, getDisplayName, identityMatchesPlayer } from '../utils/identityUtils';
 import { displayRank, DEFAULT_RANK_DISPLAY, type RankDisplay } from '../types/classroom';
+import InstallHint from './InstallHint';
 import GameThumbnail from './GameThumbnail';
 import SavedGameList from './SavedGameList';
 import ClassroomSelector from './ClassroomSelector';
@@ -130,6 +131,9 @@ export default function Lobby({
           )}
         </div>
       )}
+
+      {/* 次回の入り口の案内。初めて入れた生徒に1回だけ */}
+      {role === 'STUDENT' && <InstallHint />}
 
       <div className="flex flex-col lg:flex-row gap-6 w-full">
       {/* メインエリア */}

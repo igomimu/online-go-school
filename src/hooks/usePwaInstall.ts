@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { installCopy } from '../utils/installCopy';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -96,16 +97,9 @@ export async function promptOrExplainInstall(): Promise<boolean> {
     return choice.outcome === 'accepted';
   }
 
-  if (snapshot.isIos) {
-    alert('Safari の共有ボタン（□↑）から「ホーム画面に追加」を選んでください。');
-  } else {
-    alert(
-      'ブラウザのメニューからインストールできます。\n\n' +
-      'Chrome: 右上メニュー（︙）→「保存と共有」→「ページをアプリとしてインストール」\n' +
-      'Edge: 右上メニュー（…）→「アプリ」→「このサイトをアプリとしてインストール」\n\n' +
-      '※メニューに項目が無い場合は、ページを一度再読み込みしてからお試しください。',
-    );
-  }
+  // 端末に合わせた手順を出す。「PWA」「アプリをインストール」ではなく
+  // 何が起きるか（アイコンができる）で書く（2026-08-30 三村さん）。
+  alert(installCopy().steps);
   return false;
 }
 

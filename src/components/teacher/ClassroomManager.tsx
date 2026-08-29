@@ -17,6 +17,7 @@ import { resolveGrade } from '../../utils/gradeCalc';
 import { usePwaInstall } from '../../hooks/usePwaInstall';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
 import { buildStudentLoginLink } from '../../utils/studentLoginLink';
+import { installCopy } from '../../utils/installCopy';
 
 interface ClassroomManagerProps {
   students: Student[];
@@ -701,7 +702,7 @@ export default function ClassroomManager({
         <IgcButton label="ログアウト" onClick={onBack} />
         <div style={{ flex: 1 }} />
         {pwaInstall.shouldShowInstall && (
-          <IgcButton label="⬇ アプリをインストール" color="var(--color-raised)" onClick={() => { void pwaInstall.install(); }} />
+          <IgcButton label={`⬇ ${installCopy().action}`} color="var(--color-raised)" onClick={() => { void pwaInstall.install(); }} />
         )}
         <IgcButton label="教室追加" color="var(--color-raised)" onClick={handleAddClassroom} />
         <IgcButton label="生徒追加" color="var(--color-raised)" onClick={() => { setActiveTab('student'); startAddStudent(); }} />
