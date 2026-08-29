@@ -14,7 +14,7 @@ import {
 } from '../utils/byoyomiVoice';
 import { formatResultSpeech } from '../utils/scoring';
 import { reconcileLiveMoves } from '../utils/liveMoveReconcile';
-import { switchClock } from './useGameClock';
+import { switchClock, startClockOnReceipt, shouldDeclareTimeUp } from './useGameClock';
 import type { GameClock } from '../types/game';
 import {
   ensureRealtimeAuth,
@@ -218,6 +218,26 @@ export function useLiveGame(
   useEffect(() => {
     localClockRef.current = localClock;
   }, [localClock]);
+  // サーバーから届いた時計をローカルに取り込む。
+  // ・同じ内容が再送されただけ（「待った」申請など時計以外の更新）なら、ローカルで
+  //   進めた残り時間を巻き戻さない。
+  // ・新しい着手の時計は、着手した端末の時刻ではなく「受け取った今」から計り始める
+  //   （通信の遅れを次に打つ人に負わせない）。戻すのは CLOCK_LAG_ALLOWANCE_MS まで。
+  const lastIngestedClockRef = useRef<string | null>(null);
+  const ingestClock = useCallback((incoming: GameClock | null | undefined) => {
+    const next = incoming ?? null;
+    const signature = next ? JSON.stringify(next) : null;
+    if (lastIngestedClockRef.current === signature && localClockRef.current !== null) return;
+    lastIngestedClockRef.current = signature;
+    if (!next || next.lastTickTime === null) {
+      localClockRef.current = next;
+      setLocalClock(next);
+      return;
+    }
+    const adjusted = startClockOnReceipt(next);
+    localClockRef.current = adjusted;
+    setLocalClock(adjusted);
+  }, []);
   const channelRef = useRef<ReturnType<typeof subscribeLiveGame> | null>(null);
   const lastByoyomiSpeakRef = useRef<string | null>(null); // 秒読み読み上げの重複防止
 
@@ -249,7 +269,7 @@ export function useLiveGame(
         const [g, m] = await Promise.all([fetchLiveGame(gameId), fetchLiveMoves(gameId)]);
         if (cancelled) return;
         setGame(g);
-        setLocalClock(g?.clock ?? null);
+        ingestClock(g?.clock ?? null);
         setMoves(m);
         setLoading(false);
       } catch (e) {
@@ -267,7 +287,7 @@ export function useLiveGame(
       channel = subscribeLiveGame(gameId, {
         onGameChange: (row) => {
           setGame(row);
-          setLocalClock(row.clock ?? null);
+          ingestClock(row.clock ?? null);
           // submit_move は着手INSERT後に必ず games.updated_at も更新する。
           // moves側INSERTだけを取り逃した場合、この更新を合図にサーバー棋譜へ追いつく。
           void reconcileMovesFromServer();
@@ -307,7 +327,7 @@ export function useLiveGame(
       channel?.unsubscribe();
       channelRef.current = null;
     };
-  }, [gameId]);
+  }, [gameId, ingestClock]);
 
   // LiveKitデータチャネル経由の低レイテンシ着手メッセージをリッスン
   useEffect(() => {
@@ -763,6 +783,17 @@ export function useLiveGame(
             }
             newTimeLeft = prev.considerationSeconds ?? 60;
             inConsideration = true;
+          } else if (!shouldDeclareTimeUp(newTimeLeft)) {
+            // 0になった瞬間には切らない。通信の遅れで数百ミリ秒ぶん先に進むことが
+            // あるので、猶予のあいだは打てる状態のまま待つ（表示は上限で止まる）。
+            commit({
+              ...prev,
+              lastTickTime: now,
+              ...(isBlackTurn
+                ? { blackTimeLeft: newTimeLeft }
+                : { whiteTimeLeft: newTimeLeft }),
+            });
+            return;
           } else {
             speakByoyomi(getNhkTimeUpAnnouncement(derived.currentColor));
             clearInterval(timer);
@@ -822,6 +853,16 @@ export function useLiveGame(
               ...(isBlackTurn ? { blackTimeLeft: 0 } : { whiteTimeLeft: 0 }),
             });
             return;
+          } else if (!shouldDeclareTimeUp(newTimeLeft)) {
+            // 0になった瞬間には切らない（猶予のあいだは打てる）
+            commit({
+              ...prev,
+              lastTickTime: now,
+              ...(isBlackTurn
+                ? { blackTimeLeft: newTimeLeft }
+                : { whiteTimeLeft: newTimeLeft }),
+            });
+            return;
           } else {
             // 秒読みなし → 切れ負け
             speakByoyomi('時間切れ負けです');
@@ -849,6 +890,18 @@ export function useLiveGame(
               ...(isBlackTurn
                 ? { blackTimeLeft: newTimeLeft, blackByoyomiLeft: 1, blackInByoyomi: true }
                 : { whiteTimeLeft: newTimeLeft, whiteByoyomiLeft: 1, whiteInByoyomi: true }),
+            });
+            return;
+          }
+          if (newByoyomiLeft <= 0 && !shouldDeclareTimeUp(newTimeLeft)) {
+            // 0になった瞬間には切らない。猶予のあいだは秒読みの回数も減らさず、
+            // 打てる状態のまま待つ（ここで打てば次の秒読みに入る）。
+            commit({
+              ...prev,
+              lastTickTime: now,
+              ...(isBlackTurn
+                ? { blackTimeLeft: newTimeLeft, blackByoyomiLeft: byoyomiLeft, blackInByoyomi: true }
+                : { whiteTimeLeft: newTimeLeft, whiteByoyomiLeft: byoyomiLeft, whiteInByoyomi: true }),
             });
             return;
           }

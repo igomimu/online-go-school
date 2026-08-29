@@ -79,10 +79,42 @@ export function timeSettingsToClock(s: TimeSettings): GameClock | undefined {
   return createClock(main, byoSec, byoPer);
 }
 
+// 相手の着手が自分の端末に届くまでの遅れは、次に打つ人の考慮時間から引かない。
+// 計時は「着手した端末の時刻」ではなく「その着手を受け取った時刻」から始める。
+// ただし戻すのは最大この値まで（再入場・復帰で、使ったはずの時間が回復しないように）。
+export const CLOCK_LAG_ALLOWANCE_MS = 2000;
+
+// 残りが0になった瞬間には切らず、この秒数だけ待ってから切れ負けにする。
+// tick は1秒間隔なので、実際の猶予は 0.5〜1.5 秒になる。
+export const TIMEUP_GRACE_SECONDS = 0.5;
+
+/**
+ * 残りが0を割ってから切れ負けを宣言してよいか。
+ * 0になった瞬間には切らない（通信の遅れで数百ミリ秒ぶん先に進むことがあるため）。
+ */
+export function shouldDeclareTimeUp(remainingSeconds: number): boolean {
+  return remainingSeconds <= -TIMEUP_GRACE_SECONDS;
+}
+
+/**
+ * サーバーから届いた時計を、受け取った側の時刻で計り直す。
+ * lastTickTime は着手した端末が書いた時刻なので、そのまま使うと
+ * 「相手が打ってから自分に届くまで」が自分の持ち時間から引かれる。
+ * 端末どうしの時計ズレも同じ向きに効くため、受信時刻へ寄せる。
+ */
+export function startClockOnReceipt(clock: GameClock, now = Date.now()): GameClock {
+  if (clock.lastTickTime === null) return clock;
+  const startedAt = Math.min(now, clock.lastTickTime + CLOCK_LAG_ALLOWANCE_MS);
+  return { ...clock, lastTickTime: startedAt };
+}
+
 // 時間表示フォーマット
+// 残り時間は切れ負けの猶予のあいだだけ負になる（useLiveGame の TIMEUP_GRACE_SECONDS）。
+// 「-1:00」と出ては読めないので、表示は 0 で止める。
 export function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
+  const clamped = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+  const m = Math.floor(clamped / 60);
+  const s = Math.floor(clamped % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
