@@ -22,8 +22,6 @@ interface LoginScreenProps {
   onTeacherLogin: () => void;
   /** URL等で事前に設定された教室ID */
   prefilledClassroomId?: string;
-  /** URL等で事前に設定された生徒コード/ID */
-  prefilledStudentCode?: string;
   /**
    * 道場の共有PC用の鍵（?roster=...）。渡されると名簿から名前を選ぶだけで入れる。
    * 生徒はIDを打たない（2026-08-13 三村さん）。
@@ -35,13 +33,12 @@ export default function LoginScreen({
   onStudentLogin,
   onTeacherLogin,
   prefilledClassroomId,
-  prefilledStudentCode,
   rosterToken,
 }: LoginScreenProps) {
   const [mode, setMode] = useState<'student' | 'teacher'>('student');
   const [accounts, setAccounts] = useState<SavedAccount[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [studentId, setStudentId] = useState(prefilledStudentCode || '');
+  const [studentId, setStudentId] = useState('');
   const [classroomId, setClassroomId] = useState(prefilledClassroomId || '');
   const [classroomChoices, setClassroomChoices] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedAccount, setSelectedAccount] = useState<SavedAccount | null>(null);
@@ -63,28 +60,16 @@ export default function LoginScreen({
     const saved = loadAccounts();
     setAccounts(saved);
 
-    // URLで生徒コードが指定されている場合はそれを優先
-    if (prefilledStudentCode) {
-      setStudentId(prefilledStudentCode);
-      const matchingAccount = saved.find(a => a.studentId === prefilledStudentCode);
-      if (matchingAccount) {
-        setSelectedAccount(matchingAccount);
-        if (!prefilledClassroomId) setClassroomId(matchingAccount.classroomId);
-      }
-    } else if (saved.length === 1) {
-      // 自動ログインは廃止（2026-04-22）: 生徒が「どの教室に入ったか」
-      // 判別できない問題があったため、必ずログイン画面で確認させる。
-      // 保存アカウントが1つだけなら pre-select だけはして、入力の手間は省く。
+    // 自動ログインは廃止（2026-04-22）: 生徒が「どの教室に入ったか」
+    // 判別できない問題があったため、必ずログイン画面で確認させる。
+    // 保存アカウントが1つだけなら pre-select だけはして、入力の手間は省く。
+    if (saved.length === 1) {
       const a = saved[0];
       setSelectedAccount(a);
       setStudentId(a.studentId);
       if (!prefilledClassroomId) setClassroomId(a.classroomId);
     }
-  }, [prefilledStudentCode]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (prefilledStudentCode) setStudentId(prefilledStudentCode);
-  }, [prefilledStudentCode]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (prefilledClassroomId) setClassroomId(prefilledClassroomId);

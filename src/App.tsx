@@ -284,8 +284,6 @@ function App() {
   const [studentClassroomId, setStudentClassroomId] = useState<string | null>(null);
   // URLから事前設定された教室ID
   const [prefilledClassroomId, setPrefilledClassroomId] = useState<string | undefined>(undefined);
-  // URLから事前設定された生徒コード/ID（?code=... または ?studentCode=... または ?studentId=...）
-  const [prefilledStudentCode, setPrefilledStudentCode] = useState<string | undefined>(undefined);
   // 道場の共有PC用（?roster=...）。名簿から名前を選ぶだけで入れる
   const [rosterToken, setRosterToken] = useState<string | undefined>(undefined);
 
@@ -759,14 +757,12 @@ function App() {
     const params = new URLSearchParams(window.location.search);
 
     const urlClassroomId = params.get('classroomId');
-    const urlStudentCode = params.get('code') || params.get('studentCode') || params.get('studentId');
     const urlLkUrl = params.get('url');
     const urlRoom = params.get('room');
     const urlRole = params.get('role');
     const urlToken = params.get('token');
 
     if (urlClassroomId) setPrefilledClassroomId(urlClassroomId);
-    if (urlStudentCode) setPrefilledStudentCode(urlStudentCode);
 
     const urlRosterToken = params.get('roster');
     if (urlRosterToken) setRosterToken(urlRosterToken);
@@ -1595,7 +1591,6 @@ function App() {
       <>
         <LoginScreen
           prefilledClassroomId={prefilledClassroomId}
-          prefilledStudentCode={prefilledStudentCode}
           rosterToken={rosterToken}
           onStudentLogin={(sid, cid, rawCode, displayName) => {
             // Supabase Session は LoginScreen 側で確立済み（失敗時はここに来ない）
