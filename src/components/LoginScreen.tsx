@@ -23,6 +23,12 @@ interface LoginScreenProps {
   /** URL等で事前に設定された教室ID */
   prefilledClassroomId?: string;
   /**
+   * 参加リンク（?code=...）から渡された生徒コード。初めて使う大人向けに、
+   * コードと教室を記入済みにして「参加する」を押すだけにする（2026-08-30 三村さん）。
+   * 自動ログインはしない。
+   */
+  prefilledStudentCode?: string;
+  /**
    * 道場の共有PC用の鍵（?roster=...）。渡されると名簿から名前を選ぶだけで入れる。
    * 生徒はIDを打たない（2026-08-13 三村さん）。
    */
@@ -33,12 +39,13 @@ export default function LoginScreen({
   onStudentLogin,
   onTeacherLogin,
   prefilledClassroomId,
+  prefilledStudentCode,
   rosterToken,
 }: LoginScreenProps) {
   const [mode, setMode] = useState<'student' | 'teacher'>('student');
   const [accounts, setAccounts] = useState<SavedAccount[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [studentId, setStudentId] = useState('');
+  const [studentId, setStudentId] = useState(prefilledStudentCode || '');
   const [classroomId, setClassroomId] = useState(prefilledClassroomId || '');
   const [classroomChoices, setClassroomChoices] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedAccount, setSelectedAccount] = useState<SavedAccount | null>(null);
@@ -60,6 +67,18 @@ export default function LoginScreen({
     const saved = loadAccounts();
     setAccounts(saved);
 
+    // 参加リンクで来た人が最優先。保存アカウントで上書きしない
+    // （家族の共用端末で、前に入った人のコードに戻ってしまうため）。
+    if (prefilledStudentCode) {
+      setStudentId(prefilledStudentCode);
+      const matching = saved.find(a => a.studentId === prefilledStudentCode);
+      if (matching) {
+        setSelectedAccount(matching);
+        if (!prefilledClassroomId) setClassroomId(matching.classroomId);
+      }
+      return;
+    }
+
     // 自動ログインは廃止（2026-04-22）: 生徒が「どの教室に入ったか」
     // 判別できない問題があったため、必ずログイン画面で確認させる。
     // 保存アカウントが1つだけなら pre-select だけはして、入力の手間は省く。
@@ -69,11 +88,15 @@ export default function LoginScreen({
       setStudentId(a.studentId);
       if (!prefilledClassroomId) setClassroomId(a.classroomId);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [prefilledStudentCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (prefilledClassroomId) setClassroomId(prefilledClassroomId);
   }, [prefilledClassroomId]);
+
+  useEffect(() => {
+    if (prefilledStudentCode) setStudentId(prefilledStudentCode);
+  }, [prefilledStudentCode]);
 
   const refreshAccounts = () => setAccounts(loadAccounts());
 
@@ -351,6 +374,22 @@ export default function LoginScreen({
   return (
     <LoginLayout>
       <div className="glass-panel p-6 sm:p-7 space-y-5">
+        {/*
+          参加リンクから来た人への案内。初めて使う大人が「次に何を押すのか」で
+          迷わないよう、記入済みであることと押すボタンを名指しで書く。
+        */}
+        {prefilledStudentCode && (
+          <div
+            data-testid="prefilled-notice"
+            className="rounded-lg border border-accent bg-ground px-4 py-3"
+          >
+            <p className="text-sm font-semibold text-ink">参加リンクから開きました</p>
+            <p className="mt-1 text-sm text-muted [word-break:auto-phrase]">
+              生徒コードと教室は入力済みです。<br />あとは「参加する」を押すだけです。
+            </p>
+          </div>
+        )}
+
         {/* ドロップダウン: 保存済みアカウントが1つ以上ある場合 */}
         {accounts.length > 0 && (
           <div className="relative">

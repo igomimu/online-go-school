@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LoginScreen from './LoginScreen';
-import { supabaseSignInStudent } from '../utils/authStore';
+import { loadAccounts, supabaseSignInStudent } from '../utils/authStore';
 
 vi.mock('../utils/authStore', () => ({
   loadAccounts: vi.fn(() => []),
@@ -74,5 +74,61 @@ describe('子ども向け生徒ログイン', () => {
     await waitFor(() => expect(onStudentLogin).toHaveBeenCalledWith(
       '1016', 'CLASS-A', '1016', '鈴木 榛人',
     ));
+  });
+});
+
+describe('参加リンク（初めての大人向け）', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('リンクの生徒コードが記入済みで、押すのは「参加する」だけ', async () => {
+    vi.mocked(supabaseSignInStudent).mockResolvedValue({
+      ok: true,
+      studentId: '1020',
+      displayName: '井町 太郎',
+      classroomId: 'CLS1',
+    });
+    const onStudentLogin = vi.fn();
+
+    render(
+      <LoginScreen
+        prefilledClassroomId="CLS1"
+        prefilledStudentCode="1020"
+        onStudentLogin={onStudentLogin}
+        onTeacherLogin={vi.fn()}
+      />,
+    );
+
+    expect((screen.getByTestId('student-id-input') as HTMLInputElement).value).toBe('1020');
+    expect(screen.getByTestId('prefilled-notice')).toBeVisible();
+
+    // コードを打ち直さず、そのまま参加できる
+    fireEvent.click(screen.getByTestId('student-login-button'));
+
+    await waitFor(() => expect(supabaseSignInStudent).toHaveBeenCalledWith('1020', 'CLS1'));
+    await waitFor(() => expect(onStudentLogin).toHaveBeenCalledWith(
+      '1020', 'CLS1', '1020', '井町 太郎',
+    ));
+  });
+
+  it('端末に前の人の保存アカウントが残っていてもリンクのコードを上書きしない', () => {
+    vi.mocked(loadAccounts).mockReturnValue([
+      { studentId: '1001', classroomId: 'CLS1', studentName: '前の人', classroomName: '火曜クラス' },
+    ]);
+
+    render(
+      <LoginScreen
+        prefilledClassroomId="CLS1"
+        prefilledStudentCode="1020"
+        onStudentLogin={vi.fn()}
+        onTeacherLogin={vi.fn()}
+      />,
+    );
+
+    expect((screen.getByTestId('student-id-input') as HTMLInputElement).value).toBe('1020');
+  });
+
+  it('参加リンクが無いときは案内を出さない', () => {
+    render(<LoginScreen onStudentLogin={vi.fn()} onTeacherLogin={vi.fn()} />);
+    expect(screen.queryByTestId('prefilled-notice')).toBeNull();
   });
 });

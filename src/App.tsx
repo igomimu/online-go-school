@@ -20,6 +20,7 @@ import type { Student, Classroom, RankDisplay } from './types/classroom';
 import { DEFAULT_RANK_DISPLAY } from './types/classroom';
 import { fetchToken, TeacherAbsentError } from './utils/livekitToken';
 import { getDisplayName, getTeacherDisplayName, identityMatchesPlayer, makeStudentIdentity, TEACHER_IDENTITY } from './utils/identityUtils';
+import { readStudentCodeFromParams } from './utils/studentLoginLink';
 import { ConnectionState } from './utils/classroomRtc';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession, interruptAllGames, interruptGame, resumeLiveGame } from './utils/liveGameApi';
@@ -285,6 +286,8 @@ function App() {
   const [studentClassroomId, setStudentClassroomId] = useState<string | null>(null);
   // URLから事前設定された教室ID
   const [prefilledClassroomId, setPrefilledClassroomId] = useState<string | undefined>(undefined);
+  // URLから事前設定された生徒コード（?code=...）。初めての大人向けの参加リンク
+  const [prefilledStudentCode, setPrefilledStudentCode] = useState<string | undefined>(undefined);
   // 道場の共有PC用（?roster=...）。名簿から名前を選ぶだけで入れる
   const [rosterToken, setRosterToken] = useState<string | undefined>(undefined);
 
@@ -782,7 +785,15 @@ function App() {
     if (urlLkUrl) setLivekitUrl(urlLkUrl);
     if (urlRoom) setRoomName(urlRoom);
 
-    if (urlRole === 'STUDENT' && urlRoom) {
+    // 参加リンク（?code=...）は入力欄を埋めるだけで、ログイン画面は必ず見せる。
+    // ここで自動ログインまでやると、生徒はどの教室に入ったのか分からなくなる（2026-04-22の教訓）。
+    const urlStudentCode = readStudentCodeFromParams(params);
+    if (urlStudentCode) setPrefilledStudentCode(urlStudentCode);
+
+    // ログイン画面を飛ばして入室してよいのは、dojo-app が発行した一時トークン付きのリンクだけ。
+    // トークンが無いまま role=STUDENT で入室しに行くと Supabase セッションが無く、
+    // /api/token が 403 を返して「接続に失敗しました」で終わる（旧「生徒リンク」がこれだった）。
+    if (urlRole === 'STUDENT' && urlRoom && urlToken) {
       const urlStudentId = params.get('studentId');
       const urlStudentName = params.get('studentName');
       if (urlStudentId) {
@@ -1600,6 +1611,7 @@ function App() {
       <>
         <LoginScreen
           prefilledClassroomId={prefilledClassroomId}
+          prefilledStudentCode={prefilledStudentCode}
           rosterToken={rosterToken}
           onStudentLogin={(sid, cid, rawCode, displayName) => {
             // Supabase Session は LoginScreen 側で確立済み（失敗時はここに来ない）

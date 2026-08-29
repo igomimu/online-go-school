@@ -16,6 +16,7 @@ import { fetchDojoNetStudents } from '../../utils/dojoSync';
 import { resolveGrade } from '../../utils/gradeCalc';
 import { usePwaInstall } from '../../hooks/usePwaInstall';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
+import { buildStudentLoginLink } from '../../utils/studentLoginLink';
 
 interface ClassroomManagerProps {
   students: Student[];
@@ -54,6 +55,13 @@ export default function ClassroomManager({
   const [syncing, setSyncing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+  /**
+   * ID を発行した直後に出す参加リンク。初めて使う大人には、コードだけ伝えても
+   * 「どこに打つのか」で詰まる。発行の場でそのまま送れる形にしておく（2026-08-30 三村さん）。
+   */
+  const [issuedStudent, setIssuedStudent] = useState<{ name: string; code: string } | null>(null);
+  const [issuedClassroomId, setIssuedClassroomId] = useState('');
+  const [issuedLinkCopied, setIssuedLinkCopied] = useState(false);
 
   const toggleSelectStudent = (id: string) => {
     setSelectedStudentIds(prev => {
@@ -153,7 +161,13 @@ export default function ClassroomManager({
       setIsAddingStudent(false);
       setEditingStudent(null);
       await onReloadData();
-      setImportResult(`「${form.name}」を登録しました（ログインコード: ${loginCode || form.id}）`);
+      const savedCode = loginCode || form.id;
+      setImportResult(`「${form.name}」を登録しました（ログインコード: ${savedCode}）`);
+      // 所属が分かっていればその教室を、まだ無ければ先生に選んでもらう
+      const belongsTo = classrooms.find(c => c.studentIds.includes(savedCode));
+      setIssuedStudent({ name: form.name, code: savedCode });
+      setIssuedClassroomId(belongsTo?.id || issuedClassroomId || '');
+      setIssuedLinkCopied(false);
     } catch (err) {
       setImportResult(`エラー: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -456,6 +470,76 @@ export default function ClassroomManager({
           ) : (
             /* === 生徒情報タブ === */
             <div style={{ flex: 1, overflowY: 'auto' }}>
+              {/* 発行した生徒の参加リンク（そのまま生徒へ送れる） */}
+              {issuedStudent && (
+                <div
+                  data-testid="issued-student-link"
+                  style={{
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-accent)',
+                    padding: 12,
+                    margin: 8,
+                    fontSize: 12,
+                    lineHeight: 1.8,
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 6 }}>
+                    「{issuedStudent.name}」さんの参加リンク（コード: {issuedStudent.code}）
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <span>教室</span>
+                    <select
+                      data-testid="issued-link-classroom"
+                      value={issuedClassroomId}
+                      onChange={e => { setIssuedClassroomId(e.target.value); setIssuedLinkCopied(false); }}
+                      style={inputStyle}
+                    >
+                      <option value="">-- 教室を選ぶ --</option>
+                      {classrooms.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {issuedClassroomId ? (
+                    <>
+                      <div
+                        data-testid="issued-link-url"
+                        style={{
+                          background: 'var(--color-ground)',
+                          border: '1px solid var(--color-line)',
+                          padding: '4px 6px',
+                          wordBreak: 'break-all',
+                          fontSize: 11,
+                        }}
+                      >
+                        {buildStudentLoginLink({ classroomId: issuedClassroomId, studentCode: issuedStudent.code })}
+                      </div>
+                      <div style={{ color: 'var(--color-muted)', marginTop: 4 }}>
+                        このリンクを送ると、生徒のログイン画面がコードと教室を記入済みで開きます。生徒は「参加する」を押すだけです。
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ color: 'var(--color-muted)' }}>
+                      教室を選ぶとリンクが出ます。（まだどの教室にも入っていない生徒は「教室」タブの「調整」で入れてください）
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    <IgcButton
+                      label={issuedLinkCopied ? '✓ コピーしました' : 'リンクをコピー'}
+                      color={issuedLinkCopied ? 'var(--color-accent)' : 'var(--color-raised)'}
+                      onClick={() => {
+                        if (!issuedClassroomId) return;
+                        navigator.clipboard.writeText(
+                          buildStudentLoginLink({ classroomId: issuedClassroomId, studentCode: issuedStudent.code }),
+                        ).catch(() => {});
+                        setIssuedLinkCopied(true);
+                      }}
+                    />
+                    <IgcButton label="閉じる" onClick={() => setIssuedStudent(null)} />
+                  </div>
+                </div>
+              )}
+
               {/* 生徒追加/編集フォーム */}
               {isAddingStudent && (
                 <div style={{

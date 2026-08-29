@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Student } from '../../types/classroom';
+import { buildStudentLoginLink } from '../../utils/studentLoginLink';
 
 interface StudentLinkGeneratorProps {
   students: Student[];
@@ -11,21 +12,11 @@ export default function StudentLinkGenerator({ students, classroomId, onClose }:
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showMode, setShowMode] = useState<'link' | 'id'>('id');
 
-  const baseUrl = `${window.location.origin}${window.location.pathname}`;
-
-  // 生徒が何も入力せずに教室へ入れるリンク。
-  // App.tsx の自動参加は `role=STUDENT` かつ `room` が揃って初めて studentId を読むので、
-  // classroomId と studentId だけでは生徒ID欄が空のままログイン画面で止まる。
-  const makeLink = (student: Student): string => {
-    const params = new URLSearchParams({
-      role: 'STUDENT',
-      room: `go-${classroomId || ''}`,
-      classroomId: classroomId || '',
-      studentId: student.id,
-      studentName: student.name,
-    });
-    return `${baseUrl}?${params.toString()}`;
-  };
+  // 生徒コードと教室が記入済みのログイン画面が開くリンク。
+  // 旧実装は role=STUDENT を付けてログインごと飛ばそうとしていたが、その経路には
+  // Supabase セッションが無く /api/token が 403 を返すため、リンクは常に失敗していた。
+  const makeLink = (student: Student): string =>
+    buildStudentLoginLink({ classroomId: classroomId || '', studentCode: student.id });
 
   const copyLink = (student: Student) => {
     navigator.clipboard.writeText(makeLink(student)).catch(() => {});
@@ -101,6 +92,12 @@ export default function StudentLinkGenerator({ students, classroomId, onClose }:
         {classroomId && (
           <div style={{ background: 'var(--color-surface)', padding: '4px 8px', marginBottom: 8, border: '1px solid var(--color-line)' }}>
             教室ID: <strong>{classroomId}</strong>
+          </div>
+        )}
+
+        {showMode === 'link' && (
+          <div style={{ background: 'var(--color-raised)', padding: '4px 8px', marginBottom: 8, border: '1px solid var(--color-line)', lineHeight: 1.7 }}>
+            このリンクを送ると、生徒のログイン画面が<strong>生徒コードと教室を記入済み</strong>の状態で開きます。生徒は「参加する」を押すだけです。
           </div>
         )}
 
