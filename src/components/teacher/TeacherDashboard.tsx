@@ -691,6 +691,7 @@ export default function TeacherDashboard({
         onClearAudioM={onClearAudioM}
         onClearAudioS={onClearAudioS}
         onClearSharing={onClearSharing}
+        hasConnectedStudents={filteredParticipants.some(p => p.identity !== localIdentity)}
       />
 
       {/* 詰碁データベース選択ダイアログ */}

@@ -62,6 +62,7 @@ import type { ChatMessagePayload } from './types/chat';
 import type { AiAnalysisSyncPayload } from './types/ai';
 import { resolveEffectiveViewMode } from './utils/viewMode';
 import { applyMediaIntent, loadMediaIntent, saveMediaIntent, type MediaIntent } from './utils/mediaIntent';
+import { audioPermissionFor, setStudentAudioPermission } from './utils/audioPermissions';
 import {
   buildTeacherGameWindowUrl,
   showCreatedGameInTeacherWindow,
@@ -622,8 +623,12 @@ function App() {
         // 音声制御（生徒用）
         if (msg.type === 'AUDIO_CONTROL' && connectRole === 'STUDENT' && msg.payload) {
           const p = msg.payload as { canHear: boolean };
-          // 先生の音声を止める / 鳴らす
-          classroomRef.current?.setRemoteAudioEnabled(p.canHear);
+          // Sは「生徒が講師の声を聞く」設定。他の生徒の音声トラックには触れない。
+          classroomRef.current?.setRemoteAudioEnabled(
+            p.canHear,
+            [sender || TEACHER_IDENTITY],
+          );
+          setIsMuted(!p.canHear);
         }
 
         // 棋力の見せ方（生徒用）。講師が授業中に切り替えたら生徒の画面も合わせる
@@ -635,14 +640,21 @@ function App() {
         // メディア制御（生徒用）
         if (msg.type === 'MEDIA_CONTROL' && connectRole === 'STUDENT' && msg.payload) {
           const p = msg.payload as { micAllowed: boolean; cameraAllowed: boolean };
-          if (!p.micAllowed) {
-            if (classroomRef.current?.isMicrophoneEnabled) {
-              classroomRef.current.disableMicrophone();
+          // Mは生徒マイクの実状態。許可表示だけで終わらせず、ON/OFFをトラックへ反映する。
+          void (async () => {
+            const current = classroomRef.current;
+            if (!current) return;
+            try {
+              if (p.micAllowed) await current.enableMicrophone();
+              else await current.disableMicrophone();
+              setIsMicEnabled(p.micAllowed);
+              // 講師が決めた状態を再接続後にも復元する。
+              rememberMediaIntent('STUDENT', { mic: p.micAllowed });
+            } catch (err) {
+              console.error('Failed to apply teacher microphone control:', err);
+              setIsMicEnabled(current.isMicrophoneEnabled);
             }
-            setIsMicEnabled(false);
-            // 講師が明示的に禁止した状態は、再接続で勝手に覆さない。
-            rememberMediaIntent('STUDENT', { mic: false });
-          }
+          })();
         }
 
         // チャットメッセージ
@@ -1468,39 +1480,36 @@ function App() {
     });
   };
 
-  const handleClearAudioM = async () => {
-    if (!classroomRef.current || !classroomRef.current.isConnected) return;
-    try {
-      setAudioDebug(prev => prev + ' [先生音声状態リセット]');
-      await classroomRef.current.enableMicrophone();
-      setIsMicEnabled(true);
-      if (role) rememberMediaIntent(role, { mic: true });
-      setIsMuted(false);
-    } catch (err) {
-      console.error('Clear audio M error:', err);
-    }
+  const handleClearAudioM = () => {
+    const room = classroomRef.current;
+    if (!room?.isConnected) return;
+    const studentIdentities = room.remoteIdentities;
+    if (studentIdentities.length === 0) return;
+
+    // Mをクリア = 参加中の全生徒のマイクをOFF。
+    setAudioPermissions(prev => setStudentAudioPermission(prev, studentIdentities, { micAllowed: false }));
+    studentIdentities.forEach(identity => {
+      const current = audioPermissionFor(audioPermissions, identity);
+      void room.sendTo(
+        { type: 'MEDIA_CONTROL', payload: { micAllowed: false, cameraAllowed: current.cameraAllowed } },
+        [identity],
+      );
+    });
   };
 
   const handleClearAudioS = () => {
-    if (!classroomRef.current || !classroomRef.current.isConnected) return;
-    setAudioDebug(prev => prev + ' [生徒音声状態リセット]');
-    const remoteIdentities = classroomRef.current.remoteIdentities;
-    if (remoteIdentities.length === 0) return;
+    const room = classroomRef.current;
+    if (!room?.isConnected) return;
+    const studentIdentities = room.remoteIdentities;
+    if (studentIdentities.length === 0) return;
 
-    setAudioPermissions(prev => {
-      const next = { ...prev };
-      remoteIdentities.forEach(identity => {
-        next[identity] = { canHear: true, micAllowed: true, cameraAllowed: true };
-        classroomRef.current?.sendTo(
-          { type: 'MEDIA_CONTROL', payload: { micAllowed: true, cameraAllowed: true } },
-          [identity]
-        );
-        classroomRef.current?.sendTo(
-          { type: 'AUDIO_CONTROL', payload: { canHear: true } },
-          [identity]
-        );
-      });
-      return next;
+    // Sをクリア = 参加中の全生徒で、講師音声の受信をOFF。
+    setAudioPermissions(prev => setStudentAudioPermission(prev, studentIdentities, { canHear: false }));
+    studentIdentities.forEach(identity => {
+      void room.sendTo(
+        { type: 'AUDIO_CONTROL', payload: { canHear: false } },
+        [identity],
+      );
     });
   };
 

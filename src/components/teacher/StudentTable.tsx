@@ -157,6 +157,7 @@ export default function StudentTable({
                       {row.identity !== localIdentity ? (
                         <>
                           <ConnectionToggle
+                            testId={`mic-${row.identity}`}
                             checked={perm.micAllowed}
                             onChange={() => onToggleMic(row.identity)}
                             onLabel="マイクが入っています（押すと切る）"
@@ -165,6 +166,7 @@ export default function StudentTable({
                             OffIcon={MicOff}
                           />
                           <ConnectionToggle
+                            testId={`hear-${row.identity}`}
                             checked={perm.canHear}
                             onChange={() => onToggleHear(row.identity)}
                             onLabel="こちらの声が聞こえています（押すと聞こえなくする）"

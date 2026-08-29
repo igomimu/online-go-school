@@ -160,8 +160,8 @@ export interface ClassroomRtc {
   switchDevice(kind: 'audioinput' | 'videoinput', deviceId: string): Promise<void>;
   applySavedDevices(): Promise<void>;
 
-  /** 相手の声を鳴らすか止めるか（先生の一斉ミュート・自分側のミュート） */
-  setRemoteAudioEnabled(enabled: boolean): void;
+  /** 相手の声を鳴らすか止める。identities省略時は全員、指定時はその相手だけ */
+  setRemoteAudioEnabled(enabled: boolean, identities?: string[]): void;
   /** ブラウザの自動再生制限を解除する。ユーザー操作の中から呼ぶ */
   startAudio(): Promise<void>;
 

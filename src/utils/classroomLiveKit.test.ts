@@ -315,6 +315,45 @@ describe('ClassroomLiveKit', () => {
     });
   });
 
+  describe('remote audio', () => {
+    it('指定した相手の音声だけをOFFにする', () => {
+      const teacherTrack = { mediaStreamTrack: { enabled: true } };
+      const studentTrack = { mediaStreamTrack: { enabled: true } };
+      classroom.room.remoteParticipants.set('teacher', {
+        identity: 'teacher',
+        audioTrackPublications: new Map([['teacher-audio', { track: teacherTrack }]]),
+      });
+      classroom.room.remoteParticipants.set('student', {
+        identity: 'sid:1010',
+        audioTrackPublications: new Map([['student-audio', { track: studentTrack }]]),
+      });
+
+      classroom.setRemoteAudioEnabled(false, ['teacher']);
+
+      expect(teacherTrack.mediaStreamTrack.enabled).toBe(false);
+      expect(studentTrack.mediaStreamTrack.enabled).toBe(true);
+    });
+
+    it('指定相手のOFF状態を、あとから購読した音声にも適用する', () => {
+      classroom.setRemoteAudioEnabled(false, ['teacher']);
+      const mediaStreamTrack = { enabled: true };
+      const track = {
+        kind: 'audio',
+        mediaStreamTrack,
+        attach: vi.fn(() => document.createElement('audio')),
+      };
+
+      (classroom.room as unknown as { emit: Function }).emit(
+        'trackSubscribed',
+        track,
+        {},
+        { identity: 'teacher' },
+      );
+
+      expect(mediaStreamTrack.enabled).toBe(false);
+    });
+  });
+
   // === destroy ===
   describe('destroy', () => {
     it('disconnectが呼ばれる', () => {

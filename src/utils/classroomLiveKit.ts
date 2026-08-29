@@ -45,6 +45,8 @@ export class ClassroomLiveKit implements ClassroomRtc {
   private handlers: ClassroomEventHandler = {};
   private _videoElements = new Map<string, HTMLVideoElement>();
   private _audioElements = new Map<string, HTMLAudioElement>();
+  private remoteAudioEnabled = true;
+  private remoteAudioOverrides = new Map<string, boolean>();
   onVideoTrackChanged?: (info: VideoTrackInfo) => void;
   /** 録画中に音声トラックが増減したときに知らせる（録画に途中参加の生徒の声を混ぜるため） */
   onAudioTracksChanged?: () => void;
@@ -104,6 +106,8 @@ export class ClassroomLiveKit implements ClassroomRtc {
       participant: RemoteParticipant,
     ) => {
       if (track.kind === Track.Kind.Audio) {
+        track.mediaStreamTrack.enabled = this.remoteAudioOverrides.get(participant.identity)
+          ?? this.remoteAudioEnabled;
         const el = track.attach() as HTMLAudioElement;
         el.id = `audio-${participant.identity}`;
         document.body.appendChild(el);
@@ -396,8 +400,15 @@ export class ClassroomLiveKit implements ClassroomRtc {
   }
 
   /** 相手の声を鳴らすか止めるか。購読済みトラックの enabled を直接触る */
-  setRemoteAudioEnabled(enabled: boolean): void {
+  setRemoteAudioEnabled(enabled: boolean, identities?: string[]): void {
+    if (identities) {
+      identities.forEach(identity => this.remoteAudioOverrides.set(identity, enabled));
+    } else {
+      this.remoteAudioEnabled = enabled;
+      this.remoteAudioOverrides.clear();
+    }
     this.room.remoteParticipants.forEach((p) => {
+      if (identities && !identities.includes(p.identity)) return;
       p.audioTrackPublications.forEach((pub) => {
         if (pub.track) pub.track.mediaStreamTrack.enabled = enabled;
       });
@@ -435,6 +446,7 @@ export class ClassroomLiveKit implements ClassroomRtc {
     this._videoElements.clear();
     this._audioElements.forEach(el => el.remove());
     this._audioElements.clear();
+    this.remoteAudioOverrides.clear();
     this.room.disconnect();
   }
 }

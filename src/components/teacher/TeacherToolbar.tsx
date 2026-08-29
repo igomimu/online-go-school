@@ -21,6 +21,7 @@ interface TeacherToolbarProps {
   onClearAudioM?: () => void;
   onClearAudioS?: () => void;
   onClearSharing?: () => void;
+  hasConnectedStudents?: boolean;
   /** 道場の共有PC用リンク。名簿から名前を選ぶだけで入れる画面へ繋がる */
   rosterUrl?: string;
   /** 回線の状態。切れている時だけ「回線復旧」を朱にするために使う */
@@ -234,6 +235,7 @@ export default function TeacherToolbar({
   onClearAudioM,
   onClearAudioS,
   onClearSharing,
+  hasConnectedStudents = false,
   rosterUrl,
   connectionState,
 }: TeacherToolbarProps) {
@@ -333,9 +335,24 @@ export default function TeacherToolbar({
         )}
 
         <div style={{ flex: 1 }} />
-        <SmallButton label="音声Mをクリア" onClick={onClearAudioM} />
-        <SmallButton label="音声Sをクリア" onClick={onClearAudioS} />
-        <SmallButton label="共有を全員に" onClick={onClearSharing} />
+        <SmallButton
+          label="音声Mをクリア"
+          onClick={onClearAudioM}
+          disabled={!hasConnectedStudents}
+          title="参加中の生徒全員のマイクをOFFにする"
+        />
+        <SmallButton
+          label="音声Sをクリア"
+          onClick={onClearAudioS}
+          disabled={!hasConnectedStudents}
+          title="参加中の生徒全員で、講師の声の受信をOFFにする"
+        />
+        <SmallButton
+          label="共有を全員に"
+          onClick={onClearSharing}
+          disabled={!hasConnectedStudents}
+          title="参加中の生徒全員に検討を見せる"
+        />
       </div>
 
       {/* 下段: アクションボタン群。

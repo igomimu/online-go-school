@@ -68,6 +68,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   private _state: ConnectionState = ConnectionState.Disconnected;
   /** 生徒側で「先生の声を止める」を効かせるための現在値 */
   private remoteAudioEnabled = true;
+  private remoteAudioOverrides = new Map<string, boolean>();
 
   onVideoTrackChanged?: (info: VideoTrackInfo) => void;
   onAudioTracksChanged?: () => void;
@@ -313,7 +314,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
       this._audioElements.set(identity, el);
     }
     el.srcObject = new MediaStream([track]);
-    track.enabled = this.remoteAudioEnabled;
+    track.enabled = this.remoteAudioOverrides.get(identity) ?? this.remoteAudioEnabled;
     el.play().catch(() => {});
     return el;
   }
@@ -586,9 +587,15 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     return this.meeting?.self.videoEnabled ?? false;
   }
 
-  setRemoteAudioEnabled(enabled: boolean): void {
-    this.remoteAudioEnabled = enabled;
+  setRemoteAudioEnabled(enabled: boolean, identities?: string[]): void {
+    if (identities) {
+      identities.forEach(identity => this.remoteAudioOverrides.set(identity, enabled));
+    } else {
+      this.remoteAudioEnabled = enabled;
+      this.remoteAudioOverrides.clear();
+    }
     this.remotePeers().forEach((p) => {
+      if (identities && !identities.includes(this.identityOf(p))) return;
       if (p.audioTrack) p.audioTrack.enabled = enabled;
     });
   }
@@ -645,6 +652,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     this._videoElements.clear();
     this._audioElements.forEach((el) => { el.srcObject = null; el.remove(); });
     this._audioElements.clear();
+    this.remoteAudioOverrides.clear();
     this.meeting?.leave().catch(() => {});
     this.meeting = null;
   }

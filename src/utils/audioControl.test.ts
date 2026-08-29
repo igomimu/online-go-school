@@ -65,10 +65,15 @@ function handleMediaControl(
   payload: { micAllowed: boolean; cameraAllowed: boolean },
   isMicEnabled: boolean,
   disableMicrophone: () => void,
+  enableMicrophone: () => void = () => {},
 ): boolean {
   if (!payload.micAllowed && isMicEnabled) {
     disableMicrophone();
     return false; // マイクOFF
+  }
+  if (payload.micAllowed && !isMicEnabled) {
+    enableMicrophone();
+    return true; // マイクON
   }
   return isMicEnabled;
 }
@@ -285,15 +290,18 @@ describe('音声制御フロー', () => {
       expect(result).toBe(false);
     });
 
-    it('micAllowed: trueの場合→マイク状態は変わらない（許可のみ）', () => {
+    it('micAllowed: trueでマイクOFF中→マイクをONにする', () => {
       const disableMic = vi.fn();
+      const enableMic = vi.fn();
       const result = handleMediaControl(
         { micAllowed: true, cameraAllowed: true },
-        true,
+        false,
         disableMic,
+        enableMic,
       );
 
       expect(disableMic).not.toHaveBeenCalled();
+      expect(enableMic).toHaveBeenCalled();
       expect(result).toBe(true);
     });
   });
