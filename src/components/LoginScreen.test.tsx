@@ -75,4 +75,32 @@ describe('子ども向け生徒ログイン', () => {
       '1016', 'CLASS-A', '1016', '鈴木 榛人',
     ));
   });
+
+  it('prefilledStudentCodeが渡された場合、入力欄に自動記入され1クリックで参加できる', async () => {
+    vi.mocked(supabaseSignInStudent).mockResolvedValue({
+      ok: true,
+      studentId: '1020',
+      displayName: 'テスト 生徒',
+      classroomId: 'CLASS-A',
+    });
+    const onStudentLogin = vi.fn();
+
+    render(
+      <LoginScreen
+        prefilledStudentCode="1020"
+        onStudentLogin={onStudentLogin}
+        onTeacherLogin={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByTestId('student-id-input') as HTMLInputElement;
+    expect(input.value).toBe('1020');
+
+    // IDを打ち直さずにそのまま参加ボタンをクリック
+    fireEvent.click(screen.getByTestId('student-login-button'));
+
+    await waitFor(() => expect(onStudentLogin).toHaveBeenCalledWith(
+      '1020', 'CLASS-A', '1020', 'テスト 生徒',
+    ));
+  });
 });
