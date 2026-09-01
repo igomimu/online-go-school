@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import VideoTiles from './VideoTiles';
 import type { ParticipantInfo } from '../utils/classroomRtc';
 import { saveMirrorLocalVideo } from '../utils/mediaDevices';
@@ -25,7 +25,31 @@ const participant = (
   ...state,
 });
 
+beforeEach(() => {
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+});
+
+afterEach(() => vi.restoreAllMocks());
+
 describe('VideoTiles', () => {
+  it('映像要素を移し替えた直後と停止検知時に再生を戻す', () => {
+    const studentVideo = document.createElement('video');
+    render(
+      <VideoTiles
+        videoElements={new Map([['sid:1004', studentVideo]])}
+        localIdentity="teacher"
+        participants={participants}
+        variant="classroom"
+      />,
+    );
+
+    expect(studentVideo.play).toHaveBeenCalled();
+
+    const calls = vi.mocked(studentVideo.play).mock.calls.length;
+    studentVideo.dispatchEvent(new Event('pause'));
+    expect(studentVideo.play).toHaveBeenCalledTimes(calls + 1);
+  });
+
   it('講師画面では本人を先頭にして、横スクロール可能な大きい映像を並べる', () => {
     const teacherVideo = document.createElement('video');
     const studentVideo = document.createElement('video');

@@ -4,6 +4,7 @@ import type { Student } from '../../types/classroom';
 import { anyIdentityMatchesPlayer, studentIdentityCandidates } from '../../utils/identityUtils';
 import GameThumbnail from '../GameThumbnail';
 import { displayRank, DEFAULT_RANK_DISPLAY, type RankDisplay } from '../../types/classroom';
+import { isTimeoutResult } from '../../utils/scoring';
 
 interface BoardThumbnailGridProps {
   games: GameSession[];
@@ -67,9 +68,15 @@ export default function BoardThumbnailGrid({
       {students.map(student => {
         const candidates = studentIdentityCandidates(student);
         const isConnected = candidates.some(identity => connectedIdentities.has(identity));
+        const matchesStudent = (game: GameSession) =>
+          anyIdentityMatchesPlayer(candidates, game.blackPlayer)
+          || anyIdentityMatchesPlayer(candidates, game.whitePlayer);
+        // 中断局は履歴で扱い、中央の「進行中の碁盤」には残さない。
+        // 時間切れだけは授業中にすぐ再開できるよう従来どおり表示する。
         const game = games.find(g =>
-          anyIdentityMatchesPlayer(candidates, g.blackPlayer) ||
-          anyIdentityMatchesPlayer(candidates, g.whitePlayer)
+          matchesStudent(g) && (g.status === 'playing' || g.status === 'scoring')
+        ) ?? games.find(g =>
+          matchesStudent(g) && g.status === 'finished' && isTimeoutResult(g.result)
         );
 
         // IGC風ラベル: 名前(Rxx)

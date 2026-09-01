@@ -41,6 +41,36 @@ const game: GameSession = {
 };
 
 describe('StudentTable', () => {
+  it('マイクは先生の声を届け、スピーカーは生徒の声を聞く操作にする', () => {
+    const onToggleHear = vi.fn();
+    const onToggleMic = vi.fn();
+    render(
+      <StudentTable
+        participants={[participant]}
+        students={[student]}
+        games={[]}
+        audioPermissions={{
+          [participant.identity]: { canHear: true, micAllowed: false, cameraAllowed: true },
+        }}
+        localIdentity="teacher"
+        onToggleHear={onToggleHear}
+        onToggleMic={onToggleMic}
+      />,
+    );
+
+    const teacherMic = screen.getByTestId(`mic-${participant.identity}`);
+    const studentSpeaker = screen.getByTestId(`hear-${participant.identity}`);
+    expect(teacherMic).toHaveAttribute('title', 'こちらのマイク音声が届いています（押すと止める）');
+    expect(teacherMic).toHaveAttribute('aria-checked', 'true');
+    expect(studentSpeaker).toHaveAttribute('title', 'この生徒の声が聞こえません（押すと聞く）');
+    expect(studentSpeaker).toHaveAttribute('aria-checked', 'false');
+
+    fireEvent.click(teacherMic);
+    fireEvent.click(studentSpeaker);
+    expect(onToggleHear).toHaveBeenCalledWith(participant.identity);
+    expect(onToggleMic).toHaveBeenCalledWith(participant.identity);
+  });
+
   it('sid付き参加者と素の生徒IDの対局を同じ生徒として表示する', () => {
     const onInterruptGame = vi.fn();
     render(

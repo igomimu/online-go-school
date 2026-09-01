@@ -913,7 +913,28 @@ export default function TeacherDashboard({
                             </span>
                           </span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {resumable && onResumeGame ? (
+                            {onSelectSavedGame && (
+                              <button
+                                type="button"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  onSelectSavedGame(game);
+                                  setHistoryStudent(null);
+                                }}
+                                style={{
+                                  background: 'var(--color-ground)',
+                                  border: '1px solid var(--color-line)',
+                                  color: 'var(--color-accent-text)',
+                                  fontSize: 11,
+                                  fontWeight: 'bold',
+                                  padding: '1px 8px',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                検討
+                              </button>
+                            )}
+                            {resumable && onResumeGame && (
                               <button
                                 onClick={e => {
                                   e.stopPropagation();
@@ -934,8 +955,6 @@ export default function TeacherDashboard({
                               >
                                 再開
                               </button>
-                            ) : (
-                              <span style={{ color: 'var(--color-accent-text)', fontSize: 11 }}>検討を開始する</span>
                             )}
                             <button
                               type="button"

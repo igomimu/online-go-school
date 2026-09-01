@@ -75,15 +75,93 @@ function VideoTile({
     const container = containerRef.current;
     if (!container || !videoElement) return;
     const video = videoElement;
+    let frameCallbackId: number | null = null;
+    let lastFrameAt = Date.now();
+    let lastRecoveryAt = 0;
 
     container.appendChild(video);
 
+    const play = () => {
+      if (!cameraOn || document.visibilityState === 'hidden') return;
+      try {
+        const result = video.play();
+        void result?.catch(() => {
+          // フォーカス復帰や次のフレーム到着時に再試行する。
+        });
+      } catch {
+        // DOMだけのテスト環境など、再生APIを持たない環境では何もしない。
+      }
+    };
+
+    const markFrame = () => { lastFrameAt = Date.now(); };
+    const watchFrames = () => {
+      if (typeof video.requestVideoFrameCallback !== 'function') return;
+      frameCallbackId = video.requestVideoFrameCallback(() => {
+        markFrame();
+        watchFrames();
+      });
+    };
+
+    const reattachStream = () => {
+      if (!cameraOn || document.visibilityState === 'hidden') return;
+      const now = Date.now();
+      if (now - lastRecoveryAt < 8_000) return;
+      const stream = video.srcObject;
+      if (!(stream instanceof MediaStream)) {
+        play();
+        return;
+      }
+      const hasLiveTrack = stream.getVideoTracks().some(
+        track => track.readyState === 'live' && track.enabled,
+      );
+      if (!hasLiveTrack) return;
+      lastRecoveryAt = now;
+      // RealtimeKitのトラックは生きているのにvideo要素だけ止まる場合がある。
+      // 同じMediaStreamを付け直すと、教室接続や囲碁盤を切らずデコーダーだけ再開できる。
+      video.srcObject = null;
+      video.srcObject = stream;
+      play();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'hidden') play();
+    };
+    const handleStall = () => reattachStream();
+    const watchdog = window.setInterval(() => {
+      if (!cameraOn || document.visibilityState === 'hidden') return;
+      if (video.paused) play();
+      if (typeof video.requestVideoFrameCallback === 'function' && Date.now() - lastFrameAt > 10_000) {
+        reattachStream();
+      }
+    }, 4_000);
+
+    video.addEventListener('playing', markFrame);
+    video.addEventListener('timeupdate', markFrame);
+    video.addEventListener('stalled', handleStall);
+    video.addEventListener('waiting', handleStall);
+    video.addEventListener('pause', play);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', play);
+    watchFrames();
+    play();
+
     return () => {
+      window.clearInterval(watchdog);
+      if (frameCallbackId !== null && typeof video.cancelVideoFrameCallback === 'function') {
+        video.cancelVideoFrameCallback(frameCallbackId);
+      }
+      video.removeEventListener('playing', markFrame);
+      video.removeEventListener('timeupdate', markFrame);
+      video.removeEventListener('stalled', handleStall);
+      video.removeEventListener('waiting', handleStall);
+      video.removeEventListener('pause', play);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', play);
       if (container.contains(video)) {
         container.removeChild(video);
       }
     };
-  }, [videoElement]);
+  }, [videoElement, cameraOn]);
 
   const showFullscreen = () => {
     if (!videoElement.requestFullscreen) return;

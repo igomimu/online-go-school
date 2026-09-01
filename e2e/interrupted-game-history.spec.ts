@@ -112,12 +112,15 @@ test.describe('中断した対局の扱い', () => {
 
     // --- 中断局があっても、同じ2人で新しい対局を作れる ---
     await createGame(teacherPage, {
-      blackName: TEST_STUDENT_B.name,
-      whiteName: TEST_STUDENT_A.name,
+      blackName: TEST_STUDENT_A.name,
+      whiteName: TEST_STUDENT_B.name,
       boardSize: 9,
       expectedPlayersCount: 3,
     });
     await expect(getStudentBoard(teacherPage, TEST_STUDENT_A.id)).toBeVisible({ timeout: 20_000 });
+    // 講師一覧に新しい盤が出るだけでは不十分。実運用では、生徒側が中断局から
+    // 新しい対局へ切り替わらず、碁盤が開かなかった。
+    await Promise.all([enterAssignedGame(studentAPage), enterAssignedGame(studentBPage)]);
 
     // --- 棋譜履歴に「中断中」で並び、再開と削除ができる ---
     const row = teacherPage.locator(`tr[data-student-id="${TEST_STUDENT_A.id}"]`).first();
@@ -125,6 +128,7 @@ test.describe('中断した対局の扱い', () => {
     await expect(teacherPage.getByText(/棋譜履歴 -/)).toBeVisible({ timeout: 15_000 });
 
     await expect(teacherPage.getByText('中断中').first()).toBeVisible({ timeout: 20_000 });
+    await expect(teacherPage.getByRole('button', { name: '検討' }).first()).toBeVisible();
     await expect(teacherPage.getByRole('button', { name: '再開' }).first()).toBeVisible();
     await expect(teacherPage.getByRole('button', { name: '削除' }).first()).toBeVisible();
   });
