@@ -336,16 +336,16 @@ export default function TeacherToolbar({
 
         <div style={{ flex: 1 }} />
         <SmallButton
-          label="音声Mをクリア"
+          label="全員へのマイクを切る"
           onClick={onClearAudioM}
           disabled={!hasConnectedStudents}
-          title="参加中の生徒全員のマイクをOFFにする"
+          title="参加中の生徒全員へ、講師の声を届けない"
         />
         <SmallButton
-          label="音声Sをクリア"
+          label="全員の声を切る"
           onClick={onClearAudioS}
           disabled={!hasConnectedStudents}
-          title="参加中の生徒全員で、講師の声の受信をOFFにする"
+          title="参加中の生徒全員のマイクをOFFにする"
         />
         <SmallButton
           label="共有を全員に"

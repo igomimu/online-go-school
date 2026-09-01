@@ -241,16 +241,28 @@ export async function createGame(
   const hasBlack = optionsNow.some((o) => o.includes(blackName));
   const hasWhite = optionsNow.some((o) => o.includes(whiteName));
 
-  if (hasBlack && hasWhite) {
+  const studentVsStudent = hasBlack && hasWhite;
+  if (studentVsStudent) {
     // 指定の2人が両方とも「相手」側に居る＝生徒同士の対局
     await page.getByTestId('student-vs-student-checkbox').check();
     await expect(opponent.locator('option')).not.toHaveCount(0, { timeout: 10_000 });
   }
 
-  // 相手側に居るほうが相手。自分はその反対の色になる
-  const opponentIsBlack = hasBlack && !(hasBlack && hasWhite);
-  const opponentName = opponentIsBlack ? blackName : whiteName;
-  const selfColor: 'BLACK' | 'WHITE' = opponentIsBlack ? 'WHITE' : 'BLACK';
+  // 生徒同士では接続順によって「自分」に選ばれる生徒が変わる。表示された本人を読み、
+  // 指定した黒白になるよう相手と色を決める（参加者配列の順番を前提にしない）。
+  let opponentName: string;
+  let selfColor: 'BLACK' | 'WHITE';
+  if (studentVsStudent) {
+    const selfName = await page.getByTestId('self-player-name').innerText();
+    const selfIsBlack = selfName.includes(blackName);
+    opponentName = selfIsBlack ? whiteName : blackName;
+    selfColor = selfIsBlack ? 'BLACK' : 'WHITE';
+  } else {
+    // 先生対生徒では、相手側に居るほうが相手。先生はその反対の色になる。
+    const opponentIsBlack = hasBlack;
+    opponentName = opponentIsBlack ? blackName : whiteName;
+    selfColor = opponentIsBlack ? 'WHITE' : 'BLACK';
+  }
 
   await page.getByRole('radio', { name: selfColor === 'BLACK' ? '黒' : '白' }).check();
 

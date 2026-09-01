@@ -57,7 +57,7 @@ describe('MediaControlPanel', () => {
         onToggleMic={vi.fn()}
       />
     );
-    const hearBtns = screen.getAllByTitle('音声配信中');
+    const hearBtns = screen.getAllByTitle('こちらのマイク音声が届いています');
     fireEvent.click(hearBtns[0]);
     expect(onToggleHear).toHaveBeenCalledWith('たろう');
   });
@@ -76,7 +76,7 @@ describe('MediaControlPanel', () => {
         onToggleMic={onToggleMic}
       />
     );
-    const micBtns = screen.getAllByTitle('マイク許可中');
+    const micBtns = screen.getAllByTitle('この生徒の声が聞こえます');
     fireEvent.click(micBtns[0]);
     expect(onToggleMic).toHaveBeenCalledWith('たろう');
   });

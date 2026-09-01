@@ -64,6 +64,7 @@ import type { AiAnalysisSyncPayload } from './types/ai';
 import { resolveEffectiveViewMode } from './utils/viewMode';
 import { applyMediaIntent, loadMediaIntent, saveMediaIntent, type MediaIntent } from './utils/mediaIntent';
 import { audioPermissionFor, setStudentAudioPermission } from './utils/audioPermissions';
+import { loadTeacherAudioPermissions, saveTeacherAudioPermissions } from './utils/teacherAudioPermissions';
 import {
   buildTeacherGameWindowUrl,
   showCreatedGameInTeacherWindow,
@@ -83,6 +84,27 @@ function reviewKomiFromSgf(value: string | undefined, fallback = 6.5): number {
 
 /** 検討の盤を配る間隔。手を早送りしても最後の一枚は必ず届く */
 const REVIEW_BOARD_INTERVAL_MS = 120;
+
+function sendTeacherAudioPermission(
+  classroom: ClassroomRtc,
+  identity: string,
+  permission: AudioPermissions[string],
+): void {
+  void classroom.sendTo(
+    { type: 'AUDIO_CONTROL', payload: { canHear: permission.canHear } },
+    [identity],
+  );
+  void classroom.sendTo(
+    {
+      type: 'MEDIA_CONTROL',
+      payload: {
+        micAllowed: permission.micAllowed,
+        cameraAllowed: permission.cameraAllowed,
+      },
+    },
+    [identity],
+  );
+}
 
 function reviewBoardUpdatePayload(node: GameNode, boardSize: number, numberMode: NumberMode = 'off', branchStartId: string | null = null) {
   const nextColor = node.move
@@ -143,6 +165,8 @@ function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraEnabled, setIsCameraEnabled] = useState(false);
   const [audioPermissions, setAudioPermissions] = useState<AudioPermissions>({});
+  const audioPermissionsRef = useRef<AudioPermissions>({});
+  useEffect(() => { audioPermissionsRef.current = audioPermissions; }, [audioPermissions]);
   // 実トラックの状態とは別に「本人が最後にONにしていたか」を保持する。
   // Room再作成やページ再読込でLiveKitのgetterがfalseへ戻っても、この値から復元する。
   const mediaIntentRef = useRef<Record<Role, MediaIntent>>({
@@ -401,6 +425,28 @@ function App() {
     [liveGameList.games],
   );
 
+  // 生徒の対局切替は描画中にsetStateせず、一覧更新を受けたeffectで行う。
+  // 中断直後に次の対局が作られた場合も、古い対局IDから新しいIDへ確実に切り替える。
+  useEffect(() => {
+    if (role !== 'STUDENT') {
+      if (autoOpenedGameId !== null) setAutoOpenedGameId(null);
+      return;
+    }
+    const me = classroomRef.current?.localIdentity || userName;
+    const nextGame = games.find(
+      game => game.status === 'playing'
+        && (identityMatchesPlayer(me, game.blackPlayer) || identityMatchesPlayer(me, game.whitePlayer)),
+    );
+    if (nextGame && autoOpenedGameId !== nextGame.id) {
+      setAutoOpenedGameId(nextGame.id);
+      setSyncedDrawings([]);
+      setActiveGameId(nextGame.id);
+      setViewMode('game');
+    } else if (!nextGame && autoOpenedGameId !== null) {
+      setAutoOpenedGameId(null);
+    }
+  }, [role, games, userName, autoOpenedGameId]);
+
   useEffect(() => {
     initUnloadInterruptAuthCache();
   }, []);
@@ -446,6 +492,11 @@ function App() {
   const connectLiveKit = useCallback(async (connectRole: Role, connectUserName: string, overrideRoomName?: string, overrideClassroomId?: string) => {
     const effectiveRoomName = overrideRoomName || roomName;
     const effectiveClassroomId = overrideClassroomId ?? selectedClassroomId ?? '';
+    if (connectRole === 'TEACHER') {
+      const restored = loadTeacherAudioPermissions(effectiveClassroomId);
+      audioPermissionsRef.current = restored;
+      setAudioPermissions(restored);
+    }
     // 前回のマイク・カメラを読み出す先を、これから入る人に合わせる
     mediaIntentScopeRef.current = connectRole === 'STUDENT' ? (studentId ?? undefined) : undefined;
     classroomRef.current?.destroy();
@@ -454,6 +505,11 @@ function App() {
 
     classroom.setHandlers({
       onMessage: (msg: ClassroomMessage, sender?: string) => {
+        // Supabase Realtime の INSERT を取り逃しても、新規対局の合図を受けたら一覧を
+        // 読み直す。中断直後に新しい対局を作ったとき、生徒だけ旧局面に残る経路を塞ぐ。
+        if (msg.type === 'GAME_CREATED' && connectRole === 'STUDENT') {
+          void liveGameList.refresh();
+        }
         // 対局関連メッセージをカスタムイベントで通知（低遅延同期用）
         if (msg.type === 'GAME_MOVE' || msg.type === 'GAME_PASS' || msg.type === 'GAME_RESIGN') {
           window.dispatchEvent(
@@ -677,6 +733,8 @@ function App() {
         // 戻ってきたことも講師には見せる（切れたきり戻らないのか、復旧したのかが分かる）
         if (connectRole === 'TEACHER') {
           pushAlert({ kind: 'rejoin', identity });
+          const permission = audioPermissionsRef.current[identity];
+          if (permission) sendTeacherAudioPermission(classroom, identity, permission);
           // 後から入った生徒にも、今の棋力の見せ方を伝える
           void classroom.broadcast({
             type: 'RANK_DISPLAY',
@@ -743,6 +801,13 @@ function App() {
 
       await classroom.connect({ url: livekitUrl, token: connectToken });
       await restoreMediaIntent(classroom, connectRole);
+      if (connectRole === 'TEACHER') {
+        // 接続時点ですでに居る生徒は ParticipantJoined が発火しないため、ここで復元する。
+        classroom.remoteIdentities.forEach(identity => {
+          const permission = audioPermissionsRef.current[identity];
+          if (permission) sendTeacherAudioPermission(classroom, identity, permission);
+        });
+      }
       setConnectionError('');
       setWaitingForTeacher(false);
 
@@ -765,7 +830,7 @@ function App() {
     // notificationSound.play は ref 経由）。依存に入れると毎レンダー作り直しになり、
     // かえって接続処理が張り直される。rawStudentCode は studentId と同時に更新される。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomName, livekitUrl, studentId, studentClassroomId, selectedClassroomId, userName, rememberMediaIntent, restoreMediaIntent]);
+  }, [roomName, livekitUrl, studentId, studentClassroomId, selectedClassroomId, userName, rememberMediaIntent, restoreMediaIntent, liveGameList.refresh]);
 
   // URL params for student auto-join
   useEffect(() => {
@@ -1232,6 +1297,14 @@ function App() {
       ? openTeacherGameWindow(selectedClassroomId)
       : null;
     const createdGame = await liveGameList.createGame(opts);
+    if (createdGame) {
+      // Supabase Realtime が一時的に INSERT を取り逃した生徒にも、新規対局の発生を
+      // reliable な合図で知らせる。生徒側はこれを受けてDB一覧を読み直す。
+      void classroomRef.current?.broadcast({
+        type: 'GAME_CREATED',
+        payload: { game: liveRowToSession(createdGame) },
+      });
+    }
     // 別ウィンドウは作成前に開くため、初回fetchとRealtime購読の間にINSERTを取り逃すことがある。
     // 作成完了後のIDをURLで直接渡して読み直し、初手のUPDATEを待たず空盤を表示する。
     if (createdGame && teacherGameWindow && selectedClassroomId) {
@@ -1422,9 +1495,11 @@ function App() {
     if (role === 'TEACHER' && currentGame?.status === 'finished' && isTimeoutResult(currentGame.result)) return;
     if (currentGame && (currentGame.status === 'finished' || currentGame.status === 'interrupted')) {
       // 終局の読み上げ（投了「〇の中押し勝ちです」）を聞き終える余裕を持たせてから閉じる
+      // 中断には読み上げが無いので即座にロビーへ戻し、次の新規対局を妨げない。
+      const delay = currentGame.status === 'interrupted' ? 0 : 5000;
       const timer = setTimeout(() => {
         handleBackToLobby();
-      }, 5000);
+      }, delay);
       return () => clearTimeout(timer);
     }
   }, [activeGameId, games, handleBackToLobby, role]);
@@ -1467,28 +1542,41 @@ function App() {
   }, [role, games, userName]);
 
   // 音声制御（先生用）
+  const commitTeacherAudioPermissions = (next: AudioPermissions) => {
+    audioPermissionsRef.current = next;
+    setAudioPermissions(next);
+    if (selectedClassroomId) saveTeacherAudioPermissions(selectedClassroomId, next);
+  };
+
   const handleToggleHear = (identity: string) => {
-    setAudioPermissions(prev => {
-      const current = prev[identity] || { canHear: true, micAllowed: true, cameraAllowed: true };
-      const updated = { ...prev, [identity]: { ...current, canHear: !current.canHear } };
-      classroomRef.current?.sendTo(
-        { type: 'AUDIO_CONTROL', payload: { canHear: !current.canHear } },
-        [identity]
-      );
-      return updated;
+    const current = audioPermissionFor(audioPermissionsRef.current, identity);
+    const permission = { ...current, canHear: !current.canHear };
+    commitTeacherAudioPermissions({
+      ...audioPermissionsRef.current,
+      [identity]: permission,
     });
+    const room = classroomRef.current;
+    void room?.sendTo(
+      { type: 'AUDIO_CONTROL', payload: { canHear: permission.canHear } },
+      [identity],
+    );
   };
 
   const handleToggleStudentMic = (identity: string) => {
-    setAudioPermissions(prev => {
-      const current = prev[identity] || { canHear: true, micAllowed: true, cameraAllowed: true };
-      const updated = { ...prev, [identity]: { ...current, micAllowed: !current.micAllowed } };
-      classroomRef.current?.sendTo(
-        { type: 'MEDIA_CONTROL', payload: { micAllowed: !current.micAllowed, cameraAllowed: current.cameraAllowed } },
-        [identity]
-      );
-      return updated;
+    const current = audioPermissionFor(audioPermissionsRef.current, identity);
+    const permission = { ...current, micAllowed: !current.micAllowed };
+    commitTeacherAudioPermissions({
+      ...audioPermissionsRef.current,
+      [identity]: permission,
     });
+    const room = classroomRef.current;
+    void room?.sendTo(
+      {
+        type: 'MEDIA_CONTROL',
+        payload: { micAllowed: permission.micAllowed, cameraAllowed: permission.cameraAllowed },
+      },
+      [identity],
+    );
   };
 
   const handleClearAudioM = () => {
@@ -1497,12 +1585,12 @@ function App() {
     const studentIdentities = room.remoteIdentities;
     if (studentIdentities.length === 0) return;
 
-    // Mをクリア = 参加中の全生徒のマイクをOFF。
-    setAudioPermissions(prev => setStudentAudioPermission(prev, studentIdentities, { micAllowed: false }));
+    // マイク = 先生の声を生徒へ届ける経路。全員への受信をOFFにする。
+    const next = setStudentAudioPermission(audioPermissionsRef.current, studentIdentities, { canHear: false });
+    commitTeacherAudioPermissions(next);
     studentIdentities.forEach(identity => {
-      const current = audioPermissionFor(audioPermissions, identity);
       void room.sendTo(
-        { type: 'MEDIA_CONTROL', payload: { micAllowed: false, cameraAllowed: current.cameraAllowed } },
+        { type: 'AUDIO_CONTROL', payload: { canHear: false } },
         [identity],
       );
     });
@@ -1514,11 +1602,15 @@ function App() {
     const studentIdentities = room.remoteIdentities;
     if (studentIdentities.length === 0) return;
 
-    // Sをクリア = 参加中の全生徒で、講師音声の受信をOFF。
-    setAudioPermissions(prev => setStudentAudioPermission(prev, studentIdentities, { canHear: false }));
+    // スピーカー = 先生が生徒の声を聞く経路。全員のマイクをOFFにする。
+    const next = setStudentAudioPermission(audioPermissionsRef.current, studentIdentities, { micAllowed: false });
+    commitTeacherAudioPermissions(next);
     studentIdentities.forEach(identity => {
       void room.sendTo(
-        { type: 'AUDIO_CONTROL', payload: { canHear: false } },
+        {
+          type: 'MEDIA_CONTROL',
+          payload: { micAllowed: false, cameraAllowed: next[identity].cameraAllowed },
+        },
         [identity],
       );
     });
@@ -1787,26 +1879,6 @@ function App() {
 
   // --- メイン教室ビュー ---
   const isConnected = connectionState === ConnectionState.Connected;
-
-  // 生徒が対局中なら自動的にゲーム画面に遷移
-  const myIdentityForGame = classroomRef.current?.localIdentity || userName;
-  const myGame = role === 'STUDENT'
-    ? games.find(
-        (g) =>
-          (g.status === 'playing' || g.status === 'scoring') &&
-          (identityMatchesPlayer(myIdentityForGame, g.blackPlayer) || identityMatchesPlayer(myIdentityForGame, g.whitePlayer)),
-      )
-    : null;
-  const myPlayingGame = myGame?.status === 'playing' ? myGame : null;
-
-  if (myPlayingGame && autoOpenedGameId !== myPlayingGame.id) {
-    setAutoOpenedGameId(myPlayingGame.id);
-    setSyncedDrawings([]);
-    setActiveGameId(myPlayingGame.id);
-    setViewMode('game');
-  } else if (!myPlayingGame && autoOpenedGameId !== null) {
-    setAutoOpenedGameId(null);
-  }
 
   // 生徒の自動ビュー判定
   const effectiveViewMode = resolveEffectiveViewMode(role, viewMode, !!syncedNode);

@@ -25,8 +25,8 @@ describe('TeacherToolbar 一括操作', () => {
     const onClearSharing = vi.fn();
     renderToolbar({ hasConnectedStudents: true, onClearAudioM, onClearAudioS, onClearSharing });
 
-    fireEvent.click(screen.getByRole('button', { name: '音声Mをクリア' }));
-    fireEvent.click(screen.getByRole('button', { name: '音声Sをクリア' }));
+    fireEvent.click(screen.getByRole('button', { name: '全員へのマイクを切る' }));
+    fireEvent.click(screen.getByRole('button', { name: '全員の声を切る' }));
     fireEvent.click(screen.getByRole('button', { name: '共有を全員に' }));
 
     expect(onClearAudioM).toHaveBeenCalledOnce();
@@ -37,8 +37,8 @@ describe('TeacherToolbar 一括操作', () => {
   it('参加生徒がいないと3ボタンを無効にする', () => {
     renderToolbar();
 
-    expect(screen.getByRole('button', { name: '音声Mをクリア' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: '音声Sをクリア' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '全員へのマイクを切る' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '全員の声を切る' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '共有を全員に' })).toBeDisabled();
   });
 });

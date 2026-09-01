@@ -38,18 +38,18 @@ export default function MediaControlPanel({
                 className={`p-1.5 rounded transition-all ${
                   perms.canHear ? 'text-ink hover:bg-ink/8' : 'text-alert-text hover:bg-alert/15'
                 }`}
-                title={perms.canHear ? '音声配信中' : '音声停止中'}
+                title={perms.canHear ? 'こちらのマイク音声が届いています' : 'こちらのマイク音声が届いていません'}
               >
-                {perms.canHear ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                {perms.canHear ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
               </button>
               <button
                 onClick={() => onToggleMic(p.identity)}
                 className={`p-1.5 rounded transition-all ${
                   perms.micAllowed ? 'text-ink hover:bg-ink/8' : 'text-alert-text hover:bg-alert/15'
                 }`}
-                title={perms.micAllowed ? 'マイク許可中' : 'マイク禁止中'}
+                title={perms.micAllowed ? 'この生徒の声が聞こえます' : 'この生徒の声が聞こえません'}
               >
-                {perms.micAllowed ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+                {perms.micAllowed ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
               </button>
             </div>
           </div>

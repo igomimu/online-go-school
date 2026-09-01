@@ -186,7 +186,7 @@ describe('棋譜履歴からの再開', () => {
 
     expect(screen.queryByText('中断中')).not.toBeInTheDocument();
     expect(screen.queryByText('再開')).not.toBeInTheDocument();
-    expect(screen.getByText('検討を開始する')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '検討' })).toBeInTheDocument();
   });
 
   it('時間切れで終わった棋譜は再開できる（回線トラブル救済）', async () => {
