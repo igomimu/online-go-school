@@ -21,6 +21,7 @@ import { DEFAULT_RANK_DISPLAY } from './types/classroom';
 import { fetchToken, TeacherAbsentError } from './utils/livekitToken';
 import { getDisplayName, getTeacherDisplayName, identityMatchesPlayer, makeStudentIdentity, TEACHER_IDENTITY } from './utils/identityUtils';
 import { readStudentCodeFromParams } from './utils/studentLoginLink';
+import { runSingleFlight } from './utils/singleFlight';
 import { ConnectionState } from './utils/classroomRtc';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession, interruptAllGames, interruptGame, resumeLiveGame } from './utils/liveGameApi';
@@ -372,6 +373,8 @@ function App() {
     ?? DEFAULT_RANK_DISPLAY;
 
   const classroomRef = useRef<ClassroomRtc | null>(null);
+  // 自動入室・先生待ちの再試行・手動ボタンが重なっても接続を1本だけ開始する。
+  const connectionAttemptRef = useRef<Promise<void> | null>(null);
   // 教室への出入り。対局や検討へ移っても消えないよう、教室ホームではなくここで控える
   const { log: participantLog, record: recordParticipantEvent } = useParticipantLog();
 
@@ -489,7 +492,7 @@ function App() {
   }, [connectionState, updateAudioDebug]);
 
   // LiveKit接続
-  const connectLiveKit = useCallback(async (connectRole: Role, connectUserName: string, overrideRoomName?: string, overrideClassroomId?: string) => {
+  const runConnectLiveKit = useCallback(async (connectRole: Role, connectUserName: string, overrideRoomName?: string, overrideClassroomId?: string) => {
     const effectiveRoomName = overrideRoomName || roomName;
     const effectiveClassroomId = overrideClassroomId ?? selectedClassroomId ?? '';
     if (connectRole === 'TEACHER') {
@@ -831,6 +834,16 @@ function App() {
     // かえって接続処理が張り直される。rawStudentCode は studentId と同時に更新される。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName, livekitUrl, studentId, studentClassroomId, selectedClassroomId, userName, rememberMediaIntent, restoreMediaIntent, liveGameList.refresh]);
+
+  const connectLiveKit = useCallback((
+    connectRole: Role,
+    connectUserName: string,
+    overrideRoomName?: string,
+    overrideClassroomId?: string,
+  ) => runSingleFlight(
+    connectionAttemptRef,
+    () => runConnectLiveKit(connectRole, connectUserName, overrideRoomName, overrideClassroomId),
+  ), [runConnectLiveKit]);
 
   // URL params for student auto-join
   useEffect(() => {

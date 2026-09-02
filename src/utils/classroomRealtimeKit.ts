@@ -1,5 +1,6 @@
 import RealtimeKitClient from '@cloudflare/realtimekit';
 import { getSavedDeviceId } from './mediaDevices';
+import { selectDuplicateStudentPeersToKick } from './realtimeParticipantDedup';
 import { ConnectionState, LATEST_ONLY_TYPES, RELIABLE_TYPES } from './classroomRtc';
 import type {
   AudioDebugInfo,
@@ -102,6 +103,10 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     await meeting.join();
     meeting.participants.updateRateLimits(RATE_LIMIT_PER_SEC, RATE_LIMIT_WINDOW_SEC);
 
+    // トークン発行前のkickだけでは、別タブから同時に入った競合を防げない。
+    // 講師が入室時点ですでに見えている同一生徒の重複も、最新の1本へ収束させる。
+    this.kickDuplicateStudentConnections();
+
     // 「回線復旧」で作り直しても、選んだマイク・カメラを使い続ける
     await this.applySavedDevices();
 
@@ -171,6 +176,23 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     return p.customParticipantId || p.id;
   }
 
+  /** 講師のhost権限で、同じ生徒identityの古いpeerだけを切断する。 */
+  private kickDuplicateStudentConnections(preferredPeer?: RemotePeer): void {
+    if (this.localIdentity.replace(/^sid:/, '') !== 'teacher') return;
+    const duplicates = selectDuplicateStudentPeersToKick(
+      this.remotePeers(),
+      preferredPeer?.id,
+    );
+    duplicates.forEach((peer) => {
+      void peer.kick().catch((err: unknown) => {
+        console.warn(
+          '[realtimekit] 重複した生徒接続を切れませんでした:',
+          err instanceof Error ? err.message : err,
+        );
+      });
+    });
+  }
+
   private setupEventListeners(meeting: Meeting) {
     meeting.participants.on('broadcastedMessage', ({ type, payload }) => {
       // 🔴 自分の送信も返ってくる。返事を返す種類のメッセージが無限に往復するので捨てる
@@ -186,6 +208,8 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     });
 
     meeting.participants.joined.on('participantJoined', (p) => {
+      // 同じ生徒が別タブ・再試行で重なったら、新しく入った接続だけを残す。
+      this.kickDuplicateStudentConnections(p);
       this.handlers.onParticipantJoined?.(this.identityOf(p), p.name);
       this.attachRemoteTracks(p);
       this.watchPeerMedia(p);
@@ -194,8 +218,17 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
 
     meeting.participants.joined.on('participantLeft', (p) => {
       const identity = this.identityOf(p);
-      this.detachRemote(identity);
-      this.handlers.onParticipantLeft?.(identity, p.name);
+      const replacement = this.remotePeers().find(
+        peer => peer.id !== p.id && this.identityOf(peer) === identity,
+      );
+      if (replacement) {
+        // 重複していた古い接続だけが退出した。残った新しい接続の映像・音声を維持し、
+        // 生徒本人の「退出」通知は出さない。
+        this.attachRemoteTracks(replacement);
+      } else {
+        this.detachRemote(identity);
+        this.handlers.onParticipantLeft?.(identity, p.name);
+      }
       this.notifyParticipantsChanged();
     });
 
