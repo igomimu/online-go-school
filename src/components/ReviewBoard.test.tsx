@@ -149,6 +149,35 @@ describe('ReviewBoard', () => {
     expect(screen.getByText('たろう')).toBeInTheDocument();
   });
 
+  it('同じ生徒IDの接続情報が重複しても参加者は1人だけ表示する', () => {
+    const { root } = makeTree();
+    const participants = [
+      { identity: 'teacher', name: '三村九段', isSpeaking: false, audioEnabled: true, videoEnabled: false },
+      { identity: 'sid:1001', name: '影山 陽翔', isSpeaking: false, audioEnabled: true, videoEnabled: false },
+      { identity: 'sid:1001', name: '影山 陽翔', isSpeaking: false, audioEnabled: true, videoEnabled: false },
+      { identity: 'sid:1002', name: '清水 菜奈子', isSpeaking: false, audioEnabled: true, videoEnabled: false },
+    ];
+
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+        participants={participants}
+        localIdentity="teacher"
+        targetStudents={null}
+        onSetTargetStudents={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByText('影山 陽翔')).toHaveLength(1);
+    expect(screen.getByText('清水 菜奈子')).toBeInTheDocument();
+    expect(screen.getAllByTestId('review-share-sid:1001')).toHaveLength(1);
+  });
+
   it('PCレイアウトは碁盤と情報パネルを半分ずつ表示する', () => {
     const { root } = makeTree();
     render(
