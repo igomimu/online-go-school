@@ -699,7 +699,16 @@ export default function ReviewBoard({
   // 生徒選択
   const studentParticipants = useMemo(() => {
     if (!participants || !localIdentity) return [];
-    return participants.filter(p => p.identity !== localIdentity);
+    // RealtimeKit の接続切替時には、同じ customParticipantId の古い接続と
+    // 新しい接続が一時的に同居することがある。通信自体は両方へ届ける必要が
+    // あるため接続層では潰さず、この「人」を並べる一覧だけ identity で一意化する。
+    const uniqueStudents = new Map<string, ParticipantInfo>();
+    participants.forEach((participant) => {
+      if (participant.identity !== localIdentity) {
+        uniqueStudents.set(participant.identity, participant);
+      }
+    });
+    return Array.from(uniqueStudents.values());
   }, [participants, localIdentity]);
 
   // 参加者の選び方は教室ホームの「共有」列と同じ規則（utils/sharingTargets）
