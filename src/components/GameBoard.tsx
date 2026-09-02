@@ -511,8 +511,13 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               onClick={() => {
                 const role = isTeacher ? 'TEACHER' : 'STUDENT';
                 const url = `${window.location.origin}${window.location.pathname}?mode=game&gameId=${gameId}&identity=${encodeURIComponent(myIdentity)}&role=${role}`;
-                window.open(url, '_blank', 'width=700,height=800,menubar=no,toolbar=no,location=no,status=no');
+                const popup = window.open(url, '_blank', 'width=700,height=800,menubar=no,toolbar=no,location=no,status=no');
+                // 同じ対局盤を2枚購読したままだと着手音が二重に鳴る。
+                // 新しい窓が実際に開いたときだけ、元画面は通常のホームへ戻す。
+                // ポップアップを塞がれた場合は、対局盤まで消してしまわない。
+                if (popup) onBack?.();
               }}
+              data-testid="open-game-window"
               className="text-xs bg-raised hover:bg-line text-ink font-bold border border-line rounded px-3 py-1 transition-colors duration-150"
             >
               別ウィンドウ ↗

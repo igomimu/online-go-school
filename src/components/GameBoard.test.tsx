@@ -635,4 +635,44 @@ describe('GameBoard', () => {
       expect(screen.queryByTestId('spectating-badge')).not.toBeInTheDocument();
     });
   });
+
+  describe('別ウィンドウ', () => {
+    beforeEach(() => {
+      window.matchMedia = ((q: string) => ({
+        matches: false,
+        media: q,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })) as unknown as typeof window.matchMedia;
+    });
+
+    it('別ウィンドウが開いたら元画面をホームへ戻す', () => {
+      setupMock({});
+      const onBack = vi.fn();
+      const openSpy = vi.spyOn(window, 'open').mockReturnValue({} as Window);
+
+      render(<GameBoard gameId="game-1" myIdentity="たろう" onBack={onBack} />);
+      fireEvent.click(screen.getByTestId('open-game-window'));
+
+      expect(window.open).toHaveBeenCalledWith(
+        expect.stringContaining('mode=game&gameId=game-1'),
+        '_blank',
+        expect.any(String),
+      );
+      expect(onBack).toHaveBeenCalledTimes(1);
+      openSpy.mockRestore();
+    });
+
+    it('ポップアップがブロックされたら元画面を維持する', () => {
+      setupMock({});
+      const onBack = vi.fn();
+      const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+
+      render(<GameBoard gameId="game-1" myIdentity="たろう" onBack={onBack} />);
+      fireEvent.click(screen.getByTestId('open-game-window'));
+
+      expect(onBack).not.toHaveBeenCalled();
+      openSpy.mockRestore();
+    });
+  });
 });
