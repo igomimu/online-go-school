@@ -787,4 +787,60 @@ describe('ホイールの手順送り', () => {
       expect(drawUpdates).toHaveLength(0);
     });
   });
+
+  // 2026-09-06 三村さん「共有検討画面に、棋譜を開くボタンを」
+  describe('棋譜を開く', () => {
+    const openProps = {
+      onOpenSgfText: vi.fn(),
+      onOpenSavedGame: vi.fn(),
+      onOpenProblem: vi.fn(),
+    };
+
+    it('講師には「開く」が出て、押すと窓が出る', () => {
+      const { root } = makeTree();
+      render(
+        <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
+          onSetCurrentNode={vi.fn()} isTeacher={true} classroomRef={mockClassroomRef as never}
+          registeredStudents={[]} {...openProps} />
+      );
+      fireEvent.click(screen.getByTestId('open-record-button'));
+      const dialog = screen.getByTestId('review-open-dialog');
+      expect(dialog).toBeInTheDocument();
+      // 3つの入口がそろっている（生徒の対局・SGF・詰碁）
+      expect(screen.getByTestId('review-open-student')).toBeInTheDocument();
+      expect(screen.getByTestId('review-open-sgf')).toBeInTheDocument();
+      expect(screen.getByTestId('review-open-tsumego')).toBeInTheDocument();
+    });
+
+    it('自分の棋譜を並べている生徒には出さない', () => {
+      const { root } = makeTree();
+      render(
+        <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
+          onSetCurrentNode={vi.fn()} isTeacher={false} selfReview classroomRef={mockClassroomRef as never}
+          registeredStudents={[]} {...openProps} />
+      );
+      expect(screen.queryByTestId('open-record-button')).not.toBeInTheDocument();
+    });
+
+    it('開く手立てが渡されていなければボタンを出さない', () => {
+      const { root } = makeTree();
+      render(
+        <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
+          onSetCurrentNode={vi.fn()} isTeacher={true} classroomRef={mockClassroomRef as never} />
+      );
+      expect(screen.queryByTestId('open-record-button')).not.toBeInTheDocument();
+    });
+
+    it('窓は閉じられる', () => {
+      const { root } = makeTree();
+      render(
+        <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
+          onSetCurrentNode={vi.fn()} isTeacher={true} classroomRef={mockClassroomRef as never}
+          registeredStudents={[]} {...openProps} />
+      );
+      fireEvent.click(screen.getByTestId('open-record-button'));
+      fireEvent.click(screen.getByLabelText('閉じる'));
+      expect(screen.queryByTestId('review-open-dialog')).not.toBeInTheDocument();
+    });
+  });
 });

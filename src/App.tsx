@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { Drawing, NumberMode } from './components/GoBoard';
 import type { GameNode } from './utils/treeUtilsV2';
 import { convertSgfToGameTree, withBranchNumbers } from './utils/treeUtilsV2';
-import { parseSGFTree } from './utils/sgfUtils';
+import { generateSGFTree, parseSGFTree } from './utils/sgfUtils';
 import { playReviewMove } from './utils/reviewMove';
 import {
   getSharingTargetChanges,
@@ -1274,6 +1274,42 @@ function App() {
     classroomRef.current?.broadcast({ type: 'REVIEW_END', payload: {} });
   };
 
+  /**
+   * SGF の中身から検討を開く。ロビーの「SGF読込」も、検討盤の「開く」も同じ道を通る。
+   * 参加者に選ばれている生徒にだけ知らせる。
+   * ここを broadcast にしていたため、講師が参加者を選んでも全員の画面が
+   * 検討に切り替わっていた（対局中の生徒は対局から引き剥がされる 2026-08-05）。
+   */
+  const openReviewFromSgf = useCallback((content: string) => {
+    const parsed = parseSGFTree(content);
+    const root = convertSgfToGameTree(parsed.root, null, parsed.size, 1, parsed.board);
+    setReviewRootNode(root);
+    setReviewCurrentNode(root);
+    setReviewBoardSize(parsed.size);
+    setReviewKomi(reviewKomiFromSgf(parsed.metadata?.komi));
+    reviewSourceSgfRef.current = content;
+    // 検討を開き直したら着手の許可は持ち越さない
+    setReviewMovePermissions([]);
+    setReviewBranchStartId(null);
+    setReviewIsOwn(false); // 先生が読み込んで配信する検討
+    setViewMode('review');
+
+    void classroomRef.current?.sendToOrAll({
+      type: 'REVIEW_START',
+      payload: { sgf: content, boardSize: parsed.size },
+    }, reviewTargetStudentsRef.current);
+  }, []);
+
+  /**
+   * 詰碁を検討盤で開く（2026-09-06 三村さん）。
+   * 盤に並べ直すのではなく SGF に書き出してから共通経路へ流す。
+   * こうすると生徒への配信（REVIEW_START）も普段どおりに乗る。
+   */
+  const openReviewFromProblem = useCallback((problem: import('./types/problem').Problem) => {
+    const root = convertSgfToGameTree(problem.sgfTree, null, problem.boardSize, 1, problem.initialBoard);
+    openReviewFromSgf(generateSGFTree(root, problem.boardSize));
+  }, [openReviewFromSgf]);
+
   // SGF読込（ロビーから）
   const handleSgfLoadFromLobby = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1281,31 +1317,11 @@ function App() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const content = e.target?.result as string;
-      if (!content) return;
-      const parsed = parseSGFTree(content);
-      const root = convertSgfToGameTree(parsed.root, null, parsed.size, 1, parsed.board);
-      setReviewRootNode(root);
-      setReviewCurrentNode(root);
-      setReviewBoardSize(parsed.size);
-      setReviewKomi(reviewKomiFromSgf(parsed.metadata?.komi));
-      reviewSourceSgfRef.current = content;
-      // 検討を開き直したら着手の許可は持ち越さない
-      setReviewMovePermissions([]);
-      setReviewBranchStartId(null);
-      setReviewIsOwn(false); // 先生がSGFを読み込んで配信する検討
-      setViewMode('review');
-
-      // 参加者に選ばれている生徒にだけ知らせる。
-      // ここを broadcast にしていたため、講師が参加者を選んでも全員の画面が
-      // 検討に切り替わっていた（対局中の生徒は対局から引き剥がされる 2026-08-05）。
-      void classroomRef.current?.sendToOrAll({
-        type: 'REVIEW_START',
-        payload: { sgf: content, boardSize: parsed.size },
-      }, reviewTargetStudentsRef.current);
+      if (content) openReviewFromSgf(content);
     };
     reader.readAsText(file);
     event.target.value = '';
-  }, []);
+  }, [openReviewFromSgf]);
 
   // 保存された棋譜を検討モードで開く
   const handleSelectSavedGame = useCallback((game: SavedGame) => {
@@ -2085,6 +2101,9 @@ function App() {
                 chatMessages={chat.messages}
                 onChatSend={chat.sendMessage}
                 syncedAiAnalysis={syncedAiAnalysis}
+                onOpenSgfText={role === 'TEACHER' ? openReviewFromSgf : undefined}
+                onOpenSavedGame={role === 'TEACHER' ? handleSelectSavedGame : undefined}
+                onOpenProblem={role === 'TEACHER' ? openReviewFromProblem : undefined}
               />
             </ErrorBoundary>
           );

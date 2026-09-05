@@ -8,6 +8,9 @@ import { copyBoardToClipboard, copySgfToClipboard, downloadBoardAsPNG, downloadS
 import { playReviewMove } from '../utils/reviewMove';
 import { isSharingTarget, toggleSharingTarget, type SharingTargets } from '../utils/sharingTargets';
 import { findNearestDrawingIndex, roundPoint, shouldAppendPoint } from '../utils/drawingUtils';
+import ReviewOpenDialog from './ReviewOpenDialog';
+import type { SavedGame } from '../types/game';
+import type { Problem } from '../types/problem';
 import type { ParticipantInfo, ClassroomRtc, ClassroomMessage } from '../utils/classroomRtc';
 import { useThrottledCursor } from '../hooks/useThrottledCursor';
 
@@ -23,7 +26,7 @@ import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';
 import { fromGtpCoord } from '../utils/katagoClient';
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2, Eye, EyeOff, Menu } from 'lucide-react';
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2, Eye, EyeOff, Menu, FolderOpen } from 'lucide-react';
 import { getDisplayName } from '../utils/identityUtils';
 import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
 import { useAiAnalysis, toBlackWinrate } from '../hooks/useAiAnalysis';
@@ -60,6 +63,14 @@ interface ReviewBoardProps {
    * AI は付けない（三村さんの指示 2026-08-13）。盤は誰にも配信しない。
    */
   selfReview?: boolean;
+  /**
+   * 検討の途中で別の棋譜へ移るための口（2026-09-06 三村さん）。
+   * 渡されたときだけヘッダーに「開く」が出る。窓は検討盤の中に描く
+   * （別ウィンドウなので、ホーム側に出すと裏に隠れて見えない）。
+   */
+  onOpenSgfText?: (sgf: string) => void;
+  onOpenSavedGame?: (game: SavedGame) => void;
+  onOpenProblem?: (problem: Problem) => void;
 
   /** 石の手番号の見せ方。先生が切り替え、生徒の盤にも同じ値が配られる */
   numberMode?: NumberMode;
@@ -137,6 +148,9 @@ export default function ReviewBoard({
   canPlay,
   onStudentMove,
   selfReview = false,
+  onOpenSgfText,
+  onOpenSavedGame,
+  onOpenProblem,
   numberMode = 'off',
   onNumberModeChange,
   branchStartId = null,
@@ -161,6 +175,7 @@ export default function ReviewBoard({
   // 描いている最中の軌跡。確定するまで drawings には入れない
   const freePointsRef = useRef<{ x: number; y: number }[]>([]);
   const [freePoints, setFreePoints] = useState<{ x: number; y: number }[]>([]);
+  const [showOpenDialog, setShowOpenDialog] = useState(false);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const drawLastCell = useRef<{ x: number; y: number } | null>(null);
   const [showCandidates, setShowCandidates] = useState(true);
@@ -816,6 +831,18 @@ export default function ReviewBoard({
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            {/* 棋譜を開く。検討の途中でも別の棋譜へ移れるようにする（2026-09-06 三村さん） */}
+            {isTeacher && (onOpenSgfText || onOpenSavedGame || onOpenProblem) && (
+              <button
+                data-testid="open-record-button"
+                onClick={() => setShowOpenDialog(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-raised hover:bg-line border border-line text-ink rounded-lg text-xs font-semibold transition-all"
+                title="棋譜を開く（生徒の対局・SGF・詰碁）"
+              >
+                <FolderOpen className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">開く</span>
+              </button>
+            )}
             {/* 書き出しメニュー。中身と操作は Pocket KataGo と同じ */}
             <div className="relative">
               <button
@@ -1339,6 +1366,15 @@ export default function ReviewBoard({
             )}
           </div>
         </aside>
+      )}
+      {showOpenDialog && (
+        <ReviewOpenDialog
+          students={registeredStudents ?? []}
+          onOpenSgfText={(sgf) => onOpenSgfText?.(sgf)}
+          onOpenSavedGame={(game) => onOpenSavedGame?.(game)}
+          onOpenProblem={(problem) => onOpenProblem?.(problem)}
+          onClose={() => setShowOpenDialog(false)}
+        />
       )}
     </div>
   );
