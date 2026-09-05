@@ -522,6 +522,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                         fill="none"
                         stroke="#e53e3e" strokeWidth={DRAW_STROKE_WIDTH}
                         strokeLinecap="round" strokeLinejoin="round"
+                        markerEnd="url(#arrowhead-curve)"
                         className="pointer-events-none"
                         opacity={0.85}
                     />
@@ -660,6 +661,12 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             <defs>
                 <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
                     <polygon points="0 0, 10 3.5, 0 7" fill="#e53e3e" />
+                </marker>
+                {/* 曲線の先に付ける矢じり。markerUnits 既定は線の太さに比例するため、
+                    太い曲線(8)だと頭だけ巨大になる。実寸指定にして盤のマス目に合わせる。 */}
+                <marker id="arrowhead-curve" markerUnits="userSpaceOnUse"
+                    markerWidth="24" markerHeight="18" refX="21" refY="9" orient="auto">
+                    <polygon points="0 0, 24 9, 0 18" fill="#e53e3e" />
                 </marker>
                 <radialGradient id="stoneBlack" cx="35%" cy="30%" r="75%">
                     <stop offset="0%" stopColor="#5a5a5a" />
