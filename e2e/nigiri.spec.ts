@@ -47,10 +47,11 @@ test.describe('ニギリ（黒白決め）', () => {
     await teacherPage.getByRole('button', { name: '対局作成', exact: true }).click();
     await expect(teacherPage.getByTestId('nigiri-button')).toBeVisible({ timeout: 10_000 });
 
-    // 置石を選ぶとニギリは消える（互先のときだけの手続き）
-    await teacherPage.getByTestId('handicap-3').click();
+    // 置石を選ぶとニギリは消える（互先のときだけの手続き）。
+    // 置き石は a107af9 の再設計でボタン群からセレクトになった（互先＝0）。
+    await teacherPage.getByTestId('handicap-select').selectOption('3');
     await expect(teacherPage.getByTestId('nigiri-button')).toHaveCount(0);
-    await teacherPage.getByTestId('handicap-even').click();
+    await teacherPage.getByTestId('handicap-select').selectOption('0');
     await expect(teacherPage.getByTestId('nigiri-button')).toBeVisible();
 
     await teacherPage.getByTestId('nigiri-button').click();
@@ -67,9 +68,12 @@ test.describe('ニギリ（黒白決め）', () => {
     const studentIsBlack = studentText.includes('黒番');
     expect(teacherResult.includes(TEST_STUDENT_A.name)).toBe(studentIsBlack);
 
-    // 決まった黒番が対局作成の黒番に入っている
-    const blackValue = await teacherPage.getByTestId('black-player-select').inputValue();
-    expect(blackValue.includes(TEST_STUDENT_A.id)).toBe(studentIsBlack);
+    // 決まった色が対局作成の画面に反映されている。
+    // a107af9「対局作成とNHK杯時計を再設計」(2026-08-23) 以降、黒白それぞれを選ぶ形ではなく
+    // 「自分（先生）の色」を選ぶ形になったので、生徒が黒なら先生は白になっていること。
+    const selfColorGroup = teacherPage.getByRole('radiogroup', { name: '自分の石の色' });
+    const teacherIsWhite = await selfColorGroup.getByRole('radio', { name: '白', exact: true }).isChecked();
+    expect(teacherIsWhite).toBe(studentIsBlack);
 
     // 知らせは自分で消える
     await expect(studentPage.getByTestId('nigiri-announcement')).toHaveCount(0, { timeout: 15_000 });

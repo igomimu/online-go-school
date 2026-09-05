@@ -1,6 +1,7 @@
 import { test, devices, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import { clearLiveGames } from './helpers/setup';
+import { createGame } from './helpers/teacher-actions';
 
 /**
  * みむいご通信に載せる紹介画像を撮るためだけのスペック。合否ではなく写真が目的。
@@ -89,22 +90,14 @@ test('みむいご通信用: デモ教室の対局画面を撮る', async ({ bro
   }
 
   // === 先生: あおい(黒) vs ゆい(白) の19路を作る ===
-  await teacher.getByTestId('create-game-toolbar-button').click();
-  await teacher.getByTestId('create-game-button').waitFor({ timeout: 10_000 });
-  await teacher.getByRole('button', { name: '19路', exact: true }).click();
-
-  const blackSelect = teacher.getByTestId('black-player-select');
-  await expect
-    .poll(async () => (await blackSelect.locator('option').allTextContents()).join('|'), { timeout: 30_000 })
-    .toContain(BLACK.name);
-  const options = await blackSelect.locator('option').allTextContents();
-  await blackSelect.selectOption({ index: options.findIndex(o => o.includes(BLACK.name)) });
-  await teacher.getByTestId('white-player-select').selectOption({
-    index: options.findIndex(o => o.includes(WHITE.name)),
-  });
   // 持ち時間30分。既定(0分・秒読み30秒)だと撮影中に時間切れになる。
-  await teacher.locator('input[type="number"]').nth(1).fill('30');
-  await teacher.getByTestId('create-game-button').click();
+  await createGame(teacher, {
+    blackName: BLACK.name,
+    whiteName: WHITE.name,
+    boardSize: 19,
+    expectedPlayersCount: 3, // 先生＋生徒2人
+    mainMinutes: 30,
+  });
 
   // === 両者の碁盤が出るまで待つ ===
   for (const page of [black, white]) {

@@ -210,10 +210,17 @@ export async function createGame(
     boardSize?: 9 | 13 | 19;
     /** 先生を含む参加人数。候補がそろうまで待つのに使う */
     expectedPlayersCount?: number;
-    mainMinutes?: number; // 未指定ならDEFAULT_TIME_SETTINGS(持ち時間0分・秒読み30秒×1)のまま
+    // 時間設定。未指定の項目は DEFAULT_TIME_SETTINGS（持ち時間0分・秒読み30秒×1）のまま
+    mainMinutes?: number;
+    byoyomiPeriods?: number;
+    /** 秒読みの秒数。選べるのは 10/20/30/40/50/60 */
+    byoyomiSeconds?: 10 | 20 | 30 | 40 | 50 | 60;
   },
 ): Promise<void> {
-  const { blackName, whiteName, boardSize = 9, mainMinutes, expectedPlayersCount } = opts;
+  const {
+    blackName, whiteName, boardSize = 9, expectedPlayersCount,
+    mainMinutes, byoyomiPeriods, byoyomiSeconds,
+  } = opts;
 
   await page.getByTestId('create-game-toolbar-button').click();
   await page.getByTestId('create-game-button').waitFor({ timeout: 5_000 });
@@ -247,23 +254,41 @@ export async function createGame(
     await expect(opponent.locator('option')).not.toHaveCount(0, { timeout: 10_000 });
   }
 
-  // 相手側に居るほうが相手。自分はその反対の色になる
-  const opponentIsBlack = hasBlack && !(hasBlack && hasWhite);
-  const opponentName = opponentIsBlack ? blackName : whiteName;
+  // 🔴 どちらが「自分」になるかは画面が決める。生徒同士対局に切り替えると、
+  // それまで相手だった生徒が「自分」に繰り上がり、相手はもう一方に移る
+  // （GameCreationDialog.handleStudentVsStudentChange）。ここで
+  // 「自分＝黒・相手＝白」と決め打つと、順序が逆のときに相手が候補から消えて
+  // 「相手の候補に見つからない」で落ちる（2026-09-05）。候補に残っているほうを相手とする。
+  const finalOptions = await opponent.locator('option').allTextContents();
+  const blackIdx = finalOptions.findIndex((o) => o.includes(blackName));
+  const whiteIdx = finalOptions.findIndex((o) => o.includes(whiteName));
+  if (blackIdx < 0 && whiteIdx < 0) {
+    throw new Error(
+      `相手の候補に "${blackName}" も "${whiteName}" も見つからない: ${JSON.stringify(finalOptions)}`,
+    );
+  }
+  // 相手が黒なら自分は白、相手が白なら自分は黒
+  const opponentIsBlack = blackIdx >= 0;
   const selfColor: 'BLACK' | 'WHITE' = opponentIsBlack ? 'WHITE' : 'BLACK';
 
   await page.getByRole('radio', { name: selfColor === 'BLACK' ? '黒' : '白' }).check();
+  await opponent.selectOption({ index: opponentIsBlack ? blackIdx : whiteIdx });
 
-  const finalOptions = await opponent.locator('option').allTextContents();
-  const idx = finalOptions.findIndex((o) => o.includes(opponentName));
-  if (idx < 0) {
-    throw new Error(`相手の候補に "${opponentName}" が見つからない: ${JSON.stringify(finalOptions)}`);
-  }
-  await opponent.selectOption({ index: idx });
-
-  if (mainMinutes !== undefined) {
-    await page.getByTestId('time-limit-checkbox').check().catch(() => {});
-    await page.locator('input[type="number"]').first().fill(String(mainMinutes));
+  // 🔴 時間設定は a107af9「対局作成とNHK杯時計を再設計」(2026-08-23) で select になった。
+  // それ以前は number 入力で、ここは `input[type=number]` の先頭を埋めていたが、
+  // 新しい画面でその欄はコミの自由入力しかなく、持ち時間はどこにも入っていなかった。
+  if (mainMinutes !== undefined || byoyomiPeriods !== undefined || byoyomiSeconds !== undefined) {
+    await page.getByTestId('time-limit-checkbox').check();
+    await page.getByTestId('nhk-style-checkbox').uncheck();
+    if (mainMinutes !== undefined) {
+      await page.getByLabel('持ち時間（分）').selectOption(String(mainMinutes));
+    }
+    if (byoyomiPeriods !== undefined) {
+      await page.getByLabel('秒読み回数').selectOption(String(byoyomiPeriods));
+    }
+    if (byoyomiSeconds !== undefined) {
+      await page.getByLabel('秒読み（秒/手）').selectOption(String(byoyomiSeconds));
+    }
   }
 
   // 対局開始

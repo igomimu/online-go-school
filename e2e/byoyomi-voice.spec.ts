@@ -1,7 +1,7 @@
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { TEST_STUDENT_A, TEST_TEACHER_PASSWORD, generateClassroomId } from './helpers/test-data';
 import { clearAllData, setupTeacherPassword, setupClassroomData, teardownSupabaseRoster } from './helpers/setup';
-import { loginAsTeacher, openClassroomAndConnect, waitForStudentJoined, waitForTeacherGameWindow } from './helpers/teacher-actions';
+import { createGame, loginAsTeacher, openClassroomAndConnect, waitForStudentJoined, waitForTeacherGameWindow } from './helpers/teacher-actions';
 import { loginAsStudent, enterAssignedGame, waitForMyTurn, playMove } from './helpers/student-actions';
 
 // 回帰テスト: 秒読み音声の二重読み上げ（2026-07-10修正）。
@@ -62,29 +62,18 @@ test('秒読み音声が二重に読み上げられない（持ち時間0・秒�
     await loginAsStudent(studentAPage, { studentCode: TEST_STUDENT_A.code, classroomId });
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
 
-    // 対局作成: 生徒A(黒) vs 先生(白)、持ち時間0・秒読み10秒×2（テストを短くするため）
-    await teacherPage.getByTestId('create-game-toolbar-button').click();
-    await teacherPage.getByTestId('create-game-button').waitFor({ timeout: 5_000 });
-    await teacherPage.getByRole('button', { name: '9路', exact: true }).click();
-
-    const blackSelect = teacherPage.getByTestId('black-player-select');
-    await expect(blackSelect.locator('option')).toHaveCount(2, { timeout: 20_000 });
-    const options = await blackSelect.locator('option').allTextContents();
-    const blackIdx = options.findIndex(o => o.includes(TEST_STUDENT_A.name));
-    const whiteIdx = options.findIndex(o => o.includes('先生'));
-    await blackSelect.selectOption({ index: blackIdx });
-    await teacherPage.getByTestId('white-player-select').selectOption({ index: whiteIdx });
-
-    // number input はダイアログ内で コミ → 持ち時間（分） → 秒読みの回数 の順
-    const numberInputs = teacherPage.locator('input[type="number"]');
-    await numberInputs.nth(1).fill('0'); // 持ち時間0 → いきなり秒読み
-    await teacherPage.getByRole('button', { name: '10秒', exact: true }).click();
-    await numberInputs.nth(2).fill('2'); // 秒読み2回
-
+    // 対局作成: 生徒A(黒) vs 先生(白)、持ち時間0・秒読み10秒×2（テストを短くするため）。
     // 先生は対局者なので講師専用の別ウィンドウが自動で開く。
     // 時計tickを止めないようウィンドウは閉じずに開いたままにする。
     const teacherGameWindow = await waitForTeacherGameWindow(teacherPage, () =>
-      teacherPage.getByTestId('create-game-button').click(),
+      createGame(teacherPage, {
+        blackName: TEST_STUDENT_A.name,
+        whiteName: '先生',
+        boardSize: 9,
+        mainMinutes: 0, // 持ち時間0 → いきなり秒読み
+        byoyomiSeconds: 10,
+        byoyomiPeriods: 2,
+      }),
     );
 
     // 黒(A)→白(先生)と1手ずつ打つと、以降は黒(A)の時計が動く。
@@ -166,25 +155,16 @@ test('秒読みの回数消費の告知が二重に読み上げられない（�
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
 
     // 対局作成: 生徒A(黒) vs 先生(白)、持ち時間0・秒読み10秒×3
-    await teacherPage.getByTestId('create-game-toolbar-button').click();
-    await teacherPage.getByTestId('create-game-button').waitFor({ timeout: 5_000 });
-    await teacherPage.getByRole('button', { name: '9路', exact: true }).click();
-
-    const blackSelect = teacherPage.getByTestId('black-player-select');
-    await expect(blackSelect.locator('option')).toHaveCount(2, { timeout: 20_000 });
-    const options = await blackSelect.locator('option').allTextContents();
-    const blackIdx = options.findIndex(o => o.includes(TEST_STUDENT_A.name));
-    const whiteIdx = options.findIndex(o => o.includes('先生'));
-    await blackSelect.selectOption({ index: blackIdx });
-    await teacherPage.getByTestId('white-player-select').selectOption({ index: whiteIdx });
-
-    const numberInputs = teacherPage.locator('input[type="number"]');
-    await numberInputs.nth(1).fill('0');
-    await teacherPage.getByRole('button', { name: '10秒', exact: true }).click();
-    await numberInputs.nth(2).fill('3'); // 秒読み3回（残りN回です→最後の考慮時間ですの遷移を踏むため）
-
+    // （残りN回です→最後の考慮時間です、の遷移を踏むため3回にする）
     const teacherGameWindow = await waitForTeacherGameWindow(teacherPage, () =>
-      teacherPage.getByTestId('create-game-button').click(),
+      createGame(teacherPage, {
+        blackName: TEST_STUDENT_A.name,
+        whiteName: '先生',
+        boardSize: 9,
+        mainMinutes: 0,
+        byoyomiSeconds: 10,
+        byoyomiPeriods: 3,
+      }),
     );
 
     await enterAssignedGame(studentAPage);
@@ -246,23 +226,16 @@ test('講師は秒読みを使い切っても時間切れ負けにならない�
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
 
     // 対局作成: 生徒A(黒) vs 先生(白)、持ち時間0・秒読み10秒×1
-    await teacherPage.getByTestId('create-game-toolbar-button').click();
-    await teacherPage.getByTestId('create-game-button').waitFor({ timeout: 5_000 });
-    await teacherPage.getByRole('button', { name: '9路', exact: true }).click();
-
-    const blackSelect = teacherPage.getByTestId('black-player-select');
-    await expect(blackSelect.locator('option')).toHaveCount(2, { timeout: 20_000 });
-    const options = await blackSelect.locator('option').allTextContents();
-    await blackSelect.selectOption({ index: options.findIndex(o => o.includes(TEST_STUDENT_A.name)) });
-    await teacherPage.getByTestId('white-player-select').selectOption({ index: options.findIndex(o => o.includes('先生')) });
-
-    const numberInputs = teacherPage.locator('input[type="number"]');
-    await numberInputs.nth(1).fill('0');
-    await teacherPage.getByRole('button', { name: '10秒', exact: true }).click();
-    await numberInputs.nth(2).fill('1'); // 秒読み1回だけ = 使い切れば本来は切れ負け
-
+    // （秒読み1回だけ = 使い切れば本来は切れ負けになる設定）
     await waitForTeacherGameWindow(teacherPage, () =>
-      teacherPage.getByTestId('create-game-button').click(),
+      createGame(teacherPage, {
+        blackName: TEST_STUDENT_A.name,
+        whiteName: '先生',
+        boardSize: 9,
+        mainMinutes: 0,
+        byoyomiSeconds: 10,
+        byoyomiPeriods: 1,
+      }),
     );
 
     // 黒(A)が1手打つと白(先生)の時計が動き出す。先生は着手しない。
