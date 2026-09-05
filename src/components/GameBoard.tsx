@@ -9,7 +9,6 @@ import { formatTime } from '../hooks/useGameClock';
 import { useLiveGame } from '../hooks/useLiveGame';
 import { useIsTouchDevice } from '../hooks/useIsTouchDevice';
 import { useIsPinchZoomed } from '../hooks/useIsPinchZoomed';
-import { getSupabase } from '../utils/liveGameApi';
 import { resolvePlayerName } from '../utils/identityUtils';
 import type { ClassroomRtc } from '../utils/classroomRtc';
 import { isStoneSoundEnabled, setStoneSoundEnabled, playStoneSound, playCaptureSound, unlockStoneSound, shouldPlayMoveSound } from '../utils/stoneSound';
@@ -527,7 +526,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
         <div className="glass-panel px-4 py-3 text-sm text-alert-text bg-alert/10 border border-alert/25 rounded-xl flex items-center justify-between gap-4">
           <div className="flex-1">
             <span className="font-bold">接続エラーが発生しました:</span> {error}
-            <p className="text-muted text-xs mt-1">※もしリロードしても消えない場合は、右側のリセットボタンをお試しください。大切な教室設定は消えません。</p>
+            <p className="text-muted text-xs mt-1">※もしリロードしても消えない場合は、右側のリセットボタンをお試しください。対局中に押しても、棋譜も教室設定も消えません（読み込み直すだけです）。</p>
           </div>
           <button
             onClick={async (e) => {
@@ -535,13 +534,13 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               btn.disabled = true;
               btn.innerHTML = 'リセット中...';
               
-              // 1. Supabase 強制サインアウト
-              try {
-                const supabase = getSupabase();
-                await supabase.auth.signOut();
-              } catch { /* ベストエフォート: 失敗は無視 */ }
+              // 🔴 ここで supabase.auth.signOut() を呼んでいたため、対局中に押すと
+              // 講師のログインが切れ、盤が画面から消えた（2026-09-05 実授業）。
+              // 棋譜自体は go_school_live_moves に残っていたが、授業中に
+              // 入り直しを強いるのは重い。このボタンの目的は古い配布物を捨てることであって、
+              // 認証を落とすことではないので signOut はしない。
 
-              // 2. Service Worker 強制アンインストール
+              // 1. Service Worker 強制アンインストール
               if ('serviceWorker' in navigator) {
                 try {
                   const regs = await navigator.serviceWorker.getRegistrations();
@@ -551,7 +550,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                 } catch { /* ベストエフォート: 失敗は無視 */ }
               }
 
-              // 3. Cache Storage 強制クリア
+              // 2. Cache Storage 強制クリア
               if ('caches' in window) {
                 try {
                   const keys = await caches.keys();
@@ -561,7 +560,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                 } catch { /* ベストエフォート: 失敗は無視 */ }
               }
 
-              // 4. 強制リロード (サーバーから最新アセットを再取得)
+              // 3. 強制リロード (サーバーから最新アセットを再取得)
               window.location.reload();
             }}
             className="flex items-center gap-1.5 shrink-0 px-3 py-1.5 text-xs bg-alert/15 hover:bg-alert/30 text-alert-text border border-alert/35 rounded-lg transition-colors duration-150 font-bold"

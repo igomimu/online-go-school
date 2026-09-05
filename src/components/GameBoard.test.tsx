@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import GameBoard from './GameBoard';
 import { createEmptyBoard } from '../utils/gameLogic';
 import type { GameSession } from '../types/game';
@@ -10,6 +10,16 @@ import { useLiveGame } from '../hooks/useLiveGame';
 vi.mock('../hooks/useLiveGame', () => {
   return {
     useLiveGame: vi.fn(),
+  };
+});
+
+// 接続リセットが認証に触っていないことを見るため、Supabase の入り口だけ差し替える
+const mockSignOut = vi.fn();
+vi.mock('../utils/liveGameApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/liveGameApi')>();
+  return {
+    ...actual,
+    getSupabase: () => ({ auth: { signOut: mockSignOut } }),
   };
 });
 function createMockGame(overrides: Partial<GameSession> = {}): GameSession {
@@ -633,6 +643,33 @@ describe('GameBoard', () => {
       setupMock({ isParticipant: false, myColor: null, isMyTurn: false });
       render(<GameBoard gameId="game-1" myIdentity="teacher" isTeacher onBack={vi.fn()} />);
       expect(screen.queryByTestId('spectating-badge')).not.toBeInTheDocument();
+    });
+  });
+
+  // 2026-09-05 実授業。対局中にこのボタンを押したら講師のログインが切れ、
+  // 盤が画面から消えた（棋譜はサーバーに残っていた）。捨ててよいのは配布物だけ。
+  describe('接続・キャッシュのリセット', () => {
+    function renderWithError() {
+      setupMock({ error: '接続が切れました' });
+      const reload = vi.fn();
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: { ...window.location, reload },
+      });
+      render(<GameBoard gameId="game-1" myIdentity="teacher" isTeacher onBack={vi.fn()} />);
+      return { reload };
+    }
+
+    it('押してもログアウトしない', async () => {
+      const { reload } = renderWithError();
+      fireEvent.click(screen.getByRole('button', { name: /接続・キャッシュをリセット/ }));
+      await waitFor(() => expect(reload).toHaveBeenCalled());
+      expect(mockSignOut).not.toHaveBeenCalled();
+    });
+
+    it('対局中でも棋譜が消えないと書いてある', () => {
+      renderWithError();
+      expect(screen.getByText(/棋譜も教室設定も消えません/)).toBeInTheDocument();
     });
   });
 });
