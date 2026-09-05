@@ -1357,27 +1357,17 @@ function App() {
   }, [role, viewMode]);
 
   // 対局の再開処理
+  // 🔴 以前は、講師が対局者なら別ウィンドウを開いて focus し、そうでなければ全画面盤へ移していた
+  // （対局作成と同じ動線に揃えたもの）。だが講師は既に対局窓で打っているので、再開を押すたびに
+  // 窓が前へ出てくるだけで邪魔だった（2026-09-05 三村さん）。
+  // 再開は「対局を続けられる状態に戻す」だけの操作にして、講師の画面はどこも動かさない。
   const handleResumeGame = useCallback(async (gameId: string) => {
-    // 先生自身が対局者なら講師専用の別ウィンドウ（対局作成と同じ動線）、それ以外は全画面盤。
-    // ポップアップブロッカー対策のため、await resumeLiveGame() より前・クリックの同期区間内で呼ぶ。
-    const row = liveGameList.games.find(g => g.id === gameId);
-    const me = classroomRef.current?.localIdentity ?? userName;
-    const teacherIsParticipant = role === 'TEACHER' && !!row &&
-      (identityMatchesPlayer(me, row.black_player) || identityMatchesPlayer(me, row.white_player));
-    if (teacherIsParticipant && selectedClassroomId) {
-      openTeacherGameWindow(selectedClassroomId);
-    }
     try {
       await resumeLiveGame(gameId);
-      if (!teacherIsParticipant) {
-        setSyncedDrawings([]);
-        setActiveGameId(gameId);
-        setViewMode('game');
-      }
     } catch (e) {
       alert(`対局の再開に失敗しました: ${e}`);
     }
-  }, [liveGameList.games, role, userName, selectedClassroomId, openTeacherGameWindow]);
+  }, []);
 
   // 時間切れを講師に即時知らせる。
   // 時間切れで勝負を付けたくない＝基本は講師が再開する運用なので（2026-08-05 三村さん）、
