@@ -54,7 +54,7 @@ vi.mock('../../utils/teacherAlertChannel', () => ({
   subscribeTeacherAlerts: () => () => {},
 }));
 
-function game(id: string, status: LiveGameRow['status']): LiveGameRow {
+function game(id: string, status: LiveGameRow['status'], result?: string): LiveGameRow {
   return {
     id,
     classroom_id: 'class-1',
@@ -64,7 +64,7 @@ function game(id: string, status: LiveGameRow['status']): LiveGameRow {
     handicap: 0,
     komi: 6.5,
     status,
-    result: status === 'interrupted' ? '中断' : null,
+    result: result ?? (status === 'interrupted' ? '中断' : null),
     scoring_dead_stones: [],
     clock: null,
     undo_request: null,
@@ -133,5 +133,39 @@ describe('TeacherGameWindow の新規対局表示', () => {
     );
 
     expect(screen.getByTestId('game-board')).toHaveTextContent('new-playing');
+  });
+
+  // 2026-09-05 三村さん「盤は残してほしい」。1面だけ打っていて時間切れになると、
+  // 次の盤が無いのに今の盤を手放し、結果も再開ボタンも消えていた。
+  it('1面だけのときは時間切れになってもその盤を表示したままにする', () => {
+    const playing = game('timeout-game', 'playing');
+    testState.games = [playing];
+    const view = render(
+      <TeacherGameWindow classroomId="class-1" teacherIdentity="teacher" students={[]} />,
+    );
+    expect(screen.getByTestId('game-board')).toHaveTextContent('timeout-game');
+
+    testState.games = [game('timeout-game', 'finished', 'W+T')];
+    view.rerender(
+      <TeacherGameWindow classroomId="class-1" teacherIdentity="teacher" students={[]} />,
+    );
+
+    expect(screen.getByTestId('game-board')).toHaveTextContent('timeout-game');
+    expect(screen.queryByText(/進行中の対局がありません/)).not.toBeInTheDocument();
+  });
+
+  it('他に打っている盤があれば、時間切れの盤からそちらへ移る', () => {
+    testState.games = [game('timeout-game', 'playing')];
+    const view = render(
+      <TeacherGameWindow classroomId="class-1" teacherIdentity="teacher" students={[]} />,
+    );
+    expect(screen.getByTestId('game-board')).toHaveTextContent('timeout-game');
+
+    testState.games = [game('timeout-game', 'finished', 'W+T'), game('other-playing', 'playing')];
+    view.rerender(
+      <TeacherGameWindow classroomId="class-1" teacherIdentity="teacher" students={[]} />,
+    );
+
+    expect(screen.getByTestId('game-board')).toHaveTextContent('other-playing');
   });
 });

@@ -40,20 +40,25 @@ test('時間切れで終わった対局を講師が再開でき、切れた側�
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
 
     // 対局作成: 生徒A(黒) vs 先生(白)、持ち時間0・秒読み10秒×1
+    // 対局作成ダイアログは a107af9「対局作成とNHK杯時計を再設計」(2026-08-23) で
+    // 「自分の色 ＋ 相手を1人選ぶ」形に変わった。黒白それぞれを選ぶ形ではない。
     await teacherPage.getByTestId('create-game-toolbar-button').click();
     await teacherPage.getByTestId('create-game-button').waitFor({ timeout: 5_000 });
-    await teacherPage.getByRole('button', { name: '9路', exact: true }).click();
+    await teacherPage.getByTestId('board-size-select').selectOption('9');
 
-    const blackSelect = teacherPage.getByTestId('black-player-select');
-    await expect(blackSelect.locator('option')).toHaveCount(2, { timeout: 20_000 });
-    const options = await blackSelect.locator('option').allTextContents();
-    await blackSelect.selectOption({ index: options.findIndex(o => o.includes(TEST_STUDENT_A.name)) });
-    await teacherPage.getByTestId('white-player-select').selectOption({ index: options.findIndex(o => o.includes('先生')) });
+    // 先生が白、相手（＝生徒A）が黒
+    await teacherPage.getByRole('radio', { name: '白', exact: true }).check();
+    const opponentSelect = teacherPage.getByTestId('opponent-player-select');
+    await expect(opponentSelect.locator('option')).toHaveCount(1, { timeout: 20_000 });
+    await expect(opponentSelect.locator('option')).toContainText(TEST_STUDENT_A.name);
+    await opponentSelect.selectOption({ index: 0 });
 
-    const numberInputs = teacherPage.locator('input[type="number"]');
-    await numberInputs.nth(1).fill('0');
-    await teacherPage.getByRole('button', { name: '10秒', exact: true }).click();
-    await numberInputs.nth(2).fill('1'); // 秒読み10秒×1
+    // 時間制限は既定でON・NHK杯方式はOFF。持ち時間0分＋10秒×1回の秒読み
+    await expect(teacherPage.getByTestId('time-limit-checkbox')).toBeChecked();
+    await expect(teacherPage.getByTestId('nhk-style-checkbox')).not.toBeChecked();
+    await teacherPage.getByLabel('持ち時間（分）').selectOption('0');
+    await teacherPage.getByLabel('秒読み回数').selectOption('1');
+    await teacherPage.getByLabel('秒読み（秒/手）').selectOption('10');
 
     const teacherGameWindow = await waitForTeacherGameWindow(teacherPage, () =>
       teacherPage.getByTestId('create-game-button').click(),
@@ -84,7 +89,21 @@ test('時間切れで終わった対局を講師が再開でき、切れた側�
     await expect(windowAlert).toBeVisible({ timeout: 15_000 });
     await expect(windowAlert).toContainText(TEST_STUDENT_A.name);
 
-    // 講師がその知らせから対局を再開する
+    // 講師がその知らせから対局を再開する。
+    // 再開は「対局を続けられる状態に戻す」だけの操作で、講師の画面は動かさない。
+    // 以前は別ウィンドウを開いて前面へ出していたが、打っている窓の上に窓が乗るだけだった
+    // （2026-09-05 三村さん「これは不要」）。window.open が呼ばれないことで見張る。
+    await teacherPage.evaluate(() => {
+      const w = window as unknown as { __openCalls?: number };
+      w.__openCalls = 0;
+      const original = window.open.bind(window);
+      window.open = ((...args: Parameters<typeof window.open>) => {
+        w.__openCalls = (w.__openCalls ?? 0) + 1;
+        return original(...args);
+      }) as typeof window.open;
+    });
+    const pagesBeforeResume = teacherPage.context().pages().length;
+
     await timeoutAlert.getByRole('button', { name: '対局を再開する' }).click();
     // 再開したら知らせは両方から消える
     await expect(teacherPage.getByTestId('classroom-alert-timeout')).toHaveCount(0, { timeout: 20_000 });
@@ -96,6 +115,10 @@ test('時間切れで終わった対局を講師が再開でき、切れた側�
     await expect(studentAPage.getByTestId('clock-black')).toContainText('秒読み 残1', { timeout: 30_000 });
     await expect(studentAPage.getByText('あなたの番です')).toBeVisible({ timeout: 15_000 });
     await expect(studentAPage.getByText(/時間切れ/)).toHaveCount(0);
+
+    // 再開で窓は増えず、開き直しも起きない
+    expect(await teacherPage.evaluate(() => (window as unknown as { __openCalls?: number }).__openCalls)).toBe(0);
+    expect(teacherPage.context().pages().length).toBe(pagesBeforeResume);
 
     // 再開後も打てる
     await playMove(studentAPage, 3, 3);

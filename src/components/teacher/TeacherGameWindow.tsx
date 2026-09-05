@@ -138,7 +138,11 @@ export default function TeacherGameWindow({
           const nextId = activeSession.game.status === 'playing'
             ? getNextTeacherTurnGameId(sessions, teacherIdentity)
             : getDefaultActiveGameId(sessions, teacherIdentity);
-          if (nextId !== resolvedActiveId) {
+          // 🔴 移る先が無いときは今の盤を手放さない。1面だけ打っていて時間切れになると
+          // nextId が null になり、結果も再開ボタンも消えて「進行中の対局がありません」
+          // だけが残っていた（2026-09-05 三村さん「盤は残してほしい」）。
+          // 他に打っている盤があるときだけ移る、という元の狙いはそのまま。
+          if (nextId && nextId !== resolvedActiveId) {
             setActiveSimulGameId(nextId);
           }
         }
