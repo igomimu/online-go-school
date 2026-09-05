@@ -372,7 +372,7 @@ export default function TeacherToolbar({
           <IgcButton label="対局ウィンドウ" outline onClick={onOpenTeacherGameWindow} data-testid="open-teacher-game-window-button" />
         )}
         <IgcButton label="自動対局" color="var(--color-raised)" onClick={onAutoPairing} />
-        <IgcButton label="共有検討" color="var(--color-raised)" onClick={onStartLecture} />
+        <IgcButton label="検討" color="var(--color-raised)" onClick={onStartLecture} />
 
         <Divider />
 

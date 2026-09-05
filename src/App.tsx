@@ -74,7 +74,7 @@ import { Settings } from 'lucide-react';
 
 // 講師専用の検討別ウィンドウ。中身は本体からポータルで描く（PopupPortal 参照）。
 const TEACHER_REVIEW_WINDOW_NAME = 'teacher-review-window';
-// 「共有検討」を白紙から始めるときの盤の大きさ（授業モードの既定と同じ）
+// ツールバーの「検討」を白紙から始めるときの盤の大きさ（授業モードの既定と同じ）
 const LECTURE_BOARD_SIZE = 19;
 
 function reviewKomiFromSgf(value: string | undefined, fallback = 6.5): number {
@@ -1354,7 +1354,7 @@ function App() {
     }
   }, [role]);
 
-  // 「共有検討」= 白紙の盤から始める検討。
+  // ツールバーの「検討」（2026-09-06 までは「共有検討」）= 白紙の盤から始める検討。
   // 🔴 以前は授業モード(LectureBoard)を開いていたが、授業モードだけ isBoardFocusMode に
   // 入っておらずヘッダーとビデオが残るため、盤が小さくて使えなかった
   // （2026-09-05 三村さん「碁盤が小さすぎて使えない」「同じ画面にしてほしい」）。
