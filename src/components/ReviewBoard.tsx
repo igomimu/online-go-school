@@ -7,7 +7,7 @@ import { generateSGFTree } from '../utils/sgfUtils';
 import { copyBoardToClipboard, copySgfToClipboard, downloadBoardAsPNG, downloadSgf } from '../utils/boardExport';
 import { playReviewMove } from '../utils/reviewMove';
 import { isSharingTarget, toggleSharingTarget, type SharingTargets } from '../utils/sharingTargets';
-import { findNearestDrawingIndex } from '../utils/drawingUtils';
+import { findNearestDrawingIndex, roundPoint, shouldAppendPoint } from '../utils/drawingUtils';
 import type { ParticipantInfo, ClassroomRtc, ClassroomMessage } from '../utils/classroomRtc';
 import { useThrottledCursor } from '../hooks/useThrottledCursor';
 
@@ -155,7 +155,12 @@ export default function ReviewBoard({
       : false
   ));
   const [drawings, setDrawings] = useState<Drawing[]>([]);
-  const [drawMode, setDrawMode] = useState<'off' | 'line' | 'arrow'>('off');
+  // 直線ボタンは廃止し、手でなぞる曲線に置き換えた（2026-09-05 三村さん）。
+  // 'line' は過去に配信・保存されたデータのために型としては残っている。
+  const [drawMode, setDrawMode] = useState<'off' | 'free' | 'arrow'>('off');
+  // 描いている最中の軌跡。確定するまで drawings には入れない
+  const freePointsRef = useRef<{ x: number; y: number }[]>([]);
+  const [freePoints, setFreePoints] = useState<{ x: number; y: number }[]>([]);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const drawLastCell = useRef<{ x: number; y: number } | null>(null);
   const [showCandidates, setShowCandidates] = useState(true);
@@ -292,15 +297,24 @@ export default function ReviewBoard({
     }, WHEEL_BATCH_MS);
   }, [canEdit, jumpBy]);
 
-  // 右クリックで、クリック位置に最も近い描画(線・矢印)を1つ消す（pokekata踏襲、石は対象外）
+  /**
+   * 生徒へ配る描画。🔴 曲線(free)は講師の手元だけに残すので送らない
+   * （2026-09-05 三村さん「検討時に講師だけに見えればいい」）。
+   * 送る前に必ずここを通す。生の sendToTargets を直接呼ばない。
+   */
+  const broadcastDrawings = useCallback((list: Drawing[]) => {
+    sendToTargets({ type: 'DRAW_UPDATE', payload: list.filter(d => d.type !== 'free') });
+  }, [sendToTargets]);
+
+  // 右クリックで、クリック位置に最も近い描画(線・矢印・曲線)を1つ消す（pokekata踏襲、石は対象外）
   const handleCellRightClick = useCallback((x: number, y: number) => {
     if (!canEdit || drawings.length === 0) return;
     const idx = findNearestDrawingIndex(drawings, x, y);
     if (idx < 0) return;
     const updated = drawings.filter((_, i) => i !== idx);
     setDrawings(updated);
-    sendToTargets({ type: 'DRAW_UPDATE', payload: updated });
-  }, [canEdit, drawings, sendToTargets]);
+    broadcastDrawings(updated);
+  }, [broadcastDrawings, canEdit, drawings]);
 
   // 検討中の局面を SGF にする。分岐（変化手順）も含めて丸ごと書き出す
   const buildSgf = useCallback(() => generateSGFTree(rootNode, boardSize, { komi: String(komi) }), [rootNode, boardSize, komi]);
@@ -362,35 +376,84 @@ export default function ReviewBoard({
 
   // 描画ハンドラ
   const handleDrawDragStart = useCallback((x: number, y: number) => {
-    if (canEdit && drawMode !== 'off') {
+    if (canEdit && drawMode === 'arrow') {
       setDrawStart({ x, y });
       drawLastCell.current = { x, y };
     }
   }, [canEdit, drawMode]);
 
   const handleDrawDragMove = useCallback((x: number, y: number) => {
-    if (canEdit && drawMode !== 'off') {
+    if (canEdit && drawMode === 'arrow') {
       drawLastCell.current = { x, y };
     }
   }, [canEdit, drawMode]);
 
   const handleDrawDragEnd = useCallback(() => {
-    if (canEdit && drawMode !== 'off' && drawStart && drawLastCell.current) {
+    if (canEdit && drawMode === 'arrow' && drawStart && drawLastCell.current) {
       const end = drawLastCell.current;
       if (drawStart.x !== end.x || drawStart.y !== end.y) {
         const newDrawing: Drawing = {
           fromX: drawStart.x, fromY: drawStart.y,
           toX: end.x, toY: end.y,
-          type: drawMode,
+          type: 'arrow',
         };
         const updated = [...drawings, newDrawing];
         setDrawings(updated);
-        sendToTargets({ type: 'DRAW_UPDATE', payload: updated });
+        broadcastDrawings(updated);
       }
       setDrawStart(null);
       drawLastCell.current = null;
     }
-  }, [canEdit, drawMode, drawStart, drawings, sendToTargets]);
+  }, [broadcastDrawings, canEdit, drawMode, drawStart, drawings]);
+
+  // 曲線（マジックペン）。🔴 講師の手元だけに残し、生徒へは配信しない
+  // （2026-09-05 三村さん「検討時に講師だけに見えればいい」「生徒は使わない」）。
+  const canDrawCurve = isTeacher && drawMode === 'free';
+
+  const handleFreeDrawStart = useCallback((point: { x: number; y: number }) => {
+    if (!canDrawCurve) return;
+    const p = roundPoint(point);
+    freePointsRef.current = [p];
+    setFreePoints([p]);
+  }, [canDrawCurve]);
+
+  const handleFreeDrawMove = useCallback((point: { x: number; y: number }) => {
+    if (!canDrawCurve) return;
+    const points = freePointsRef.current;
+    const last = points[points.length - 1];
+    if (!last) return;
+    const p = roundPoint(point);
+    // 細かすぎる動きは捨てる。点が増えすぎると描画も配信も重くなる
+    if (!shouldAppendPoint(last, p)) return;
+    points.push(p);
+    setFreePoints([...points]);
+  }, [canDrawCurve]);
+
+  const handleFreeDrawEnd = useCallback(() => {
+    const points = freePointsRef.current;
+    freePointsRef.current = [];
+    setFreePoints([]);
+    // 点ひとつ（ただのタップ）では線にしない
+    if (!canDrawCurve || points.length < 2) return;
+    const newDrawing: Drawing = {
+      fromX: points[0].x, fromY: points[0].y,
+      toX: points[points.length - 1].x, toY: points[points.length - 1].y,
+      type: 'free',
+      points,
+    };
+    setDrawings(prev => [...prev, newDrawing]);
+  }, [canDrawCurve]);
+
+  // 描いている最中の線も見えるようにする（確定前）
+  const visibleDrawings = useMemo<Drawing[]>(() => {
+    if (freePoints.length === 0) return drawings;
+    return [...drawings, {
+      fromX: freePoints[0].x, fromY: freePoints[0].y,
+      toX: freePoints[freePoints.length - 1].x, toY: freePoints[freePoints.length - 1].y,
+      type: 'free' as const,
+      points: freePoints,
+    }];
+  }, [drawings, freePoints]);
 
   const clearAnnotations = useCallback(() => {
     setDrawings([]);
@@ -833,7 +896,7 @@ export default function ReviewBoard({
             className="w-full max-w-full lg:!w-auto lg:h-full"
             maxHeight="100%"
             markers={markers}
-            drawings={drawings}
+            drawings={visibleDrawings}
             analysisOverlay={analysisOverlay}
             pvOverlay={pvOverlay}
             hoveredCandidateIndex={hoveredCandidateIndex}
@@ -844,9 +907,13 @@ export default function ReviewBoard({
             onBoardWheel={canEdit ? handleBoardWheel : undefined}
             onCellMouseEnter={handleCellMouseEnter}
             onCellMouseLeave={handleCellMouseLeave}
-            onDragStart={drawMode !== 'off' ? handleDrawDragStart : undefined}
-            onDragMove={drawMode !== 'off' ? handleDrawDragMove : undefined}
-            onDragEnd={drawMode !== 'off' ? handleDrawDragEnd : undefined}
+            onDragStart={drawMode === 'arrow' ? handleDrawDragStart : undefined}
+            onDragMove={drawMode === 'arrow' ? handleDrawDragMove : undefined}
+            onDragEnd={drawMode === 'arrow' ? handleDrawDragEnd : undefined}
+            freeDrawEnabled={canDrawCurve}
+            onFreeDrawStart={handleFreeDrawStart}
+            onFreeDrawMove={handleFreeDrawMove}
+            onFreeDrawEnd={handleFreeDrawEnd}
           />
         </div>
 
@@ -994,19 +1061,22 @@ export default function ReviewBoard({
 
               <div className="w-px h-5 bg-raised mx-1" />
 
-              {/* 線・矢印 */}
-              <button
-                onClick={() => {
-                  setDrawMode(drawMode === 'line' ? 'off' : 'line');
-                  setToolMode('play');
-                }}
-                className={`p-2 rounded-lg border transition-all ${
-                  drawMode === 'line' ? 'bg-alert/15 border-alert text-alert-text' : 'bg-raised border-line text-muted hover:text-ink'
-                }`}
-                title="フリーハンド直線を描く"
-              >
-                <Pen className="w-4 h-4" />
-              </button>
+              {/* 曲線・矢印 */}
+              {isTeacher && (
+                <button
+                  data-testid="draw-curve-button"
+                  onClick={() => {
+                    setDrawMode(drawMode === 'free' ? 'off' : 'free');
+                    setToolMode('play');
+                  }}
+                  className={`p-2 rounded-lg border transition-all ${
+                    drawMode === 'free' ? 'bg-alert/15 border-alert text-alert-text' : 'bg-raised border-line text-muted hover:text-ink'
+                  }`}
+                  title="曲線を描く（自分の画面だけ）"
+                >
+                  <Pen className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={() => {
                   setDrawMode(drawMode === 'arrow' ? 'off' : 'arrow');

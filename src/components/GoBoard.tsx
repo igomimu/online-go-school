@@ -1,7 +1,8 @@
 // Simplified GoBoard for Web
-import { forwardRef, useMemo, useEffect, type ReactElement } from 'react';
+import { forwardRef, useMemo, useEffect, useRef, type ReactElement } from 'react';
 import type { TerritoryOwner } from '../utils/scoring';
 import { useViewBox } from '../hooks/useViewBox';
+import { clientToBoardPoint, smoothPathD } from '../utils/drawingUtils';
 
 export interface ViewRange {
     minX: number;
@@ -39,7 +40,15 @@ export interface Drawing {
     fromY: number;
     toX: number;
     toY: number;
-    type: 'line' | 'arrow';
+    /**
+     * line / arrow は交点から交点への直線1本。
+     * free は手でなぞった軌跡そのもので、points が本体（2026-09-05 三村さん）。
+     * free でも fromX/fromY に先頭点、toX/toY に末尾点を入れておき、
+     * 既存の消去・配信の前提をそのまま使えるようにする。
+     */
+    type: 'line' | 'arrow' | 'free';
+    /** free のときの軌跡（盤座標・小数）。交点に丸めない */
+    points?: { x: number; y: number }[];
 }
 
 export interface AnalysisOverlay {
@@ -85,6 +94,16 @@ export interface GoBoardProps {
     onDragMove?: (x: number, y: number) => void;
     onDragEnd?: () => void;
 
+    /**
+     * 曲線を描くための口（2026-09-05 三村さん）。マス目の onMouseEnter とは別に
+     * 盤の上の実座標（交点に丸めない小数）を渡す。有効な間は1本目のポインタを描画に使い、
+     * ピンチズームには渡さない。
+     */
+    freeDrawEnabled?: boolean;
+    onFreeDrawStart?: (point: { x: number; y: number }) => void;
+    onFreeDrawMove?: (point: { x: number; y: number }) => void;
+    onFreeDrawEnd?: () => void;
+
     markers?: Marker[];
     drawings?: Drawing[];
     analysisOverlay?: AnalysisOverlay[];
@@ -124,6 +143,10 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     onDragStart,
     onDragMove,
     onDragEnd,
+    freeDrawEnabled = false,
+    onFreeDrawStart,
+    onFreeDrawMove,
+    onFreeDrawEnd,
     markers,
     drawings,
     analysisOverlay = [],
@@ -198,6 +221,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     // 既存のマウス操作・描画ドラッグには影響しない。
     const {
         viewBox,
+        currentVb,
         zoom,
         handleGesturePointerDown,
         handleGesturePointerMove,
@@ -210,14 +234,55 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         onZoomChange?.(zoom);
     }, [zoom, onZoomChange]);
 
+    // 曲線を描いている最中のポインタ。描いている間はピンチズームへ渡さず、
+    // 盤の外へ出ても追えるようにポインタを捕まえておく。
+    const drawPointerIdRef = useRef<number | null>(null);
+
+    const boardPointFromEvent = (e: React.PointerEvent<SVGSVGElement>) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        return clientToBoardPoint(rect, currentVb, e.clientX, e.clientY, MARGIN, CELL_SIZE);
+    };
+
+    const endFreeDraw = (e: React.PointerEvent<SVGSVGElement>) => {
+        drawPointerIdRef.current = null;
+        try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* 既に外れていても構わない */ }
+        onFreeDrawEnd?.();
+    };
+
     const handleSvgPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+        // マウスは左ボタンのときだけ。2本目以降の指は描画に使わない
+        const usable = e.pointerType !== 'mouse' || e.button === 0;
+        if (freeDrawEnabled && usable && drawPointerIdRef.current === null) {
+            drawPointerIdRef.current = e.pointerId;
+            try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* 捕まえられなくても描ける */ }
+            e.preventDefault();
+            onFreeDrawStart?.(boardPointFromEvent(e));
+            return;
+        }
         if (handleGesturePointerDown(e)) e.preventDefault();
     };
     const handleSvgPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+        if (drawPointerIdRef.current === e.pointerId) {
+            e.preventDefault();
+            onFreeDrawMove?.(boardPointFromEvent(e));
+            return;
+        }
         if (handleGesturePointerMove(e)) e.preventDefault();
     };
     const handleSvgPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+        if (drawPointerIdRef.current === e.pointerId) {
+            e.preventDefault();
+            endFreeDraw(e);
+            return;
+        }
         if (handleGesturePointerUp(e)) e.preventDefault();
+    };
+    const handleSvgPointerCancel = (e: React.PointerEvent<SVGSVGElement>) => {
+        if (drawPointerIdRef.current === e.pointerId) {
+            endFreeDraw(e);
+            return;
+        }
+        handleGesturePointerCancel(e);
     };
 
     const lines = [];
@@ -435,10 +500,34 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         }
     }
 
-    // Drawing overlay (lines & arrows)
+    // Drawing overlay (lines, arrows & free curves)
+    // 太さは「マジックペンの感じ」に寄せる（2026-09-05 三村さん）。CELL_SIZE=40 に対して
+    // 曲線は 2 割、矢印は少し細く。矢印の頭は markerUnits 既定で線の太さに追随する。
+    const DRAW_STROKE_WIDTH = 8;
+    const ARROW_STROKE_WIDTH = 5;
     const drawingElements: ReactElement[] = [];
     if (drawings) {
         drawings.forEach((d, i) => {
+            if (d.type === 'free') {
+                const points = (d.points ?? []).map(p => ({
+                    x: MARGIN + (p.x - 1) * CELL_SIZE,
+                    y: MARGIN + (p.y - 1) * CELL_SIZE,
+                }));
+                if (points.length === 0) return;
+                drawingElements.push(
+                    <path
+                        key={`draw-${i}`}
+                        data-testid="board-free-drawing"
+                        d={smoothPathD(points)}
+                        fill="none"
+                        stroke="#e53e3e" strokeWidth={DRAW_STROKE_WIDTH}
+                        strokeLinecap="round" strokeLinejoin="round"
+                        className="pointer-events-none"
+                        opacity={0.85}
+                    />
+                );
+                return;
+            }
             const x1 = MARGIN + (d.fromX - 1) * CELL_SIZE;
             const y1 = MARGIN + (d.fromY - 1) * CELL_SIZE;
             const x2 = MARGIN + (d.toX - 1) * CELL_SIZE;
@@ -447,7 +536,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 <line
                     key={`draw-${i}`}
                     x1={x1} y1={y1} x2={x2} y2={y2}
-                    stroke="#e53e3e" strokeWidth={3} strokeLinecap="round"
+                    stroke="#e53e3e" strokeWidth={ARROW_STROKE_WIDTH} strokeLinecap="round"
                     markerEnd={d.type === 'arrow' ? 'url(#arrowhead)' : undefined}
                     className="pointer-events-none"
                     opacity={0.85}
@@ -566,7 +655,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             onPointerDown={handleSvgPointerDown}
             onPointerMove={handleSvgPointerMove}
             onPointerUp={handleSvgPointerUp}
-            onPointerCancel={handleGesturePointerCancel}
+            onPointerCancel={handleSvgPointerCancel}
         >
             <defs>
                 <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">

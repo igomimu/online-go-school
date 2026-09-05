@@ -63,8 +63,10 @@ describe('ReviewBoard', () => {
         classroomRef={mockClassroomRef as never}
       />
     );
-    // 先生用の描画ツール（Pen等）がない
-    expect(container.querySelector('[title="フリーハンド直線を描く"]')).not.toBeInTheDocument();
+    // 先生用の描画ツールがない。
+    // 🔴 実在するセレクタで見ること。存在しない title を not.toBeInTheDocument で見ても常に緑になる
+    expect(container.querySelector('[title="矢印を描く"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="draw-curve-button"]')).not.toBeInTheDocument();
   });
 
   it('「閉じてホーム」ボタン', () => {
@@ -381,9 +383,12 @@ describe('ReviewBoard', () => {
       expect(onSetCurrentNode).toHaveBeenCalledWith(root);
     });
 
-    it('先生と同じ描画ツールが使える', () => {
+    it('描画ツールが使える（ただし曲線は講師だけ）', () => {
       renderSelfReview();
-      expect(document.body.querySelector('[title="フリーハンド直線を描く"]')).toBeInTheDocument();
+      // 矢印・記号は生徒も使える
+      expect(document.body.querySelector('[title="矢印を描く"]')).toBeInTheDocument();
+      // 曲線は講師の手元専用（2026-09-05 三村さん「生徒は使わない」）
+      expect(screen.queryByTestId('draw-curve-button')).not.toBeInTheDocument();
     });
 
     it('AIは付けない（分析パネルを出さない）', () => {
@@ -422,7 +427,8 @@ describe('ReviewBoard', () => {
           classroomRef={mockClassroomRef as never}
         />
       );
-      expect(container.querySelector('[title="フリーハンド直線を描く"]')).not.toBeInTheDocument();
+      expect(container.querySelector('[title="矢印を描く"]')).not.toBeInTheDocument();
+      expect(container.querySelector('[data-testid="draw-curve-button"]')).not.toBeInTheDocument();
     });
   });
 });
@@ -710,5 +716,75 @@ describe('ホイールの手順送り', () => {
 
     expect(onSet).toHaveBeenCalledTimes(1);
     expect(onSet.mock.calls[0][0].nextNumber).toBe(8); // 10手目 → 7手目
+  });
+
+  // 2026-09-05 三村さん「曲線を描く機能」「検討時に講師だけに見えればいい」「生徒は使わない」
+  describe('曲線（マジックペン）', () => {
+    function drawStroke(board: HTMLElement) {
+      // jsdom は矩形を返さないので、盤の大きさを与えてから指を動かす
+      vi.spyOn(board, 'getBoundingClientRect').mockReturnValue({
+        left: 0, top: 0, width: 400, height: 400, right: 400, bottom: 400, x: 0, y: 0,
+        toJSON: () => ({}),
+      } as DOMRect);
+      fireEvent.pointerDown(board, { pointerId: 1, pointerType: 'mouse', button: 0, clientX: 40, clientY: 40 });
+      fireEvent.pointerMove(board, { pointerId: 1, pointerType: 'mouse', clientX: 120, clientY: 90 });
+      fireEvent.pointerMove(board, { pointerId: 1, pointerType: 'mouse', clientX: 200, clientY: 160 });
+      fireEvent.pointerUp(board, { pointerId: 1, pointerType: 'mouse' });
+    }
+
+    it('講師にはボタンが出る', () => {
+      const { root } = makeTree();
+      render(
+        <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
+          onSetCurrentNode={vi.fn()} isTeacher={true} classroomRef={mockClassroomRef as never} />
+      );
+      expect(screen.getByTestId('draw-curve-button')).toBeInTheDocument();
+    });
+
+    it('自分の棋譜を並べている生徒にはボタンを出さない', () => {
+      const { root } = makeTree();
+      render(
+        <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
+          onSetCurrentNode={vi.fn()} isTeacher={false} selfReview classroomRef={mockClassroomRef as never} />
+      );
+      expect(screen.queryByTestId('draw-curve-button')).not.toBeInTheDocument();
+    });
+
+    it('なぞった軌跡が曲線として盤に残る', () => {
+      const { root } = makeTree();
+      render(
+        <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
+          onSetCurrentNode={vi.fn()} isTeacher={true} classroomRef={mockClassroomRef as never} />
+      );
+      fireEvent.click(screen.getByTestId('draw-curve-button'));
+      drawStroke(screen.getByTestId('go-board'));
+      expect(screen.getAllByTestId('board-free-drawing')).toHaveLength(1);
+    });
+
+    it('曲線モードにしていなければ描かれない', () => {
+      const { root } = makeTree();
+      render(
+        <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
+          onSetCurrentNode={vi.fn()} isTeacher={true} classroomRef={mockClassroomRef as never} />
+      );
+      drawStroke(screen.getByTestId('go-board'));
+      expect(screen.queryByTestId('board-free-drawing')).not.toBeInTheDocument();
+    });
+
+    it('🔴 曲線は生徒へ配信しない（講師の手元だけ）', () => {
+      const { root } = makeTree();
+      const sendToOrAll = vi.fn();
+      const ref = { current: { sendToOrAll, broadcast: vi.fn(), isConnected: true } };
+      render(
+        <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
+          onSetCurrentNode={vi.fn()} isTeacher={true} classroomRef={ref as never} targetStudents={null} />
+      );
+      fireEvent.click(screen.getByTestId('draw-curve-button'));
+      drawStroke(screen.getByTestId('go-board'));
+
+      expect(screen.getAllByTestId('board-free-drawing')).toHaveLength(1);
+      const drawUpdates = sendToOrAll.mock.calls.filter(([msg]) => msg?.type === 'DRAW_UPDATE');
+      expect(drawUpdates).toHaveLength(0);
+    });
   });
 });
