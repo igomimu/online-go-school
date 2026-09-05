@@ -74,6 +74,8 @@ import { Settings } from 'lucide-react';
 
 // 講師専用の検討別ウィンドウ。中身は本体からポータルで描く（PopupPortal 参照）。
 const TEACHER_REVIEW_WINDOW_NAME = 'teacher-review-window';
+// 「共有検討」を白紙から始めるときの盤の大きさ（授業モードの既定と同じ）
+const LECTURE_BOARD_SIZE = 19;
 
 function reviewKomiFromSgf(value: string | undefined, fallback = 6.5): number {
   if (value === undefined || value.trim() === '') return fallback;
@@ -1336,10 +1338,31 @@ function App() {
     }
   }, [role]);
 
-  // 授業モード開始
+  // 「共有検討」= 白紙の盤から始める検討。
+  // 🔴 以前は授業モード(LectureBoard)を開いていたが、授業モードだけ isBoardFocusMode に
+  // 入っておらずヘッダーとビデオが残るため、盤が小さくて使えなかった
+  // （2026-09-05 三村さん「碁盤が小さすぎて使えない」「同じ画面にしてほしい」）。
+  // 棋譜履歴から開くのと同じ検討盤を、同じ経路で開く。
   const handleStartLecture = () => {
     endReviewIfOpen();
-    setViewMode('lecture');
+    const emptySgf = `(;FF[4]GM[1]SZ[${LECTURE_BOARD_SIZE}])`;
+    const parsed = parseSGFTree(emptySgf);
+    const root = convertSgfToGameTree(parsed.root, null, LECTURE_BOARD_SIZE, 1, parsed.board);
+    setReviewRootNode(root);
+    setReviewCurrentNode(root);
+    setReviewBoardSize(LECTURE_BOARD_SIZE);
+    setReviewKomi(reviewKomiFromSgf(parsed.metadata?.komi));
+    reviewSourceSgfRef.current = emptySgf;
+    setReviewMovePermissions([]);
+    setReviewBranchStartId(null);
+    setReviewIsOwn(false); // 先生が配信する検討
+    setViewMode('review');
+
+    // 参加者に選ばれている生徒にだけ知らせる（SGF読込のときと同じ扱い）
+    void classroomRef.current?.sendToOrAll({
+      type: 'REVIEW_START',
+      payload: { sgf: emptySgf, boardSize: LECTURE_BOARD_SIZE },
+    }, reviewTargetStudentsRef.current);
   };
 
   // ロビーに戻る
