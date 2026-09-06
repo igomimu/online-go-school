@@ -11,6 +11,12 @@ import { loginAsTeacher, openClassroomAndConnect } from './helpers/teacher-actio
  * 操作の邪魔になった。本番で実際に開いて確かめる。
  */
 test('最新の版を開いているとき、更新の帯は出ない', async ({ page }) => {
+  // 🔴 開発サーバーは起動した時点のコミットハッシュをアプリへ埋め込むため、
+  // その後ブランチを切り替えると version.json と必ず食い違い、帯が出たままになる。
+  // これは配信されたものを開いて確かめる性質の検証なので、配信先を指定したときだけ走らせる。
+  //   例: BASE_URL=https://online.mimura15.jp npx playwright test e2e/version-banner.spec.ts
+  test.skip(!process.env.BASE_URL, '配信先(BASE_URL)を指定したときだけ確かめる');
+
   const classroomId = generateClassroomId('ver');
   try {
     await page.goto('/');

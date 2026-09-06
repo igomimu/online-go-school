@@ -91,9 +91,11 @@ test.describe('多面打ちv2: 単一盤ローテーション', () => {
       expectedPlayersCount: 3,
     });
 
-    // -> 別ウィンドウの表示は1盤のまま（Aの盤）、上部バーが「2面（あなたの番 0面）」になる
+    // -> 作ったばかりのBの盤へ切り替わる。上部バーが「2面（あなたの番 0面）」になる。
+    //    df3f92e「新規対局を古い中断局より優先表示」(2026-08-23) 以降の動き。
+    //    作った盤がその場で見えるほうがよい、が三村さんの判断（2026-09-06）。
     await expect(activeBoard).toBeVisible();
-    await expect(activeBoard.getByText(new RegExp(TEST_STUDENT_A.name))).toBeVisible();
+    await expect(activeBoard.getByText(new RegExp(TEST_STUDENT_B.name))).toBeVisible();
     await expect(gameWindow.getByText('2面（あなたの番 0面）')).toBeVisible({ timeout: 10_000 });
 
     // 生徒A・Bが対局に入る
@@ -107,7 +109,7 @@ test.describe('多面打ちv2: 単一盤ローテーション', () => {
     await playMove(studentAPage, 4, 4);
     await expect(studentAPage.locator('[data-stone="4-4"]')).toBeVisible({ timeout: 10_000 });
 
-    // 先生の盤が「あなたの番です」に更新される（A盤表示のまま）
+    // Aの手番が来たので、自動切替でA盤へ移る
     await expect(activeBoard.getByText('あなたの番です')).toBeVisible({ timeout: 10_000 });
     await expect(activeBoard.locator('[data-stone="4-4"]')).toBeVisible();
     await expect(activeBoard.getByText(new RegExp(TEST_STUDENT_A.name))).toBeVisible();
