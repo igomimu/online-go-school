@@ -80,7 +80,7 @@ describe('子ども向け生徒ログイン', () => {
 describe('参加リンク（初めての大人向け）', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('リンクの生徒コードが記入済みで、押すのは「参加する」だけ', async () => {
+  it('リンクを開いただけでその生徒としてログインする', async () => {
     vi.mocked(supabaseSignInStudent).mockResolvedValue({
       ok: true,
       studentId: '1020',
@@ -98,19 +98,62 @@ describe('参加リンク（初めての大人向け）', () => {
       />,
     );
 
+    // 何も押していないのに入れる
+    await waitFor(() => expect(supabaseSignInStudent).toHaveBeenCalledWith('1020', 'CLS1'));
+    await waitFor(() => expect(onStudentLogin).toHaveBeenCalledWith(
+      '1020', 'CLS1', '1020', '井町 太郎',
+    ));
+    expect(supabaseSignInStudent).toHaveBeenCalledTimes(1);
+  });
+
+  it('自動ログインに失敗したら記入済みのログイン画面に留まり、押せば入れる', async () => {
+    vi.mocked(supabaseSignInStudent)
+      .mockResolvedValueOnce({ ok: false, error: '接続に失敗しました' })
+      .mockResolvedValueOnce({
+        ok: true,
+        studentId: '1020',
+        displayName: '井町 太郎',
+        classroomId: 'CLS1',
+      });
+    const onStudentLogin = vi.fn();
+
+    render(
+      <LoginScreen
+        prefilledClassroomId="CLS1"
+        prefilledStudentCode="1020"
+        onStudentLogin={onStudentLogin}
+        onTeacherLogin={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('接続に失敗しました')).toBeVisible());
     expect((screen.getByTestId('student-id-input') as HTMLInputElement).value).toBe('1020');
     expect(screen.getByTestId('prefilled-notice')).toBeVisible();
 
-    // コードを打ち直さず、そのまま参加できる
     fireEvent.click(screen.getByTestId('student-login-button'));
-
-    await waitFor(() => expect(supabaseSignInStudent).toHaveBeenCalledWith('1020', 'CLS1'));
     await waitFor(() => expect(onStudentLogin).toHaveBeenCalledWith(
       '1020', 'CLS1', '1020', '井町 太郎',
     ));
   });
 
+  it('教室IDの無い古いリンクは自動ログインせず、記入だけして待つ', async () => {
+    vi.mocked(supabaseSignInStudent).mockResolvedValue({ ok: true, studentId: '1020', displayName: '井町 太郎', classroomId: 'CLS1' });
+
+    render(
+      <LoginScreen
+        prefilledStudentCode="1020"
+        onStudentLogin={vi.fn()}
+        onTeacherLogin={vi.fn()}
+      />,
+    );
+
+    expect((screen.getByTestId('student-id-input') as HTMLInputElement).value).toBe('1020');
+    expect(screen.getByTestId('prefilled-notice')).toBeVisible();
+    await waitFor(() => expect(supabaseSignInStudent).not.toHaveBeenCalled());
+  });
+
   it('端末に前の人の保存アカウントが残っていてもリンクのコードを上書きしない', () => {
+    vi.mocked(supabaseSignInStudent).mockResolvedValue({ ok: false, error: 'dummy' });
     vi.mocked(loadAccounts).mockReturnValue([
       { studentId: '1001', classroomId: 'CLS1', studentName: '前の人', classroomName: '火曜クラス' },
     ]);

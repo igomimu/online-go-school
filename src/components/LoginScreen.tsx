@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { ChevronDown, Trash2, Plus, Lock, ArrowLeft, RefreshCw, Download } from 'lucide-react';
 import BoardCorner from './BoardCorner';
@@ -24,9 +24,11 @@ interface LoginScreenProps {
   /** URL等で事前に設定された教室ID */
   prefilledClassroomId?: string;
   /**
-   * 参加リンク（?code=...）から渡された生徒コード。初めて使う大人向けに、
-   * コードと教室を記入済みにして「参加する」を押すだけにする（2026-08-30 三村さん）。
-   * 自動ログインはしない。
+   * 参加リンク（?code=...）から渡された生徒コード。
+   * 教室ID（?classroomId=...）と揃っているときは、リンクを押しただけで
+   * その生徒としてログインする（2026-09-07 三村さん）。教室はリンクに
+   * 書かれているので「どの教室に入ったか分からない」問題（2026-04-22）は起きない。
+   * 失敗したときはコードと教室を記入済みのログイン画面に留まる。
    */
   prefilledStudentCode?: string;
   /**
@@ -52,6 +54,7 @@ export default function LoginScreen({
   const [selectedAccount, setSelectedAccount] = useState<SavedAccount | null>(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [autoLoggingIn, setAutoLoggingIn] = useState(false);
   const pwaInstall = usePwaInstall();
   // 共有PCの名簿
   const [roster, setRoster] = useState<ClassroomRoster | null>(null);
@@ -200,6 +203,24 @@ export default function LoginScreen({
     setClassroomChoices([]);
     completeStudentLogin(res, sid, cid);
   };
+
+  /**
+   * 参加リンクからの自動ログイン。
+   * コードと教室が両方リンクに入っているときだけ走らせる（教室が曖昧なまま入れない）。
+   * 共有PCの名簿リンク（?roster=）は「名前を選ぶ」導線なので対象外。
+   * 1回だけ試し、失敗したらログイン画面に留まって手で押せるようにする。
+   */
+  const autoLoginTriedRef = useRef(false);
+  useEffect(() => {
+    if (autoLoginTriedRef.current) return;
+    if (rosterToken) return;
+    const code = (prefilledStudentCode || '').trim();
+    const cls = (prefilledClassroomId || '').trim();
+    if (!code || !cls) return;
+    autoLoginTriedRef.current = true;
+    setAutoLoggingIn(true);
+    void signInToClassroom(code, cls).finally(() => setAutoLoggingIn(false));
+  }, [prefilledStudentCode, prefilledClassroomId, rosterToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStudentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -385,9 +406,15 @@ export default function LoginScreen({
             className="rounded-lg border border-accent bg-ground px-4 py-3"
           >
             <p className="text-sm font-semibold text-ink">参加リンクから開きました</p>
-            <p className="mt-1 text-sm text-muted [word-break:auto-phrase]">
-              生徒コードと教室は入力済みです。<br />あとは「参加する」を押すだけです。
-            </p>
+            {autoLoggingIn ? (
+              <p className="mt-1 text-sm text-muted [word-break:auto-phrase]">
+                ログインしています。少しお待ちください。
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-muted [word-break:auto-phrase]">
+                生徒コードと教室は入力済みです。<br />あとは「参加する」を押すだけです。
+              </p>
+            )}
           </div>
         )}
 

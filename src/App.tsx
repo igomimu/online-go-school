@@ -865,8 +865,9 @@ function App() {
     if (urlLkUrl) setLivekitUrl(urlLkUrl);
     if (urlRoom) setRoomName(urlRoom);
 
-    // 参加リンク（?code=...）は入力欄を埋めるだけで、ログイン画面は必ず見せる。
-    // ここで自動ログインまでやると、生徒はどの教室に入ったのか分からなくなる（2026-04-22の教訓）。
+    // 参加リンク（?classroomId=...&code=...）は LoginScreen 側で自動ログインする（2026-09-07 三村さん）。
+    // 教室IDがリンクに入っているので、どの教室に入ったか分からなくなる問題（2026-04-22）は起きない。
+    // 教室IDの無い古いリンクは、記入だけして「参加する」を押してもらう。
     const urlStudentCode = readStudentCodeFromParams(params);
     if (urlStudentCode) setPrefilledStudentCode(urlStudentCode);
 

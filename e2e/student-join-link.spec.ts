@@ -1,12 +1,21 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * 生徒に配る「参加リンク」。初めて使う大人がコードも教室IDも打たずに済むこと、
- * そして配布済みの古いリンク（role=STUDENT 付き）が 403 で死なないことを見る。
- * 教室に入るところまでは見ない（先生の在室が要るため）。
+ * 生徒に配る「参加リンク」。押すだけでその生徒としてログインできること、
+ * 失敗したときは記入済みのログイン画面に留まること、そして配布済みの
+ * 古いリンク（role=STUDENT 付き）が 403 で死なないことを見る。
+ * 先生の在室は要らない（ログインの先は待機画面）。
  */
 test.describe('参加リンク', () => {
-  test('リンクを開くとログイン画面に生徒コードが記入済みで出る', async ({ page }) => {
+  test('リンクを開くだけでログインする（デモ教室）', async ({ page }) => {
+    await page.goto('/?classroomId=DEMO01&code=demo01');
+
+    // 何も押さずに教室へ入る
+    await expect(page.getByTestId('student-id-input')).toHaveCount(0);
+    await expect(page.getByText('あおい')).toBeVisible();
+  });
+
+  test('コードが通らないときは記入済みのログイン画面に留まる', async ({ page }) => {
     await page.goto('/?classroomId=CLS-LINK-TEST&code=1234');
 
     await expect(page.getByTestId('student-id-input')).toHaveValue('1234');
