@@ -80,4 +80,60 @@ describe('useLiveGame の着手再照合', () => {
     expect(view.result.current.currentColor).toBe('WHITE');
     expect(view.result.current.lastMove).toEqual(blackMove);
   });
+
+  // 2026-09-07 Codex レビュー #3: 定期照合が着手一覧しか見ておらず、
+  // 回線が切れている間の打ち掛け・再開・整地が復帰後も反映されなかった
+  it('切断中に相手が打ち掛けにしても、定期照合で対局の状態に追いつく', async () => {
+    api.fetchLiveGame.mockReset()
+      .mockResolvedValueOnce(game)
+      .mockResolvedValue({ ...game, status: 'interrupted', updated_at: '2026-08-23T00:05:00.000Z' });
+
+    const view = renderHook(() => useLiveGame('game-1', 'teacher', true));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(view.result.current.game?.status).toBe('playing');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+
+    expect(view.result.current.game?.status).toBe('interrupted');
+  });
+
+  // 2026-09-07 Codex レビュー #2: 相手の保存が失敗した手が、こちらの盤に残り続けていた
+  it('相手から「保存できなかった」と届いたら、仮の石を消す', async () => {
+    api.fetchLiveMoves.mockReset().mockResolvedValue([]);
+
+    const view = renderHook(() => useLiveGame('game-1', 'sid:black', false));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // 相手が打った手が RTC で先に届く
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('live-game-message', {
+        detail: {
+          msg: { type: 'GAME_MOVE', payload: { gameId: 'game-1', x: 4, y: 4, color: 'BLACK', moveNumber: 1 } },
+          sender: 'teacher',
+        },
+      }));
+    });
+    expect(view.result.current.moveNumber).toBe(1);
+
+    // 相手側で保存に失敗した通知が届く
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('live-game-message', {
+        detail: {
+          msg: { type: 'GAME_MOVE_REJECTED', payload: { gameId: 'game-1', moveNumber: 1 } },
+          sender: 'teacher',
+        },
+      }));
+    });
+
+    expect(view.result.current.moveNumber).toBe(0);
+    expect(view.result.current.moves).toEqual([]);
+  });
 });

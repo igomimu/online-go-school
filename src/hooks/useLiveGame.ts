@@ -13,7 +13,7 @@ import {
   speakByoyomi,
 } from '../utils/byoyomiVoice';
 import { formatResultSpeech } from '../utils/scoring';
-import { reconcileLiveMoves } from '../utils/liveMoveReconcile';
+import { reconcileLiveMoves, REMOTE_PREFIX } from '../utils/liveMoveReconcile';
 import { switchClock, startClockOnReceipt, shouldDeclareTimeUp } from './useGameClock';
 import type { GameClock } from '../types/game';
 import {
@@ -36,7 +36,12 @@ import {
   type SubmitMoveResult,
 } from '../utils/liveGameApi';
 import type { ClassroomRtc, ClassroomMessage } from '../utils/classroomRtc';
-import type { GameMovePayload, GameUndoRequestPayload, GameUndoResponsePayload } from '../types/game';
+import type {
+  GameMovePayload,
+  GameMoveRejectedPayload,
+  GameUndoRequestPayload,
+  GameUndoResponsePayload,
+} from '../types/game';
 
 export interface DerivedState {
   boardState: BoardState;
@@ -247,18 +252,44 @@ export function useLiveGame(
     }
 
     let cancelled = false;
-    let moveReconcileInFlight = false;
+    let reconcileInFlight = false;
+    // 直近にサーバーから見た対局行。定期照合で毎回上書きすると、RTC で先に見せている
+    // 「待った」バナーなどの先出し表示を打ち消してしまうので、サーバー側が実際に
+    // 変わったときだけ当てる。
+    let lastServerGameSignature: string | null = null;
 
-    const reconcileMovesFromServer = async () => {
-      if (moveReconcileInFlight || cancelled) return;
-      moveReconcileInFlight = true;
+    const applyServerGame = (row: LiveGameRow | null) => {
+      const signature = row ? JSON.stringify(row) : null;
+      if (signature === lastServerGameSignature) return;
+      lastServerGameSignature = signature;
+      if (!row) return;
+      setGame(row);
+      ingestClock(row.clock ?? null);
+    };
+
+    /**
+     * サーバーを正本として現在の対局へ追いつく。
+     *
+     * 着手だけでなく対局行（中断・再開・整地・時計・「待った」）も取り直す。
+     * 以前は着手一覧しか見ていなかったため、回線が切れている間に相手が打ち掛けや
+     * 整地へ進むと、復帰しても片方だけ古い画面のままだった
+     * （2026-09-07 Codex レビュー #3）。
+     */
+    const reconcileFromServer = async () => {
+      if (reconcileInFlight || cancelled) return;
+      reconcileInFlight = true;
       try {
-        const serverMoves = await fetchLiveMoves(gameId);
-        if (!cancelled) setMoves(current => reconcileLiveMoves(current, serverMoves));
+        const [serverGame, serverMoves] = await Promise.all([
+          fetchLiveGame(gameId),
+          fetchLiveMoves(gameId),
+        ]);
+        if (cancelled) return;
+        applyServerGame(serverGame);
+        setMoves(current => reconcileLiveMoves(current, serverMoves));
       } catch {
         // Realtimeが正常な間は無視できる保険経路。次回の照合で再試行する。
       } finally {
-        moveReconcileInFlight = false;
+        reconcileInFlight = false;
       }
     };
 
@@ -268,6 +299,7 @@ export function useLiveGame(
       try {
         const [g, m] = await Promise.all([fetchLiveGame(gameId), fetchLiveMoves(gameId)]);
         if (cancelled) return;
+        lastServerGameSignature = g ? JSON.stringify(g) : null;
         setGame(g);
         ingestClock(g?.clock ?? null);
         setMoves(m);
@@ -286,11 +318,12 @@ export function useLiveGame(
       if (cancelled) return;
       channel = subscribeLiveGame(gameId, {
         onGameChange: (row) => {
+          lastServerGameSignature = JSON.stringify(row);
           setGame(row);
           ingestClock(row.clock ?? null);
           // submit_move は着手INSERT後に必ず games.updated_at も更新する。
           // moves側INSERTだけを取り逃した場合、この更新を合図にサーバー棋譜へ追いつく。
-          void reconcileMovesFromServer();
+          void reconcileFromServer();
         },
         onMoveInsert: (row) => {
           setMoves((prev) => {
@@ -318,7 +351,7 @@ export function useLiveGame(
     // Realtimeチャンネルの再接続中はINSERTとgames UPDATEを両方取り逃すことがある。
     // 双方の端末が通知を受けなくても、数秒以内に正本の棋譜へ収束させる。
     const reconcileTimer = window.setInterval(() => {
-      void reconcileMovesFromServer();
+      void reconcileFromServer();
     }, MOVE_RECONCILE_INTERVAL_MS);
 
     return () => {
@@ -377,6 +410,16 @@ export function useLiveGame(
           };
           return [...prev, tempMove].sort((a, b) => a.move_number - b.move_number);
         });
+      }
+
+      if (msg.type === 'GAME_MOVE_REJECTED') {
+        const p = msg.payload as GameMoveRejectedPayload;
+        if (p.gameId !== gameId) return;
+        // 相手の保存が失敗した手。こちらに乗っている「相手から届いた仮の石」だけを消す。
+        // サーバー確定行と、自分が送信中の手には触れない。
+        setMoves((prev) => prev.filter(
+          (m) => !(m.move_number === p.moveNumber && m.player_id.startsWith(REMOTE_PREFIX)),
+        ));
       }
 
       if (msg.type === 'GAME_RESIGN') {
@@ -523,6 +566,21 @@ export function useLiveGame(
     [],
   );
 
+  /**
+   * 送った手が保存できなかったことを相手へ伝える。
+   *
+   * 着手は保存の完了前に RTC で相手へ届き、相手の盤には仮の石が乗る。こちらで石を
+   * 戻すだけでは相手の盤に残り続け、両者の盤面と手数が食い違う
+   * （2026-09-07 Codex レビュー #2）。
+   */
+  const broadcastMoveRejected = useCallback((gameIdOfMove: string, moveNumber: number) => {
+    if (!classroom || !classroom.isConnected) return;
+    classroom.broadcast({
+      type: 'GAME_MOVE_REJECTED',
+      payload: { gameId: gameIdOfMove, moveNumber } as GameMoveRejectedPayload,
+    }).catch((err) => console.error('[LiveKit move-rejected broadcast error]', err));
+  }, [classroom]);
+
   const submitMoveFn = useCallback(
     async (x: number, y: number) => {
       if (!activeGame || !effectivePlayer) return;
@@ -600,12 +658,13 @@ export function useLiveGame(
         }
         if (!res.ok) {
           setError(res.error ?? 'submit failed');
-          // 失敗した場合は仮着手を削除
+          // 失敗した場合は仮着手を削除し、相手の盤からも消してもらう
           setMoves((prev) => prev.filter((m) => m.player_id !== tempMove.player_id));
+          broadcastMoveRejected(game.id, moveNumber);
         }
       });
     },
-    [activeGame, effectivePlayer, derived.moveNumber, derived.currentColor, derived.boardState, moves, classroom, isMyTurn, retrySubmitAfterResync, enqueueSubmit, localClock],
+    [activeGame, effectivePlayer, derived.moveNumber, derived.currentColor, derived.boardState, moves, classroom, isMyTurn, retrySubmitAfterResync, enqueueSubmit, localClock, broadcastMoveRejected],
   );
 
   const submitPass = useCallback(async () => {
@@ -661,8 +720,9 @@ export function useLiveGame(
       }
       if (!res.ok) {
         setError(res.error ?? 'pass failed');
-        // 失敗した場合は仮着手を削除
+        // 失敗した場合は仮着手を削除し、相手の盤からも消してもらう
         setMoves((prev) => prev.filter((m) => m.player_id !== tempMove.player_id));
+        broadcastMoveRejected(game.id, moveNumber);
         return;
       }
       if (isSecondPass) {
@@ -675,7 +735,7 @@ export function useLiveGame(
         }
       }
     });
-  }, [activeGame, effectivePlayer, derived.lastMove, derived.moveNumber, derived.currentColor, classroom, isMyTurn, retrySubmitAfterResync, enqueueSubmit, localClock]);
+  }, [activeGame, effectivePlayer, derived.lastMove, derived.moveNumber, derived.currentColor, classroom, isMyTurn, retrySubmitAfterResync, enqueueSubmit, localClock, broadcastMoveRejected]);
 
   // ローカルの時間切れ処理
   const handleLocalTimeUp = useCallback(

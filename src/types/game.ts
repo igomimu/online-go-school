@@ -78,6 +78,7 @@ export type ViewMode = 'lobby' | 'game' | 'review' | 'lecture' | 'problem';
 export type GameMessageType =
   | 'GAME_CREATED'
   | 'GAME_MOVE'
+  | 'GAME_MOVE_REJECTED'
   | 'GAME_BOARD_UPDATE'
   | 'GAME_PASS'
   | 'GAME_RESIGN'
@@ -130,6 +131,16 @@ export interface GameMovePayload {
   y: number;
   color: StoneColor;
   moveNumber?: number;
+}
+
+/**
+ * 送った手がサーバーに保存できなかったことの通知。
+ * RTC で先に配った仮の石を、相手の盤からも消してもらうために使う
+ * （2026-09-07 Codex レビュー #2）。
+ */
+export interface GameMoveRejectedPayload {
+  gameId: string;
+  moveNumber: number;
 }
 
 export interface GameBoardUpdatePayload {
