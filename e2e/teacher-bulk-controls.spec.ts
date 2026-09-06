@@ -39,6 +39,11 @@ test('Mクリア・Sクリア・共有を全員にが参加中の全生徒へ反
     await waitForStudentJoined(teacher, TEST_STUDENT_A.id);
     await waitForStudentJoined(teacher, TEST_STUDENT_B.id);
 
+    // 🔴 2026-09-01「生徒リストのマイク/スピーカーが講師感覚と逆」を直した際に、
+    // ボタン名と列の中身が入れ替わった。testid は据え置きなので実態は次のとおり:
+    //   mic-<identity>  = 講師の声がその生徒へ届くか（canHear）
+    //   hear-<identity> = その生徒の声が講師に聞こえるか（micAllowed）
+    // 生徒側から見ると、前者は「スピーカー」、後者は「マイク」に当たる。
     const studentMic = (page: Page) => page.locator('header button', { hasText: 'マイク' }).first();
     const studentSpeaker = (page: Page) => page.locator('header button', { hasText: 'スピーカー' }).first();
     await studentMic(studentA).click();
@@ -46,17 +51,19 @@ test('Mクリア・Sクリア・共有を全員にが参加中の全生徒へ反
     await expect(studentMic(studentA)).toHaveAttribute('aria-pressed', 'true');
     await expect(studentMic(studentB)).toHaveAttribute('aria-pressed', 'true');
 
-    await teacher.getByRole('button', { name: '音声Mをクリア' }).click();
+    // 講師の声を全員へ届けない → 生徒側は「スピーカー」が切れる
+    await teacher.getByRole('button', { name: '全員へのマイクを切る' }).click();
     await expect(teacher.getByTestId(`mic-sid:${TEST_STUDENT_A.id}`)).not.toBeChecked();
     await expect(teacher.getByTestId(`mic-sid:${TEST_STUDENT_B.id}`)).not.toBeChecked();
-    await expect(studentMic(studentA)).toHaveAttribute('aria-pressed', 'false');
-    await expect(studentMic(studentB)).toHaveAttribute('aria-pressed', 'false');
-
-    await teacher.getByRole('button', { name: '音声Sをクリア' }).click();
-    await expect(teacher.getByTestId(`hear-sid:${TEST_STUDENT_A.id}`)).not.toBeChecked();
-    await expect(teacher.getByTestId(`hear-sid:${TEST_STUDENT_B.id}`)).not.toBeChecked();
     await expect(studentSpeaker(studentA)).toHaveAttribute('aria-pressed', 'false');
     await expect(studentSpeaker(studentB)).toHaveAttribute('aria-pressed', 'false');
+
+    // 生徒全員のマイクを切る → 生徒側は「マイク」が切れる
+    await teacher.getByRole('button', { name: '全員の声を切る' }).click();
+    await expect(teacher.getByTestId(`hear-sid:${TEST_STUDENT_A.id}`)).not.toBeChecked();
+    await expect(teacher.getByTestId(`hear-sid:${TEST_STUDENT_B.id}`)).not.toBeChecked();
+    await expect(studentMic(studentA)).toHaveAttribute('aria-pressed', 'false');
+    await expect(studentMic(studentB)).toHaveAttribute('aria-pressed', 'false');
 
     const shareA = teacher.getByTestId(`share-sid:${TEST_STUDENT_A.id}`);
     const shareB = teacher.getByTestId(`share-sid:${TEST_STUDENT_B.id}`);
