@@ -186,7 +186,8 @@ describe('棋譜履歴からの再開', () => {
 
     expect(screen.queryByText('中断中')).not.toBeInTheDocument();
     expect(screen.queryByText('再開')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '検討' })).toBeInTheDocument();
+    // 「検討」はツールバーにもあるので、棋譜履歴の行のものを名指しで見る
+    expect(screen.getByTestId('history-review-g-done')).toBeInTheDocument();
   });
 
   it('時間切れで終わった棋譜は再開できる（回線トラブル救済）', async () => {

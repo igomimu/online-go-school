@@ -916,6 +916,9 @@ export default function TeacherDashboard({
                             {onSelectSavedGame && (
                               <button
                                 type="button"
+                                // ツールバーにも「検討」があるので、棋譜履歴の方は印で見分ける
+                                // （2026-09-06 三村さん「2つあっても問題ない」＝画面の言葉は揃えたまま）
+                                data-testid={`history-review-${game.id}`}
                                 onClick={e => {
                                   e.stopPropagation();
                                   onSelectSavedGame(game);
