@@ -174,8 +174,9 @@ describe('StudentTable', () => {
     expect(within(rows[1]).queryByRole('button', { name: '中断' })).not.toBeInTheDocument();
   });
 
+  // 🔴 中断局の操作は棋譜履歴へ移した（2026-09-06 三村さん）。
+  // 生徒リストに残すのは時間切れ終局の再開だけ。気づかないと対局が止まるため。
   it.each([
-    ['中断局', { status: 'interrupted' as const, result: '中断' }],
     ['時間切れ局', { status: 'finished' as const, result: 'W+T' }],
   ])('%sには再開ボタンを表示する', (_label, gameState) => {
     const onResumeGame = vi.fn();
@@ -260,10 +261,8 @@ describe('StudentTable', () => {
     expect(onCancelGame).toHaveBeenCalledWith('game-1');
   });
 
-  it('中断局には新規作成・再開・取消をすべて表示する', () => {
+  it('中断局には新規作成だけを出し、再開・取消は棋譜履歴に任せる', () => {
     const onCreateGame = vi.fn();
-    const onResumeGame = vi.fn();
-    const onCancelGame = vi.fn();
     render(
       <StudentTable
         participants={[participant]}
@@ -274,16 +273,17 @@ describe('StudentTable', () => {
         onToggleHear={vi.fn()}
         onToggleMic={vi.fn()}
         onCreateGame={onCreateGame}
-        onResumeGame={onResumeGame}
-        onCancelGame={onCancelGame}
+        onResumeGame={vi.fn()}
+        onCancelGame={vi.fn()}
       />,
     );
 
+    // 次の対局はここから始められる
     fireEvent.click(screen.getByRole('button', { name: '新規' }));
     expect(onCreateGame).toHaveBeenCalledWith('sid:S001');
-    expect(screen.getByRole('button', { name: '再開' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '取消' }));
-    expect(onCancelGame).toHaveBeenCalledWith('game-1');
+    // 中断局の始末は棋譜履歴で行う（2026-09-06 三村さん「すべて棋譜履歴から操作する」）
+    expect(screen.queryByRole('button', { name: '再開' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '取消' })).not.toBeInTheDocument();
   });
 
   it('ホーム画面に独立した検討列を表示し、生徒ごとにオン・オフできる', () => {

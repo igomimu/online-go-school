@@ -114,11 +114,13 @@ export default function StudentTable({
           {rows.map((row, i) => {
             const perm = audioPermissions[row.identity] || { canHear: true, micAllowed: true, cameraAllowed: true };
             const canInterrupt = row.game?.status === 'playing' || row.game?.status === 'scoring';
-            const canResume = row.game?.status === 'interrupted'
-              || (row.game?.status === 'finished' && isTimeoutResult(row.game.result));
-            const canCancel = row.game?.status === 'playing'
-              || row.game?.status === 'scoring'
-              || row.game?.status === 'interrupted';
+            // 🔴 中断局の操作（再開・取消・検討）は生徒リストに出さない。
+            // すべて棋譜履歴から行う（2026-09-06 三村さん）。生徒リストは
+            // 「いま打っている対局」を扱う場所で、終わった局を並べる場所ではない。
+            // 時間切れ終局の再開だけは残す。気づかないと対局が止まったままになるので、
+            // その場で戻せる必要がある（2026-08-05）。
+            const canResume = row.game?.status === 'finished' && isTimeoutResult(row.game.result);
+            const canCancel = row.game?.status === 'playing' || row.game?.status === 'scoring';
             const canCreate = row.isConnected && !canInterrupt;
             // 接続中は面を一段持ち上げ、先頭（アクティブ）行だけ榧を薄く敷く
             const bgColor = row.isConnected
