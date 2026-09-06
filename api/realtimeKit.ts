@@ -64,7 +64,7 @@ export function classroomIdFromRoomName(roomName: string): string {
  *
  * 同時に2人が入ってきて二重に作られることがあるが、その場合も
  * どちらか片方の ID に収束すれば同じ部屋に入れる。`is null` を条件にして
- * 後から来たほうの書き込みを捨てている。
+ * 後から来たほうの書き込みを捨て、負けたほうは DB を読み直して勝ったほうに合わせる。
  */
 export async function resolveMeetingId(
   cfg: RealtimeKitConfig,
@@ -89,7 +89,7 @@ export async function resolveMeetingId(
     body: { title: roomName },
   });
 
-  const { data: saved } = await supabase
+  const { data: saved, error: saveErr } = await supabase
     .from('go_school_classrooms')
     .update({ realtime_meeting_id: created.id })
     .eq('id', classroomId)
@@ -97,8 +97,21 @@ export async function resolveMeetingId(
     .select('realtime_meeting_id')
     .maybeSingle();
 
-  // 競争に負けたら、先に書かれたほうを使う（作ったばかりの meeting は捨てる）
-  return saved?.realtime_meeting_id ?? created.id;
+  if (saveErr) throw new Error(`教室への meeting の書き込みに失敗しました: ${saveErr.message}`);
+  if (saved?.realtime_meeting_id) return saved.realtime_meeting_id;
+
+  // 競争に負けたら、先に書かれたほうを使う（作ったばかりの meeting は捨てる）。
+  // 条件付き UPDATE は負けると「該当行なし」で返るため data は null になる。ここで
+  // created.id を返すと DB に採用された meeting とは別の部屋に入り、同じ教室を選んだのに
+  // 会えない（2026-09-07 Codex レビュー #4）。採用された ID を読み直して合わせる。
+  const { data: winner, error: rereadErr } = await supabase
+    .from('go_school_classrooms')
+    .select('realtime_meeting_id')
+    .eq('id', classroomId)
+    .maybeSingle();
+
+  if (rereadErr) throw new Error(`教室の再読み取りに失敗しました: ${rereadErr.message}`);
+  return winner?.realtime_meeting_id ?? created.id;
 }
 
 /**

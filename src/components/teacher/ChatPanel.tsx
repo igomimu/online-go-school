@@ -39,6 +39,11 @@ export default function ChatPanel({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // 日本語入力の変換確定 Enter は「確定」であって送信ではない。これを弾かないと
+    // 「けんとう」を変換した瞬間に送信されてしまう（2026-09-07 Codex レビュー #5）。
+    // isComposing が立たないブラウザ（Safari の一部）向けに keyCode 229 も見る。
+    const native = e.nativeEvent as KeyboardEvent;
+    if (native.isComposing || native.keyCode === 229) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
