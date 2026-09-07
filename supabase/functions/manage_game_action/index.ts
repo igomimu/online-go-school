@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { studentMatchesPlayer, toStudentIdentity, playersMatchPair, resolvePlayerColor, stripSid, TEACHER_IDENTITY } from '../_shared/identity.ts'
+import { readSessionRole } from '../_shared/sessionRole.ts'
 import { exportLiveGameToSgf, formatTokyoSgfDate } from '../_shared/sgf.ts'
 import { restoreClockForTimeout, startClock, timedOutColorFromResult } from '../_shared/clock.ts'
 import { NEW_GAME_BLOCKING_STATUSES, shouldCloseLiveGameWhenDeletingHistory } from '../_shared/game_lifecycle.ts'
@@ -103,14 +104,13 @@ Deno.serve(async (req) => {
       const anonClient = createClient(supabaseUrl, anonKey)
       const { data: userResult, error: userErr } = await anonClient.auth.getUser(token)
       if (!userErr && userResult?.user) {
-        const user = userResult.user
-        const meta = user.user_metadata ?? {}
-        const role = meta.app_role
-        
-        if (role === 'teacher') {
+        // 役割は app_metadata だけを見る（readSessionRole）。user_metadata は本人が
+        // 書き換えられるので認可に使えない
+        const session = readSessionRole(userResult.user)
+        if (session.isTeacher) {
           isTeacher = true
-        } else if (role === 'student') {
-          validatedStudentId = meta.student_id
+        } else if (session.studentId) {
+          validatedStudentId = session.studentId
         }
       } else {
         return json({ error: 'Invalid or expired token', detail: userErr?.message }, 401)

@@ -15,6 +15,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { versionResponse } from '../_shared/version.ts'
+import { readSessionRole } from '../_shared/sessionRole.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,18 +63,20 @@ Deno.serve(async (req) => {
     return json({ error: 'Invalid or expired token' }, 401)
   }
 
-  const meta = userResult.user.user_metadata ?? {}
-  if (meta.app_role !== 'student') {
+  // 役割は app_metadata だけを見る（readSessionRole）。user_metadata は本人が
+  // 書き換えられるので認可に使えない
+  const session = readSessionRole(userResult.user)
+  if (session.role !== 'student') {
     return json({ error: 'Forbidden: student session required' }, 403)
   }
-  const studentId = typeof meta.student_id === 'string' ? meta.student_id : ''
+  const studentId = session.studentId ?? ''
   if (!studentId) {
     return json({ error: 'Forbidden: no student in session' }, 403)
   }
 
   const admin = createClient(supabaseUrl, serviceRoleKey)
 
-  const classroomId = typeof meta.classroom_id === 'string' ? meta.classroom_id : ''
+  const classroomId = session.classroomId ?? ''
   if (!classroomId) {
     return json({ error: 'No classroom in session' }, 404)
   }

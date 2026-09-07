@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { classroomIdFromRoomName } from './realtimeKit.js';
+import { readSessionRole } from './sessionRole.js';
 
 /**
  * 先生が教室に入っていることを記録する。
@@ -46,7 +47,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error || !userResult?.user) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
-    isTeacher = userResult.user.user_metadata?.app_role === 'teacher';
+    // 役割は app_metadata だけを見る（readSessionRole）。user_metadata は本人が
+    // 書き換えられるので認可に使えない
+    const session = readSessionRole(userResult.user);
+    // ゲストPWの先生は、自分のデモ教室以外の在室を書き換えられない
+    isTeacher = session.isTeacher
+      && (!session.isGuest || roomName === `go-${session.classroomId}`);
   }
   if (!isTeacher) {
     return res.status(403).json({ error: 'Forbidden' });

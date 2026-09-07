@@ -3,6 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { identityBelongsToStudent } from './tokenAuth.js';
+import { readSessionRole } from './sessionRole.js';
 import {
   isTeacherInMeeting,
   issueParticipantToken,
@@ -144,15 +145,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const anonClient = createClient(supabaseUrl, anonKey);
       const { data: userResult, error: userErr } = await anonClient.auth.getUser(jwt);
       if (!userErr && userResult?.user) {
-        const user = userResult.user;
-        const meta = user.user_metadata ?? {};
-        const role = meta.app_role;
+        // 役割は app_metadata だけを見る（readSessionRole）。user_metadata は本人が
+        // 書き換えられるので認可に使えない
+        const session = readSessionRole(userResult.user);
 
-        if (role === 'teacher') {
-          authorized = true; // 先生は全てのルームへのアクセスを許可
-        } else if (role === 'student') {
-          const studentClassroomId = meta.classroom_id;
-          const studentId = meta.student_id;
+        if (session.isTeacher) {
+          // ゲストPWで入った先生はデモ教室に固定する。実教室の部屋には入れない
+          // （2026-09-07 Codex レビュー #1）
+          authorized = session.isGuest
+            ? roomName === `go-${session.classroomId}`
+            : true;
+          if (!authorized) {
+            console.warn(`[token-auth] Guest teacher denied for room ${roomName} (allowed: go-${session.classroomId})`);
+          }
+        } else if (session.role === 'student') {
+          const studentClassroomId = session.classroomId;
+          const studentId = session.studentId;
           // 生徒は自身の classroom_id に対応するルーム、かつ自身のIDと完全一致する identity のみ許可
           const expectedRoom = `go-${studentClassroomId}`;
           if (roomName === expectedRoom && identityBelongsToStudent(identity, studentId)) {

@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { versionResponse } from '../_shared/version.ts'
+import { readSessionRole } from '../_shared/sessionRole.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,17 +50,17 @@ Deno.serve(async (req) => {
     return json({ error: 'Invalid or expired token', detail: userErr?.message }, 401)
   }
   
-  const user = userResult.user
-  const meta = user.user_metadata ?? {}
-  const role = meta.app_role
+  // 役割は app_metadata だけを見る（readSessionRole）。user_metadata は本人が
+  // 書き換えられるので認可に使えない
+  const session = readSessionRole(userResult.user)
 
   // 先生（teacher）のみ生徒リストを取得可能にする
-  if (role !== 'teacher') {
+  if (!session.isTeacher) {
     return json({ error: 'Forbidden: Only teachers can fetch student list' }, 403)
   }
 
   // ゲスト（デモ見学）先生には道場アプリの実生徒を渡さない
-  if (meta.is_guest === true) {
+  if (session.isGuest) {
     return json({ error: 'Forbidden: Guest teachers cannot fetch student list' }, 403)
   }
 

@@ -1,6 +1,6 @@
 // online-go-school: validate_teacher_session
 //
-// Anonymous Sign-In で作られた anon user の user_metadata に、検証済みの
+// Anonymous Sign-In で作られた anon user の app_metadata に、検証済みの
 // teacher_id / classroom_id / app_role = 'teacher' を書き込む Edge Function。
 //
 // フロー:
@@ -8,9 +8,9 @@
 //   2. その JWT を Authorization: Bearer ヘッダーで本関数に POST
 //   3. 本関数が JWT を検証 → sub (anon user uuid) 取得
 //   4. body の password をハッシュ化して環境変数 TEACHER_PASSWORD_HASH と照合
-//   5. service_role で auth.admin.updateUserById により user_metadata を上書き
+//   5. service_role で auth.admin.updateUserById により app_metadata を上書き
 //   6. フロントが supabase.auth.refreshSession() で metadata 反映済み JWT を受ける
-//   7. custom_access_token_hook が user_metadata を JWT claim に昇格
+//   7. custom_access_token_hook が app_metadata を JWT claim に昇格
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { versionResponse } from '../_shared/version.ts'
@@ -101,10 +101,12 @@ Deno.serve(async (req) => {
     return json({ error: 'Invalid teacher password' }, 403)
   }
 
-  // user_metadata 上書き
+  // 役割は app_metadata に書く。user_metadata は本人が auth.updateUser({data}) で
+  // 書き換えられるため、パスワードを通らずに teacher を名乗れてしまう
+  // （2026-09-07 Codex レビュー #1）。app_metadata は service_role でしか書けない。
   const admin = createClient(supabaseUrl, serviceRoleKey)
   const { error: updateErr } = await admin.auth.admin.updateUserById(user.id, {
-    user_metadata: {
+    app_metadata: {
       teacher_id: user.id, // teacher_id として自身の UUID をセット
       classroom_id: isGuest ? DEMO_CLASSROOM_ID : (body.classroomId ?? 'global'),
       app_role: 'teacher',

@@ -1,6 +1,6 @@
 // online-go-school: validate_student_session
 //
-// Anonymous Sign-In で作られた anon user の user_metadata に、検証済みの
+// Anonymous Sign-In で作られた anon user の app_metadata に、検証済みの
 // student_id / classroom_id / app_role を書き込む Edge Function。
 //
 // フロー:
@@ -10,9 +10,9 @@
 //   4. body の studentCode をオンライン名簿で照合
 //   5. 所属が1教室なら自動確定。複数ならリンク指定の教室を検証し、
 //      指定なし/不一致なら所属教室の選択肢を返す
-//   6. service_role で auth.admin.updateUserById により user_metadata を上書き
+//   6. service_role で auth.admin.updateUserById により app_metadata を上書き
 //   7. フロントが supabase.auth.refreshSession() で metadata 反映済み JWT を受ける
-//   8. custom_access_token_hook が user_metadata を JWT claim に昇格
+//   8. custom_access_token_hook が app_metadata を JWT claim に昇格
 //
 // classroom_id はクライアント入力を信用しない。所属テーブルを正本にして
 // canonical ID をJWTへ書き込む。
@@ -162,9 +162,10 @@ Deno.serve(async (req) => {
     }, 409)
   }
 
-  // user_metadata 上書き
+  // 役割は app_metadata に書く（user_metadata は本人が書き換えられるので認可に使えない。
+  // 2026-09-07 Codex レビュー #1）
   const { error: updateErr } = await admin.auth.admin.updateUserById(user.id, {
-    user_metadata: {
+    app_metadata: {
       student_id: resolvedId,
       classroom_id: selectedClassroom.id,
       app_role: 'student',
