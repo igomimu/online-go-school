@@ -34,6 +34,7 @@ import {
 } from './utils/unloadInterrupt';
 import { fetchRoster, loadStudents, loadClassrooms, loadStudentTypes } from './utils/classroomStore';
 import { clearRecordDraft, loadRecordDraft, saveRecordDraft, type RecordDraft } from './utils/recordDraft';
+import { getReviewTimeline, nodeAtReviewIndex } from './utils/reviewTimeline';
 import { insertGameRecord } from './utils/savedGames';
 import { fetchMyClassroomRoster } from './utils/studentRoster';
 import { saveAccount, supabaseSignInStudent, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } from './utils/authStore';
@@ -117,7 +118,11 @@ function reviewBoardUpdatePayload(node: GameNode, boardSize: number, numberMode:
   const nextColor = node.move
     ? (node.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
     : 'BLACK';
+  // 生徒の盤は親を持たない写しなので、手順の位置は数えられない。先生の盤で数えて配る
+  const timeline = getReviewTimeline(node);
   return {
+    timelineIndex: timeline.index,
+    timelineLast: timeline.nodes.length - 1,
     // 生徒の盤は親を持たない写しなので、変化手順の番号は先生側で振ってから配る
     boardState: numberMode === 'branch' ? withBranchNumbers(node, branchStartId) : node.board,
     boardSize,
@@ -141,7 +146,7 @@ function App() {
   // 🔴 先生がホイールで早送りすると盤面が毎秒何十枚も届く。19路の碁盤は
   // 描き直しが重く、来るたびに描いていると生徒側が固まる（2026-08-26 実授業）。
   // 途中の局面は見えなくてよいので、間隔ごとに最新の一枚だけを描く。
-  const [framedBoard, pushFrameBoard, clearFrameBoard] = useLatestFrame<{ node: GameNode; size: number }>();
+  const [framedBoard, pushFrameBoard, clearFrameBoard] = useLatestFrame<{ node: GameNode; size: number; timeline?: { index: number; last: number } }>();
   // 送れなかったことを画面に出す。今までは失敗が誰にも見えず、
   // 「届かない」の原因が送信側か受け取る側か切り分けられなかった（2026-08-26）
   const [sendTrouble, setSendTrouble] = useState<{ type: string; message: string; pending: number; at: number } | null>(null);
@@ -266,6 +271,8 @@ function App() {
   const reviewMovePermissionsRef = useRef<string[]>([]);
   // 生徒側: 自分が今この検討盤に打てるか
   const [reviewCanPlay, setReviewCanPlay] = useState(false);
+  // 生徒側: 先生の盤の「何手目 / 全何手」。操作列のゲージと進む戻るの可否に使う
+  const [syncedReviewTimeline, setSyncedReviewTimeline] = useState<{ index: number; last: number } | undefined>(undefined);
 
   // === 棋譜を並べる（2026-09-07 三村さん「棋譜をアップロード／アプリ内に入力して保存」） ===
   // 共有検討とは別の画面にする。viewMode を分けているので、授業中の配信経路
@@ -577,6 +584,8 @@ function App() {
             markers: GameNode['markers'];
             moveNumber: number;
             numberMode?: NumberMode;
+            timelineIndex?: number;
+            timelineLast?: number;
           };
           if (!Array.isArray(p.boardState) || typeof p.boardSize !== 'number') return;
           // 先生が切り替えた手番号の見せ方に、生徒の盤も合わせる
@@ -596,7 +605,14 @@ function App() {
               : undefined,
           };
           setReceivedMoveNo(p.moveNumber ?? 0);
-          pushFrameBoard({ node: dummyNode, size: p.boardSize });
+          pushFrameBoard({
+            node: dummyNode,
+            size: p.boardSize,
+            // 操作列のゲージに使う。盤と一緒に間引かないと、数字だけ先に進む
+            timeline: typeof p.timelineIndex === 'number' && typeof p.timelineLast === 'number'
+              ? { index: p.timelineIndex, last: p.timelineLast }
+              : undefined,
+          });
         }
 
         // AI解析同期（生徒用）。KataGoへの問い合わせは先生端末だけで行う。
@@ -671,6 +687,7 @@ function App() {
           setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null, hoveredCandidateRank: null, allowStudentInteraction: false });
           // 新しい検討が始まったら前回の許可は引き継がない（先生が改めて許可する）
           setReviewCanPlay(false);
+          setSyncedReviewTimeline(undefined);
           setReviewIsOwn(false); // 先生の配信なので、進む・戻るは先生に従う
           setViewMode('review');
         }
@@ -707,6 +724,14 @@ function App() {
           }
         }
 
+        // 許可した生徒の手順移動（先生用）。動かすのは先生の盤で、結果が全員に返る
+        if (msg.type === 'REVIEW_STUDENT_NAV' && connectRole === 'TEACHER' && msg.payload && sender) {
+          const p = msg.payload as import('./types/game').ReviewStudentNavPayload;
+          if (reviewMovePermissionsRef.current.includes(sender) && typeof p.index === 'number') {
+            setReviewCurrentNode(prev => (prev ? nodeAtReviewIndex(prev, p.index) ?? prev : prev));
+          }
+        }
+
         // 許可した生徒の「1手戻す」（先生用）。着手と同じで判定はここが正本
         if (msg.type === 'REVIEW_STUDENT_UNDO' && connectRole === 'TEACHER' && sender) {
           if (reviewMovePermissionsRef.current.includes(sender)) {
@@ -732,6 +757,7 @@ function App() {
           setReviewCanPlay(false);
           // 溜めている盤も捨てる。残すと閉じた直後に遅れて現れる
           clearFrameBoard();
+          setSyncedReviewTimeline(undefined);
           setSyncedNode(null);
           setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null, hoveredCandidateRank: null, allowStudentInteraction: false });
           setActiveProblem(null);
@@ -1042,6 +1068,7 @@ function App() {
   useEffect(() => {
     if (!framedBoard) return;
     setSyncedBoardSize(framedBoard.size);
+    if (framedBoard.timeline) setSyncedReviewTimeline(framedBoard.timeline);
     setSyncedNode(framedBoard.node);
     // 検討画面は reviewCurrentNode を表示するため、授業用の同期盤面も同時に更新する
     setReviewCurrentNode(prev => prev ? framedBoard.node : prev);
@@ -1089,6 +1116,11 @@ function App() {
   // 生徒が並べ間違いを1手戻すとき。着手と同じで、戻すのは先生の盤（2026-09-07）
   const handleStudentReviewUndo = useCallback(() => {
     void classroomRef.current?.sendTo({ type: 'REVIEW_STUDENT_UNDO', payload: {} }, [TEACHER_IDENTITY]);
+  }, []);
+
+  // 生徒が手順を動かすとき（◯手目へ）。ゲージ・進む戻る・ホイール・矢印キーの共通の口
+  const handleStudentReviewNav = useCallback((index: number) => {
+    void classroomRef.current?.sendTo({ type: 'REVIEW_STUDENT_NAV', payload: { index } }, [TEACHER_IDENTITY]);
   }, []);
 
   // ホームと検討室で共通の参加者更新。
@@ -2357,6 +2389,8 @@ function App() {
                 selfReview={reviewIsOwn}
                 onStudentMove={handleStudentReviewMove}
                 onStudentUndo={handleStudentReviewUndo}
+                onStudentNav={handleStudentReviewNav}
+                syncedTimeline={syncedReviewTimeline}
                 registeredStudents={students}
                 chatMessages={chat.messages}
                 onChatSend={chat.sendMessage}

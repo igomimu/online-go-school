@@ -79,11 +79,22 @@ test.describe('検討の別ウィンドウと生徒の着手権限', () => {
     await expect(review.getByText('1手目')).toBeVisible({ timeout: 10_000 });
     await expect(studentPage.getByText('1手目')).toBeVisible({ timeout: 10_000 });
 
-    // 並べ間違いは生徒が自分で戻せる（2026-09-07 三村さん）。
-    // 戻すのは先生の盤で、結果が両方の画面に返る
+    // 生徒にも Pocket KataGo と同じ操作列が出る（2026-09-07 三村さん）。
+    // 動かすのは先生の盤で、結果が両方の画面に返る
     await studentPage.getByTestId('go-board').locator('[data-cell="3-3"]').click({ timeout: 10_000 });
     await expect(review.getByText('2手目')).toBeVisible({ timeout: 10_000 });
-    await studentPage.getByTestId('student-undo-button').click();
+
+    // 取消（列の左端の ✕）
+    await studentPage.getByTestId('review-undo-button').click();
+    await expect(review.getByText('1手目')).toBeVisible({ timeout: 10_000 });
+    await expect(studentPage.getByText('1手目')).toBeVisible({ timeout: 10_000 });
+
+    // 手順の移動。生徒が戻すと先生の盤も一緒に戻る
+    await studentPage.getByTitle('一手戻る').click();
+    await expect(review.getByText('0手目')).toBeVisible({ timeout: 10_000 });
+    await expect(studentPage.getByText('0手目')).toBeVisible({ timeout: 10_000 });
+
+    await studentPage.getByTitle('最後へ').click();
     await expect(review.getByText('1手目')).toBeVisible({ timeout: 10_000 });
     await expect(studentPage.getByText('1手目')).toBeVisible({ timeout: 10_000 });
 

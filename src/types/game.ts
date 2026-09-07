@@ -104,6 +104,7 @@ export type GameMessageType =
   | 'REVIEW_PERMISSIONS'
   | 'REVIEW_STUDENT_MOVE'
   | 'REVIEW_STUDENT_UNDO'
+  | 'REVIEW_STUDENT_NAV'
   | 'AUDIO_CONTROL'
   | 'MEDIA_CONTROL'
   | 'RANK_DISPLAY'
@@ -142,6 +143,14 @@ export interface ReviewStudentMovePayload {
  * 並べ間違いのたびに先生の手が止まるのを防ぐためのもの（2026-09-07 三村さん）。
  */
 export type ReviewStudentUndoPayload = Record<string, never>;
+
+/**
+ * 許可された生徒からの「◯手目へ」。手順の何番目かを絶対値で送る。
+ * 「1手進む」のような差分だと、往復の間に先生が動かしたときにずれる。
+ */
+export interface ReviewStudentNavPayload {
+  index: number;
+}
 
 export interface GameMovePayload {
   gameId: string;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import ReviewBoard from './ReviewBoard';
 import { createNode, addMove } from '../utils/treeUtilsV2';
 import { createEmptyBoard } from '../utils/gameLogic';
@@ -888,8 +888,9 @@ describe('棋譜作成と、着手を許された生徒の1手戻し', () => {
     expect(screen.queryByTestId('save-record-button')).not.toBeInTheDocument();
   });
 
-  it('着手を許された生徒には「1手戻す」が出て、先生へ送る口を呼ぶ', () => {
+  it('着手を許された生徒には Pocket KataGo と同じ操作列が出る', async () => {
     const onStudentUndo = vi.fn();
+    const onStudentNav = vi.fn();
     const { root, child } = makeTree();
     render(
       <ReviewBoard
@@ -901,16 +902,59 @@ describe('棋譜作成と、着手を許された生徒の1手戻し', () => {
         canPlay
         onStudentMove={vi.fn()}
         onStudentUndo={onStudentUndo}
+        onStudentNav={onStudentNav}
+        syncedTimeline={{ index: 2, last: 5 }}
         classroomRef={mockClassroomRef as never}
       />
     );
 
-    fireEvent.click(screen.getByTestId('student-undo-button'));
+    // 手順の位置は先生の盤から配られた値で出す（生徒の盤は親を持たない写し）
+    expect(screen.getByText('2/5')).toBeInTheDocument();
 
+    // 取消は列の左端。押すと先生へ送る
+    fireEvent.click(screen.getByTestId('review-undo-button'));
     expect(onStudentUndo).toHaveBeenCalledTimes(1);
+
+    // 進む・戻る・多く進む・多く戻る・ゲージは「◯手目へ」で送る
+    fireEvent.click(screen.getByTitle('一手進む'));
+    expect(onStudentNav).toHaveBeenLastCalledWith(3);
+
+    // ゲージは掴んだまま動くので、送信は間引かれて最後の位置だけが届く
+    fireEvent.change(screen.getByTestId('review-seek-bar'), { target: { value: '4' } });
+    fireEvent.change(screen.getByTestId('review-seek-bar'), { target: { value: '5' } });
+    await waitFor(() => expect(onStudentNav).toHaveBeenLastCalledWith(5));
   });
 
-  it('着手を許されていない生徒には「1手戻す」を出さない', () => {
+  it('手順の端を越えて送らない（最初より前・最後より先）', () => {
+    const onStudentNav = vi.fn();
+    const { root, child } = makeTree();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={child}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={false}
+        canPlay
+        onStudentMove={vi.fn()}
+        onStudentUndo={vi.fn()}
+        onStudentNav={onStudentNav}
+        syncedTimeline={{ index: 0, last: 3 }}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+
+    // 0手目では戻る側が押せない
+    expect(screen.getByTitle('一手戻る')).toBeDisabled();
+    expect(screen.getByTitle('10手戻る')).toBeDisabled();
+    expect(screen.getByTestId('review-undo-button')).toBeDisabled();
+
+    // 10手進むは終端で止まる
+    fireEvent.click(screen.getByTitle('10手進む'));
+    expect(onStudentNav).toHaveBeenLastCalledWith(3);
+  });
+
+  it('着手を許されていない生徒には操作列を出さない', () => {
     const { root, child } = makeTree();
     render(
       <ReviewBoard
@@ -920,29 +964,61 @@ describe('棋譜作成と、着手を許された生徒の1手戻し', () => {
         onSetCurrentNode={vi.fn()}
         isTeacher={false}
         onStudentUndo={vi.fn()}
+        onStudentNav={vi.fn()}
+        syncedTimeline={{ index: 2, last: 5 }}
         classroomRef={mockClassroomRef as never}
       />
     );
 
-    expect(screen.queryByTestId('student-undo-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('review-undo-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('review-seek-bar')).not.toBeInTheDocument();
   });
 
-  it('自分ひとりの検討（selfReview）には「1手戻す」を足さない（元から取消がある）', () => {
+  it('生徒には記号・描画の道具は出さない（手順の操作だけ）', () => {
+    const { root, child } = makeTree();
+    const { container } = render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={child}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={false}
+        canPlay
+        onStudentMove={vi.fn()}
+        onStudentUndo={vi.fn()}
+        onStudentNav={vi.fn()}
+        syncedTimeline={{ index: 1, last: 2 }}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+
+    expect(screen.getByTestId('review-undo-button')).toBeInTheDocument();
+    expect(container.querySelector('[title="丸印 (CIR)"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="draw-curve-button"]')).not.toBeInTheDocument();
+  });
+
+  it('自分ひとりの検討（selfReview）では、取消は自分の盤で効く（先生へ送らない）', () => {
+    const onStudentUndo = vi.fn();
+    const onSetCurrentNode = vi.fn();
     const { root, child } = makeTree();
     render(
       <ReviewBoard
         rootNode={root}
         currentNode={child}
         boardSize={9}
-        onSetCurrentNode={vi.fn()}
+        onSetCurrentNode={onSetCurrentNode}
         isTeacher={false}
         selfReview
         canPlay
-        onStudentUndo={vi.fn()}
+        onStudentUndo={onStudentUndo}
+        onStudentNav={vi.fn()}
         classroomRef={mockClassroomRef as never}
       />
     );
 
-    expect(screen.queryByTestId('student-undo-button')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('review-undo-button'));
+
+    expect(onStudentUndo).not.toHaveBeenCalled();
+    expect(onSetCurrentNode).toHaveBeenCalled();
   });
 });

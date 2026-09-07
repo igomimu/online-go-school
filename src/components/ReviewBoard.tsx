@@ -3,6 +3,7 @@ import GoBoard from './GoBoard';
 import type { AnalysisOverlay, Drawing, Marker, NumberMode, PvStone } from './GoBoard';
 import type { GameNode } from '../utils/treeUtilsV2';
 import { getMainPath, removeNode, withBranchNumbers } from '../utils/treeUtilsV2';
+import { getReviewTimeline } from '../utils/reviewTimeline';
 import { generateSGFTree } from '../utils/sgfUtils';
 import { copyBoardToClipboard, copySgfToClipboard, downloadBoardAsPNG, downloadSgf } from '../utils/boardExport';
 import { playReviewMove } from '../utils/reviewMove';
@@ -26,7 +27,7 @@ import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';
 import { fromGtpCoord } from '../utils/katagoClient';
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2, Eye, EyeOff, Menu, FolderOpen, Save } from 'lucide-react';
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Eye, EyeOff, Menu, FolderOpen, Save } from 'lucide-react';
 import { getDisplayName } from '../utils/identityUtils';
 import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
 import { useAiAnalysis, toBlackWinrate } from '../hooks/useAiAnalysis';
@@ -75,6 +76,17 @@ interface ReviewBoardProps {
    * 実際に戻すのは先生側。着手（onStudentMove）と同じ往復にする。
    */
   onStudentUndo?: () => void;
+  /**
+   * 着手を許された生徒の手順移動（◯手目へ）。渡されたとき、生徒にも
+   * Pocket KataGo と同じ操作列（取消・⏮⏪◀▶⏩⏭・ゲージ）を出す。
+   * 動かすのは先生の盤なので、全員の画面が一緒に動く。
+   */
+  onStudentNav?: (index: number) => void;
+  /**
+   * 生徒の盤は親を持たない写しなので、自前では手順の位置を数えられない。
+   * 先生の盤の「何手目 / 全何手」を配ってもらってゲージに使う。
+   */
+  syncedTimeline?: { index: number; last: number };
   /**
    * 検討の途中で別の棋譜へ移るための口（2026-09-06 三村さん）。
    * 渡されたときだけヘッダーに「開く」が出る。窓は検討盤の中に描く
@@ -163,6 +175,8 @@ export default function ReviewBoard({
   onRequestSave,
   recordMode = false,
   onStudentUndo,
+  onStudentNav,
+  syncedTimeline,
   onOpenSgfText,
   onOpenSavedGame,
   onOpenProblem,
@@ -243,36 +257,17 @@ export default function ReviewBoard({
   // 盤を操作できるか。先生と、自分の棋譜を開いた生徒。
   const canEdit = isTeacher || selfReview;
 
-  const goToRoot = useCallback(() => onSetCurrentNode(rootNode), [rootNode, onSetCurrentNode]);
-  const goBack = useCallback(() => {
-    if (currentNode.parent) onSetCurrentNode(currentNode.parent);
-  }, [currentNode, onSetCurrentNode]);
-  const goForward = useCallback(() => {
-    if (currentNode.children.length > 0) onSetCurrentNode(currentNode.children[0]);
-  }, [currentNode, onSetCurrentNode]);
+  // 手順の移動は「◯手目へ」(navTo) に一本化した。生徒の盤は写しで親を持たないため、
+  // ノードを直接たどる形だと生徒側だけ動かせなくなる（2026-09-07）
   const goForwardBranch = (index: number) => {
     if (currentNode.children[index]) onSetCurrentNode(currentNode.children[index]);
   };
-  const goLast = useCallback(() => {
-    let curr = currentNode;
-    while (curr.children.length > 0) curr = curr.children[0];
-    onSetCurrentNode(curr);
-  }, [currentNode, onSetCurrentNode]);
-
   /**
    * いま見ている手順の全体。ここまで来た道（ルート→現在）と、
    * この先の続き（主分岐）をつないだもの。
    * 分岐に入っていても「今いる筋」がそのまま並ぶので、ゲージがずれない。
    */
-  const timeline = useMemo(() => {
-    const behind: GameNode[] = [];
-    let back: GameNode | null = currentNode;
-    while (back) { behind.unshift(back); back = back.parent; }
-    const ahead: GameNode[] = [];
-    let fwd = currentNode;
-    while (fwd.children.length > 0) { fwd = fwd.children[0]; ahead.push(fwd); }
-    return { nodes: [...behind, ...ahead], index: behind.length - 1 };
-  }, [currentNode]);
+  const timeline = useMemo(() => getReviewTimeline(currentNode), [currentNode]);
 
   /** ゲージや早送りで、手順の好きなところへ飛ぶ */
   const goToIndex = useCallback((index: number) => {
@@ -281,16 +276,36 @@ export default function ReviewBoard({
     if (target) onSetCurrentNode(target);
   }, [timeline, onSetCurrentNode]);
 
-  const jumpBy = useCallback((delta: number) => {
-    goToIndex(timeline.index + delta);
-  }, [goToIndex, timeline.index]);
-
   // 直近の一手を取り消す（誤クリックで作った分岐をツリーから除去する）。
   // 読み込んだ棋譜の手は削除されず「一手戻る」だけになる（元手順を守る）。
   const handleUndo = useCallback(() => {
     const parent = removeNode(currentNode);
     if (parent) onSetCurrentNode(parent);
   }, [currentNode, onSetCurrentNode]);
+
+  /**
+   * 着手を許された生徒の操作列（2026-09-07 三村さん「講師のような操作ツールを」）。
+   *
+   * 生徒の盤は先生の盤の写しなので、自分では動かさず「◯手目へ」を先生へ送り、
+   * 返ってきた盤で追いつく。着手・取消と同じ往復。
+   */
+  const studentControls = !canEdit && !!canPlay && !!onStudentNav;
+  // ゲージを掴んで動かすと毎秒何十回も送ることになる。送信の上限に当たると
+  // そこから先が誰にも届かなくなるので、最後の位置だけを間引いて送る（2026-08-26 の再発防止）
+  const studentNavThrottle = useThrottledCursor<number>(
+    useCallback((index: number) => { onStudentNav?.(index); }, [onStudentNav]),
+  );
+  const navIndex = studentControls ? (syncedTimeline?.index ?? 0) : timeline.index;
+  const navLast = studentControls ? (syncedTimeline?.last ?? 0) : timeline.nodes.length - 1;
+  const navTo = useCallback((index: number) => {
+    const clamped = Math.max(0, Math.min(navLast, index));
+    if (studentControls) studentNavThrottle.push(clamped);
+    else goToIndex(clamped);
+  }, [studentControls, studentNavThrottle, goToIndex, navLast]);
+  const undoMove = useCallback(() => {
+    if (studentControls) onStudentUndo?.();
+    else handleUndo();
+  }, [studentControls, onStudentUndo, handleUndo]);
 
   /**
    * マウスホイールで手順送り/戻り（pokekata踏襲）。
@@ -316,16 +331,16 @@ export default function ReviewBoard({
   }, []);
 
   const handleBoardWheel = useCallback((delta: number) => {
-    if (!canEdit || delta === 0) return;
+    if ((!canEdit && !studentControls) || delta === 0) return;
     wheelDebt.current += delta > 0 ? 1 : -1;
     if (wheelTimer.current !== null) return;
     wheelTimer.current = setTimeout(() => {
       wheelTimer.current = null;
       const steps = wheelDebt.current;
       wheelDebt.current = 0;
-      if (steps !== 0) jumpBy(steps);
+      if (steps !== 0) navTo(navIndex + steps);
     }, WHEEL_BATCH_MS);
-  }, [canEdit, jumpBy]);
+  }, [canEdit, studentControls, navTo, navIndex]);
 
   /**
    * 生徒へ配る描画。🔴 曲線(free)は講師の手元だけに残すので送らない
@@ -377,17 +392,20 @@ export default function ReviewBoard({
 
   // キーボードショートカット（pokekata踏襲）。チャット等の入力中は無効化する。
   useEffect(() => {
-    if (!canEdit) return;
+    if (!canEdit && !studentControls) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
       const ctrl = e.ctrlKey || e.metaKey;
-      if (e.key === 'ArrowLeft' || e.key === 'Backspace') { e.preventDefault(); goBack(); }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); goForward(); }
-      else if (e.key === 'Home') { e.preventDefault(); goToRoot(); }
-      else if (e.key === 'End') { e.preventDefault(); goLast(); }
-      else if (e.key === 'Delete') { e.preventDefault(); handleUndo(); }
-      else if (ctrl && e.key === 'z') { e.preventDefault(); handleUndo(); }
+      // 手順の移動と取消は、着手を許された生徒にも同じキーで効かせる
+      if (e.key === 'ArrowLeft' || e.key === 'Backspace') { e.preventDefault(); navTo(navIndex - 1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); navTo(navIndex + 1); }
+      else if (e.key === 'Home') { e.preventDefault(); navTo(0); }
+      else if (e.key === 'End') { e.preventDefault(); navTo(navLast); }
+      else if (e.key === 'Delete') { e.preventDefault(); undoMove(); }
+      else if (ctrl && e.key === 'z') { e.preventDefault(); undoMove(); }
+      // ここから下は先生（と自分の検討）だけの操作
+      else if (!canEdit) return;
       // 書き出しは Pocket KataGo と同じ割り当て（Ctrl+C=SGF / Ctrl+S=SGF保存 / Ctrl+F=画像コピー）
       else if (ctrl && e.key === 'c') { e.preventDefault(); void handleCopySgf(); }
       else if (ctrl && e.key === 's') { e.preventDefault(); handleSaveSgf(); }
@@ -402,7 +420,7 @@ export default function ReviewBoard({
     // 別ウィンドウに描かれているときは、そのウィンドウに張らないとキーが効かない
     hostWindow.addEventListener('keydown', handleKeyDown);
     return () => hostWindow.removeEventListener('keydown', handleKeyDown);
-  }, [canEdit, isTeacher, handleUndo, goBack, goForward, goToRoot, goLast, hostWindow, cycleNumberMode, toggleBranchStart, handleCopySgf, handleSaveSgf, handleCopyImage]);
+  }, [canEdit, studentControls, isTeacher, undoMove, navTo, navIndex, navLast, hostWindow, cycleNumberMode, toggleBranchStart, handleCopySgf, handleSaveSgf, handleCopyImage]);
 
   // 描画ハンドラ
   const handleDrawDragStart = useCallback((x: number, y: number) => {
@@ -846,19 +864,6 @@ export default function ReviewBoard({
                 打てます
               </span>
             )}
-            {/* 並べ間違いを自分で戻す。戻すのは先生の盤で、結果が全員に返る */}
-            {!canEdit && canPlay && onStudentUndo && (
-              <button
-                type="button"
-                data-testid="student-undo-button"
-                onClick={onStudentUndo}
-                title="いま置いた石を1つ戻す"
-                className="flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 py-1.5 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-line"
-              >
-                <Undo2 className="h-3.5 w-3.5" />
-                1手戻す
-              </button>
-            )}
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             {/* 並べた棋譜を残す（2026-09-07 三村さん）。共有検討では渡されないので出ない */}
@@ -974,7 +979,7 @@ export default function ReviewBoard({
             readOnly={!canEdit && !canPlay}
             onCellClick={canEdit ? handleCellClick : (canPlay ? handleStudentCellClick : undefined)}
             onCellRightClick={canEdit ? handleCellRightClick : undefined}
-            onBoardWheel={canEdit ? handleBoardWheel : undefined}
+            onBoardWheel={canEdit || studentControls ? handleBoardWheel : undefined}
             onCellMouseEnter={handleCellMouseEnter}
             onCellMouseLeave={handleCellMouseLeave}
             onDragStart={drawMode === 'arrow' ? handleDrawDragStart : undefined}
@@ -994,62 +999,65 @@ export default function ReviewBoard({
           data-testid="review-controls"
           className="space-y-2 sm:space-y-3 lg:h-[190px] lg:shrink-0 lg:overflow-y-auto lg:pr-1"
         >
-          {/* ナビゲーション */}
-          {canEdit && (
+          {/* ナビゲーション。着手を許された生徒にも同じ列を出す（2026-09-07 三村さん） */}
+          {(canEdit || studentControls) && (
           <div className="flex flex-col gap-2 sm:gap-3 w-full items-center">
-            {/* ステップ移動 */}
-            <div className="flex justify-center gap-2">
-              <button onClick={goToRoot} disabled={!currentNode.parent} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="最初へ">
-                <ChevronFirst />
-              </button>
-              <button onClick={() => jumpBy(-10)} disabled={!currentNode.parent} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="10手戻る">
-                <ChevronsLeft />
-              </button>
-              <button onClick={goBack} disabled={!currentNode.parent} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="一手戻る">
-                <ChevronLeft />
-              </button>
-              <button onClick={goForward} disabled={currentNode.children.length === 0} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="一手進む">
-                <ChevronRight />
-              </button>
-              <button onClick={() => jumpBy(10)} disabled={currentNode.children.length === 0} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="10手進む">
-                <ChevronsRight />
-              </button>
-              <button onClick={goLast} disabled={currentNode.children.length === 0} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="最後へ">
-                <ChevronLast />
-              </button>
-              <div className="w-px h-8 bg-ink/8 mx-1 self-center" />
+            {/* ステップ移動。並び・割り当ては Pocket KataGo に揃える */}
+            <div className="flex justify-center items-center gap-2">
+              {/* 取消は Pocket KataGo と同じで列の左端。押す機会が多いので一回り大きい */}
               <button
-                onClick={handleUndo}
-                disabled={!currentNode.parent}
+                data-testid="review-undo-button"
+                onClick={undoMove}
+                disabled={navIndex <= 0}
                 title={currentNode.fromRecord
                   ? '棋譜の手は消えません（一手戻ります）'
-                  : '検討で置いた直近の一手を取り消す (Delete / Ctrl+Z)'}
-                className="p-2.5 sm:p-3 glass-panel hover:bg-alert/10 hover:text-alert-text disabled:opacity-30"
+                  : '一手戻す（検討で置いた直近の一手を取り消す / Delete・Ctrl+Z）'}
+                className="p-3 sm:p-3.5 glass-panel text-alert-text hover:bg-alert/10 disabled:opacity-30"
               >
-                <Undo2 />
+                <X className="h-7 w-7" />
+              </button>
+              <div className="w-px h-8 bg-ink/8 mx-1 self-center" />
+              <button onClick={() => navTo(0)} disabled={navIndex <= 0} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="最初へ">
+                <ChevronFirst />
+              </button>
+              <button onClick={() => navTo(navIndex - 10)} disabled={navIndex <= 0} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="10手戻る">
+                <ChevronsLeft />
+              </button>
+              <button onClick={() => navTo(navIndex - 1)} disabled={navIndex <= 0} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="一手戻る">
+                <ChevronLeft />
+              </button>
+              <button onClick={() => navTo(navIndex + 1)} disabled={navIndex >= navLast} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="一手進む">
+                <ChevronRight />
+              </button>
+              <button onClick={() => navTo(navIndex + 10)} disabled={navIndex >= navLast} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="10手進む">
+                <ChevronsRight />
+              </button>
+              <button onClick={() => navTo(navLast)} disabled={navIndex >= navLast} className="p-2.5 sm:p-3 glass-panel hover:bg-ink/10 disabled:opacity-30" title="最後へ">
+                <ChevronLast />
               </button>
             </div>
 
             {/* 手順のゲージ。200手を超える棋譜でも、見たい場面まで一気に飛べる */}
-            {timeline.nodes.length > 1 && (
+            {navLast > 0 && (
               <div className="flex w-full items-center gap-2 px-1">
                 <span className="tabular text-xs text-muted whitespace-nowrap">
-                  {timeline.index}/{timeline.nodes.length - 1}
+                  {navIndex}/{navLast}
                 </span>
                 <input
                   type="range"
                   aria-label="手順の位置"
                   data-testid="review-seek-bar"
                   min={0}
-                  max={timeline.nodes.length - 1}
-                  value={timeline.index}
-                  onChange={(e) => goToIndex(Number(e.target.value))}
+                  max={navLast}
+                  value={navIndex}
+                  onChange={(e) => navTo(Number(e.target.value))}
                   className="h-2 w-full cursor-pointer appearance-none rounded-full bg-ink/10 accent-accent"
                 />
               </div>
             )}
 
-            {/* アノテーション & 描画ツールバー */}
+            {/* アノテーション & 描画ツールバー。記号と描画は先生（と自分の検討）だけ */}
+            {canEdit && (
             <div className="flex flex-wrap justify-center items-center gap-1.5 p-2 bg-ground/60 border border-line rounded-xl max-w-full">
               {/* 着手モード */}
               <button
@@ -1241,6 +1249,7 @@ export default function ReviewBoard({
                 </>
               )}
             </div>
+            )}
           </div>
           )}
 
