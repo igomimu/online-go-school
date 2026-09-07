@@ -26,7 +26,7 @@ import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';
 import { fromGtpCoord } from '../utils/katagoClient';
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2, Eye, EyeOff, Menu, FolderOpen } from 'lucide-react';
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Undo2, Eye, EyeOff, Menu, FolderOpen, Save } from 'lucide-react';
 import { getDisplayName } from '../utils/identityUtils';
 import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
 import { useAiAnalysis, toBlackWinrate } from '../hooks/useAiAnalysis';
@@ -63,6 +63,18 @@ interface ReviewBoardProps {
    * AI は付けない（三村さんの指示 2026-08-13）。盤は誰にも配信しない。
    */
   selfReview?: boolean;
+  /**
+   * 棋譜として残すための口（2026-09-07 三村さん「アプリ内に棋譜を入力して保存する」）。
+   * 渡されたときだけヘッダーに「保存」が出る。窓（誰の碁か・日付・結果）は App が持つ。
+   */
+  onRequestSave?: (sgf: string) => void;
+  /** 「棋譜作成」画面かどうか。見出しの語だけ変える */
+  recordMode?: boolean;
+  /**
+   * 着手を許された生徒が、自分の並べ間違いを1手戻す（2026-09-07 三村さん）。
+   * 実際に戻すのは先生側。着手（onStudentMove）と同じ往復にする。
+   */
+  onStudentUndo?: () => void;
   /**
    * 検討の途中で別の棋譜へ移るための口（2026-09-06 三村さん）。
    * 渡されたときだけヘッダーに「開く」が出る。窓は検討盤の中に描く
@@ -148,6 +160,9 @@ export default function ReviewBoard({
   canPlay,
   onStudentMove,
   selfReview = false,
+  onRequestSave,
+  recordMode = false,
+  onStudentUndo,
   onOpenSgfText,
   onOpenSavedGame,
   onOpenProblem,
@@ -820,7 +835,9 @@ export default function ReviewBoard({
                 <span className="sm:hidden">閉じる</span>
               </button>
             )}
-            <span className="font-bold text-sm sm:text-base sm:ml-2 whitespace-nowrap">検討モード</span>
+            <span className="font-bold text-sm sm:text-base sm:ml-2 whitespace-nowrap">
+              {recordMode ? '棋譜作成' : '検討モード'}
+            </span>
             <span className="text-sm text-muted whitespace-nowrap">
               {currentMoveNumber}手目
             </span>
@@ -829,8 +846,34 @@ export default function ReviewBoard({
                 打てます
               </span>
             )}
+            {/* 並べ間違いを自分で戻す。戻すのは先生の盤で、結果が全員に返る */}
+            {!canEdit && canPlay && onStudentUndo && (
+              <button
+                type="button"
+                data-testid="student-undo-button"
+                onClick={onStudentUndo}
+                title="いま置いた石を1つ戻す"
+                className="flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 py-1.5 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-line"
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+                1手戻す
+              </button>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            {/* 並べた棋譜を残す（2026-09-07 三村さん）。共有検討では渡されないので出ない */}
+            {onRequestSave && (
+              <button
+                type="button"
+                data-testid="save-record-button"
+                onClick={() => onRequestSave(buildSgf())}
+                className="flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-semibold text-ground transition-all"
+                title="この棋譜を保存する"
+              >
+                <Save className="h-3.5 w-3.5" />
+                保存
+              </button>
+            )}
             {/* 棋譜を開く。検討の途中でも別の棋譜へ移れるようにする（2026-09-06 三村さん） */}
             {isTeacher && (onOpenSgfText || onOpenSavedGame || onOpenProblem) && (
               <button

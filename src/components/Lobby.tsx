@@ -51,6 +51,8 @@ interface LobbyProps {
   chatMessages?: ChatMessage[];
   onChatSend?: (text: string, target: 'all' | string) => void;
   onResumeGame?: (gameId: string) => void;
+  /** 棋譜作成（SGFの読み込み・盤に入力して保存） */
+  onCreateRecord?: () => void;
 }
 
 export default function Lobby({
@@ -78,6 +80,7 @@ export default function Lobby({
   chatMessages,
   onChatSend,
   onResumeGame,
+  onCreateRecord,
 }: LobbyProps) {
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -349,6 +352,7 @@ export default function Lobby({
             studentName={currentStudentName || myIdentity}
             students={students}
             onSelectGame={onSelectSavedGame}
+            onCreateRecord={onCreateRecord}
           />
         )}
 

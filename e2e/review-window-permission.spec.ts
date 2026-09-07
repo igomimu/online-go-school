@@ -79,6 +79,14 @@ test.describe('検討の別ウィンドウと生徒の着手権限', () => {
     await expect(review.getByText('1手目')).toBeVisible({ timeout: 10_000 });
     await expect(studentPage.getByText('1手目')).toBeVisible({ timeout: 10_000 });
 
+    // 並べ間違いは生徒が自分で戻せる（2026-09-07 三村さん）。
+    // 戻すのは先生の盤で、結果が両方の画面に返る
+    await studentPage.getByTestId('go-board').locator('[data-cell="3-3"]').click({ timeout: 10_000 });
+    await expect(review.getByText('2手目')).toBeVisible({ timeout: 10_000 });
+    await studentPage.getByTestId('student-undo-button').click();
+    await expect(review.getByText('1手目')).toBeVisible({ timeout: 10_000 });
+    await expect(studentPage.getByText('1手目')).toBeVisible({ timeout: 10_000 });
+
     // 許可を外すと打てなくなる
     await permissionButton.click();
     await expect(studentPage.getByText('打てます')).toHaveCount(0, { timeout: 10_000 });

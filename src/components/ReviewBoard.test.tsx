@@ -844,3 +844,105 @@ describe('ホイールの手順送り', () => {
     });
   });
 });
+
+describe('棋譜作成と、着手を許された生徒の1手戻し', () => {
+  it('onRequestSave が渡されたときだけ「保存」が出て、SGFを渡す', () => {
+    const onRequestSave = vi.fn();
+    const { root, child } = makeTree();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={child}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={false}
+        selfReview
+        recordMode
+        onRequestSave={onRequestSave}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+
+    expect(screen.getByText('棋譜作成')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('save-record-button'));
+
+    expect(onRequestSave).toHaveBeenCalledTimes(1);
+    const sgf = onRequestSave.mock.calls[0][0] as string;
+    expect(sgf).toContain('SZ[9]');
+    expect(sgf).toContain(';B[ee]');
+  });
+
+  it('共有検討（保存の口を渡さない）では「保存」を出さない', () => {
+    const { root } = makeTree();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={root}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={true}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+
+    expect(screen.queryByTestId('save-record-button')).not.toBeInTheDocument();
+  });
+
+  it('着手を許された生徒には「1手戻す」が出て、先生へ送る口を呼ぶ', () => {
+    const onStudentUndo = vi.fn();
+    const { root, child } = makeTree();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={child}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={false}
+        canPlay
+        onStudentMove={vi.fn()}
+        onStudentUndo={onStudentUndo}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('student-undo-button'));
+
+    expect(onStudentUndo).toHaveBeenCalledTimes(1);
+  });
+
+  it('着手を許されていない生徒には「1手戻す」を出さない', () => {
+    const { root, child } = makeTree();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={child}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={false}
+        onStudentUndo={vi.fn()}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+
+    expect(screen.queryByTestId('student-undo-button')).not.toBeInTheDocument();
+  });
+
+  it('自分ひとりの検討（selfReview）には「1手戻す」を足さない（元から取消がある）', () => {
+    const { root, child } = makeTree();
+    render(
+      <ReviewBoard
+        rootNode={root}
+        currentNode={child}
+        boardSize={9}
+        onSetCurrentNode={vi.fn()}
+        isTeacher={false}
+        selfReview
+        canPlay
+        onStudentUndo={vi.fn()}
+        classroomRef={mockClassroomRef as never}
+      />
+    );
+
+    expect(screen.queryByTestId('student-undo-button')).not.toBeInTheDocument();
+  });
+});

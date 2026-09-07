@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, FilePlus2 } from 'lucide-react';
 import type { SavedGame } from '../types/game';
 import type { Student } from '../types/classroom';
 import { loadSavedGamesForStudent } from '../utils/savedGames';
@@ -10,6 +10,8 @@ interface StudentGameHistoryProps {
   studentName: string;
   students?: Student[];
   onSelectGame: (game: SavedGame) => void;
+  /** 棋譜作成（SGFの読み込み・盤に入力して保存）を開く */
+  onCreateRecord?: () => void;
 }
 
 export default function StudentGameHistory({
@@ -17,6 +19,7 @@ export default function StudentGameHistory({
   studentName,
   students = [],
   onSelectGame,
+  onCreateRecord,
 }: StudentGameHistoryProps) {
   const [games, setGames] = useState<SavedGame[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -43,6 +46,18 @@ export default function StudentGameHistory({
       <div className="flex items-center gap-2">
         <BookOpen className="h-4 w-4 text-accent-text" aria-hidden="true" />
         <h3 className="heading-section">自分の棋譜履歴</h3>
+        {onCreateRecord && (
+          <button
+            type="button"
+            data-testid="open-record-create"
+            onClick={onCreateRecord}
+            className="ml-auto flex items-center gap-1.5 rounded-md border border-line bg-raised px-2.5 py-1.5 text-xs font-semibold text-ink transition-colors duration-150 hover:bg-line"
+            title="自分の打った碁を入力して保存する（SGFの読み込みもここから）"
+          >
+            <FilePlus2 className="h-3.5 w-3.5" />
+            棋譜作成
+          </button>
+        )}
       </div>
 
       {games === null ? (

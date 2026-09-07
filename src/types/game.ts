@@ -60,7 +60,18 @@ export interface SavedGame {
    * 中断局も棋譜履歴の一件として扱う（2026-08-27）。undefined は突き合わせをしていない場合。
    */
   liveStatus?: 'playing' | 'scoring' | 'finished' | 'interrupted';
+  /**
+   * この棋譜の出どころ。
+   * live=アプリで打った対局 / upload=SGFファイルの持込 / manual=盤に並べて入力。
+   * 持込と対局の記録が混ざると勝敗の見え方が狂うので、一覧では印で分ける。
+   */
+  source?: GameRecordSource;
+  /** 持込棋譜を入れた人の identity。自分が入れたものだけ消せるようにするために使う */
+  createdBy?: string;
 }
+
+/** 棋譜の出どころ。DB の go_school_games.source と同じ値 */
+export type GameRecordSource = 'live' | 'upload' | 'manual';
 
 // === 音声制御 ===
 export interface AudioPermissions {
@@ -72,7 +83,7 @@ export interface AudioPermissions {
 }
 
 // === 画面状態 ===
-export type ViewMode = 'lobby' | 'game' | 'review' | 'lecture' | 'problem';
+export type ViewMode = 'lobby' | 'game' | 'review' | 'lecture' | 'problem' | 'record';
 
 // === DataChannelメッセージ ===
 export type GameMessageType =
@@ -92,6 +103,7 @@ export type GameMessageType =
   | 'NIGIRI_DRAW'
   | 'REVIEW_PERMISSIONS'
   | 'REVIEW_STUDENT_MOVE'
+  | 'REVIEW_STUDENT_UNDO'
   | 'AUDIO_CONTROL'
   | 'MEDIA_CONTROL'
   | 'RANK_DISPLAY'
@@ -124,6 +136,12 @@ export interface ReviewStudentMovePayload {
   x: number;
   y: number;
 }
+
+/**
+ * 許可された生徒からの「1手戻す」。着手と同じで、実際に戻すのは先生側。
+ * 並べ間違いのたびに先生の手が止まるのを防ぐためのもの（2026-09-07 三村さん）。
+ */
+export type ReviewStudentUndoPayload = Record<string, never>;
 
 export interface GameMovePayload {
   gameId: string;

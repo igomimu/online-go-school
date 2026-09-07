@@ -1,4 +1,4 @@
-import type { SavedGame } from '../types/game';
+import type { GameRecordSource, SavedGame } from '../types/game';
 import { getSupabase } from './liveGameApi';
 import { makeStudentIdentity } from './identityUtils';
 
@@ -93,6 +93,8 @@ export async function syncFromSupabase(): Promise<SavedGame[]> {
     komi: row.komi,
     result: row.result,
     sgf: row.sgf,
+    source: (row.source ?? 'live') as GameRecordSource,
+    createdBy: row.created_by ?? undefined,
   }));
 
   // localStorageも更新
@@ -138,6 +140,8 @@ export async function loadSavedGamesForStudent(studentName: string, studentIdent
     komi: row.komi,
     result: row.result,
     sgf: row.sgf,
+    source: (row.source ?? 'live') as GameRecordSource,
+    createdBy: row.created_by ?? undefined,
   }));
 
   return attachLiveStatus(sb, games);
@@ -168,4 +172,65 @@ async function attachLiveStatus(sb: NonNullable<ReturnType<typeof getSupabase>>,
     console.error('[loadSavedGamesForStudent] 対局状態の突き合わせに失敗:', e);
     return games;
   }
+}
+
+/**
+ * 持ち込んだ棋譜（SGFの読み込み／盤に並べたもの）を1件入れる。
+ *
+ * 🔴 upsert ではなく insert を使う。upsert は UPDATE ポリシーまで開ける必要があり、
+ * 既にある他人の棋譜を id 衝突で踏み替えられる余地を残すため。
+ *
+ * 🔴 生徒の「自分の棋譜履歴」は Supabase しか見ていない（StudentGameHistory）。
+ * 失敗を黙って localStorage だけに残すと、保存できたように見えて次に開くと消えている。
+ * ここでは必ず結果を待ち、失敗は文言で返す。
+ */
+export async function insertGameRecord(
+  game: SavedGame,
+  meta: { source: Exclude<GameRecordSource, 'live'>; createdBy: string },
+): Promise<{ error?: string }> {
+  let sb: ReturnType<typeof getSupabase>;
+  try {
+    sb = getSupabase();
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+
+  const { error } = await sb.from('go_school_games').insert({
+    id: game.id,
+    date: game.date,
+    black_player: game.blackPlayer,
+    white_player: game.whitePlayer,
+    board_size: game.boardSize,
+    handicap: game.handicap,
+    komi: game.komi,
+    result: game.result,
+    sgf: game.sgf,
+    source: meta.source,
+    created_by: meta.createdBy,
+  });
+
+  if (error) return { error: error.message };
+
+  // 保存できたときだけ手元の控えにも足す（先生ホームの「保存棋譜」はこれを見ている）
+  const games = loadSavedGames().filter(g => g.id !== game.id);
+  games.unshift({ ...game, source: meta.source, createdBy: meta.createdBy });
+  saveToLocalStorage(games);
+
+  return {};
+}
+
+/** 持込棋譜を消す。deleteGame と違って結果を待ち、失敗を返す */
+export async function deleteGameRecord(id: string): Promise<{ error?: string }> {
+  let sb: ReturnType<typeof getSupabase>;
+  try {
+    sb = getSupabase();
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+
+  const { error } = await sb.from('go_school_games').delete().eq('id', id);
+  if (error) return { error: error.message };
+
+  saveToLocalStorage(loadSavedGames().filter(g => g.id !== id));
+  return {};
 }

@@ -189,6 +189,30 @@ export async function clearLiveGames(classroomId: string): Promise<void> {
   if (error) throw new Error(`Failed to clear live games: ${error.message}`);
 }
 
+/**
+ * テストで作った持込棋譜（棋譜作成・SGFアップロード）を消す。
+ *
+ * 🔴 go_school_games は本番の棋譜庫。E2E の残骸を置いていくと、生徒の棋譜履歴に
+ * テストの対局が混ざる（過去に「たろう vs はなこ」が半年残った）。
+ * 消すのは created_by が指定の人で、かつ source が live でない行だけ＝実際の対局には触れない。
+ */
+export async function deleteBroughtGames(createdBy: string): Promise<void> {
+  try {
+    const { url, serviceRoleKey } = getRosterSeedEnv();
+    const supabase = createClient(url, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { error } = await supabase
+      .from('go_school_games')
+      .delete()
+      .eq('created_by', createdBy)
+      .neq('source', 'live');
+    if (error) throw new Error(error.message);
+  } catch (err) {
+    console.error(`[E2E Teardown Error] Failed to delete brought games for ${createdBy}:`, err);
+  }
+}
+
 export async function teardownSupabaseRoster(classroomId: string): Promise<void> {
   try {
     const { url, serviceRoleKey } = getRosterSeedEnv();

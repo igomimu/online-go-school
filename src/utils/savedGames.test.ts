@@ -1,16 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { loadSavedGames, saveGame, deleteGame, getGame, loadSavedGamesForStudent } from './savedGames';
+import { loadSavedGames, saveGame, deleteGame, getGame, loadSavedGamesForStudent, insertGameRecord, deleteGameRecord } from './savedGames';
 import type { SavedGame } from '../types/game';
 
 const mockOrder = vi.fn(() => Promise.resolve({ data: [], error: null }));
 const mockOr = vi.fn(() => ({ order: mockOrder }));
 const mockSelect = vi.fn(() => ({ or: mockOr }));
 const mockUpsert = vi.fn(() => Promise.resolve({ error: null }));
+let insertResult: { error: { message: string } | null } = { error: null };
+const mockInsert = vi.fn(() => Promise.resolve(insertResult));
 const mockDeleteEq = vi.fn(() => Promise.resolve({ error: null }));
 const mockDelete = vi.fn(() => ({ eq: mockDeleteEq }));
 const mockFrom = vi.fn(() => ({
   select: mockSelect,
   upsert: mockUpsert,
+  insert: mockInsert,
   delete: mockDelete,
 }));
 
@@ -115,5 +118,51 @@ describe('savedGames (localStorage)', () => {
     expect(mockOr).toHaveBeenCalledWith(
       'black_player.eq."たろう",white_player.eq."たろう"',
     );
+  });
+});
+
+describe('持ち込んだ棋譜（棋譜作成）', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    insertResult = { error: null };
+  });
+
+  it('source と created_by を付けて insert する（upsert は使わない）', async () => {
+    const res = await insertGameRecord(mockGame, { source: 'upload', createdBy: 'sid:1010' });
+
+    expect(res.error).toBeUndefined();
+    expect(mockUpsert).not.toHaveBeenCalled();
+    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'test-1',
+      black_player: 'たろう',
+      source: 'upload',
+      created_by: 'sid:1010',
+    }));
+  });
+
+  it('保存できたときだけ手元の控えにも足す', async () => {
+    await insertGameRecord(mockGame, { source: 'manual', createdBy: 'sid:1010' });
+    expect(loadSavedGames()).toHaveLength(1);
+    expect(loadSavedGames()[0].source).toBe('manual');
+  });
+
+  it('失敗したら文言を返し、手元にも残さない', async () => {
+    insertResult = { error: { message: 'new row violates row-level security policy' } };
+
+    const res = await insertGameRecord(mockGame, { source: 'upload', createdBy: 'sid:9999' });
+
+    expect(res.error).toContain('row-level security');
+    expect(loadSavedGames()).toHaveLength(0);
+  });
+
+  it('持込棋譜を消すと手元の控えからも消える', async () => {
+    await insertGameRecord(mockGame, { source: 'upload', createdBy: 'sid:1010' });
+
+    const res = await deleteGameRecord('test-1');
+
+    expect(res.error).toBeUndefined();
+    expect(mockDeleteEq).toHaveBeenCalledWith('id', 'test-1');
+    expect(loadSavedGames()).toHaveLength(0);
   });
 });

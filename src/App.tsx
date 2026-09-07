@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { Drawing, NumberMode } from './components/GoBoard';
 import type { GameNode } from './utils/treeUtilsV2';
-import { convertSgfToGameTree, withBranchNumbers } from './utils/treeUtilsV2';
+import { convertSgfToGameTree, getMainPath, removeNode, withBranchNumbers } from './utils/treeUtilsV2';
 import { generateSGFTree, parseSGFTree } from './utils/sgfUtils';
 import { playReviewMove } from './utils/reviewMove';
 import {
@@ -33,10 +33,14 @@ import {
   interruptGameOnUnload,
 } from './utils/unloadInterrupt';
 import { fetchRoster, loadStudents, loadClassrooms, loadStudentTypes } from './utils/classroomStore';
+import { clearRecordDraft, loadRecordDraft, saveRecordDraft, type RecordDraft } from './utils/recordDraft';
+import { insertGameRecord } from './utils/savedGames';
 import { fetchMyClassroomRoster } from './utils/studentRoster';
 import { saveAccount, supabaseSignInStudent, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } from './utils/authStore';
 
 import Header from './components/Header';
+import RecordStartDialog from './components/RecordStartDialog';
+import RecordSaveDialog, { type RecordSaveValues } from './components/RecordSaveDialog';
 import ErrorBoundary from './components/ErrorBoundary';
 import PopupPortal from './components/PopupPortal';
 import NigiriAnnouncement from './components/NigiriAnnouncement';
@@ -262,6 +266,42 @@ function App() {
   const reviewMovePermissionsRef = useRef<string[]>([]);
   // 生徒側: 自分が今この検討盤に打てるか
   const [reviewCanPlay, setReviewCanPlay] = useState(false);
+
+  // === 棋譜を並べる（2026-09-07 三村さん「棋譜をアップロード／アプリ内に入力して保存」） ===
+  // 共有検討とは別の画面にする。viewMode を分けているので、授業中の配信経路
+  // （BOARD_UPDATE / REVIEW_PERMISSIONS / REVIEW_END は viewMode === 'review' で絞っている）
+  // には一切かからない＝先生がここで並べても生徒の盤は動かない。
+  const [showRecordStart, setShowRecordStart] = useState(false);
+  const [recordRootNode, setRecordRootNode] = useState<GameNode | null>(null);
+  const [recordCurrentNode, setRecordCurrentNode] = useState<GameNode | null>(null);
+  const [recordBoardSize, setRecordBoardSize] = useState(19);
+  const [recordSource, setRecordSource] = useState<'upload' | 'manual'>('manual');
+  const [recordInitialMeta, setRecordInitialMeta] = useState<Partial<RecordSaveValues>>({});
+  const [recordSaveSgf, setRecordSaveSgf] = useState<string | null>(null);
+  const [recordSaving, setRecordSaving] = useState(false);
+  const [recordSaveError, setRecordSaveError] = useState<string | null>(null);
+  const [recordDraft, setRecordDraft] = useState<RecordDraft | null>(null);
+  // メッセージ処理は接続時に作った関数の中で走るので、最新の並べかけを ref で見る
+  const recordRootRef = useRef<GameNode | null>(null);
+  const recordBoardSizeRef = useRef(19);
+  useEffect(() => { recordRootRef.current = recordRootNode; }, [recordRootNode]);
+  useEffect(() => { recordBoardSizeRef.current = recordBoardSize; }, [recordBoardSize]);
+
+  /**
+   * 作りかけの棋譜を下書きに残して、棋譜作成の画面を畳む。
+   * 先生が検討や詰碁を始めたとき（生徒の画面が切り替わるとき）に呼ぶ。
+   */
+  const stashRecordDraft = useCallback(() => {
+    const root = recordRootRef.current;
+    if (!root) return;
+    if (root.children.length > 0) {
+      saveRecordDraft(generateSGFTree(root, recordBoardSizeRef.current), recordBoardSizeRef.current);
+    }
+    setRecordRootNode(null);
+    setRecordCurrentNode(null);
+    setRecordSaveSgf(null);
+    setShowRecordStart(false);
+  }, []);
   // 講師への即時通知（接続切れ・時間切れ）。音だけだと何が起きたか分からないので一緒に出す
   const [alerts, setAlerts] = useState<ClassroomAlert[]>([]);
   const dismissAlert = useCallback((id: number) => {
@@ -617,6 +657,9 @@ function App() {
 
         // 検討モード開始（生徒用）
         if (msg.type === 'REVIEW_START' && connectRole === 'STUDENT' && msg.payload) {
+          // 棋譜作成の途中なら下書きに残してから切り替える。
+          // 授業の主導は先生側、という今の作りは変えない（2026-09-07）
+          stashRecordDraft();
           const p = msg.payload as { sgf: string; boardSize: number };
           const parsed = parseSGFTree(p.sgf);
           const root = convertSgfToGameTree(parsed.root, null, p.boardSize, 1, parsed.board);
@@ -633,6 +676,7 @@ function App() {
         }
         // 詰碁配信（生徒用）
         if (msg.type === 'PROBLEM_ASSIGN' && connectRole === 'STUDENT' && msg.payload) {
+          stashRecordDraft();
           const p = msg.payload as import('./types/problem').ProblemAssignPayload;
           setActiveProblem(p.problem);
           setViewMode('problem');
@@ -660,6 +704,15 @@ function App() {
           ) {
             // 打った結果は通常のBOARD_UPDATE（reviewCurrentNodeのeffect）で全員へ返る
             setReviewCurrentNode(prev => (prev ? playReviewMove(prev, p.x, p.y) ?? prev : prev));
+          }
+        }
+
+        // 許可した生徒の「1手戻す」（先生用）。着手と同じで判定はここが正本
+        if (msg.type === 'REVIEW_STUDENT_UNDO' && connectRole === 'TEACHER' && sender) {
+          if (reviewMovePermissionsRef.current.includes(sender)) {
+            // 戻した結果は通常の BOARD_UPDATE（reviewCurrentNode の effect）で全員へ返る。
+            // 読み込んだ棋譜の本手は removeNode では消えず、一手戻るだけになる
+            setReviewCurrentNode(prev => (prev ? removeNode(prev) ?? prev : prev));
           }
         }
 
@@ -1031,6 +1084,11 @@ function App() {
   // 生徒が検討盤に打ったとき。自分では置かず先生へ送り、先生の盤経由で返るのを待つ
   const handleStudentReviewMove = useCallback((x: number, y: number) => {
     void classroomRef.current?.sendTo({ type: 'REVIEW_STUDENT_MOVE', payload: { x, y } }, [TEACHER_IDENTITY]);
+  }, []);
+
+  // 生徒が並べ間違いを1手戻すとき。着手と同じで、戻すのは先生の盤（2026-09-07）
+  const handleStudentReviewUndo = useCallback(() => {
+    void classroomRef.current?.sendTo({ type: 'REVIEW_STUDENT_UNDO', payload: {} }, [TEACHER_IDENTITY]);
   }, []);
 
   // ホームと検討室で共通の参加者更新。
@@ -1440,6 +1498,118 @@ function App() {
       alert('棋譜の読み込みに失敗しました');
     }
   }, [role]);
+
+  // === 棋譜作成（SGFのアップロード／盤に入力して保存） ===
+  // 共有検討とは別モード（viewMode='record'）。配信もAIも付けず、先生・生徒とも同じ画面を使う。
+  const openRecordStart = useCallback(() => {
+    setRecordDraft(loadRecordDraft());
+    setShowRecordStart(true);
+  }, []);
+
+  const startRecord = useCallback((sgf: string, boardSize: number, source: 'upload' | 'manual', initial: Partial<RecordSaveValues>) => {
+    const parsed = parseSGFTree(sgf);
+    const size = boardSize || parsed.size;
+    const root = convertSgfToGameTree(parsed.root, null, size, 1, parsed.board);
+    // 棋譜作成では最終手から始める。続きを入力するのが目的なので、
+    // 読み込んだ棋譜を毎回終局まで進め直させない（検討で開くときは0手目から）
+    const mainPath = getMainPath(root);
+    setRecordRootNode(root);
+    setRecordCurrentNode(mainPath[mainPath.length - 1] ?? root);
+    setRecordBoardSize(size);
+    setRecordSource(source);
+    setRecordInitialMeta(initial);
+    setRecordSaveSgf(null);
+    setRecordSaveError(null);
+    setShowRecordStart(false);
+    setViewMode('record');
+  }, []);
+
+  const handleRecordStartEmpty = useCallback((boardSize: number) => {
+    clearRecordDraft();
+    setRecordDraft(null);
+    startRecord(`(;FF[4]GM[1]SZ[${boardSize}])`, boardSize, 'manual', {});
+  }, [startRecord]);
+
+  // 読み込んだSGFの対局者・日付・結果を保存の窓の初期値にする（打ち直させない）
+  const handleRecordOpenSgf = useCallback((sgf: string) => {
+    try {
+      const parsed = parseSGFTree(sgf);
+      const meta = parsed.metadata ?? {};
+      const komi = Number(meta.komi);
+      const handicap = Number(meta.handicap);
+      startRecord(sgf, parsed.size, 'upload', {
+        blackPlayer: meta.blackName,
+        whitePlayer: meta.whiteName,
+        date: meta.date,
+        result: meta.result,
+        komi: Number.isFinite(komi) ? komi : undefined,
+        handicap: Number.isFinite(handicap) ? handicap : undefined,
+      });
+    } catch {
+      alert('棋譜の読み込みに失敗しました');
+    }
+  }, [startRecord]);
+
+  const handleResumeRecordDraft = useCallback(() => {
+    const draft = loadRecordDraft();
+    if (!draft) return;
+    startRecord(draft.sgf, draft.boardSize, 'manual', {});
+  }, [startRecord]);
+
+  const handleDiscardRecordDraft = useCallback(() => {
+    clearRecordDraft();
+    setRecordDraft(null);
+  }, []);
+
+  const closeRecord = useCallback(() => {
+    if (recordRootNode && recordRootNode.children.length > 0 &&
+        !confirm('保存せずに閉じますか？入力した棋譜は残りません。')) return;
+    setRecordRootNode(null);
+    setRecordCurrentNode(null);
+    setRecordSaveSgf(null);
+    setViewMode('lobby');
+  }, [recordRootNode]);
+
+  const handleRecordSave = useCallback(async (values: RecordSaveValues) => {
+    if (!recordRootNode) return;
+    setRecordSaving(true);
+    setRecordSaveError(null);
+    // 対局者・日付・結果を入れ直したSGFで残す（分岐も含めて書き出される）
+    const sgf = generateSGFTree(recordRootNode, recordBoardSize, {
+      blackName: values.blackPlayer,
+      whiteName: values.whitePlayer,
+      date: values.date,
+      result: values.result,
+      komi: String(values.komi),
+      handicap: values.handicap > 0 ? String(values.handicap) : undefined,
+    });
+    const createdBy = role === 'TEACHER'
+      ? TEACHER_IDENTITY
+      : (studentId ? makeStudentIdentity(studentId) : (classroomRef.current?.localIdentity ?? userName));
+    const { error } = await insertGameRecord({
+      id: `rec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      date: values.date,
+      blackPlayer: values.blackPlayer,
+      whitePlayer: values.whitePlayer,
+      boardSize: recordBoardSize,
+      handicap: values.handicap,
+      komi: values.komi,
+      result: values.result,
+      sgf,
+    }, { source: recordSource, createdBy });
+    setRecordSaving(false);
+    if (error) {
+      setRecordSaveError(`保存できませんでした: ${error}`);
+      return;
+    }
+    clearRecordDraft();
+    setRecordDraft(null);
+    setRecordSaveSgf(null);
+    setRecordRootNode(null);
+    setRecordCurrentNode(null);
+    setViewMode('lobby');
+    alert('棋譜を保存しました。棋譜履歴から開けます。');
+  }, [recordRootNode, recordBoardSize, recordSource, role, studentId, userName]);
 
   // ツールバーの「検討」（2026-09-06 までは「共有検討」）= 白紙の盤から始める検討。
   // 🔴 以前は授業モード(LectureBoard)を開いていたが、授業モードだけ isBoardFocusMode に
@@ -1937,6 +2107,7 @@ function App() {
   const isBoardFocusMode =
     mainViewMode === 'game' ||
     mainViewMode === 'review' ||
+    mainViewMode === 'record' ||
     mainViewMode === 'problem';
 
   return (
@@ -2060,6 +2231,7 @@ function App() {
             }}
             onStartLecture={handleStartLecture}
             onLoadSgf={handleSgfLoadFromLobby}
+            onOpenRecord={openRecordStart}
             onDisconnect={handleDisconnect}
             onReconnect={handleReconnect}
             isReconnecting={isReconnecting}
@@ -2114,6 +2286,7 @@ function App() {
             onChatSend={chat.sendMessage}
             onResumeGame={handleResumeGame}
             onSelectSavedGame={handleSelectSavedGame}
+            onCreateRecord={openRecordStart}
           />
         )}
 
@@ -2183,6 +2356,7 @@ function App() {
                 canPlay={role === 'STUDENT' && reviewCanPlay}
                 selfReview={reviewIsOwn}
                 onStudentMove={handleStudentReviewMove}
+                onStudentUndo={handleStudentReviewUndo}
                 registeredStudents={students}
                 chatMessages={chat.messages}
                 onChatSend={chat.sendMessage}
@@ -2214,6 +2388,30 @@ function App() {
         })()}
 
         {/* 詰碁モード: 先生は一緒に解くのではなく、生徒の解答状況を見るモニター画面 */}
+        {/* 棋譜作成。共有検討とは別の画面で、盤は誰にも配信しない（AIも付けない） */}
+        {mainViewMode === 'record' && recordRootNode && recordCurrentNode && (
+          <div
+            className="fixed inset-0 z-50 bg-ground overflow-y-auto lg:overflow-hidden p-2 sm:p-4"
+            style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+          >
+            <ErrorBoundary label="棋譜作成">
+              <ReviewBoard
+                rootNode={recordRootNode}
+                currentNode={recordCurrentNode}
+                boardSize={recordBoardSize}
+                onSetCurrentNode={setRecordCurrentNode}
+                isTeacher={false}
+                selfReview
+                recordMode
+                classroomRef={classroomRef}
+                onBack={closeRecord}
+                onRequestSave={setRecordSaveSgf}
+                registeredStudents={students}
+              />
+            </ErrorBoundary>
+          </div>
+        )}
+
         {mainViewMode === 'problem' && activeProblem && role === 'TEACHER' && (
           <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4"><ErrorBoundary label="この画面">
             <ProblemMonitorPanel
@@ -2265,6 +2463,34 @@ function App() {
             onToggleMic={handleToggleStudentMic}
           />
         </div>
+      )}
+
+      {/* 棋譜作成の入口（空の盤 / SGFファイル / 前回の続き） */}
+      {showRecordStart && (
+        <RecordStartDialog
+          onStartEmpty={handleRecordStartEmpty}
+          onOpenSgf={handleRecordOpenSgf}
+          draft={recordDraft}
+          onResumeDraft={handleResumeRecordDraft}
+          onDiscardDraft={handleDiscardRecordDraft}
+          onClose={() => setShowRecordStart(false)}
+        />
+      )}
+
+      {/* 棋譜作成の保存（誰の碁か・日付・結果） */}
+      {recordSaveSgf && (
+        <RecordSaveDialog
+          role={role === 'TEACHER' ? 'TEACHER' : 'STUDENT'}
+          students={students}
+          myIdentity={studentId ? makeStudentIdentity(studentId) : (classroomRef.current?.localIdentity ?? userName)}
+          myName={currentStudentName || userName}
+          boardSize={recordBoardSize}
+          initial={recordInitialMeta}
+          saving={recordSaving}
+          error={recordSaveError}
+          onSave={(values) => { void handleRecordSave(values); }}
+          onClose={() => { setRecordSaveSgf(null); setRecordSaveError(null); }}
+        />
       )}
 
       {/* 対局作成ダイアログ */}

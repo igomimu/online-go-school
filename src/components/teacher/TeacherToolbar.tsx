@@ -18,6 +18,8 @@ interface TeacherToolbarProps {
   onShowStudentLinks?: () => void;
   onAutoPairing?: () => void;
   onOpenTsumegoPicker?: () => void;
+  /** 棋譜作成（SGFを読み込む／盤に入力して保存する） */
+  onOpenRecord?: () => void;
   onClearAudioM?: () => void;
   onClearAudioS?: () => void;
   onClearSharing?: () => void;
@@ -232,6 +234,7 @@ export default function TeacherToolbar({
   onShowStudentLinks,
   onAutoPairing,
   onOpenTsumegoPicker,
+  onOpenRecord,
   onClearAudioM,
   onClearAudioS,
   onClearSharing,
@@ -381,6 +384,7 @@ export default function TeacherToolbar({
         <DropdownButton label="教材">
           <MenuItem label="SGF読込" onClick={() => fileInputRef.current?.click()} />
           {onOpenTsumegoPicker && <MenuItem label="詰碁DB" onClick={onOpenTsumegoPicker} />}
+          {onOpenRecord && <MenuItem label="棋譜作成" onClick={onOpenRecord} />}
         </DropdownButton>
         <DropdownButton label="生徒管理">
           <MenuItem label="生徒入替" onClick={onEditClassroom} />

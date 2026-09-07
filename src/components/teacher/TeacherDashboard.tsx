@@ -52,6 +52,8 @@ interface TeacherDashboardProps {
   onCreateGame: (initialPlayer?: string) => void;
   onStartLecture: () => void;
   onLoadSgf: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  /** 棋譜作成（SGFを読み込む／盤に入力して保存する） */
+  onOpenRecord?: () => void;
   onDisconnect: () => void;
   onReconnect: () => void;
   isReconnecting: boolean;
@@ -98,6 +100,7 @@ export default function TeacherDashboard({
   onCreateGame,
   onStartLecture,
   onLoadSgf,
+  onOpenRecord,
   onDisconnect,
   onReconnect,
   isReconnecting,
@@ -675,6 +678,7 @@ export default function TeacherDashboard({
         onCreateGame={() => onCreateGame()}
         onStartLecture={onStartLecture}
         onLoadSgf={onLoadSgf}
+        onOpenRecord={onOpenRecord}
         onDisconnect={onDisconnect}
         onReconnect={onReconnect}
         isReconnecting={isReconnecting}
