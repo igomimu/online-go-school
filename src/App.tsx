@@ -35,6 +35,7 @@ import {
 import { fetchRoster, loadStudents, loadClassrooms, loadStudentTypes } from './utils/classroomStore';
 import { clearRecordDraft, loadRecordDraft, saveRecordDraft, type RecordDraft } from './utils/recordDraft';
 import { getReviewTimeline, nodeAtReviewIndex } from './utils/reviewTimeline';
+import { shouldAutoReload } from './utils/appUpdatePolicy';
 import { insertGameRecord } from './utils/savedGames';
 import { fetchMyClassroomRoster } from './utils/studentRoster';
 import { saveAccount, supabaseSignInStudent, supabaseSignOut, loadAccounts, getSupabaseSessionClaims } from './utils/authStore';
@@ -288,6 +289,29 @@ function App() {
   const [recordSaving, setRecordSaving] = useState(false);
   const [recordSaveError, setRecordSaveError] = useState<string | null>(null);
   const [recordDraft, setRecordDraft] = useState<RecordDraft | null>(null);
+
+  /**
+   * 新しい版を、迷惑にならない端末だけ自動で取り込む。
+   *
+   * 🔴 以前は Service Worker が更新を掴んだ端末をすべて再読み込みしていたため、
+   * 授業中に配ると生徒の接続がその場で切れた（2026-09-07 実害）。
+   * 教室に入っている間と、棋譜作成の入力を抱えている間は帯を出すだけにする。
+   */
+  const autoReloadedRef = useRef(false);
+  useEffect(() => {
+    if (!shouldAutoReload({
+      updateAvailable: appVersion.updateAvailable,
+      isConnected: connectionState === ConnectionState.Connected,
+      hasUnsavedWork: !!recordRootNode || showRecordStart,
+      alreadyReloaded: autoReloadedRef.current,
+    })) return;
+    // 押している最中に画面が消えないよう、少しだけ置いてから
+    const timer = setTimeout(() => {
+      autoReloadedRef.current = true;
+      appVersion.reload();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [appVersion, connectionState, recordRootNode, showRecordStart]);
   // メッセージ処理は接続時に作った関数の中で走るので、最新の並べかけを ref で見る
   const recordRootRef = useRef<GameNode | null>(null);
   const recordBoardSizeRef = useRef(19);
@@ -2165,7 +2189,10 @@ function App() {
       {/* 新しい版が出ているのに古いまま動いていると、直したはずの不具合が出続ける */}
       {appVersion.updateAvailable && (
         <div className="flex items-center justify-center gap-3 bg-accent/15 border-b border-accent/40 px-4 py-2 text-sm">
-          <span>新しい版が出ています。読み込み直すと最新になります。</span>
+          <span>
+            新しい版が出ています。
+            {isConnected ? '授業が終わってから読み込み直してください。' : '読み込み直すと最新になります。'}
+          </span>
           <button onClick={appVersion.reload} className="secondary-button px-3 py-1 text-xs">
             今すぐ読み込み直す
           </button>

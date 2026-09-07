@@ -17,8 +17,10 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
-// SW更新時のリロードは index.html の controllerchange ハンドラが一元管理
-// （初回インストールの claim ではリロードしないガード付き）
+// 🔴 更新を掴んでも、ここでは読み込み直さない（registerType: 'prompt'）。
+// 授業中の端末を勝手に再読み込みすると教室との接続が切れる（2026-09-07）。
+// 読み込み直すかどうかは App が決める（utils/appUpdatePolicy.ts）。
+// 60秒ごとの update() は、新しい版を早く掴むためだけのもの。
 const updateSW = registerSW({
   immediate: true,
   onRegisteredSW(_swUrl, registration) {

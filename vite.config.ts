@@ -23,7 +23,10 @@ export default defineConfig({
     tailwindcss(),
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 🔴 autoUpdate は、更新を掴んだ端末を問答無用で window.location.reload() する。
+      // 授業中に配ると生徒の接続がその場で切れる（2026-09-07 実害）。
+      // 読み込み直す判断はアプリ側（utils/appUpdatePolicy.ts）に持たせる。
+      registerType: 'prompt',
       includeAssets: ['favicon.ico', 'favicon.png', 'apple-touch-icon.png'],
       manifest: {
         id: '/',
