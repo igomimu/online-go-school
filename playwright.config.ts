@@ -5,6 +5,9 @@ const isProduction = process.env.NODE_ENV === 'production' || !!process.env.BASE
 
 export default defineConfig({
   testDir: './e2e',
+  // 走り終わったらテスト教室を消す。放置すると本番の名簿に溜まり、
+  // テスト生徒が複数教室に所属してログインが 409 になる（2026-09-07）
+  globalTeardown: './e2e/global-teardown.ts',
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
