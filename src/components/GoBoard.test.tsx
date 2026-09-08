@@ -22,6 +22,26 @@ describe('GoBoard', () => {
     expect(circles.length).toBeGreaterThanOrEqual(2);
   });
 
+  // 古い iPad（iOS 15.3 以前の Safari）は feDropShadow を知らず、SVG は解決できない
+  // フィルタを参照した要素を丸ごと描かないため、石だけが盤から消えていた（2026-09-08）。
+  // 石の描画をフィルタに依存させないことを固定する。
+  it('石の描画にSVGフィルタを使わない（古いiPadで石だけ消えるため）', () => {
+    const board = createEmptyBoard(9);
+    board[4][4] = { color: 'BLACK' };
+    board[2][2] = { color: 'WHITE' };
+    const { container } = render(<GoBoard boardState={board} boardSize={9} />);
+
+    const stoneGroups = container.querySelectorAll('[data-stone]');
+    expect(stoneGroups.length).toBe(2);
+    stoneGroups.forEach(group => {
+      expect(group.getAttribute('filter')).toBeNull();
+      expect(group.querySelectorAll('[filter]').length).toBe(0);
+    });
+    // 盤のどこにもフィルタ参照を残さない
+    expect(container.querySelectorAll('[filter]').length).toBe(0);
+    expect(container.querySelector('filter')).toBeNull();
+  });
+
   it('クリックイベントが発火する', () => {
     const board = createEmptyBoard(9);
     const handleClick = vi.fn();

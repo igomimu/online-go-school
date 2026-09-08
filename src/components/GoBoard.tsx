@@ -175,6 +175,9 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     const LINE_WIDTH = 1;
     const BORDER_WIDTH = 2;
     const STONE_RADIUS = CELL_SIZE * 0.46;
+    // 石の影のずらし幅（もとの feDropShadow の dx/dy と同じ値）
+    const STONE_SHADOW_DX = 1.2;
+    const STONE_SHADOW_DY = 2.2;
     const FONT_SIZE = CELL_SIZE * 0.65;
     const COORD_FONT_SIZE = 14;
     const STAR_POINT_RADIUS = 3.5;
@@ -340,7 +343,10 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             if (stone) {
                 const isBlack = stone.color === 'BLACK';
                 cells.push(
-                    <g key={`s-group-${x}-${y}`} data-stone={`${x}-${y}`} className="pointer-events-none" filter="url(#stoneShadow)">
+                    <g key={`s-group-${x}-${y}`} data-stone={`${x}-${y}`} className="pointer-events-none">
+                        {/* 影はフィルタではなくグラデーションの円で敷く。理由は defs の
+                            stoneShadowSoft を参照（古い iPad で石だけが消えていた） */}
+                        <circle cx={cx + STONE_SHADOW_DX} cy={cy + STONE_SHADOW_DY} r={STONE_RADIUS * 1.16} fill="url(#stoneShadowSoft)" />
                         <circle cx={cx} cy={cy} r={STONE_RADIUS} fill={isBlack ? "url(#stoneBlack)" : "url(#stoneWhite)"} stroke={isBlack ? "#000000" : "#3a3a3a"} strokeWidth={isBlack ? 2 : 1.5} />
                         {(() => {
                             // 変化手順モードでは、変化に入ってからの石だけに番号が付く
@@ -678,9 +684,18 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                     <stop offset="55%" stopColor="#f0ede4" />
                     <stop offset="100%" stopColor="#d8d2c0" />
                 </radialGradient>
-                <filter id="stoneShadow" x="-60%" y="-60%" width="220%" height="220%">
-                    <feDropShadow dx="1.2" dy="2.2" stdDeviation="1.4" floodColor="#000000" floodOpacity={0.45} />
-                </filter>
+                {/* 石の影。SVGフィルタ(feDropShadow)は iOS 15.3 以前の Safari が解釈できず、
+                    SVG は「解決できないフィルタを参照した要素を描画しない」と定めているため、
+                    古い iPad では石だけが盤から消えていた（2026-09-08 井町さんの実機報告：
+                    盤線と直前の手の▲は見えるのに石が出ない・置くことはできる）。
+                    フィルタを使わず、外へ向かって薄れるグラデーションの円を石の下に敷く。
+                    361 個の要素にフィルタを掛けなくなるので低スペック端末の描画も軽くなる。 */}
+                <radialGradient id="stoneShadowSoft" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="#000000" stopOpacity={0.42} />
+                    <stop offset="62%" stopColor="#000000" stopOpacity={0.34} />
+                    <stop offset="84%" stopColor="#000000" stopOpacity={0.14} />
+                    <stop offset="100%" stopColor="#000000" stopOpacity={0} />
+                </radialGradient>
             </defs>
             {isMonochrome ? (
                 <rect x={viewBoxData.x} y={viewBoxData.y} width={viewBoxData.w} height={viewBoxData.h} fill="white" stroke="none" />
