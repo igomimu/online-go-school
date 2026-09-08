@@ -1,5 +1,5 @@
 import type { TimeSettings } from '../hooks/useGameClock';
-import { BYOYOMI_SECONDS_OPTIONS } from '../hooks/useGameClock';
+import { BYOYOMI_SECONDS_OPTIONS, DEFAULT_BYOYOMI_TIME_SETTINGS } from '../hooks/useGameClock';
 
 interface TimeControlPickerProps {
   value: TimeSettings;
@@ -58,6 +58,7 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
         <label className={labelCls} style={labelStyle}>持ち時間（分）</label>
         <input
           type="number"
+          aria-label="持ち時間（分）"
           min={0}
           step={1}
           value={value.mainMinutes}
@@ -77,7 +78,10 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
         <label className={labelCls} style={labelStyle}>秒読み</label>
         <button
           type="button"
-          onClick={() => set({ byoyomiEnabled: true })}
+          aria-pressed={value.byoyomiEnabled}
+          onClick={() => {
+            if (!value.byoyomiEnabled) onChange(DEFAULT_BYOYOMI_TIME_SETTINGS);
+          }}
           className={segBtnCls(value.byoyomiEnabled)}
           style={segBtn(value.byoyomiEnabled)}
         >
@@ -85,6 +89,7 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
         </button>
         <button
           type="button"
+          aria-pressed={!value.byoyomiEnabled}
           onClick={() => set({
             byoyomiEnabled: false,
             // 秒読みなしは持時間だけで打つ設定。未入力(0分)なら30分を初期値にする。
@@ -107,6 +112,7 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
               <button
                 key={sec}
                 type="button"
+                aria-pressed={value.byoyomiSeconds === sec}
                 onClick={() => set({ byoyomiSeconds: sec })}
                 className={segBtnCls(value.byoyomiSeconds === sec)}
                 style={segBtn(value.byoyomiSeconds === sec)}
@@ -121,6 +127,7 @@ export default function TimeControlPicker({ value, onChange, variant = 'light' }
             <label className={labelCls} style={labelStyle}>秒読みの回数（考慮時間）</label>
             <input
               type="number"
+              aria-label="秒読みの回数（考慮時間）"
               min={1}
               step={1}
               value={value.byoyomiPeriods}

@@ -29,9 +29,9 @@ describe('GameCreationDialog', () => {
     expect(screen.getByTestId('opponent-player-select')).toHaveValue('たろう');
     expect(screen.getByTestId('time-limit-checkbox')).toBeChecked();
     expect(screen.getByTestId('nhk-style-checkbox')).not.toBeChecked();
-    expect(screen.getByRole('combobox', { name: '持ち時間（分）' })).toHaveValue('30');
-    expect(screen.getByRole('combobox', { name: '秒読み回数' })).toHaveValue('0');
-    expect(screen.getByRole('combobox', { name: '秒読み（秒/手）' })).toHaveValue('30');
+    expect(screen.getByLabelText('持ち時間（分）')).toHaveValue(30);
+    expect(screen.getByRole('button', { name: 'なし' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByLabelText('秒読みの回数（考慮時間）')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('create-game-button'));
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
@@ -44,6 +44,25 @@ describe('GameCreationDialog', () => {
         timeSystem: 'STANDARD',
         mainTimeSeconds: 1800,
         byoyomiPeriods: 0,
+      }),
+    })));
+  });
+
+  it('秒読みありを選ぶと、持ち時間0分・3回・30秒で作成する', async () => {
+    const onCreate = vi.fn();
+    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'あり' }));
+    expect(screen.getByLabelText('持ち時間（分）')).toHaveValue(0);
+    expect(screen.getByLabelText('秒読みの回数（考慮時間）')).toHaveValue(3);
+    expect(screen.getByRole('button', { name: '30秒' })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByTestId('create-game-button'));
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
+      clock: expect.objectContaining({
+        mainTimeSeconds: 0,
+        byoyomiSeconds: 30,
+        byoyomiPeriods: 3,
       }),
     })));
   });
@@ -127,7 +146,7 @@ describe('GameCreationDialog', () => {
     render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
     fireEvent.click(screen.getByTestId('time-limit-checkbox'));
     expect(screen.getByTestId('nhk-style-checkbox')).toBeDisabled();
-    expect(screen.getByRole('combobox', { name: '持ち時間（分）' })).toBeDisabled();
+    expect(screen.getByLabelText('持ち時間（分）')).toBeDisabled();
     fireEvent.click(screen.getByTestId('create-game-button'));
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ clock: undefined })));
   });
@@ -137,7 +156,7 @@ describe('GameCreationDialog', () => {
     render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
     fireEvent.click(screen.getByTestId('nhk-style-checkbox'));
 
-    expect(screen.queryByRole('combobox', { name: '持ち時間（分）' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('持ち時間（分）')).not.toBeInTheDocument();
     const consideration = screen.getByTestId('nhk-consideration-select');
     expect(within(consideration).getAllByRole('option').map(option => option.textContent)).toEqual([
       '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',

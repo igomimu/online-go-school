@@ -32,10 +32,10 @@ describe('AutoPairingDialog', () => {
     expect(screen.getByText('持ち時間（分）')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'あり' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'なし' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: '30秒' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'なし' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('デフォルト設定（持0分・秒読30秒×1）で clock が付与される', () => {
+  it('デフォルト設定（持30分・秒読みなし）で clock が付与される', () => {
     const onCreateGames = vi.fn();
     render(<AutoPairingDialog {...defaultProps} onCreateGames={onCreateGames} />);
     fireEvent.click(screen.getByText('1局を一括開始'));
@@ -44,37 +44,38 @@ describe('AutoPairingDialog', () => {
     expect(pairs).toHaveLength(1);
     expect(pairs[0].clock).toEqual(
       expect.objectContaining({
-        mainTimeSeconds: 0,
-        byoyomiSeconds: 30,
-        byoyomiPeriods: 1,
+        mainTimeSeconds: 1800,
+        byoyomiSeconds: 0,
+        byoyomiPeriods: 0,
         lastTickTime: null,
       })
     );
   });
 
-  it('秒読み「なし」にすると持ち時間の初期値が30分になる', () => {
+  it('秒読み「あり」にすると持ち時間0分・30秒×3回になる', () => {
     const onCreateGames = vi.fn();
     render(<AutoPairingDialog {...defaultProps} onCreateGames={onCreateGames} />);
-    fireEvent.click(screen.getByRole('button', { name: 'なし' }));
+    fireEvent.click(screen.getByRole('button', { name: 'あり' }));
     fireEvent.click(screen.getByText('1局を一括開始'));
     const pairs = onCreateGames.mock.calls[0][0];
     expect(pairs[0].clock).toEqual(expect.objectContaining({
-      mainTimeSeconds: 1800,
-      byoyomiSeconds: 0,
-      byoyomiPeriods: 0,
-      blackTimeLeft: 1800,
-      whiteTimeLeft: 1800,
+      mainTimeSeconds: 0,
+      byoyomiSeconds: 30,
+      byoyomiPeriods: 3,
+      blackTimeLeft: 30,
+      whiteTimeLeft: 30,
     }));
   });
 
   it('秒読み秒数を60秒に変更すると clock に反映される', () => {
     const onCreateGames = vi.fn();
     render(<AutoPairingDialog {...defaultProps} onCreateGames={onCreateGames} />);
+    fireEvent.click(screen.getByRole('button', { name: 'あり' }));
     fireEvent.click(screen.getByRole('button', { name: '60秒' }));
     fireEvent.click(screen.getByText('1局を一括開始'));
     const pairs = onCreateGames.mock.calls[0][0];
     expect(pairs[0].clock).toEqual(
-      expect.objectContaining({ byoyomiSeconds: 60, byoyomiPeriods: 1 })
+      expect.objectContaining({ byoyomiSeconds: 60, byoyomiPeriods: 3 })
     );
   });
 

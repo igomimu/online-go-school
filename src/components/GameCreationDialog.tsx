@@ -3,8 +3,9 @@ import { X } from 'lucide-react';
 import type { Student } from '../types/classroom';
 import { findStudentByIdentity, getDisplayName, identityMatchesPlayer } from '../utils/identityUtils';
 import type { GameClock } from '../types/game';
-import { createNhkClock, timeSettingsToClock } from '../hooks/useGameClock';
+import { createNhkClock, DEFAULT_TIME_SETTINGS, timeSettingsToClock, type TimeSettings } from '../hooks/useGameClock';
 import NigiriDraw from './NigiriDraw';
+import TimeControlPicker from './TimeControlPicker';
 
 interface GameCreationDialogProps {
   students: string[];
@@ -34,9 +35,6 @@ const KOMI_OPTIONS = [6.5, 5.5, 4.5, 3.5, 2.5, 1.5, 0.5, -0.5, -1.5, -2.5, -3.5,
 const EVEN_KOMI = 6.5;
 /** 置き石を置いたときのコミ（半目残し） */
 const HANDICAP_KOMI = 0.5;
-const MINUTE_OPTIONS = Array.from({ length: 61 }, (_, i) => i);
-const BYOYOMI_PERIOD_OPTIONS = Array.from({ length: 11 }, (_, i) => i);
-const BYOYOMI_SECONDS_OPTIONS = [10, 20, 30, 40, 50, 60] as const;
 const NHK_CONSIDERATION_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1);
 
 type PlayerColor = 'BLACK' | 'WHITE';
@@ -74,9 +72,7 @@ export default function GameCreationDialog({
   const [customKomiEnabled, setCustomKomiEnabled] = useState(false);
   const [timeLimitEnabled, setTimeLimitEnabled] = useState(true);
   const [nhkStyle, setNhkStyle] = useState(false);
-  const [mainMinutes, setMainMinutes] = useState(30);
-  const [byoyomiPeriods, setByoyomiPeriods] = useState(0);
-  const [byoyomiSeconds, setByoyomiSeconds] = useState(30);
+  const [timeSettings, setTimeSettings] = useState<TimeSettings>(DEFAULT_TIME_SETTINGS);
   const [nhkConsiderationPeriods, setNhkConsiderationPeriods] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
@@ -145,12 +141,7 @@ export default function GameCreationDialog({
       ? undefined
       : nhkStyle
         ? createNhkClock(nhkConsiderationPeriods)
-        : timeSettingsToClock({
-            mainMinutes,
-            byoyomiEnabled: byoyomiPeriods > 0,
-            byoyomiSeconds,
-            byoyomiPeriods,
-          });
+        : timeSettingsToClock(timeSettings);
     try {
       await onCreate({
         blackPlayer,
@@ -363,38 +354,11 @@ export default function GameCreationDialog({
                 <span className="text-xs text-muted">1手30秒・考慮時間は1回60秒</span>
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span>持ち時間</span>
-                <select
-                  aria-label="持ち時間（分）"
-                  value={mainMinutes}
-                  onChange={event => setMainMinutes(Number(event.target.value))}
-                  className={selectClassName}
-                >
-                  {MINUTE_OPTIONS.map(value => <option key={value} value={value}>{value}</option>)}
-                </select>
-                <span>分</span>
-                <span className="text-muted">＋</span>
-                <span>秒読み回数</span>
-                <select
-                  aria-label="秒読み回数"
-                  value={byoyomiPeriods}
-                  onChange={event => setByoyomiPeriods(Number(event.target.value))}
-                  className={selectClassName}
-                >
-                  {BYOYOMI_PERIOD_OPTIONS.map(value => <option key={value} value={value}>{value}</option>)}
-                </select>
-                <span>回 × 秒読み</span>
-                <select
-                  aria-label="秒読み（秒/手）"
-                  value={byoyomiSeconds}
-                  onChange={event => setByoyomiSeconds(Number(event.target.value))}
-                  className={selectClassName}
-                >
-                  {BYOYOMI_SECONDS_OPTIONS.map(value => <option key={value} value={value}>{value}</option>)}
-                </select>
-                <span>秒/手</span>
-              </div>
+              <TimeControlPicker
+                value={timeSettings}
+                onChange={setTimeSettings}
+                variant="dark"
+              />
             )}
           </fieldset>
         </section>
