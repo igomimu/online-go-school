@@ -2,7 +2,7 @@
 import { forwardRef, useMemo, useEffect, useRef, type ReactElement } from 'react';
 import type { TerritoryOwner } from '../utils/scoring';
 import { useViewBox } from '../hooks/useViewBox';
-import { clientToBoardPoint, smoothPathD } from '../utils/drawingUtils';
+import { arrowHeadPoints, clientToBoardPoint, directionAnchor, smoothPathD } from '../utils/drawingUtils';
 
 export interface ViewRange {
     minX: number;
@@ -518,6 +518,12 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     // 曲線は 2 割、矢印は少し細く。矢印の頭は markerUnits 既定で線の太さに追随する。
     const DRAW_STROKE_WIDTH = 8;
     const ARROW_STROKE_WIDTH = 5;
+    // 矢じりの寸法。marker(url(#…)) をやめて自分で描くので、もとの marker の
+    // 大きさをそのまま持ってくる（直線は線の太さ追随、曲線は実寸指定だった）
+    const LINE_ARROW_LENGTH = ARROW_STROKE_WIDTH * 10;
+    const LINE_ARROW_WIDTH = ARROW_STROKE_WIDTH * 7;
+    const CURVE_ARROW_LENGTH = 24;
+    const CURVE_ARROW_WIDTH = 18;
     const drawingElements: ReactElement[] = [];
     if (drawings) {
         drawings.forEach((d, i) => {
@@ -535,11 +541,23 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                         fill="none"
                         stroke="#e53e3e" strokeWidth={DRAW_STROKE_WIDTH}
                         strokeLinecap="round" strokeLinejoin="round"
-                        markerEnd="url(#arrowhead-curve)"
                         className="pointer-events-none"
                         opacity={0.85}
                     />
                 );
+                // 曲線の矢じり。向きは終点から十分離れた直近の点で決める
+                const anchor = directionAnchor(points);
+                if (anchor) {
+                    const tip = points[points.length - 1];
+                    const head = arrowHeadPoints(tip, anchor, CURVE_ARROW_LENGTH, CURVE_ARROW_WIDTH);
+                    if (head) {
+                        drawingElements.push(
+                            <polygon key={`draw-${i}-head`} data-testid="board-free-arrowhead"
+                                points={head} fill="#e53e3e" opacity={0.85}
+                                className="pointer-events-none" />
+                        );
+                    }
+                }
                 return;
             }
             const x1 = MARGIN + (d.fromX - 1) * CELL_SIZE;
@@ -551,11 +569,20 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                     key={`draw-${i}`}
                     x1={x1} y1={y1} x2={x2} y2={y2}
                     stroke="#e53e3e" strokeWidth={ARROW_STROKE_WIDTH} strokeLinecap="round"
-                    markerEnd={d.type === 'arrow' ? 'url(#arrowhead)' : undefined}
                     className="pointer-events-none"
                     opacity={0.85}
                 />
             );
+            if (d.type === 'arrow') {
+                const head = arrowHeadPoints({ x: x2, y: y2 }, { x: x1, y: y1 }, LINE_ARROW_LENGTH, LINE_ARROW_WIDTH);
+                if (head) {
+                    drawingElements.push(
+                        <polygon key={`draw-${i}-head`} data-testid="board-arrowhead"
+                            points={head} fill="#e53e3e" opacity={0.85}
+                            className="pointer-events-none" />
+                    );
+                }
+            }
         });
     }
 
@@ -672,15 +699,6 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             onPointerCancel={handleSvgPointerCancel}
         >
             <defs>
-                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                    <polygon points="0 0, 10 3.5, 0 7" fill="#e53e3e" />
-                </marker>
-                {/* 曲線の先に付ける矢じり。markerUnits 既定は線の太さに比例するため、
-                    太い曲線(8)だと頭だけ巨大になる。実寸指定にして盤のマス目に合わせる。 */}
-                <marker id="arrowhead-curve" markerUnits="userSpaceOnUse"
-                    markerWidth="24" markerHeight="18" refX="21" refY="9" orient="auto">
-                    <polygon points="0 0, 24 9, 0 18" fill="#e53e3e" />
-                </marker>
                 <radialGradient id="stoneBlack" cx="35%" cy="30%" r="75%">
                     <stop offset="0%" stopColor="#5a5a5a" />
                     <stop offset="40%" stopColor="#1a1a1a" />

@@ -4,6 +4,8 @@ import {
   clientToBoardPoint,
   shouldAppendPoint,
   smoothPathD,
+  arrowHeadPoints,
+  directionAnchor,
   roundPoint,
 } from './drawingUtils';
 import type { Drawing } from '../components/GoBoard';
@@ -143,5 +145,43 @@ describe('曲線(free)の描画', () => {
     it('小数2桁に丸める', () => {
       expect(roundPoint({ x: 1.23456, y: 7.89123 })).toEqual({ x: 1.23, y: 7.89 });
     });
+  });
+});
+
+describe('arrowHeadPoints', () => {
+  it('右向きの矢じりは終点を頂点に、後ろへ底辺を張る', () => {
+    const pts = arrowHeadPoints({ x: 10, y: 0 }, { x: 0, y: 0 }, 10, 6);
+    expect(pts).toBe('10,0 0,3 0,-3');
+  });
+
+  it('向きが変わると三角形も回る', () => {
+    const pts = arrowHeadPoints({ x: 0, y: 10 }, { x: 0, y: 0 }, 10, 6);
+    expect(pts).toBe('0,10 -3,0 3,0');
+  });
+
+  it('2点が同じなら向きが決まらないので空を返す', () => {
+    expect(arrowHeadPoints({ x: 5, y: 5 }, { x: 5, y: 5 }, 10, 6)).toBe('');
+  });
+});
+
+describe('directionAnchor', () => {
+  it('点が1つなら向きを決められない', () => {
+    expect(directionAnchor([{ x: 0, y: 0 }])).toBeNull();
+  });
+
+  it('終点に密集した点は飛ばし、十分離れた点を返す', () => {
+    const points = [
+      { x: 0, y: 0 },
+      { x: 50, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100.5, y: 0 },
+      { x: 101, y: 0 },
+    ];
+    expect(directionAnchor(points, 4)).toEqual({ x: 50, y: 0 });
+  });
+
+  it('どの点も近すぎるときは先頭を使う', () => {
+    const points = [{ x: 0, y: 0 }, { x: 0.5, y: 0 }, { x: 1, y: 0 }];
+    expect(directionAnchor(points, 4)).toEqual({ x: 0, y: 0 });
   });
 });

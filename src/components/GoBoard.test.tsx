@@ -62,6 +62,36 @@ describe('GoBoard', () => {
     });
   });
 
+  // 矢じりは marker-end="url(#…)" だった。同じ端末では参照が解決されず矢じりだけ
+  // 出ないので、三角形を自分で描くようにした。
+  it('矢印の矢じりを marker 参照ではなく自前の三角形で描く', () => {
+    const board = createEmptyBoard(9);
+    const { container } = render(
+      <GoBoard
+        boardState={board}
+        boardSize={9}
+        drawings={[
+          { fromX: 2, fromY: 2, toX: 6, toY: 2, type: 'arrow' },
+          { fromX: 1, fromY: 1, toX: 5, toY: 5, type: 'free', points: [{ x: 1, y: 1 }, { x: 3, y: 3 }, { x: 5, y: 5 }] },
+        ]}
+      />
+    );
+
+    expect(container.querySelector('[data-testid="board-arrowhead"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-testid="board-free-arrowhead"]')).toBeInTheDocument();
+    expect(container.querySelectorAll('[marker-end]').length).toBe(0);
+    expect(container.querySelector('marker')).toBeNull();
+  });
+
+  it('矢印でない直線には矢じりを付けない', () => {
+    const board = createEmptyBoard(9);
+    const { container } = render(
+      <GoBoard boardState={board} boardSize={9}
+        drawings={[{ fromX: 2, fromY: 2, toX: 6, toY: 2, type: 'line' }]} />
+    );
+    expect(container.querySelector('[data-testid="board-arrowhead"]')).toBeNull();
+  });
+
   it('クリックイベントが発火する', () => {
     const board = createEmptyBoard(9);
     const handleClick = vi.fn();

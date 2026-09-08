@@ -20,6 +20,32 @@ const STAR_POINTS = [
 
 const linePos = (i: number) => EDGE + i * CELL;
 
+/** 木目テクスチャの原寸。引き伸ばすと縞が太くなり木に見えないので、この大きさで並べる */
+const WOOD_TILE = 512;
+/** 盤を地の色へ溶かし始める位置（従来の linearGradient の 30% と同じ） */
+const FADE_START = 0.3;
+/** 溶かしを段で近似する数。多いほど滑らか、24 段で段差は 4% */
+const FADE_BANDS = 24;
+
+/**
+ * 地の色へ溶かす帯。linearGradient(url(#…)) を使わないのは、SVG の url(#…) 参照を
+ * 解決できない端末があるため（2026-09-08、碁石の塗りが乗らなかったのと同じ根）。
+ * 参照が効かないと溶けずに盤が四角く切れて見えてしまう。
+ */
+function fadeBands(axis: 'x' | 'y') {
+  return Array.from({ length: FADE_BANDS }, (_, i) => {
+    const from = FADE_START + (1 - FADE_START) * (i / FADE_BANDS);
+    const to = FADE_START + (1 - FADE_START) * ((i + 1) / FADE_BANDS);
+    // 帯の境目に筋が出ないよう、次の帯へ少しだけ食い込ませる
+    const span = (to - from) * SIZE + 0.5;
+    const start = from * SIZE;
+    const opacity = (i + 0.5) / FADE_BANDS;
+    return axis === 'x'
+      ? <rect key={`fade-x-${i}`} x={start} y={0} width={span} height={SIZE} fill="var(--color-ground)" opacity={opacity} />
+      : <rect key={`fade-y-${i}`} x={0} y={start} width={SIZE} height={span} fill="var(--color-ground)" opacity={opacity} />;
+  });
+}
+
 export default function BoardCorner({ className = '' }: { className?: string }) {
   return (
     <svg
@@ -29,24 +55,12 @@ export default function BoardCorner({ className = '' }: { className?: string }) 
       focusable="false"
       role="presentation"
     >
-      <defs>
-        {/* 木目は 512px のテクスチャを原寸で並べる。引き伸ばすと縞が太くなり木に見えない */}
-        <pattern id="board-corner-wood" patternUnits="userSpaceOnUse" width="512" height="512">
-          <image href="/wood-board-texture-v2.webp" x="0" y="0" width="512" height="512" />
-        </pattern>
-        {/* 盤は画面の外へ続いているように、右と下を地の色へ溶かす。
-            溶かす先を墨で決め打つと、明るい地のときに黒い矩形が浮いて見出しを潰す */}
-        <linearGradient id="board-corner-fade-x" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="30%" stopColor="var(--color-ground)" stopOpacity="0" />
-          <stop offset="100%" stopColor="var(--color-ground)" stopOpacity="1" />
-        </linearGradient>
-        <linearGradient id="board-corner-fade-y" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="30%" stopColor="var(--color-ground)" stopOpacity="0" />
-          <stop offset="100%" stopColor="var(--color-ground)" stopOpacity="1" />
-        </linearGradient>
-      </defs>
-
-      <rect x="0" y="0" width={SIZE} height={SIZE} fill="url(#board-corner-wood)" />
+      {/* 木目は 512px のテクスチャを原寸で並べる。pattern(url(#…)) を使わないのは
+          その参照を解決できない端末があるため。viewBox の外へ出た分は切り取られる */}
+      {[0, WOOD_TILE].map(ty => [0, WOOD_TILE].map(tx => (
+        <image key={`wood-${tx}-${ty}`} href="/wood-board-texture-v2.webp"
+          x={tx} y={ty} width={WOOD_TILE} height={WOOD_TILE} />
+      )))}
       {/* 背景装飾なので地の色でかぶせて沈める。暗い地なら暗く、明るい地なら淡く木目が残る
           （ここが強いとフォームより先に目に入ってしまう） */}
       <rect x="0" y="0" width={SIZE} height={SIZE} fill="var(--color-ground)" opacity="0.42" />
@@ -64,8 +78,10 @@ export default function BoardCorner({ className = '' }: { className?: string }) 
         <circle key={`star-${sx}-${sy}`} cx={linePos(sx)} cy={linePos(sy)} r={3.5} fill="black" />
       ))}
 
-      <rect x="0" y="0" width={SIZE} height={SIZE} fill="url(#board-corner-fade-x)" />
-      <rect x="0" y="0" width={SIZE} height={SIZE} fill="url(#board-corner-fade-y)" />
+      {/* 盤は画面の外へ続いているように、右と下を地の色へ溶かす。
+          溶かす先を墨で決め打つと、明るい地のときに黒い矩形が浮いて見出しを潰す */}
+      {fadeBands('x')}
+      {fadeBands('y')}
     </svg>
   );
 }

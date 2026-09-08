@@ -120,3 +120,51 @@ export function smoothPathD(points: BoardPoint[]): string {
   }
   return d;
 }
+
+/**
+ * 線の終端に置く矢じり（三角形）の頂点。
+ *
+ * SVG の `marker-end="url(#…)"` を使わずに自分で描くためのもの。url(#…) の参照を
+ * 解決できない端末があり、そこでは矢じりだけが出ない（2026-09-08、碁石の塗りが
+ * 乗らなかったのと同じ根）。
+ *
+ * @param tip    矢じりの先端（線の終点そのものでなくてよい）
+ * @param from   向きを決める手前の点
+ * @param length 先端から底辺までの長さ
+ * @param width  底辺の幅
+ * @returns polygon の points 文字列。向きが定まらない（2点が同じ）ときは空文字
+ */
+export function arrowHeadPoints(
+  tip: BoardPoint,
+  from: BoardPoint,
+  length: number,
+  width: number,
+): string {
+  const r = (n: number) => Math.round(n * 100) / 100;
+  const dx = tip.x - from.x;
+  const dy = tip.y - from.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist === 0) return '';
+  const ux = dx / dist;
+  const uy = dy / dist;
+  // 底辺の中心と、そこから左右へ伸ばす半幅（進行方向に直交）
+  const baseX = tip.x - ux * length;
+  const baseY = tip.y - uy * length;
+  const halfX = -uy * (width / 2);
+  const halfY = ux * (width / 2);
+  return `${r(tip.x)},${r(tip.y)} ${r(baseX + halfX)},${r(baseY + halfY)} ${r(baseX - halfX)},${r(baseY - halfY)}`;
+}
+
+/**
+ * 終点の向きを決めるための、終点から十分離れた直近の点を後ろから探す。
+ * 手描きの点列は終盤で密集するので、最後の2点だけを見ると向きが暴れる。
+ */
+export function directionAnchor(points: BoardPoint[], minDistance = 4): BoardPoint | null {
+  if (points.length < 2) return null;
+  const last = points[points.length - 1];
+  for (let i = points.length - 2; i >= 0; i--) {
+    if (Math.hypot(last.x - points[i].x, last.y - points[i].y) >= minDistance) return points[i];
+  }
+  // どの点も近すぎるときは先頭を使う（同一点なら arrowHeadPoints が空を返す）
+  return points[0];
+}
