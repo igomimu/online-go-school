@@ -501,6 +501,13 @@ function App() {
     [liveGameList.games],
   );
 
+  const unavailableGamePlayers = useMemo(
+    () => liveGameList.games
+      .filter(game => game.status === 'playing' || game.status === 'scoring')
+      .flatMap(game => [game.black_player, game.white_player]),
+    [liveGameList.games],
+  );
+
   // 生徒の対局切替は描画中にsetStateせず、一覧更新を受けたeffectで行う。
   // 中断直後に次の対局が作られた場合も、古い対局IDから新しいIDへ確実に切り替える。
   useEffect(() => {
@@ -2558,6 +2565,7 @@ function App() {
       {showGameCreation && role === 'TEACHER' && (
         <GameCreationDialog
           students={participants.filter(p => p.identity !== (classroomRef.current?.localIdentity ?? '')).map(p => p.identity)}
+          unavailablePlayers={unavailableGamePlayers}
           teacherName={classroomRef.current?.localIdentity || TEACHER_IDENTITY}
           initialBlackPlayer={initialGameCreationPlayer}
           onClose={() => {

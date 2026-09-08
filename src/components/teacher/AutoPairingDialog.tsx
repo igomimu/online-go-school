@@ -4,7 +4,7 @@ import type { GameClock } from '../../types/game';
 import { rankToNumber, suggestHandicap } from '../../types/classroom';
 import type { TimeSettings } from '../../hooks/useGameClock';
 import { DEFAULT_TIME_SETTINGS, timeSettingsToClock } from '../../hooks/useGameClock';
-import { findStudentByIdentity, getDisplayName } from '../../utils/identityUtils';
+import { findStudentByIdentity, getDisplayName, identityMatchesPlayer } from '../../utils/identityUtils';
 import TimeControlPicker from '../TimeControlPicker';
 
 /**
@@ -41,6 +41,8 @@ interface AutoPairingDialogProps {
   connectedIdentities: string[];
   students: Student[];
   teacherIdentity: string;
+  /** 既に対局中（playing/scoring）の生徒。自動ペアリングの候補から除外する。 */
+  unavailablePlayers?: string[];
   onClose: () => void;
   onCreateGames: (pairs: {
     blackPlayer: string;
@@ -100,10 +102,13 @@ export default function AutoPairingDialog({
   connectedIdentities,
   students,
   teacherIdentity,
+  unavailablePlayers = [],
   onClose,
   onCreateGames,
 }: AutoPairingDialogProps) {
-  const studentIdentities = connectedIdentities.filter(id => id !== teacherIdentity);
+  const studentIdentities = connectedIdentities.filter(id =>
+    id !== teacherIdentity && !unavailablePlayers.some(player => identityMatchesPlayer(id, player)),
+  );
   const [pairs, setPairs] = useState<PairingPair[]>(() => autoPair(studentIdentities, students));
   const [unpairedIdentity] = useState<string | null>(() => (
     studentIdentities.length % 2 === 1

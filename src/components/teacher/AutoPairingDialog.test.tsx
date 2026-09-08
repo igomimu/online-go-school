@@ -77,4 +77,24 @@ describe('AutoPairingDialog', () => {
       expect.objectContaining({ byoyomiSeconds: 60, byoyomiPeriods: 1 })
     );
   });
+
+  it('現在対局中の生徒を自動ペアリングの候補から除外する', () => {
+    const onCreateGames = vi.fn();
+    render(
+      <AutoPairingDialog
+        {...defaultProps}
+        connectedIdentities={['sid:s1', 'sid:s2', 'sid:s3', 'teacher']}
+        students={[...students, makeStudent('s3', 'じろう', '5K')]}
+        unavailablePlayers={['s2']}
+        onCreateGames={onCreateGames}
+      />,
+    );
+
+    expect(screen.getByText('自動ペアリング（2名）')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('1局を一括開始'));
+    const pairs = onCreateGames.mock.calls[0][0];
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0].blackPlayer).not.toBe('sid:s2');
+    expect(pairs[0].whitePlayer).not.toBe('sid:s2');
+  });
 });

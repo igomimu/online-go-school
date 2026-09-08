@@ -745,6 +745,9 @@ export default function TeacherDashboard({
           connectedIdentities={participants.map(p => p.identity)}
           students={filteredStudents}
           teacherIdentity={localIdentity}
+          unavailablePlayers={filteredGames
+            .filter(game => game.status === 'playing' || game.status === 'scoring')
+            .flatMap(game => [game.blackPlayer, game.whitePlayer])}
           onClose={() => setShowAutoPairing(false)}
           onCreateGames={onCreateGames}
         />

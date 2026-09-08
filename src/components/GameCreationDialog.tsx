@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import type { Student } from '../types/classroom';
-import { findStudentByIdentity, getDisplayName } from '../utils/identityUtils';
+import { findStudentByIdentity, getDisplayName, identityMatchesPlayer } from '../utils/identityUtils';
 import type { GameClock } from '../types/game';
 import { createNhkClock, timeSettingsToClock } from '../hooks/useGameClock';
 import NigiriDraw from './NigiriDraw';
@@ -19,6 +19,8 @@ interface GameCreationDialogProps {
     clock?: GameClock;
   }) => void | Promise<void>;
   registeredStudents?: Student[];
+  /** 既に対局中（playing/scoring）の生徒。対局相手の候補から除外する。 */
+  unavailablePlayers?: string[];
   /** 生徒一覧の「新規」を押した生徒。相手の初期値にする。 */
   initialBlackPlayer?: string;
   onNigiriDraw?: (blackPlayer: string, whitePlayer: string) => void;
@@ -47,11 +49,19 @@ export default function GameCreationDialog({
   onClose,
   onCreate,
   registeredStudents = [],
+  unavailablePlayers = [],
   initialBlackPlayer,
   onNigiriDraw,
 }: GameCreationDialogProps) {
-  const uniqueStudents = useMemo(() => Array.from(new Set(students)), [students]);
-  const initialStudent = initialBlackPlayer || uniqueStudents[0] || '';
+  const uniqueStudents = useMemo(
+    () => Array.from(new Set(students)).filter(student =>
+      !unavailablePlayers.some(player => identityMatchesPlayer(student, player)),
+    ),
+    [students, unavailablePlayers],
+  );
+  const initialStudent = uniqueStudents.find(student =>
+    initialBlackPlayer && identityMatchesPlayer(student, initialBlackPlayer),
+  ) || uniqueStudents[0] || '';
 
   const [primaryStudent, setPrimaryStudent] = useState(initialStudent);
   const [opponentPlayer, setOpponentPlayer] = useState(initialStudent);
@@ -72,12 +82,14 @@ export default function GameCreationDialog({
 
   useEffect(() => {
     if (!initialBlackPlayer) return;
-    setPrimaryStudent(initialBlackPlayer);
+    const selectedInitialStudent = uniqueStudents.find(student => identityMatchesPlayer(student, initialBlackPlayer));
+    if (!selectedInitialStudent) return;
+    setPrimaryStudent(selectedInitialStudent);
     setOpponentPlayer(current => {
-      if (!studentVsStudent) return initialBlackPlayer;
-      return current !== initialBlackPlayer
+      if (!studentVsStudent) return selectedInitialStudent;
+      return current !== selectedInitialStudent
         ? current
-        : uniqueStudents.find(student => student !== initialBlackPlayer) || '';
+        : uniqueStudents.find(student => student !== selectedInitialStudent) || '';
     });
   }, [initialBlackPlayer, studentVsStudent, uniqueStudents]);
 

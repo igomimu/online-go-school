@@ -60,6 +60,19 @@ describe('GameCreationDialog', () => {
     expect(screen.getByTestId('opponent-player-select')).toHaveValue('sid:1002');
   });
 
+  it('現在対局中の生徒を相手の候補から除外する', () => {
+    render(
+      <GameCreationDialog
+        {...defaultProps}
+        students={['sid:1001', 'sid:1002', 'sid:1003']}
+        unavailablePlayers={['1002']}
+      />,
+    );
+
+    const options = within(screen.getByTestId('opponent-player-select')).getAllByRole('option');
+    expect(options.map(option => option.getAttribute('value'))).toEqual(['sid:1001', 'sid:1003']);
+  });
+
   it('黒白入替ボタンは表示せず、自分の黒白ラジオで対局者を入れ替える', async () => {
     const onCreate = vi.fn();
     render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
