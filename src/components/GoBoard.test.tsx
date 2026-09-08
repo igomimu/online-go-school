@@ -42,6 +42,26 @@ describe('GoBoard', () => {
     expect(container.querySelector('filter')).toBeNull();
   });
 
+  // 同じ端末で、今度は塗り（url(#stoneBlack) のグラデーション参照）が乗らず
+  // 輪郭だけの◯になった。参照が効かなくても石の色が出ることを固定する。
+  it('石はグラデーション参照に頼らずベタ色でも塗られる', () => {
+    const board = createEmptyBoard(9);
+    board[4][4] = { color: 'BLACK' };
+    board[2][2] = { color: 'WHITE' };
+    const { container } = render(<GoBoard boardState={board} boardSize={9} />);
+
+    const stoneGroups = container.querySelectorAll('[data-stone]');
+    expect(stoneGroups.length).toBe(2);
+    stoneGroups.forEach(group => {
+      const solid = Array.from(group.querySelectorAll('circle')).filter(c => {
+        const fill = c.getAttribute('fill') ?? '';
+        return fill.startsWith('#');
+      });
+      // ベタ色で塗られた石の円が必ず1つある
+      expect(solid.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
   it('クリックイベントが発火する', () => {
     const board = createEmptyBoard(9);
     const handleClick = vi.fn();

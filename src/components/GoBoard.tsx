@@ -178,6 +178,9 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     // 石の影のずらし幅（もとの feDropShadow の dx/dy と同じ値）
     const STONE_SHADOW_DX = 1.2;
     const STONE_SHADOW_DY = 2.2;
+    // グラデーションが乗らない端末でも石が石に見える色（各グラデーションの中間色）
+    const STONE_BLACK_SOLID = '#1a1a1a';
+    const STONE_WHITE_SOLID = '#f0ede4';
     const FONT_SIZE = CELL_SIZE * 0.65;
     const COORD_FONT_SIZE = 14;
     const STAR_POINT_RADIUS = 3.5;
@@ -344,10 +347,14 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 const isBlack = stone.color === 'BLACK';
                 cells.push(
                     <g key={`s-group-${x}-${y}`} data-stone={`${x}-${y}`} className="pointer-events-none">
-                        {/* 影はフィルタではなくグラデーションの円で敷く。理由は defs の
-                            stoneShadowSoft を参照（古い iPad で石だけが消えていた） */}
-                        <circle cx={cx + STONE_SHADOW_DX} cy={cy + STONE_SHADOW_DY} r={STONE_RADIUS * 1.16} fill="url(#stoneShadowSoft)" />
-                        <circle cx={cx} cy={cy} r={STONE_RADIUS} fill={isBlack ? "url(#stoneBlack)" : "url(#stoneWhite)"} stroke={isBlack ? "#000000" : "#3a3a3a"} strokeWidth={isBlack ? 2 : 1.5} />
+                        {/* 影。参照が解決できない端末では透明になるだけで、石の視認性には関わらない */}
+                        <circle cx={cx + STONE_SHADOW_DX} cy={cy + STONE_SHADOW_DY} r={STONE_RADIUS * 1.16} fill="url(#stoneShadowSoft) transparent" />
+                        {/* 石は必ずベタ塗りで描く。url(#…) の参照（グラデーション・フィルタ）を
+                            解決できない古い WebKit があり、塗りが乗らず輪郭だけの◯になった
+                            （2026-09-08 井町さんの iPad）。質感のグラデーションは次の円で
+                            上に重ね、参照が効く端末だけ乗るようにする。 */}
+                        <circle cx={cx} cy={cy} r={STONE_RADIUS} fill={isBlack ? STONE_BLACK_SOLID : STONE_WHITE_SOLID} stroke={isBlack ? "#000000" : "#3a3a3a"} strokeWidth={isBlack ? 2 : 1.5} />
+                        <circle cx={cx} cy={cy} r={STONE_RADIUS} fill={isBlack ? "url(#stoneBlack) transparent" : "url(#stoneWhite) transparent"} />
                         {(() => {
                             // 変化手順モードでは、変化に入ってからの石だけに番号が付く
                             const shown = effectiveNumberMode === 'all'
