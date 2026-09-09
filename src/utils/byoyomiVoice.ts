@@ -10,6 +10,8 @@
 // NHK杯方式は毎手30秒。考慮時間が残っていれば30秒で60秒の考慮時間へ入り、
 // 残っていなければ21〜30秒を「1」〜「10」と読む。
 
+import { formatResultSpeech } from './scoring';
+
 /**
  * 秒読み中の各整数秒で読み上げる語句を返す（無ければ null）。
  * @param byoyomiSeconds 1回の秒読みの長さ B（10/20/30/60）
@@ -144,4 +146,71 @@ export function speakByoyomi(text: string): void {
   } catch {
     // 読み上げ失敗は無視（対局進行に影響させない）
   }
+}
+
+// ── 終局結果の読み上げ ───────────────────────────────────────────────
+// 秒読みのカウントと違い、終局の一言は言い直しが無い。取りこぼすと無音のまま
+// 結果が消えるので、専用の経路を用意する（2026-09-09 三村さん「終局時に
+// 黒・白 ◯◯勝ちです の声が無い」）。
+
+/** 対局ごと・結果ごとに一度だけ喋るための記憶（gameId:result） */
+const spokenResults = new Set<string>();
+
+/** テスト用: 終局読み上げの記憶をリセットする */
+export function resetGameResultSpeechState(): void {
+  spokenResults.clear();
+}
+
+/**
+ * 一度きりの大事な読み上げ。
+ * Chrome は cancel() の直後に speak() すると、その発話ごと握りつぶすことがある。
+ * 秒読みは1秒後に言い直せるので実害が無いが、終局の一言はそれきりなので、
+ * 少し置いてから喋り、それでも始まっていなければ一度だけ言い直す。
+ */
+function speakImportant(text: string): void {
+  if (!voiceEnabled) return;
+  if (typeof window === 'undefined') return;
+  const synth = window.speechSynthesis;
+  if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return;
+
+  const utter = () => {
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ja-JP';
+      u.rate = 1.05;
+      u.volume = 1;
+      synth.speak(u);
+    } catch {
+      // 読み上げ失敗は無視（対局進行に影響させない）
+    }
+  };
+
+  try {
+    // 秒読みのカウントが残っていると結果に被さるので、そこだけは止める
+    synth.cancel();
+  } catch {
+    // cancel できない環境でもそのまま喋る
+  }
+  window.setTimeout(() => {
+    utter();
+    window.setTimeout(() => {
+      if (!synth.speaking && !synth.pending) utter();
+    }, 400);
+  }, 120);
+}
+
+/**
+ * 終局結果を1回だけ読み上げる（投了「黒、ちゅうおしがちです」／整地「黒、2目半がちです」）。
+ *
+ * 盤のフック（useLiveGame）と、盤を閉じる側（App）の両方から呼ぶ。先に終局を掴んだ方が
+ * 喋り、もう一方は黙る。読み上げを盤のフックだけに任せていたころは、閉じる判断が先に
+ * 走った端末で声が出ないまま結果が消えていた。
+ */
+export function speakGameResultOnce(gameId: string, result: string | null | undefined): void {
+  const phrase = formatResultSpeech(result);
+  if (!phrase) return;
+  const key = `${gameId}:${result}`;
+  if (spokenResults.has(key)) return;
+  spokenResults.add(key);
+  speakImportant(phrase);
 }

@@ -11,8 +11,8 @@ import {
   getNhkContinuationAnnouncement,
   getNhkTimeUpAnnouncement,
   speakByoyomi,
+  speakGameResultOnce,
 } from '../utils/byoyomiVoice';
-import { formatResultSpeech } from '../utils/scoring';
 import { reconcileLiveMoves, REMOTE_PREFIX } from '../utils/liveMoveReconcile';
 import { switchClock, startClockOnReceipt, shouldDeclareTimeUp } from './useGameClock';
 import type { GameClock } from '../types/game';
@@ -760,16 +760,12 @@ export function useLiveGame(
   );
 
   // 終局の読み上げ（投了「黒、中押し勝ちです」／整地「黒、2目半勝ちです」）。
-  // 結果が決まると碁盤がすぐ閉じてしまうので、声でも伝える。
-  // 対局者・観戦者それぞれの端末で1回だけ喋る（同じ対局・同じ結果では二度言わない）。
-  const spokenResultRef = useRef<string | null>(null);
+  // 結果が決まると碁盤が閉じてしまうので、声でも伝える。
+  // 同じ対局・同じ結果は一度しか喋らない（判定は speakGameResultOnce 側が持つので、
+  // App 側の「閉じる前に喋る」経路と二重にならない）。
   useEffect(() => {
     if (!activeGame || activeGame.status !== 'finished' || !activeGame.result) return;
-    const key = `${activeGame.id}:${activeGame.result}`;
-    if (spokenResultRef.current === key) return;
-    spokenResultRef.current = key;
-    const phrase = formatResultSpeech(activeGame.result);
-    if (phrase) speakByoyomi(phrase);
+    speakGameResultOnce(activeGame.id, activeGame.result);
   }, [activeGame]);
 
   const hasLocalClock = localClock !== null;

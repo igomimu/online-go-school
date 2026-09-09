@@ -26,6 +26,7 @@ import { ConnectionState } from './utils/classroomRtc';
 import { useLiveGameList } from './hooks/useLiveGameList';
 import { liveRowToSession, interruptAllGames, interruptGame, resumeLiveGame } from './utils/liveGameApi';
 import { isTimeoutResult, timedOutColorFromResult } from './utils/scoring';
+import { speakGameResultOnce } from './utils/byoyomiVoice';
 import {
   clearPendingResumeGameId,
   getPendingResumeGameId,
@@ -1770,9 +1771,13 @@ function App() {
     // 時間切れ終局は先生が「対局を再開する」を押せるよう、先生の画面は自動で閉じない
     if (role === 'TEACHER' && currentGame?.status === 'finished' && isTimeoutResult(currentGame.result)) return;
     if (currentGame && (currentGame.status === 'finished' || currentGame.status === 'interrupted')) {
-      // 終局の読み上げ（投了「〇の中押し勝ちです」）を聞き終える余裕を持たせてから閉じる
+      // 読み上げは盤のフック（useLiveGame）にも入っているが、そちらが終局を掴む前に
+      // ここが閉じてしまうと無音のまま結果が消える（2026-09-09 三村さん報告）。
+      // 閉じる判断と同じ一覧を見て、ここでも必ず声を出す（二重には喋らない）。
+      speakGameResultOnce(currentGame.id, currentGame.result);
+      // 終局の読み上げ（投了「〇の中押し勝ちです」）と結果表示を見届ける余裕を持たせてから閉じる。
       // 中断には読み上げが無いので即座にロビーへ戻し、次の新規対局を妨げない。
-      const delay = currentGame.status === 'interrupted' ? 0 : 5000;
+      const delay = currentGame.status === 'interrupted' ? 0 : 10000;
       const timer = setTimeout(() => {
         handleBackToLobby();
       }, delay);

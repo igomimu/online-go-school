@@ -20,10 +20,15 @@ test('投了すると「〇の中押し勝ちです」と読み上げ、結果�
     if (recordSpeech) {
       await page.addInitScript(() => {
         window.__spokenPhrases = [];
+        let speaking = false;
         Object.defineProperty(window, 'speechSynthesis', {
           value: {
-            speak(u: SpeechSynthesisUtterance) { window.__spokenPhrases.push(u.text); },
-            cancel() { /* 記録は消さない */ },
+            speak(u: SpeechSynthesisUtterance) { window.__spokenPhrases.push(u.text); speaking = true; },
+            cancel() { speaking = false; /* 記録は消さない */ },
+            // 終局の読み上げは「始まっていなければ一度だけ言い直す」ので、
+            // 実ブラウザと同じく発話中かどうかを返す（言い直しの空振りを作らない）
+            get speaking() { return speaking; },
+            get pending() { return false; },
           },
           configurable: true,
         });
@@ -75,11 +80,17 @@ test('投了すると「〇の中押し勝ちです」と読み上げ、結果�
     await expect(banner).toContainText('白が投了しました。黒の中押し勝ち');
     await expect(aPage.getByTestId('game-result-close')).toBeVisible();
 
-    // 声でも結果を伝える
+    // 声でも結果を伝える。
+    // 読点で語を区切ってアクセントを頭に来させる（三村さん指定）。
+    // 発話は cancel の直後を避けて少し置いてから始まるので、届くまで待つ。
+    await expect.poll(
+      () => aPage.evaluate(() => window.__spokenPhrases),
+      { timeout: 10_000, message: '終局の読み上げが届かない' },
+    ).toContain('黒、ちゅうおしがちです');
+
+    // 言い直しは発話が始まらなかったときだけ。二重に喋らない
     const spoken = await aPage.evaluate(() => window.__spokenPhrases);
-    // 読点で語を区切ってアクセントを頭に来させる（三村さん指定）
-    
-    expect(spoken, `読み上げ: ${JSON.stringify(spoken)}`).toContain('黒、ちゅうおしがちです');
+    expect(spoken.filter(t => t === '黒、ちゅうおしがちです'), `読み上げ: ${JSON.stringify(spoken)}`).toHaveLength(1);
   } finally {
     for (const c of ctxs) await c.close().catch(() => {});
     await teardownSupabaseRoster(classroomId);

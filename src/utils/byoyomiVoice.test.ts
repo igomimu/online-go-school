@@ -7,6 +7,8 @@ import {
   getNhkTimeUpAnnouncement,
   speakByoyomi,
   resetByoyomiVoiceState,
+  speakGameResultOnce,
+  resetGameResultSpeechState,
 } from './byoyomiVoice';
 
 describe('getByoyomiAnnouncement', () => {
@@ -179,5 +181,78 @@ describe('speakByoyomi の連続重複抑止', () => {
     vi.setSystemTime(new Date('2026-08-01T00:00:02Z')); // 2秒後
     speakByoyomi('10');
     expect(spoken).toEqual(['10', '10']);
+  });
+});
+
+describe('speakGameResultOnce（終局結果の読み上げ）', () => {
+  const spoken: string[] = [];
+  let speaking = false;
+
+  beforeEach(() => {
+    spoken.length = 0;
+    speaking = false;
+    resetGameResultSpeechState();
+    vi.useFakeTimers();
+    vi.stubGlobal('speechSynthesis', {
+      speak: (u: { text: string }) => { spoken.push(u.text); speaking = true; },
+      cancel: () => { speaking = false; },
+      get speaking() { return speaking; },
+      get pending() { return false; },
+    });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { text: string; lang = ''; rate = 1; volume = 1;
+      constructor(text: string) { this.text = text; } });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('投了は「黒、ちゅうおしがちです」と読む', () => {
+    speakGameResultOnce('game-1', 'B+R');
+    vi.advanceTimersByTime(1000);
+    expect(spoken).toEqual(['黒、ちゅうおしがちです']);
+  });
+
+  it('整地は目数を囲碁の言い方で読む', () => {
+    speakGameResultOnce('game-1', 'W+2.5');
+    vi.advanceTimersByTime(1000);
+    expect(spoken).toEqual(['白、2目半がちです']);
+  });
+
+  it('同じ対局・同じ結果は二度読まない（盤側と閉じる側の両方から呼ばれる）', () => {
+    speakGameResultOnce('game-1', 'B+R');
+    speakGameResultOnce('game-1', 'B+R');
+    vi.advanceTimersByTime(1000);
+    expect(spoken).toEqual(['黒、ちゅうおしがちです']);
+  });
+
+  it('別の対局なら読む', () => {
+    speakGameResultOnce('game-1', 'B+R');
+    vi.advanceTimersByTime(1000);
+    speakGameResultOnce('game-2', 'B+R');
+    vi.advanceTimersByTime(1000);
+    expect(spoken).toEqual(['黒、ちゅうおしがちです', '黒、ちゅうおしがちです']);
+  });
+
+  it('発話が始まらなかったら一度だけ言い直す（Chromeがcancel直後のspeakを捨てる癖）', () => {
+    vi.stubGlobal('speechSynthesis', {
+      speak: (u: { text: string }) => { spoken.push(u.text); }, // speaking にならない
+      cancel: () => {},
+      speaking: false,
+      pending: false,
+    });
+    speakGameResultOnce('game-1', 'B+R');
+    vi.advanceTimersByTime(1000);
+    expect(spoken).toEqual(['黒、ちゅうおしがちです', '黒、ちゅうおしがちです']);
+  });
+
+  it('時間切れ・中断・取消は読まない（時間切れは秒読み側が言う）', () => {
+    speakGameResultOnce('game-1', 'B+T');
+    speakGameResultOnce('game-2', '中断');
+    speakGameResultOnce('game-3', '取消');
+    speakGameResultOnce('game-4', null);
+    vi.advanceTimersByTime(1000);
+    expect(spoken).toEqual([]);
   });
 });
