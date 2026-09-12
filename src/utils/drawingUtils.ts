@@ -171,6 +171,44 @@ export function taperedPathD(points: BoardPoint[], startWidth: number, endWidth:
 }
 
 /**
+ * 軌跡の終端を指定距離だけ手前へ戻す。
+ * 矢印の軸を矢じりの付け根で止め、三角形の肩を明確に見せるために使う。
+ * 短い軌跡でも全長の25%は残し、軸が完全に消えないようにする。
+ */
+export function shortenPathEnd(points: BoardPoint[], distance: number): BoardPoint[] {
+  if (points.length < 2 || distance <= 0) return [...points];
+
+  const lengths: number[] = [];
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    const length = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+    lengths.push(length);
+    total += length;
+  }
+  if (total === 0) return [...points];
+
+  const targetLength = Math.max(total * 0.25, total - distance);
+  const shortened = [points[0]];
+  let travelled = 0;
+  for (let i = 1; i < points.length; i++) {
+    const segmentLength = lengths[i - 1];
+    if (segmentLength === 0) continue;
+    if (travelled + segmentLength < targetLength) {
+      shortened.push(points[i]);
+      travelled += segmentLength;
+      continue;
+    }
+    const ratio = (targetLength - travelled) / segmentLength;
+    shortened.push({
+      x: points[i - 1].x + (points[i].x - points[i - 1].x) * ratio,
+      y: points[i - 1].y + (points[i].y - points[i - 1].y) * ratio,
+    });
+    break;
+  }
+  return shortened;
+}
+
+/**
  * 線の終端に置く矢じり（三角形）の頂点。
  *
  * SVG の `marker-end="url(#…)"` を使わずに自分で描くためのもの。url(#…) の参照を

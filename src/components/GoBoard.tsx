@@ -2,7 +2,7 @@
 import { forwardRef, useMemo, useEffect, useRef, type ReactElement } from 'react';
 import type { TerritoryOwner } from '../utils/scoring';
 import { useViewBox } from '../hooks/useViewBox';
-import { arrowHeadPoints, clientToBoardPoint, directionAnchor, smoothPathD, taperedPathD } from '../utils/drawingUtils';
+import { arrowHeadPoints, clientToBoardPoint, directionAnchor, shortenPathEnd, smoothPathD, taperedPathD } from '../utils/drawingUtils';
 
 export interface ViewRange {
     minX: number;
@@ -524,8 +524,9 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     // 大きさをそのまま持ってくる（直線は線の太さ追随、曲線は実寸指定だった）
     const LINE_ARROW_LENGTH = ARROW_STROKE_WIDTH * 10;
     const LINE_ARROW_WIDTH = ARROW_STROKE_WIDTH * 7;
-    const CURVE_ARROW_LENGTH = 24;
-    const CURVE_ARROW_WIDTH = 18;
+    // サンプルに合わせ、手描き矢印の頭は一マス(40px)より大きく、軸の終端は半マス幅にする。
+    const CURVE_ARROW_LENGTH = 48;
+    const CURVE_ARROW_WIDTH = 50;
     const drawingElements: ReactElement[] = [];
     if (drawings) {
         drawings.forEach((d, i) => {
@@ -539,12 +540,15 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 // arrowEnd 未指定は、以前に作られた free 描画との互換のため矢印扱い。
                 const hasArrow = d.arrowEnd !== false;
                 if (hasArrow) {
+                    // 軸を矢じりの付け根より少し内側で止める。軸を先端まで伸ばすと
+                    // 三角形と一体化し、矢印の肩が見えなくなる。
+                    const bodyPoints = shortenPathEnd(points, CURVE_ARROW_LENGTH - 6);
                     drawingElements.push(
                         <path
                             key={`draw-${i}`}
                             data-testid="board-free-drawing"
                             data-drawing-variant="tapered-arrow"
-                            d={taperedPathD(points, 3, 10)}
+                            d={taperedPathD(bodyPoints, 1, 20)}
                             fill="#e53e3e"
                             stroke="#e53e3e" strokeWidth={1}
                             strokeLinejoin="round"
@@ -575,7 +579,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                     if (head) {
                         drawingElements.push(
                             <polygon key={`draw-${i}-head`} data-testid="board-free-arrowhead"
-                                points={head} fill="#e53e3e" opacity={0.85}
+                                points={head} fill="#e53e3e" opacity={0.95}
                                 className="pointer-events-none" />
                         );
                     }

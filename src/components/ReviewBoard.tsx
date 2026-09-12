@@ -27,7 +27,7 @@ import type { Student } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
 import type { AiAnalysisResult, AiAnalysisSyncPayload, AiSettings } from '../types/ai';
 import { fromGtpCoord } from '../utils/katagoClient';
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GitBranch, Pen, ArrowRight as ArrowRightIcon, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Eye, EyeOff, Menu, FolderOpen, Save } from 'lucide-react';
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GitBranch, LineSquiggle, ArrowUpRight, Trash2, Play, Pause, MessageSquare, Circle, Triangle, Square, X, Type, Hash, Eraser, Maximize2, Minimize2, Eye, EyeOff, Menu, FolderOpen, Save } from 'lucide-react';
 import { getDisplayName } from '../utils/identityUtils';
 import { useAutoReplay, REPLAY_SPEEDS } from '../hooks/useAutoReplay';
 import { useAiAnalysis, toBlackWinrate } from '../hooks/useAiAnalysis';
@@ -1155,7 +1155,7 @@ export default function ReviewBoard({
                     }`}
                     title="通常線を描く（自分の画面だけ）"
                   >
-                    <Pen className="w-4 h-4" />
+                    <LineSquiggle className="w-4 h-4" />
                   </button>
                   <button
                     data-testid="draw-arrow-button"
@@ -1168,7 +1168,7 @@ export default function ReviewBoard({
                     }`}
                     title="矢印線を描く（自分の画面だけ）"
                   >
-                    <ArrowRightIcon className="w-4 h-4" />
+                    <ArrowUpRight className="w-4 h-4" />
                   </button>
                 </>
               )}
@@ -1183,7 +1183,7 @@ export default function ReviewBoard({
                   }`}
                   title="矢印を描く"
                 >
-                  <ArrowRightIcon className="w-4 h-4" />
+                  <ArrowUpRight className="w-4 h-4" />
                 </button>
               )}
 

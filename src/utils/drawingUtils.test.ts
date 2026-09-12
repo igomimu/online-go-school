@@ -8,6 +8,7 @@ import {
   directionAnchor,
   roundPoint,
   taperedPathD,
+  shortenPathEnd,
 } from './drawingUtils';
 import type { Drawing } from '../components/GoBoard';
 
@@ -161,6 +162,27 @@ describe('曲線(free)の描画', () => {
     it('2点未満または同一点だけなら空を返す', () => {
       expect(taperedPathD([{ x: 1, y: 1 }], 2, 6)).toBe('');
       expect(taperedPathD([{ x: 1, y: 1 }, { x: 1, y: 1 }], 2, 6)).toBe('');
+    });
+  });
+
+  describe('shortenPathEnd', () => {
+    it('終端を指定距離だけ手前へ戻す', () => {
+      expect(shortenPathEnd([
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 20, y: 0 },
+      ], 6)).toEqual([
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 14, y: 0 },
+      ]);
+    });
+
+    it('短い線でも全長の25%は軸として残す', () => {
+      expect(shortenPathEnd([{ x: 0, y: 0 }, { x: 8, y: 0 }], 20)).toEqual([
+        { x: 0, y: 0 },
+        { x: 2, y: 0 },
+      ]);
     });
   });
 

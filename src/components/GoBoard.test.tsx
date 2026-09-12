@@ -110,14 +110,19 @@ describe('GoBoard', () => {
     const board = createEmptyBoard(9);
     const { container } = render(
       <GoBoard boardState={board} boardSize={9} drawings={[{
-        fromX: 1, fromY: 1, toX: 5, toY: 5, type: 'free', arrowEnd: true,
-        points: [{ x: 1, y: 1 }, { x: 3, y: 3 }, { x: 5, y: 5 }],
+        fromX: 1, fromY: 1, toX: 5, toY: 1, type: 'free', arrowEnd: true,
+        points: [{ x: 1, y: 1 }, { x: 3, y: 1 }, { x: 5, y: 1 }],
       }]} />
     );
     const line = container.querySelector('[data-drawing-variant="tapered-arrow"]');
     expect(line).toHaveAttribute('fill', '#e53e3e');
-    expect(line?.getAttribute('d')).toMatch(/ Z$/);
-    expect(container.querySelector('[data-testid="board-free-arrowhead"]')).toBeInTheDocument();
+    // 書き出しは1px、矢じりの手前では20px。軸は先端まで伸ばさず肩を出す。
+    expect(line?.getAttribute('d')).toMatch(/^M 40 40\.5 .*L 158 50 L 158 30.* Z$/);
+    // 矢じりは長さ48px・幅50pxで、一マスより大きく明確に出す。
+    expect(container.querySelector('[data-testid="board-free-arrowhead"]'))
+      .toHaveAttribute('points', '200,40 152,65 152,15');
+    expect(container.querySelector('[data-testid="board-free-arrowhead"]'))
+      .toHaveAttribute('opacity', '0.95');
   });
 
   it('クリックイベントが発火する', () => {

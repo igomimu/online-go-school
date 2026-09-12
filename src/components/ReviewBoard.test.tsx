@@ -741,8 +741,10 @@ describe('ホイールの手順送り', () => {
         <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
           onSetCurrentNode={vi.fn()} isTeacher={true} classroomRef={mockClassroomRef as never} />
       );
-      expect(screen.getByTestId('draw-line-button')).toBeInTheDocument();
-      expect(screen.getByTestId('draw-arrow-button')).toBeInTheDocument();
+      const lineButton = screen.getByTestId('draw-line-button');
+      const arrowButton = screen.getByTestId('draw-arrow-button');
+      expect(lineButton.querySelector('.lucide-line-squiggle')).toBeInTheDocument();
+      expect(arrowButton.querySelector('.lucide-arrow-up-right')).toBeInTheDocument();
     });
 
     it('自分の棋譜を並べている生徒にはボタンを出さない', () => {
