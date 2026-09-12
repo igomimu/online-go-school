@@ -2,7 +2,7 @@
 import { forwardRef, useMemo, useEffect, useRef, type ReactElement } from 'react';
 import type { TerritoryOwner } from '../utils/scoring';
 import { useViewBox } from '../hooks/useViewBox';
-import { arrowHeadPoints, clientToBoardPoint, directionAnchor, shortenPathEnd, smoothPathD, taperedPathD } from '../utils/drawingUtils';
+import { arrowHeadPoints, buildArrowStrokeGeometry, clientToBoardPoint, smoothPathD, taperedPathD } from '../utils/drawingUtils';
 
 export interface ViewRange {
     minX: number;
@@ -539,16 +539,17 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 // 通常線は均一なマジックペン、矢印線は終点へ向かって徐々に太くする。
                 // arrowEnd 未指定は、以前に作られた free 描画との互換のため矢印扱い。
                 const hasArrow = d.arrowEnd !== false;
+                const arrowGeometry = hasArrow
+                    ? buildArrowStrokeGeometry(points, CURVE_ARROW_LENGTH)
+                    : null;
                 if (hasArrow) {
-                    // 軸を矢じりの付け根より少し内側で止める。軸を先端まで伸ばすと
-                    // 三角形と一体化し、矢印の肩が見えなくなる。
-                    const bodyPoints = shortenPathEnd(points, CURVE_ARROW_LENGTH - 6);
+                    if (!arrowGeometry) return;
                     drawingElements.push(
                         <path
                             key={`draw-${i}`}
                             data-testid="board-free-drawing"
                             data-drawing-variant="tapered-arrow"
-                            d={taperedPathD(bodyPoints, 1, 20)}
+                            d={taperedPathD(arrowGeometry.bodyPoints, 1, 20 * arrowGeometry.scale)}
                             fill="#e53e3e"
                             stroke="#e53e3e" strokeWidth={1}
                             strokeLinejoin="round"
@@ -572,10 +573,15 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                     );
                 }
                 // 矢印線だけ終点へ矢じりを付ける。向きは終点から十分離れた直近の点で決める
-                const anchor = hasArrow ? directionAnchor(points) : null;
-                if (anchor) {
+                const anchor = arrowGeometry?.directionAnchor ?? null;
+                if (anchor && arrowGeometry) {
                     const tip = points[points.length - 1];
-                    const head = arrowHeadPoints(tip, anchor, CURVE_ARROW_LENGTH, CURVE_ARROW_WIDTH);
+                    const head = arrowHeadPoints(
+                        tip,
+                        anchor,
+                        CURVE_ARROW_LENGTH * arrowGeometry.scale,
+                        CURVE_ARROW_WIDTH * arrowGeometry.scale,
+                    );
                     if (head) {
                         drawingElements.push(
                             <polygon key={`draw-${i}-head`} data-testid="board-free-arrowhead"

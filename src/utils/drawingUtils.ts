@@ -208,6 +208,95 @@ export function shortenPathEnd(points: BoardPoint[], distance: number): BoardPoi
   return shortened;
 }
 
+export interface ArrowStrokeGeometry {
+  bodyPoints: BoardPoint[];
+  directionAnchor: BoardPoint;
+  scale: number;
+}
+
+function pathLength(points: BoardPoint[]): number {
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    total += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+  }
+  return total;
+}
+
+/** 軌跡を始点から指定距離まで残し、最後の区間は補間する */
+function pathPrefix(points: BoardPoint[], targetLength: number): BoardPoint[] {
+  if (points.length === 0) return [];
+  if (targetLength <= 0) return [points[0]];
+  const prefix = [points[0]];
+  let travelled = 0;
+  for (let i = 1; i < points.length; i++) {
+    const start = points[i - 1];
+    const end = points[i];
+    const segmentLength = Math.hypot(end.x - start.x, end.y - start.y);
+    if (segmentLength === 0) continue;
+    if (travelled + segmentLength <= targetLength) {
+      prefix.push(end);
+      travelled += segmentLength;
+      continue;
+    }
+    const ratio = (targetLength - travelled) / segmentLength;
+    prefix.push({
+      x: start.x + (end.x - start.x) * ratio,
+      y: start.y + (end.y - start.y) * ratio,
+    });
+    break;
+  }
+  return prefix;
+}
+
+/**
+ * 手描き矢印の軸終端と矢じりを、同じ中心線・同じ角度へ揃える。
+ *
+ * 以前は軸を軌跡に沿って切り、矢じりだけ最後の数pxの向きで回していたため、
+ * 終端が曲がると軸が矢じりの中央から外れ、左右の肩幅が違って見えた。
+ * 最後の一定距離を一本の直線へ収束させることで、両肩を常に同じ幅にする。
+ */
+export function buildArrowStrokeGeometry(
+  points: BoardPoint[],
+  headLength: number,
+  guideLength = 12,
+  overlap = 8,
+): ArrowStrokeGeometry | null {
+  if (points.length < 2 || headLength <= 0 || guideLength < 0 || overlap < 0) return null;
+  const total = pathLength(points);
+  if (total === 0) return null;
+
+  // 短い線では頭・軸終端を同率で縮め、左右幅の比率を崩さない。
+  const scale = Math.min(1, total / (headLength + guideLength));
+  const effectiveHeadLength = headLength * scale;
+  const effectiveGuideLength = guideLength * scale;
+  const effectiveOverlap = Math.min(overlap * scale, effectiveHeadLength * 0.5);
+  const tip = points[points.length - 1];
+
+  // 最後の数pxの手ぶれではなく、矢じり＋案内区間の全体で安定した向きを出す。
+  const lookback = effectiveHeadLength + effectiveGuideLength;
+  const originalPrefix = pathPrefix(points, Math.max(0, total - lookback));
+  const axisFrom = originalPrefix[originalPrefix.length - 1] ?? points[0];
+  const dx = tip.x - axisFrom.x;
+  const dy = tip.y - axisFrom.y;
+  const axisLength = Math.hypot(dx, dy);
+  if (axisLength === 0) return null;
+  const ux = dx / axisLength;
+  const uy = dy / axisLength;
+
+  // 軌跡上の案内点そのものを向きの基準にする。曲率が大きくても、案内点より
+  // 後ろへ中心線が折り返さないため、矢じりへの接続が素直になる。
+  const directionAnchor = axisFrom;
+  const bodyEnd = {
+    x: tip.x - ux * (effectiveHeadLength - effectiveOverlap),
+    y: tip.y - uy * (effectiveHeadLength - effectiveOverlap),
+  };
+
+  // 元の曲線から安定した中心線へつなぎ、最後の区間を矢じりと完全に平行にする。
+  const bodyPoints = [...originalPrefix, bodyEnd];
+
+  return { bodyPoints, directionAnchor, scale };
+}
+
 /**
  * 線の終端に置く矢じり（三角形）の頂点。
  *

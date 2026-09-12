@@ -9,6 +9,7 @@ import {
   roundPoint,
   taperedPathD,
   shortenPathEnd,
+  buildArrowStrokeGeometry,
 } from './drawingUtils';
 import type { Drawing } from '../components/GoBoard';
 
@@ -183,6 +184,35 @@ describe('曲線(free)の描画', () => {
         { x: 0, y: 0 },
         { x: 2, y: 0 },
       ]);
+    });
+  });
+
+  describe('buildArrowStrokeGeometry', () => {
+    it('曲がった終端でも軸の最後と矢じりを同じ角度に揃える', () => {
+      const geometry = buildArrowStrokeGeometry([
+        { x: 0, y: 0 },
+        { x: 60, y: 0 },
+        { x: 80, y: 35 },
+        { x: 100, y: 20 },
+      ], 48);
+      expect(geometry).not.toBeNull();
+      const body = geometry!.bodyPoints;
+      const bodyFrom = body[body.length - 2];
+      const bodyEnd = body[body.length - 1];
+      const tip = { x: 100, y: 20 };
+      const bodyDx = bodyEnd.x - bodyFrom.x;
+      const bodyDy = bodyEnd.y - bodyFrom.y;
+      const headDx = tip.x - geometry!.directionAnchor.x;
+      const headDy = tip.y - geometry!.directionAnchor.y;
+      // 外積0＝軸終端と矢じりが平行。これで左右の肩幅が同じになる。
+      expect(bodyDx * headDy - bodyDy * headDx).toBeCloseTo(0);
+      expect(bodyFrom).toEqual(geometry!.directionAnchor);
+      expect(bodyDx * headDx + bodyDy * headDy).toBeGreaterThan(0);
+    });
+
+    it('短い線では矢じりと軸幅を同率で縮める', () => {
+      const geometry = buildArrowStrokeGeometry([{ x: 0, y: 0 }, { x: 30, y: 0 }], 48);
+      expect(geometry?.scale).toBeCloseTo(0.5);
     });
   });
 
