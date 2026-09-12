@@ -92,6 +92,34 @@ describe('GoBoard', () => {
     expect(container.querySelector('[data-testid="board-arrowhead"]')).toBeNull();
   });
 
+  it('手描きの通常線は均一な太さで、矢じりを付けない', () => {
+    const board = createEmptyBoard(9);
+    const { container } = render(
+      <GoBoard boardState={board} boardSize={9} drawings={[{
+        fromX: 1, fromY: 1, toX: 5, toY: 5, type: 'free', arrowEnd: false,
+        points: [{ x: 1, y: 1 }, { x: 3, y: 3 }, { x: 5, y: 5 }],
+      }]} />
+    );
+    const line = container.querySelector('[data-drawing-variant="plain-line"]');
+    expect(line).toHaveAttribute('stroke-width', '8');
+    expect(line).toHaveAttribute('fill', 'none');
+    expect(container.querySelector('[data-testid="board-free-arrowhead"]')).toBeNull();
+  });
+
+  it('手描きの矢印線は先端へ太くなる輪郭と矢じりを描く', () => {
+    const board = createEmptyBoard(9);
+    const { container } = render(
+      <GoBoard boardState={board} boardSize={9} drawings={[{
+        fromX: 1, fromY: 1, toX: 5, toY: 5, type: 'free', arrowEnd: true,
+        points: [{ x: 1, y: 1 }, { x: 3, y: 3 }, { x: 5, y: 5 }],
+      }]} />
+    );
+    const line = container.querySelector('[data-drawing-variant="tapered-arrow"]');
+    expect(line).toHaveAttribute('fill', '#e53e3e');
+    expect(line?.getAttribute('d')).toMatch(/ Z$/);
+    expect(container.querySelector('[data-testid="board-free-arrowhead"]')).toBeInTheDocument();
+  });
+
   it('クリックイベントが発火する', () => {
     const board = createEmptyBoard(9);
     const handleClick = vi.fn();

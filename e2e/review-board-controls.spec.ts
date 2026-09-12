@@ -98,6 +98,33 @@ test.describe('検討モードの碁盤操作(pokekata踏襲)', () => {
       await expect(review.getByText('1手目')).toBeVisible({ timeout: 3_000 });
     }
   });
+
+  test('通常線と矢印線を別ボタンで描き分け、マウスを離すと確定する', async () => {
+    await loginAsTeacher(teacherPage);
+    await openClassroomAndConnect(teacherPage);
+    const review = await loadSgfForReview(teacherPage, '(;FF[4]GM[1]SZ[9])');
+    const board = review.getByTestId('go-board');
+    await expect(board).toBeVisible({ timeout: 15_000 });
+
+    const bounds = await board.boundingBox();
+    if (!bounds) throw new Error('検討盤の表示位置を取得できません');
+    const draw = async (fromX: number, fromY: number, toX: number, toY: number) => {
+      await review.mouse.move(bounds.x + bounds.width * fromX, bounds.y + bounds.height * fromY);
+      await review.mouse.down();
+      await review.mouse.move(bounds.x + bounds.width * toX, bounds.y + bounds.height * toY, { steps: 12 });
+      await review.mouse.up();
+    };
+
+    await review.getByTestId('draw-line-button').click();
+    await draw(0.25, 0.25, 0.65, 0.45);
+    await expect(board.locator('[data-drawing-variant="plain-line"]')).toBeVisible();
+    await expect(board.getByTestId('board-free-arrowhead')).toHaveCount(0);
+
+    await review.getByTestId('draw-arrow-button').click();
+    await draw(0.25, 0.65, 0.7, 0.35);
+    await expect(board.locator('[data-drawing-variant="tapered-arrow"]')).toBeVisible();
+    await expect(board.getByTestId('board-free-arrowhead')).toBeVisible();
+  });
 });
 
 // 回帰テスト: 390×667（iPhone の URL バー表示中に相当）で、検討画面の操作列が

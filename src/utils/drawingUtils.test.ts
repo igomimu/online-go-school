@@ -7,6 +7,7 @@ import {
   arrowHeadPoints,
   directionAnchor,
   roundPoint,
+  taperedPathD,
 } from './drawingUtils';
 import type { Drawing } from '../components/GoBoard';
 
@@ -138,6 +139,28 @@ describe('曲線(free)の描画', () => {
       const d = smoothPathD([{ x: 2, y: 2 }, { x: 2, y: 2 }, { x: 2, y: 2 }]);
       expect(d).toContain('M 2 2');
       expect(d).not.toContain('NaN');
+    });
+  });
+
+  describe('taperedPathD', () => {
+    it('始点より終点の幅が広い閉じた輪郭を返す', () => {
+      const d = taperedPathD([{ x: 0, y: 0 }, { x: 10, y: 0 }], 2, 6);
+      expect(d).toBe('M 0 1 L 10 3 L 10 -3 L 0 -1 Z');
+    });
+
+    it('点の密度に関係なく距離に比例して太くする', () => {
+      const d = taperedPathD([
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 10, y: 0 },
+      ], 2, 6);
+      // 全長の1/10地点なので半幅は1.2。点数の中間として2にはしない。
+      expect(d).toContain('L 1 1.2');
+    });
+
+    it('2点未満または同一点だけなら空を返す', () => {
+      expect(taperedPathD([{ x: 1, y: 1 }], 2, 6)).toBe('');
+      expect(taperedPathD([{ x: 1, y: 1 }, { x: 1, y: 1 }], 2, 6)).toBe('');
     });
   });
 

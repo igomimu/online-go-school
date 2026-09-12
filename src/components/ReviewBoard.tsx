@@ -198,9 +198,9 @@ export default function ReviewBoard({
       : false
   ));
   const [drawings, setDrawings] = useState<Drawing[]>([]);
-  // 直線ボタンは廃止し、手でなぞる曲線に置き換えた（2026-09-05 三村さん）。
-  // 'line' は過去に配信・保存されたデータのために型としては残っている。
-  const [drawMode, setDrawMode] = useState<'off' | 'free' | 'arrow'>('off');
+  // 講師用の手描き線は、均一な通常線と、終点へ太くなる矢印線を別モードにする。
+  // 'arrow' は自分の棋譜を開いた生徒が使う従来の交点間矢印。
+  const [drawMode, setDrawMode] = useState<'off' | 'free-line' | 'free-arrow' | 'arrow'>('off');
   // 描いている最中の軌跡。確定するまで drawings には入れない
   const freePointsRef = useRef<{ x: number; y: number }[]>([]);
   const [freePoints, setFreePoints] = useState<{ x: number; y: number }[]>([]);
@@ -454,19 +454,19 @@ export default function ReviewBoard({
     }
   }, [broadcastDrawings, canEdit, drawMode, drawStart, drawings]);
 
-  // 曲線（マジックペン）。🔴 講師の手元だけに残し、生徒へは配信しない
+  // 通常線・矢印線（マジックペン）。🔴 講師の手元だけに残し、生徒へは配信しない
   // （2026-09-05 三村さん「検討時に講師だけに見えればいい」「生徒は使わない」）。
-  const canDrawCurve = isTeacher && drawMode === 'free';
+  const canDrawFreeLine = isTeacher && (drawMode === 'free-line' || drawMode === 'free-arrow');
 
   const handleFreeDrawStart = useCallback((point: { x: number; y: number }) => {
-    if (!canDrawCurve) return;
+    if (!canDrawFreeLine) return;
     const p = roundPoint(point);
     freePointsRef.current = [p];
     setFreePoints([p]);
-  }, [canDrawCurve]);
+  }, [canDrawFreeLine]);
 
   const handleFreeDrawMove = useCallback((point: { x: number; y: number }) => {
-    if (!canDrawCurve) return;
+    if (!canDrawFreeLine) return;
     const points = freePointsRef.current;
     const last = points[points.length - 1];
     if (!last) return;
@@ -475,22 +475,23 @@ export default function ReviewBoard({
     if (!shouldAppendPoint(last, p)) return;
     points.push(p);
     setFreePoints([...points]);
-  }, [canDrawCurve]);
+  }, [canDrawFreeLine]);
 
   const handleFreeDrawEnd = useCallback(() => {
     const points = freePointsRef.current;
     freePointsRef.current = [];
     setFreePoints([]);
     // 点ひとつ（ただのタップ）では線にしない
-    if (!canDrawCurve || points.length < 2) return;
+    if (!canDrawFreeLine || points.length < 2) return;
     const newDrawing: Drawing = {
       fromX: points[0].x, fromY: points[0].y,
       toX: points[points.length - 1].x, toY: points[points.length - 1].y,
       type: 'free',
       points,
+      arrowEnd: drawMode === 'free-arrow',
     };
     setDrawings(prev => [...prev, newDrawing]);
-  }, [canDrawCurve]);
+  }, [canDrawFreeLine, drawMode]);
 
   // 描いている最中の線も見えるようにする（確定前）
   const visibleDrawings = useMemo<Drawing[]>(() => {
@@ -500,8 +501,9 @@ export default function ReviewBoard({
       toX: freePoints[freePoints.length - 1].x, toY: freePoints[freePoints.length - 1].y,
       type: 'free' as const,
       points: freePoints,
+      arrowEnd: drawMode === 'free-arrow',
     }];
-  }, [drawings, freePoints]);
+  }, [drawMode, drawings, freePoints]);
 
   const clearAnnotations = useCallback(() => {
     setDrawings([]);
@@ -985,7 +987,7 @@ export default function ReviewBoard({
             onDragStart={drawMode === 'arrow' ? handleDrawDragStart : undefined}
             onDragMove={drawMode === 'arrow' ? handleDrawDragMove : undefined}
             onDragEnd={drawMode === 'arrow' ? handleDrawDragEnd : undefined}
-            freeDrawEnabled={canDrawCurve}
+            freeDrawEnabled={canDrawFreeLine}
             onFreeDrawStart={handleFreeDrawStart}
             onFreeDrawMove={handleFreeDrawMove}
             onFreeDrawEnd={handleFreeDrawEnd}
@@ -1139,34 +1141,51 @@ export default function ReviewBoard({
 
               <div className="w-px h-5 bg-raised mx-1" />
 
-              {/* 曲線・矢印 */}
+              {/* 通常線・矢印線（講師の手元専用） */}
               {isTeacher && (
+                <>
+                  <button
+                    data-testid="draw-line-button"
+                    onClick={() => {
+                      setDrawMode(drawMode === 'free-line' ? 'off' : 'free-line');
+                      setToolMode('play');
+                    }}
+                    className={`p-2 rounded-lg border transition-all ${
+                      drawMode === 'free-line' ? 'bg-alert/15 border-alert text-alert-text' : 'bg-raised border-line text-muted hover:text-ink'
+                    }`}
+                    title="通常線を描く（自分の画面だけ）"
+                  >
+                    <Pen className="w-4 h-4" />
+                  </button>
+                  <button
+                    data-testid="draw-arrow-button"
+                    onClick={() => {
+                      setDrawMode(drawMode === 'free-arrow' ? 'off' : 'free-arrow');
+                      setToolMode('play');
+                    }}
+                    className={`p-2 rounded-lg border transition-all ${
+                      drawMode === 'free-arrow' ? 'bg-alert/15 border-alert text-alert-text' : 'bg-raised border-line text-muted hover:text-ink'
+                    }`}
+                    title="矢印線を描く（自分の画面だけ）"
+                  >
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+              {!isTeacher && selfReview && (
                 <button
-                  data-testid="draw-curve-button"
                   onClick={() => {
-                    setDrawMode(drawMode === 'free' ? 'off' : 'free');
+                    setDrawMode(drawMode === 'arrow' ? 'off' : 'arrow');
                     setToolMode('play');
                   }}
                   className={`p-2 rounded-lg border transition-all ${
-                    drawMode === 'free' ? 'bg-alert/15 border-alert text-alert-text' : 'bg-raised border-line text-muted hover:text-ink'
+                    drawMode === 'arrow' ? 'bg-alert/15 border-alert text-alert-text' : 'bg-raised border-line text-muted hover:text-ink'
                   }`}
-                  title="曲線を描く（自分の画面だけ）"
+                  title="矢印を描く"
                 >
-                  <Pen className="w-4 h-4" />
+                  <ArrowRightIcon className="w-4 h-4" />
                 </button>
               )}
-              <button
-                onClick={() => {
-                  setDrawMode(drawMode === 'arrow' ? 'off' : 'arrow');
-                  setToolMode('play');
-                }}
-                className={`p-2 rounded-lg border transition-all ${
-                  drawMode === 'arrow' ? 'bg-alert/15 border-alert text-alert-text' : 'bg-raised border-line text-muted hover:text-ink'
-                }`}
-                title="矢印を描く"
-              >
-                <ArrowRightIcon className="w-4 h-4" />
-              </button>
 
               <div className="w-px h-5 bg-raised mx-1" />
 

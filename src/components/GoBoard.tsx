@@ -2,7 +2,7 @@
 import { forwardRef, useMemo, useEffect, useRef, type ReactElement } from 'react';
 import type { TerritoryOwner } from '../utils/scoring';
 import { useViewBox } from '../hooks/useViewBox';
-import { arrowHeadPoints, clientToBoardPoint, directionAnchor, smoothPathD } from '../utils/drawingUtils';
+import { arrowHeadPoints, clientToBoardPoint, directionAnchor, smoothPathD, taperedPathD } from '../utils/drawingUtils';
 
 export interface ViewRange {
     minX: number;
@@ -49,6 +49,8 @@ export interface Drawing {
     type: 'line' | 'arrow' | 'free';
     /** free のときの軌跡（盤座標・小数）。交点に丸めない */
     points?: { x: number; y: number }[];
+    /** free の終点に矢じりを付ける。旧データは未指定＝矢じりありとして扱う */
+    arrowEnd?: boolean;
 }
 
 export interface AnalysisOverlay {
@@ -533,20 +535,40 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                     y: MARGIN + (p.y - 1) * CELL_SIZE,
                 }));
                 if (points.length === 0) return;
-                drawingElements.push(
-                    <path
-                        key={`draw-${i}`}
-                        data-testid="board-free-drawing"
-                        d={smoothPathD(points)}
-                        fill="none"
-                        stroke="#e53e3e" strokeWidth={DRAW_STROKE_WIDTH}
-                        strokeLinecap="round" strokeLinejoin="round"
-                        className="pointer-events-none"
-                        opacity={0.85}
-                    />
-                );
-                // 曲線の矢じり。向きは終点から十分離れた直近の点で決める
-                const anchor = directionAnchor(points);
+                // 通常線は均一なマジックペン、矢印線は終点へ向かって徐々に太くする。
+                // arrowEnd 未指定は、以前に作られた free 描画との互換のため矢印扱い。
+                const hasArrow = d.arrowEnd !== false;
+                if (hasArrow) {
+                    drawingElements.push(
+                        <path
+                            key={`draw-${i}`}
+                            data-testid="board-free-drawing"
+                            data-drawing-variant="tapered-arrow"
+                            d={taperedPathD(points, 3, 10)}
+                            fill="#e53e3e"
+                            stroke="#e53e3e" strokeWidth={1}
+                            strokeLinejoin="round"
+                            className="pointer-events-none"
+                            opacity={0.85}
+                        />
+                    );
+                } else {
+                    drawingElements.push(
+                        <path
+                            key={`draw-${i}`}
+                            data-testid="board-free-drawing"
+                            data-drawing-variant="plain-line"
+                            d={smoothPathD(points)}
+                            fill="none"
+                            stroke="#e53e3e" strokeWidth={DRAW_STROKE_WIDTH}
+                            strokeLinecap="round" strokeLinejoin="round"
+                            className="pointer-events-none"
+                            opacity={0.85}
+                        />
+                    );
+                }
+                // 矢印線だけ終点へ矢じりを付ける。向きは終点から十分離れた直近の点で決める
+                const anchor = hasArrow ? directionAnchor(points) : null;
                 if (anchor) {
                     const tip = points[points.length - 1];
                     const head = arrowHeadPoints(tip, anchor, CURVE_ARROW_LENGTH, CURVE_ARROW_WIDTH);

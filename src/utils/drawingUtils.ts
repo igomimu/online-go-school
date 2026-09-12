@@ -122,6 +122,55 @@ export function smoothPathD(points: BoardPoint[]): string {
 }
 
 /**
+ * 軌跡に沿って、始点から終点へ徐々に太くなる閉じた SVG パスを作る。
+ * SVG の stroke は途中で太さを変えられないため、軌跡の左右に輪郭を作って塗りつぶす。
+ * 太さの変化は点の個数ではなく実際の移動距離で決め、pointermove の密度に左右されない。
+ */
+export function taperedPathD(points: BoardPoint[], startWidth: number, endWidth: number): string {
+  const r = (n: number) => Math.round(n * 100) / 100;
+  if (points.length < 2 || startWidth <= 0 || endWidth <= 0) return '';
+
+  // 同じ位置が連続すると接線を出せないので除く。
+  const usable = points.filter((point, index) => (
+    index === 0 || point.x !== points[index - 1].x || point.y !== points[index - 1].y
+  ));
+  if (usable.length < 2) return '';
+
+  const cumulative = [0];
+  for (let i = 1; i < usable.length; i++) {
+    cumulative.push(cumulative[i - 1] + Math.hypot(
+      usable[i].x - usable[i - 1].x,
+      usable[i].y - usable[i - 1].y,
+    ));
+  }
+  const total = cumulative[cumulative.length - 1];
+  if (total === 0) return '';
+
+  const left: BoardPoint[] = [];
+  const right: BoardPoint[] = [];
+  usable.forEach((point, index) => {
+    const before = usable[index - 1] ?? point;
+    const after = usable[index + 1] ?? point;
+    let dx = after.x - before.x;
+    let dy = after.y - before.y;
+    const length = Math.hypot(dx, dy);
+    if (length === 0) return;
+    dx /= length;
+    dy /= length;
+    const progress = cumulative[index] / total;
+    const halfWidth = (startWidth + (endWidth - startWidth) * progress) / 2;
+    const nx = -dy * halfWidth;
+    const ny = dx * halfWidth;
+    left.push({ x: point.x + nx, y: point.y + ny });
+    right.push({ x: point.x - nx, y: point.y - ny });
+  });
+  if (left.length < 2 || right.length < 2) return '';
+
+  const outline = [...left, ...right.reverse()];
+  return `${outline.map((p, index) => `${index === 0 ? 'M' : 'L'} ${r(p.x)} ${r(p.y)}`).join(' ')} Z`;
+}
+
+/**
  * 線の終端に置く矢じり（三角形）の頂点。
  *
  * SVG の `marker-end="url(#…)"` を使わずに自分で描くためのもの。url(#…) の参照を

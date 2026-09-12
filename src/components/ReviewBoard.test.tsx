@@ -66,7 +66,8 @@ describe('ReviewBoard', () => {
     // 先生用の描画ツールがない。
     // 🔴 実在するセレクタで見ること。存在しない title を not.toBeInTheDocument で見ても常に緑になる
     expect(container.querySelector('[title="矢印を描く"]')).not.toBeInTheDocument();
-    expect(container.querySelector('[data-testid="draw-curve-button"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="draw-line-button"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="draw-arrow-button"]')).not.toBeInTheDocument();
   });
 
   it('「閉じてホーム」ボタン', () => {
@@ -388,7 +389,8 @@ describe('ReviewBoard', () => {
       // 矢印・記号は生徒も使える
       expect(document.body.querySelector('[title="矢印を描く"]')).toBeInTheDocument();
       // 曲線は講師の手元専用（2026-09-05 三村さん「生徒は使わない」）
-      expect(screen.queryByTestId('draw-curve-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('draw-line-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('draw-arrow-button')).not.toBeInTheDocument();
     });
 
     it('AIは付けない（分析パネルを出さない）', () => {
@@ -428,7 +430,8 @@ describe('ReviewBoard', () => {
         />
       );
       expect(container.querySelector('[title="矢印を描く"]')).not.toBeInTheDocument();
-      expect(container.querySelector('[data-testid="draw-curve-button"]')).not.toBeInTheDocument();
+      expect(container.querySelector('[data-testid="draw-line-button"]')).not.toBeInTheDocument();
+      expect(container.querySelector('[data-testid="draw-arrow-button"]')).not.toBeInTheDocument();
     });
   });
 });
@@ -718,8 +721,8 @@ describe('ホイールの手順送り', () => {
     expect(onSet.mock.calls[0][0].nextNumber).toBe(8); // 10手目 → 7手目
   });
 
-  // 2026-09-05 三村さん「曲線を描く機能」「検討時に講師だけに見えればいい」「生徒は使わない」
-  describe('曲線（マジックペン）', () => {
+  // 2026-09-13 三村さん「矢印付きの線とただの線を別ボタンにする」
+  describe('通常線と矢印線（マジックペン）', () => {
     function drawStroke(board: HTMLElement) {
       // jsdom は矩形を返さないので、盤の大きさを与えてから指を動かす
       vi.spyOn(board, 'getBoundingClientRect').mockReturnValue({
@@ -732,13 +735,14 @@ describe('ホイールの手順送り', () => {
       fireEvent.pointerUp(board, { pointerId: 1, pointerType: 'mouse' });
     }
 
-    it('講師にはボタンが出る', () => {
+    it('講師には通常線と矢印線のボタンが別々に出る', () => {
       const { root } = makeTree();
       render(
         <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
           onSetCurrentNode={vi.fn()} isTeacher={true} classroomRef={mockClassroomRef as never} />
       );
-      expect(screen.getByTestId('draw-curve-button')).toBeInTheDocument();
+      expect(screen.getByTestId('draw-line-button')).toBeInTheDocument();
+      expect(screen.getByTestId('draw-arrow-button')).toBeInTheDocument();
     });
 
     it('自分の棋譜を並べている生徒にはボタンを出さない', () => {
@@ -747,21 +751,35 @@ describe('ホイールの手順送り', () => {
         <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
           onSetCurrentNode={vi.fn()} isTeacher={false} selfReview classroomRef={mockClassroomRef as never} />
       );
-      expect(screen.queryByTestId('draw-curve-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('draw-line-button')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('draw-arrow-button')).not.toBeInTheDocument();
     });
 
-    it('なぞった軌跡が曲線として盤に残る', () => {
+    it('通常線は均一な太さで、マウスを離すと矢じりなしで残る', () => {
       const { root } = makeTree();
       render(
         <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
           onSetCurrentNode={vi.fn()} isTeacher={true} classroomRef={mockClassroomRef as never} />
       );
-      fireEvent.click(screen.getByTestId('draw-curve-button'));
+      fireEvent.click(screen.getByTestId('draw-line-button'));
       drawStroke(screen.getByTestId('go-board'));
-      expect(screen.getAllByTestId('board-free-drawing')).toHaveLength(1);
+      expect(screen.getByTestId('board-free-drawing')).toHaveAttribute('data-drawing-variant', 'plain-line');
+      expect(screen.queryByTestId('board-free-arrowhead')).not.toBeInTheDocument();
     });
 
-    it('曲線モードにしていなければ描かれない', () => {
+    it('矢印線は終点へ太くなり、マウスを離すと矢じり付きで残る', () => {
+      const { root } = makeTree();
+      render(
+        <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
+          onSetCurrentNode={vi.fn()} isTeacher={true} classroomRef={mockClassroomRef as never} />
+      );
+      fireEvent.click(screen.getByTestId('draw-arrow-button'));
+      drawStroke(screen.getByTestId('go-board'));
+      expect(screen.getByTestId('board-free-drawing')).toHaveAttribute('data-drawing-variant', 'tapered-arrow');
+      expect(screen.getByTestId('board-free-arrowhead')).toBeInTheDocument();
+    });
+
+    it('線モードにしていなければ描かれない', () => {
       const { root } = makeTree();
       render(
         <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
@@ -771,7 +789,7 @@ describe('ホイールの手順送り', () => {
       expect(screen.queryByTestId('board-free-drawing')).not.toBeInTheDocument();
     });
 
-    it('🔴 曲線は生徒へ配信しない（講師の手元だけ）', () => {
+    it.each(['draw-line-button', 'draw-arrow-button'])('🔴 %s の描画は生徒へ配信しない（講師の手元だけ）', (buttonId) => {
       const { root } = makeTree();
       const sendToOrAll = vi.fn();
       const ref = { current: { sendToOrAll, broadcast: vi.fn(), isConnected: true } };
@@ -779,7 +797,7 @@ describe('ホイールの手順送り', () => {
         <ReviewBoard rootNode={root} currentNode={root} boardSize={9}
           onSetCurrentNode={vi.fn()} isTeacher={true} classroomRef={ref as never} targetStudents={null} />
       );
-      fireEvent.click(screen.getByTestId('draw-curve-button'));
+      fireEvent.click(screen.getByTestId(buttonId));
       drawStroke(screen.getByTestId('go-board'));
 
       expect(screen.getAllByTestId('board-free-drawing')).toHaveLength(1);
@@ -994,7 +1012,8 @@ describe('棋譜作成と、着手を許された生徒の1手戻し', () => {
 
     expect(screen.getByTestId('review-undo-button')).toBeInTheDocument();
     expect(container.querySelector('[title="丸印 (CIR)"]')).not.toBeInTheDocument();
-    expect(container.querySelector('[data-testid="draw-curve-button"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="draw-line-button"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="draw-arrow-button"]')).not.toBeInTheDocument();
   });
 
   it('自分ひとりの検討（selfReview）では、取消は自分の盤で効く（先生へ送らない）', () => {
