@@ -205,4 +205,108 @@ describe('GoBoard', () => {
     const stars = container.querySelectorAll('circle[fill="#000000"]');
     expect(stars.length).toBe(9);
   });
+
+  // 石を掴んで別の交点へ動かす（Pocket KataGo と同じ操作、2026-09-16 三村さん）。
+  // 盤の座標は getBoundingClientRect と viewBox から出すので、rect を実寸で与える。
+  describe('石のドラッグ移動', () => {
+    /** 9路盤の viewBox は 0 0 400 400。2倍に引き伸ばした 800px 四方として置く */
+    function renderDraggableBoard(onStoneMove = vi.fn()) {
+      const board = createEmptyBoard(9);
+      board[3][3] = { color: 'BLACK', number: 1 };   // (4,4)
+      const view = render(<GoBoard boardState={board} boardSize={9} onStoneMove={onStoneMove} />);
+      const svg = view.container.querySelector('svg')!;
+      svg.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 800, bottom: 800, width: 800, height: 800, x: 0, y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+      return { ...view, svg, onStoneMove };
+    }
+
+    /** 交点 → クライアント座標（margin 40 + (n-1)*40 を2倍） */
+    const at = (n: number) => (40 + (n - 1) * 40) * 2;
+
+    it('石を掴んで動かすと、移動元と移動先を渡す', () => {
+      const { svg, onStoneMove } = renderDraggableBoard();
+
+      fireEvent.pointerDown(svg, { pointerId: 1, pointerType: 'mouse', button: 0, clientX: at(4), clientY: at(4) });
+      fireEvent.pointerMove(svg, { pointerId: 1, pointerType: 'mouse', clientX: at(6), clientY: at(6) });
+      fireEvent.pointerUp(svg, { pointerId: 1, pointerType: 'mouse', clientX: at(6), clientY: at(6) });
+
+      expect(onStoneMove).toHaveBeenCalledWith({ x: 4, y: 4 }, { x: 6, y: 6 });
+    });
+
+    it('動かしている間は、掴んだ石を元の位置に描かない', () => {
+      const { svg, container } = renderDraggableBoard();
+      expect(container.querySelector('[data-stone="4-4"]')).not.toBeNull();
+
+      fireEvent.pointerDown(svg, { pointerId: 1, pointerType: 'mouse', button: 0, clientX: at(4), clientY: at(4) });
+      fireEvent.pointerMove(svg, { pointerId: 1, pointerType: 'mouse', clientX: at(6), clientY: at(6) });
+
+      expect(container.querySelector('[data-stone="4-4"]')).toBeNull();
+      expect(container.querySelector('[data-testid="stone-drag"]')).not.toBeNull();
+    });
+
+    it('掴んだだけで動かさなければ、ただのクリックとして扱う', () => {
+      const onStoneMove = vi.fn();
+      const onCellClick = vi.fn();
+      const board = createEmptyBoard(9);
+      board[3][3] = { color: 'BLACK', number: 1 };
+      const { container } = render(
+        <GoBoard boardState={board} boardSize={9} onStoneMove={onStoneMove} onCellClick={onCellClick} />,
+      );
+      const svg = container.querySelector('svg')!;
+      svg.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 800, bottom: 800, width: 800, height: 800, x: 0, y: 0, toJSON: () => ({}),
+      }) as DOMRect;
+
+      fireEvent.pointerDown(svg, { pointerId: 1, pointerType: 'mouse', button: 0, clientX: at(4), clientY: at(4) });
+      fireEvent.pointerUp(svg, { pointerId: 1, pointerType: 'mouse', clientX: at(4), clientY: at(4) });
+      fireEvent.click(container.querySelector('[data-cell="4-4"]')!);
+
+      expect(onStoneMove).not.toHaveBeenCalled();
+      expect(onCellClick).toHaveBeenCalledWith(4, 4);
+    });
+
+    it('動かして離した直後の click は着手にしない', () => {
+      const onStoneMove = vi.fn();
+      const onCellClick = vi.fn();
+      const board = createEmptyBoard(9);
+      board[3][3] = { color: 'BLACK', number: 1 };
+      const { container } = render(
+        <GoBoard boardState={board} boardSize={9} onStoneMove={onStoneMove} onCellClick={onCellClick} />,
+      );
+      const svg = container.querySelector('svg')!;
+      svg.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 800, bottom: 800, width: 800, height: 800, x: 0, y: 0, toJSON: () => ({}),
+      }) as DOMRect;
+
+      fireEvent.pointerDown(svg, { pointerId: 1, pointerType: 'mouse', button: 0, clientX: at(4), clientY: at(4) });
+      fireEvent.pointerMove(svg, { pointerId: 1, pointerType: 'mouse', clientX: at(6), clientY: at(6) });
+      fireEvent.pointerUp(svg, { pointerId: 1, pointerType: 'mouse', clientX: at(6), clientY: at(6) });
+      fireEvent.click(container.querySelector('[data-cell="6-6"]')!);
+
+      expect(onStoneMove).toHaveBeenCalledTimes(1);
+      expect(onCellClick).not.toHaveBeenCalled();
+    });
+
+    it('指では掴まない（ピンチ・パンを邪魔しない）', () => {
+      const { svg, onStoneMove } = renderDraggableBoard();
+
+      fireEvent.pointerDown(svg, { pointerId: 1, pointerType: 'touch', clientX: at(4), clientY: at(4) });
+      fireEvent.pointerMove(svg, { pointerId: 1, pointerType: 'touch', clientX: at(6), clientY: at(6) });
+      fireEvent.pointerUp(svg, { pointerId: 1, pointerType: 'touch', clientX: at(6), clientY: at(6) });
+
+      expect(onStoneMove).not.toHaveBeenCalled();
+    });
+
+    it('空の交点からは何も掴まない', () => {
+      const { svg, onStoneMove } = renderDraggableBoard();
+
+      fireEvent.pointerDown(svg, { pointerId: 1, pointerType: 'mouse', button: 0, clientX: at(7), clientY: at(7) });
+      fireEvent.pointerMove(svg, { pointerId: 1, pointerType: 'mouse', clientX: at(6), clientY: at(6) });
+      fireEvent.pointerUp(svg, { pointerId: 1, pointerType: 'mouse', clientX: at(6), clientY: at(6) });
+
+      expect(onStoneMove).not.toHaveBeenCalled();
+    });
+  });
 });

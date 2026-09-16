@@ -1,5 +1,5 @@
 // Simplified GoBoard for Web
-import { forwardRef, useMemo, useEffect, useRef, type ReactElement } from 'react';
+import { forwardRef, useMemo, useEffect, useRef, useState, type ReactElement } from 'react';
 import type { TerritoryOwner } from '../utils/scoring';
 import { useViewBox } from '../hooks/useViewBox';
 import { arrowHeadPoints, buildArrowStrokeGeometry, clientToBoardPoint, smoothPathD, taperedPathD } from '../utils/drawingUtils';
@@ -97,6 +97,12 @@ export interface GoBoardProps {
     onDragEnd?: () => void;
 
     /**
+     * 置いてある石を掴んで別の交点へ動かす（Pocket KataGo と同じ操作、2026-09-16 三村さん）。
+     * 渡されたときだけ有効。マウスの左ボタンでのみ掴む＝指はピンチ・パンのまま。
+     */
+    onStoneMove?: (from: { x: number; y: number }, to: { x: number; y: number }) => void;
+
+    /**
      * 曲線を描くための口（2026-09-05 三村さん）。マス目の onMouseEnter とは別に
      * 盤の上の実座標（交点に丸めない小数）を渡す。有効な間は1本目のポインタを描画に使い、
      * ピンチズームには渡さない。
@@ -145,6 +151,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     onDragStart,
     onDragMove,
     onDragEnd,
+    onStoneMove,
     freeDrawEnabled = false,
     onFreeDrawStart,
     onFreeDrawMove,
@@ -164,6 +171,8 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
 }, ref) => {
     const CELL_SIZE = 40;
     const MARGIN = 40;
+    /** 掴んだ石が「動かされた」と見なすまでの距離（px）。これ未満はクリック */
+    const STONE_DRAG_THRESHOLD = 5;
 
     // numberMode を指定しない旧来の呼び出し（showNumbers）も動かす
     const effectiveNumberMode: NumberMode = numberMode ?? (showNumbers ? 'all' : 'off');
@@ -246,6 +255,26 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
     // 盤の外へ出ても追えるようにポインタを捕まえておく。
     const drawPointerIdRef = useRef<number | null>(null);
 
+    // 石を掴んで動かす操作。掴んだだけ（5px未満）ならただのクリックとして扱うので、
+    // 閾値を超えるまでは画面に何も出さない。
+    const stoneDragRef = useRef<{
+        pointerId: number;
+        from: { x: number; y: number };
+        color: StoneColor;
+        startClientX: number;
+        startClientY: number;
+        moved: boolean;
+    } | null>(null);
+    // ドラッグの直後に来る click を「石を置く操作」と取り違えないための印
+    const justMovedStoneRef = useRef(false);
+    const [stoneDrag, setStoneDrag] = useState<{
+        from: { x: number; y: number };
+        color: StoneColor;
+        /** 盤座標（交点に丸めない）。ゴースト石をカーソルに追わせるために持つ */
+        x: number;
+        y: number;
+    } | null>(null);
+
     const boardPointFromEvent = (e: React.PointerEvent<SVGSVGElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
         return clientToBoardPoint(rect, currentVb, e.clientX, e.clientY, MARGIN, CELL_SIZE);
@@ -257,9 +286,39 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         onFreeDrawEnd?.();
     };
 
+    /** 掴める石か（動かす口が開いていて、その交点に石がある） */
+    const stoneAtEvent = (e: React.PointerEvent<SVGSVGElement>) => {
+        const p = boardPointFromEvent(e);
+        const x = Math.round(p.x);
+        const y = Math.round(p.y);
+        if (x < 1 || y < 1 || x > boardSize || y > boardSize) return null;
+        const stone = boardState[y - 1]?.[x - 1];
+        return stone ? { x, y, color: stone.color } : null;
+    };
+
     const handleSvgPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
         // マウスは左ボタンのときだけ。2本目以降の指は描画に使わない
         const usable = e.pointerType !== 'mouse' || e.button === 0;
+        justMovedStoneRef.current = false;
+
+        // 石を掴む。指はピンチ・パンに使うので、掴めるのはマウスだけにする
+        if (onStoneMove && !readOnly && !freeDrawEnabled && e.pointerType === 'mouse' && e.button === 0
+            && stoneDragRef.current === null) {
+            const stone = stoneAtEvent(e);
+            if (stone) {
+                stoneDragRef.current = {
+                    pointerId: e.pointerId,
+                    from: { x: stone.x, y: stone.y },
+                    color: stone.color,
+                    startClientX: e.clientX,
+                    startClientY: e.clientY,
+                    moved: false,
+                };
+                // ここでは preventDefault しない。動かさずに離せばただのクリックとして通す
+                return;
+            }
+        }
+
         if (freeDrawEnabled && usable && drawPointerIdRef.current === null) {
             drawPointerIdRef.current = e.pointerId;
             try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* 捕まえられなくても描ける */ }
@@ -270,6 +329,19 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         if (handleGesturePointerDown(e)) e.preventDefault();
     };
     const handleSvgPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+        const dragging = stoneDragRef.current;
+        if (dragging && dragging.pointerId === e.pointerId) {
+            const dist = Math.hypot(e.clientX - dragging.startClientX, e.clientY - dragging.startClientY);
+            if (!dragging.moved && dist < STONE_DRAG_THRESHOLD) return;
+            if (!dragging.moved) {
+                dragging.moved = true;
+                try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* 捕まえられなくても動かせる */ }
+            }
+            const p = boardPointFromEvent(e);
+            setStoneDrag({ from: dragging.from, color: dragging.color, x: p.x, y: p.y });
+            e.preventDefault();
+            return;
+        }
         if (drawPointerIdRef.current === e.pointerId) {
             e.preventDefault();
             onFreeDrawMove?.(boardPointFromEvent(e));
@@ -278,6 +350,24 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         if (handleGesturePointerMove(e)) e.preventDefault();
     };
     const handleSvgPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+        const dragging = stoneDragRef.current;
+        if (dragging && dragging.pointerId === e.pointerId) {
+            stoneDragRef.current = null;
+            setStoneDrag(null);
+            try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* 既に外れていても構わない */ }
+            if (dragging.moved) {
+                // 掴んだ石を離した＝クリックではない。直後の click は捨てる
+                justMovedStoneRef.current = true;
+                const p = boardPointFromEvent(e);
+                const to = { x: Math.round(p.x), y: Math.round(p.y) };
+                if (to.x >= 1 && to.y >= 1 && to.x <= boardSize && to.y <= boardSize
+                    && (to.x !== dragging.from.x || to.y !== dragging.from.y)) {
+                    onStoneMove?.(dragging.from, to);
+                }
+                e.preventDefault();
+                return;
+            }
+        }
         if (drawPointerIdRef.current === e.pointerId) {
             e.preventDefault();
             endFreeDraw(e);
@@ -286,6 +376,11 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         if (handleGesturePointerUp(e)) e.preventDefault();
     };
     const handleSvgPointerCancel = (e: React.PointerEvent<SVGSVGElement>) => {
+        if (stoneDragRef.current?.pointerId === e.pointerId) {
+            stoneDragRef.current = null;
+            setStoneDrag(null);
+            return;
+        }
         if (drawPointerIdRef.current === e.pointerId) {
             endFreeDraw(e);
             return;
@@ -335,17 +430,27 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                         onMouseEnter={(e) => { onCellMouseEnter?.(x, y); if (e.buttons === 1) onDragMove?.(x, y); }}
                         onMouseLeave={() => onCellMouseLeave?.()}
                         onMouseUp={onDragEnd}
-                        onClick={() => { if (isGesturing()) return; onCellClick?.(x, y); }}
+                        onClick={() => {
+                            if (isGesturing()) return;
+                            // 石を動かして離した直後の click は着手にしない
+                            if (justMovedStoneRef.current) { justMovedStoneRef.current = false; return; }
+                            onCellClick?.(x, y);
+                        }}
                         // これから石が落ちる場所を、盤に落ちた影として示す。
                         // （旧 hover:fill-blue-500 hover:fill-opacity-10 は Tailwind に
                         //   fill-opacity ユーティリティが無く半透明が効かないため、
                         //   木目の上に真っ青な四角が出ていた）
-                        className="cursor-pointer fill-transparent hover:fill-[rgba(21,20,15,0.16)]"
+                        className={`fill-transparent ${
+                            onStoneMove && stone ? 'cursor-grab' : 'cursor-pointer hover:fill-[rgba(21,20,15,0.16)]'
+                        }`}
                     />
                 );
             }
 
-            if (stone) {
+            // 掴んで動かしている石は、元の位置には描かない（カーソル側のゴーストが本体）
+            const isBeingDragged = !!stoneDrag && stoneDrag.from.x === x && stoneDrag.from.y === y;
+
+            if (stone && !isBeingDragged) {
                 const isBlack = stone.color === 'BLACK';
                 cells.push(
                     <g key={`s-group-${x}-${y}`} data-stone={`${x}-${y}`} className="pointer-events-none">
@@ -400,6 +505,41 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
                 opacity={0.35}
                 className="pointer-events-none"
             />
+        );
+    }
+
+    // 掴んで動かしている石。行き先の交点に印を出し、石そのものはカーソルに付いてくる
+    let stoneDragElement: ReactElement | null = null;
+    if (stoneDrag) {
+        const targetX = Math.round(stoneDrag.x);
+        const targetY = Math.round(stoneDrag.y);
+        const inside = targetX >= 1 && targetY >= 1 && targetX <= boardSize && targetY <= boardSize;
+        const occupied = inside && !!boardState[targetY - 1]?.[targetX - 1]
+            && !(targetX === stoneDrag.from.x && targetY === stoneDrag.from.y);
+        const isBlack = stoneDrag.color === 'BLACK';
+        stoneDragElement = (
+            <g key="stone-drag" className="pointer-events-none" data-testid="stone-drag">
+                {inside && !occupied && (
+                    <circle
+                        cx={MARGIN + (targetX - 1) * CELL_SIZE}
+                        cy={MARGIN + (targetY - 1) * CELL_SIZE}
+                        r={STONE_RADIUS}
+                        fill="none"
+                        stroke={isBlack ? '#000000' : '#FFFFFF'}
+                        strokeWidth={3}
+                        opacity={0.8}
+                    />
+                )}
+                <circle
+                    cx={MARGIN + (stoneDrag.x - 1) * CELL_SIZE}
+                    cy={MARGIN + (stoneDrag.y - 1) * CELL_SIZE}
+                    r={STONE_RADIUS}
+                    fill={isBlack ? STONE_BLACK_SOLID : STONE_WHITE_SOLID}
+                    stroke={isBlack ? '#000000' : '#3a3a3a'}
+                    strokeWidth={isBlack ? 2 : 1.5}
+                    opacity={0.75}
+                />
+            </g>
         );
     }
 
@@ -773,6 +913,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             ))}
             {cells}
             {ghostElement}
+            {stoneDragElement}
             {territoryElements}
             {deadStoneElements}
             {markerElements}

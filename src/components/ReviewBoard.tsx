@@ -7,6 +7,7 @@ import { getReviewTimeline } from '../utils/reviewTimeline';
 import { generateSGFTree } from '../utils/sgfUtils';
 import { copyBoardToClipboard, copySgfToClipboard, downloadBoardAsPNG, downloadSgf } from '../utils/boardExport';
 import { playReviewMove } from '../utils/reviewMove';
+import { moveStone } from '../utils/moveStone';
 import { isSharingTarget, toggleSharingTarget, type SharingTargets } from '../utils/sharingTargets';
 import { findNearestDrawingIndex, roundPoint, shouldAppendPoint } from '../utils/drawingUtils';
 import ReviewOpenDialog from './ReviewOpenDialog';
@@ -42,6 +43,12 @@ interface ReviewBoardProps {
   boardSize: number;
   komi?: number;
   onSetCurrentNode: (node: GameNode) => void;
+  /**
+   * 手順の根を差し替える。石を動かすと根から先を作り直すため、
+   * 現在地だけでなく根も新しい参照に入れ替える必要がある。
+   * 渡されていない画面では石を動かせない。
+   */
+  onSetRootNode?: (node: GameNode) => void;
   isTeacher: boolean;
   classroomRef: React.RefObject<ClassroomRtc | null>;
 
@@ -160,6 +167,7 @@ export default function ReviewBoard({
   boardSize,
   komi = 6.5,
   onSetCurrentNode,
+  onSetRootNode,
   isTeacher,
   classroomRef,
   participants,
@@ -514,6 +522,16 @@ export default function ReviewBoard({
   }, [currentNode, sendToTargets, onSetCurrentNode]);
 
   // Click handler for board (making moves or annotations)
+  // 置いてある石を掴んで別の交点へ動かす（Pocket KataGo と同じ操作）。
+  // 手数は変えずに座標だけ差し替えるので、棋譜として残り AI 分析もそのまま使える。
+  const handleStoneMove = useCallback((from: { x: number; y: number }, to: { x: number; y: number }) => {
+    if (!canEdit || !onSetRootNode) return;
+    const moved = moveStone(rootNode, currentNode, from, to);
+    if (!moved) return;
+    onSetRootNode(moved.root);
+    onSetCurrentNode(moved.current);
+  }, [canEdit, onSetRootNode, onSetCurrentNode, rootNode, currentNode]);
+
   const handleCellClick = useCallback((x: number, y: number) => {
     if (!canEdit) return;
     if (drawMode !== 'off') return;
@@ -980,6 +998,7 @@ export default function ReviewBoard({
             onCandidateHover={isTeacher || allowStudentInteraction ? handleCandidateHover : undefined}
             readOnly={!canEdit && !canPlay}
             onCellClick={canEdit ? handleCellClick : (canPlay ? handleStudentCellClick : undefined)}
+            onStoneMove={canEdit && onSetRootNode && toolMode === 'play' && drawMode === 'off' ? handleStoneMove : undefined}
             onCellRightClick={canEdit ? handleCellRightClick : undefined}
             onBoardWheel={canEdit || studentControls ? handleBoardWheel : undefined}
             onCellMouseEnter={handleCellMouseEnter}

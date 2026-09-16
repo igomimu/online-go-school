@@ -1042,4 +1042,62 @@ describe('棋譜作成と、着手を許された生徒の1手戻し', () => {
     expect(onStudentUndo).not.toHaveBeenCalled();
     expect(onSetCurrentNode).toHaveBeenCalled();
   });
+
+  // 石のドラッグ移動（2026-09-16 三村さん、Pocket KataGo と同じ操作）
+  describe('石を掴んで動かす', () => {
+    function renderForDrag(extra: Record<string, unknown> = {}) {
+      const { root, child } = makeTree();   // 黒(5,5) → 白(3,3)
+      const onSetCurrentNode = vi.fn();
+      const onSetRootNode = vi.fn();
+      const view = render(
+        <ReviewBoard
+          rootNode={root}
+          currentNode={child}
+          boardSize={9}
+          onSetCurrentNode={onSetCurrentNode}
+          onSetRootNode={onSetRootNode}
+          isTeacher={true}
+          classroomRef={mockClassroomRef as never}
+          {...extra}
+        />
+      );
+      const svg = view.container.querySelector('[data-testid="go-board"]') as SVGSVGElement;
+      svg.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 800, bottom: 800, width: 800, height: 800, x: 0, y: 0, toJSON: () => ({}),
+      }) as DOMRect;
+      return { ...view, svg, onSetCurrentNode, onSetRootNode };
+    }
+
+    const at = (n: number) => (40 + (n - 1) * 40) * 2;
+
+    function dragStone(svg: SVGSVGElement, from: number[], to: number[]) {
+      fireEvent.pointerDown(svg, { pointerId: 1, pointerType: 'mouse', button: 0, clientX: at(from[0]), clientY: at(from[1]) });
+      fireEvent.pointerMove(svg, { pointerId: 1, pointerType: 'mouse', clientX: at(to[0]), clientY: at(to[1]) });
+      fireEvent.pointerUp(svg, { pointerId: 1, pointerType: 'mouse', clientX: at(to[0]), clientY: at(to[1]) });
+    }
+
+    it('動かすと手順の根と現在地が新しい参照で差し替わる', () => {
+      const { svg, onSetCurrentNode, onSetRootNode } = renderForDrag();
+
+      dragStone(svg, [5, 5], [7, 7]);
+
+      expect(onSetRootNode).toHaveBeenCalledTimes(1);
+      expect(onSetCurrentNode).toHaveBeenCalledTimes(1);
+      const current = onSetCurrentNode.mock.calls[0][0];
+      // 動いたのは1手目の黒。手数はそのまま
+      expect(current.board[6][6]).toEqual({ color: 'BLACK', number: 1 });
+      expect(current.board[4][4]).toBeNull();
+    });
+
+    it('印を付けるモードのときは石を動かさない（マーカー操作を邪魔しない）', () => {
+      const { svg, container, onSetRootNode } = renderForDrag();
+      const markerButton = container.querySelector('[title="三角印 (TRI)"]');
+      expect(markerButton).not.toBeNull();
+      fireEvent.click(markerButton!);
+
+      dragStone(svg, [5, 5], [7, 7]);
+
+      expect(onSetRootNode).not.toHaveBeenCalled();
+    });
+  });
 });

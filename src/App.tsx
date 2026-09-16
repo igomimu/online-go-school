@@ -2415,6 +2415,7 @@ function App() {
                 boardSize={reviewBoardSize}
                 komi={reviewKomi}
                 onSetCurrentNode={setReviewCurrentNode}
+                onSetRootNode={setReviewRootNode}
                 isTeacher={role === 'TEACHER'}
                 classroomRef={classroomRef}
                 participants={participants}
@@ -2473,6 +2474,7 @@ function App() {
                 currentNode={recordCurrentNode}
                 boardSize={recordBoardSize}
                 onSetCurrentNode={setRecordCurrentNode}
+                onSetRootNode={setRecordRootNode}
                 isTeacher={false}
                 selfReview
                 recordMode
