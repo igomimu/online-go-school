@@ -1,6 +1,7 @@
 import type { GameSession } from '../types/game';
 import type { Student } from '../types/classroom';
-import { getDisplayName } from '../utils/identityUtils';
+import { findStudentByIdentity, getDisplayName } from '../utils/identityUtils';
+import { displayRank, type RankDisplay } from '../types/classroom';
 import { isTimeoutResult } from '../utils/scoring';
 
 interface GameThumbnailProps {
@@ -13,15 +14,25 @@ interface GameThumbnailProps {
   onResume?: (gameId: string) => void;
   /** 時間切れで終わった対局の再開を許可する（講師のみ true） */
   allowTimeoutResume?: boolean;
+  /** 棋力の見せ方。渡したときだけ対局者名の後ろに棋力を添える */
+  rankDisplay?: RankDisplay;
 }
 
-export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnLabel, students = [], onResume, allowTimeoutResume }: GameThumbnailProps) {
+export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnLabel, students = [], onResume, allowTimeoutResume, rankDisplay }: GameThumbnailProps) {
   const size = game.boardSize;
   const cellSize = 8;
   const totalSize = size * cellSize;
 
   const blackName = getDisplayName(game.blackPlayer, students);
   const whiteName = getDisplayName(game.whitePlayer, students);
+
+  // 棋力は名簿で引ける生徒だけに添える（先生・持込棋譜の対局者には出さない）
+  const rankOf = (player: string) => {
+    if (!rankDisplay) return '';
+    const student = findStudentByIdentity(player, students);
+    const rank = student ? displayRank(student, rankDisplay) : '';
+    return rank ? `(${rank})` : '';
+  };
 
   // 中断は本人も再開できる（回線復旧）。時間切れ終局からの再開は講師のみ。
   const isTimedOut = game.status === 'finished' && isTimeoutResult(game.result);
@@ -87,11 +98,11 @@ export default function GameThumbnail({ game, onClick, isActive, isMyTurn, turnL
       <div className="min-w-0 flex-1 space-y-0.5 text-left text-xs sm:mt-2">
         <div className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-black border border-line inline-block" />
-          <span className="truncate">{blackName}</span>
+          <span className="truncate">{blackName}<span className="text-muted">{rankOf(game.blackPlayer)}</span></span>
         </div>
         <div className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-white border border-line inline-block" />
-          <span className="truncate">{whiteName}</span>
+          <span className="truncate">{whiteName}<span className="text-muted">{rankOf(game.whitePlayer)}</span></span>
         </div>
         <div className="flex items-center justify-between gap-1 text-muted">
           <span className="tabular">

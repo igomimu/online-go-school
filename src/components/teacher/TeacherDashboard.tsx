@@ -628,7 +628,6 @@ export default function TeacherDashboard({
               rankDisplay={effectiveRankDisplay}
               games={filteredGames}
               students={filteredStudents}
-              participants={filteredParticipants}
               onSelectGame={(gameId) => {
                 // 先生自身の対局なら講師専用の別ウィンドウ（1盤表示+ローテーション）で開く
                 const game = filteredGames.find(g => g.id === gameId);

@@ -102,14 +102,11 @@ function studentNameFromId(studentId: string): string | undefined {
  *
  * 以前は生徒一覧の行に「開く」ボタンがあったが、2dcff9e で
  * 「盤を開く操作は中央の碁盤クリックへ一本化」された。
+ * 盤は1局につき1枠なので（生徒ごとではない）、その盤に映っている
+ * 生徒の識別子を並べた data-board-students で引く。
  */
 export function getStudentBoard(page: Page, studentId: string) {
-  return page.getByTestId(`open-board-${studentId}`);
-}
-
-/** 生徒の枠そのもの。対局の有無にかかわらず必ずある。 */
-export function getStudentBoardSlot(page: Page, studentId: string) {
-  return page.getByTestId(`board-slot-${studentId}`);
+  return page.locator(`[data-board-students~="${studentId}"]`);
 }
 
 export async function waitForObserverPanel(page: Page, timeout = 10_000): Promise<void> {

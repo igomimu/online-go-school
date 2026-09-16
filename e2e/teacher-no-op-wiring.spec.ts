@@ -8,7 +8,6 @@ import {
   createGame,
   clickReconnectAndWaitCycle,
   getStudentBoard,
-  getStudentBoardSlot,
   waitForTeacherGameWindow,
 } from './helpers/teacher-actions';
 import { loginAsStudent } from './helpers/student-actions';
@@ -69,10 +68,10 @@ test.describe('TeacherToolbar / StudentTable 配線検証', () => {
     });
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
 
-    // 対局が無いあいだは、生徒の枠はあるが押せる盤は無い
+    // 対局が無いあいだは盤が1つも出ない
     // （2dcff9e で「開く」ボタンは廃止され、盤を開く操作は中央の碁盤クリックに一本化された）
     const openButton = getStudentBoard(teacherPage, TEST_STUDENT_A.id);
-    await expect(getStudentBoardSlot(teacherPage, TEST_STUDENT_A.id)).toBeVisible();
+    await expect(teacherPage.getByText('進行中の対局はありません')).toBeVisible();
     await expect(openButton).toHaveCount(0);
 
     // 対局作成 → 先生自身が対局者なので講師専用の別ウィンドウが自動で開く
