@@ -520,14 +520,16 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
         stoneDragElement = (
             <g key="stone-drag" className="pointer-events-none" data-testid="stone-drag">
                 {inside && !occupied && (
+                    // 行き先の目印。石と同じ色で描くと、黒石のときに盤の線と紛れる。
+                    // 石の色は付いてくるゴースト側が示すので、ここは見やすさを採る
                     <circle
                         cx={MARGIN + (targetX - 1) * CELL_SIZE}
                         cy={MARGIN + (targetY - 1) * CELL_SIZE}
                         r={STONE_RADIUS}
-                        fill="none"
-                        stroke={isBlack ? '#000000' : '#FFFFFF'}
+                        fill={isBlack ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.45)'}
+                        stroke={isBlack ? '#FFFFFF' : '#3a3a3a'}
                         strokeWidth={3}
-                        opacity={0.8}
+                        opacity={0.9}
                     />
                 )}
                 <circle
