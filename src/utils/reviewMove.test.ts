@@ -49,6 +49,28 @@ describe('playReviewMove', () => {
     expect(node.board[0][0]).toBeNull();
   });
 
+  it('着手禁止点（自殺手）には打てない', () => {
+    // 白が自分から (1,1) へ入る。黒(1,2)(2,1) に囲まれていて呼吸点が無い
+    let node = makeRoot();
+    node = playReviewMove(node, 1, 2)!;   // 黒
+    node = playReviewMove(node, 9, 9)!;   // 白（手数合わせ）
+    node = playReviewMove(node, 2, 1)!;   // 黒
+    expect(node.move?.color).toBe('BLACK'); // 次は白番
+    expect(playReviewMove(node, 1, 1)).toBeNull();
+  });
+
+  it('相手の石を取れるなら呼吸点が無い場所にも打てる', () => {
+    // 黒(1,1)一子が白(1,2)(2,1) に囲まれて取られる直前。
+    // 白が (1,1) の隣を詰めて取る手は、取り石があるので合法。
+    let node = makeRoot();
+    node = playReviewMove(node, 1, 1)!;   // 黒
+    node = playReviewMove(node, 1, 2)!;   // 白
+    node = playReviewMove(node, 5, 5)!;   // 黒（手数合わせ）
+    const taken = playReviewMove(node, 2, 1)!; // 白: 黒(1,1)を取る
+    expect(taken).not.toBeNull();
+    expect(taken.board[0][0]).toBeNull();
+  });
+
   it('路数を明示すればノードの値より優先される', () => {
     const root = makeRoot(9);
     expect(playReviewMove(root, 9, 9, 5)).toBeNull(); // 5路として扱えば盤外

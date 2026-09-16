@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { HostWindowContext } from '../hooks/useHostWindow';
+import { copyStyles } from '../utils/copyStyles';
 
 /**
  * 中身を別ウィンドウに描く。
@@ -31,26 +32,6 @@ interface PopupPortalProps {
   /** body 直下に置くラッパーの class */
   className?: string;
   children: React.ReactNode;
-}
-
-/** 本体の <style> と <link rel=stylesheet> を、開いたウィンドウの head へ複製する */
-function copyStyles(target: Document): void {
-  target.querySelectorAll('style[data-ogs-copied], link[data-ogs-copied]').forEach(el => el.remove());
-  document.querySelectorAll('style, link[rel="stylesheet"]').forEach(node => {
-    if (node instanceof HTMLLinkElement) {
-      const link = target.createElement('link');
-      link.rel = 'stylesheet';
-      // href プロパティは絶対URLを返す。about:blank から相対パスを引かせない
-      link.href = node.href;
-      if (node.crossOrigin) link.crossOrigin = node.crossOrigin;
-      link.dataset.ogsCopied = '';
-      target.head.appendChild(link);
-    } else {
-      const style = node.cloneNode(true) as HTMLStyleElement;
-      style.dataset.ogsCopied = '';
-      target.head.appendChild(style);
-    }
-  });
 }
 
 /**
