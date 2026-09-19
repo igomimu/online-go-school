@@ -4,7 +4,7 @@ import { useProblemSession } from '../hooks/useProblemSession';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchRandomTsumegoProblem } from '../utils/tsumegoApi';
 import { tsumegoRowToProblem } from '../utils/tsumegoConvert';
-import { Check, X, RotateCcw, Flag, Heart } from 'lucide-react';
+import { Check, X, RotateCcw, Flag, Heart, Timer } from 'lucide-react';
 import TsumegoReportModal from './TsumegoReportModal';
 
 export interface ProblemProgress {
@@ -12,7 +12,8 @@ export interface ProblemProgress {
   livesLeft: number | null; // 残りライフ（null=無制限）
   problemNo: number;        // 出題から数えて何問目か
   solved: number;           // 解けた問題数
-  failed: number;           // ライフが尽きた問題数
+  failed: number;           // ライフが尽きた・時間切れの問題数
+  timedOut: boolean;        // この結果が時間切れによるものか
 }
 
 interface ProblemBoardProps {
@@ -25,6 +26,11 @@ interface ProblemBoardProps {
 /** 結果を見せてから次の問題へ進むまでの間 */
 const NEXT_PROBLEM_DELAY_MS = 2500;
 
+function formatRemaining(sec: number): string {
+  const s = Math.max(0, Math.ceil(sec));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
 /** 「5K+」も「5K」と同じレベルとして次の問題を引く */
 function baseLevel(level: string | undefined): string | undefined {
   return level ? level.replace(/\+$/, '') : undefined;
@@ -36,7 +42,7 @@ export default function ProblemBoard({
   onResult,
   isTeacher,
 }: ProblemBoardProps) {
-  const { problemState, startProblem, makeMove, retry } = useProblemSession();
+  const { problemState, startProblem, makeMove, timeUp, retry } = useProblemSession();
   const [showReport, setShowReport] = useState(false);
   // いま解いている問題。ライフ付きの出題では、解けたら・ライフが尽きたら生徒ごとに次へ進む
   const [current, setCurrent] = useState<Problem>(problem);
@@ -49,6 +55,12 @@ export default function ProblemBoard({
   const [loadingNext, setLoadingNext] = useState(false);
   const lives = current.lives;
   const autoNext = problem.lives !== undefined;
+  // 1問ごとの制限時間。やり直しても時計は戻さない（三村さん 2026-09-19）
+  const [remainingSec, setRemainingSec] = useState<number | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
+  const timedOutRef = useRef(false);
+  const problemStateRef = useRef(problemState);
+  problemStateRef.current = problemState;
 
   // 先生が新しく出題したら最初から
   useEffect(() => {
@@ -61,8 +73,46 @@ export default function ProblemBoard({
     missesRef.current = 0;
     setMisses(0);
     setNextError(null);
+    timedOutRef.current = false;
+    setTimedOut(false);
     startProblem(current);
   }, [current, startProblem]);
+
+  useEffect(() => {
+    const limit = current.timeLimitSec;
+    if (!limit) {
+      setRemainingSec(null);
+      return;
+    }
+    const deadline = Date.now() + limit * 1000;
+    setRemainingSec(limit);
+    const timer = setInterval(() => {
+      const left = (deadline - Date.now()) / 1000;
+      const state = problemStateRef.current;
+      const done = state?.status === 'correct'
+        || (state?.status === 'incorrect' && lives !== undefined && missesRef.current >= lives);
+      if (done) {
+        clearInterval(timer);
+        return;
+      }
+      setRemainingSec(Math.max(0, left));
+      if (left > 0) return;
+      clearInterval(timer);
+      // 時間切れはこの問題の失敗。ライフは減らさず、結果はここで送る（effect には任せない）
+      timedOutRef.current = true;
+      setTimedOut(true);
+      if (autoNext) statsRef.current = { ...statsRef.current, failed: statsRef.current.failed + 1 };
+      onResult?.('incorrect', state?.movesMade.length ?? 0, {
+        attempt: missesRef.current + 1,
+        livesLeft: lives === undefined ? null : Math.max(0, lives - missesRef.current),
+        ...statsRef.current,
+        timedOut: true,
+      });
+      timeUp();
+    }, 250);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, timeUp]);
 
   const goNext = useCallback(async () => {
     setLoadingNext(true);
@@ -85,7 +135,7 @@ export default function ProblemBoard({
       }
       seenIdsRef.current.add(row.id);
       statsRef.current = { ...statsRef.current, problemNo: statsRef.current.problemNo + 1 };
-      setCurrent({ ...tsumegoRowToProblem(row), lives: current.lives });
+      setCurrent({ ...tsumegoRowToProblem(row), lives: current.lives, timeLimitSec: current.timeLimitSec });
     } catch (err) {
       setNextError(err instanceof Error ? err.message : '次の問題を取得できませんでした');
     } finally {
@@ -96,6 +146,7 @@ export default function ProblemBoard({
   useEffect(() => {
     const status = problemState?.status;
     if (status !== 'correct' && status !== 'incorrect') return;
+    if (timedOutRef.current) return; // 時間切れはタイマー側で送り済み
     const attempt = missesRef.current + 1;
     if (status === 'incorrect') {
       missesRef.current = attempt;
@@ -108,14 +159,14 @@ export default function ProblemBoard({
         ? { ...statsRef.current, solved: statsRef.current.solved + 1 }
         : { ...statsRef.current, failed: statsRef.current.failed + 1 };
     }
-    onResult?.(status, problemState?.movesMade.length ?? 0, { attempt, livesLeft, ...statsRef.current });
+    onResult?.(status, problemState?.movesMade.length ?? 0, { attempt, livesLeft, ...statsRef.current, timedOut: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problemState?.status, problemState?.movesMade.length, onResult]);
 
   const livesLeft = lives === undefined ? null : Math.max(0, lives - misses);
   const outOfLives = livesLeft === 0;
   const finished = problemState?.status === 'correct'
-    || (problemState?.status === 'incorrect' && outOfLives);
+    || (problemState?.status === 'incorrect' && (outOfLives || timedOut));
 
   // 解けたら・ライフが尽きたら、結果を少し見せてから同じレベルの次の問題へ
   useEffect(() => {
@@ -128,7 +179,7 @@ export default function ProblemBoard({
 
   // ライフありの出題では正解・ライフ切れで次へ進む。やり直せるのはライフが残っている不正解だけ
   const canRetry = problemState.status === 'incorrect'
-    ? !outOfLives
+    ? !outOfLives && !timedOut
     : problemState.status === 'correct' && !autoNext;
 
   const handleCellClick = (x: number, y: number) => {
@@ -180,6 +231,15 @@ export default function ProblemBoard({
           )}
         </div>
         <div className="flex items-center gap-3">
+          {remainingSec !== null && (
+            <div
+              data-testid="problem-timer"
+              className={`flex items-center gap-1 text-sm font-bold tabular-nums ${remainingSec <= 10 ? 'text-alert-text' : 'text-muted'}`}
+            >
+              <Timer className="w-4 h-4" />
+              {formatRemaining(remainingSec)}
+            </div>
+          )}
           {lives !== undefined && livesLeft !== null && (
             <div className="flex items-center gap-0.5" aria-label={`ライフ 残り${livesLeft}`} data-testid="problem-lives">
               {Array.from({ length: lives }, (_, i) => (
@@ -192,7 +252,7 @@ export default function ProblemBoard({
           )}
           <div className={`flex items-center gap-2 font-bold ${statusColor}`}>
             {statusIcon}
-            {outOfLives && problemState.status === 'incorrect' ? 'ライフがなくなりました' : problemState.message}
+            {timedOut ? '時間切れ' : outOfLives && problemState.status === 'incorrect' ? 'ライフがなくなりました' : problemState.message}
             {autoNext && finished && (
               <span className="text-sm font-normal text-muted">
                 {nextError ?? (loadingNext ? '次の問題を準備中…' : 'まもなく次の問題')}

@@ -22,7 +22,7 @@ vi.mock('./GoBoard', () => ({
 }));
 vi.mock('./TsumegoReportModal', () => ({ default: () => null }));
 
-function makeProblem(id: string, lives?: number): Problem {
+function makeProblem(id: string, lives?: number, timeLimitSec?: number): Problem {
   return {
     id,
     title: `問題${id}`,
@@ -33,6 +33,7 @@ function makeProblem(id: string, lives?: number): Problem {
     difficulty: '5K+',
     createdAt: '',
     lives,
+    timeLimitSec,
   };
 }
 
@@ -88,5 +89,33 @@ describe('ProblemBoard のライフと次の問題', () => {
     expect(screen.getByRole('button', { name: /やり直し/ })).toBeInTheDocument();
     await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
     expect(fetchRandom).not.toHaveBeenCalled();
+  });
+
+  it('制限時間が切れたらライフを減らさず失敗にし、次の問題へ進む', async () => {
+    const onResult = vi.fn();
+    render(<ProblemBoard problem={makeProblem('a', 3, 60)} onBack={() => {}} onResult={onResult} />);
+    expect(screen.getByTestId('problem-timer')).toHaveTextContent('1:00');
+
+    // 1回まちがえてからやり直し中に時間切れ。やり直しても時計は戻らない
+    fireEvent.click(screen.getByText('まちがいの手'));
+    fireEvent.click(screen.getByRole('button', { name: /やり直し/ }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(50_000); });
+    expect(screen.getByTestId('problem-timer')).toHaveTextContent('0:10');
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_500); });
+
+    expect(screen.getAllByText('時間切れ').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /やり直し/ })).toBeNull();
+    expect(onResult).toHaveBeenLastCalledWith('incorrect', 0, expect.objectContaining({ timedOut: true, livesLeft: 2, failed: 1 }));
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(2600); });
+    expect(screen.getByText('問題next')).toBeInTheDocument();
+    // 次の問題は時計もライフも満タンから
+    expect(screen.getByTestId('problem-timer')).toHaveTextContent('1:00');
+    expect(screen.getByLabelText('ライフ 残り3')).toBeInTheDocument();
+  });
+
+  it('制限時間なしならタイマーを出さない', () => {
+    render(<ProblemBoard problem={makeProblem('a', 3)} onBack={() => {}} />);
+    expect(screen.queryByTestId('problem-timer')).toBeNull();
   });
 });

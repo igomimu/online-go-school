@@ -84,6 +84,8 @@ import { Settings } from 'lucide-react';
 
 // 講師専用の検討別ウィンドウ。中身は本体からポータルで描く（PopupPortal 参照）。
 const TEACHER_REVIEW_WINDOW_NAME = 'teacher-review-window';
+// 講師専用の詰碁モニター別ウィンドウ。出題中も教室ホームを使えるようにする
+const TEACHER_PROBLEM_WINDOW_NAME = 'teacher-problem-window';
 // ツールバーの「検討」を白紙から始めるときの盤の大きさ（授業モードの既定と同じ）
 const LECTURE_BOARD_SIZE = 19;
 
@@ -362,6 +364,7 @@ function App() {
   const [nigiriDraw, setNigiriDraw] = useState<{ iAmBlack: boolean; opponent: string; drawId: number } | null>(null);
   // ポップアップを塞がれていて検討の別ウィンドウを開けなかった（全面表示に落とす）
   const [reviewWindowBlocked, setReviewWindowBlocked] = useState(false);
+  const [problemWindowBlocked, setProblemWindowBlocked] = useState(false);
 
   // 詰碁モード用
   const [activeProblem, setActiveProblem] = useState<import('./types/problem').Problem | null>(null);
@@ -741,7 +744,7 @@ function App() {
             ...prev,
             [sender]: {
               result: p.result, moveCount: p.moveCount, attempt: p.attempt, livesLeft: p.livesLeft,
-              problemNo: p.problemNo, solved: p.solved, failed: p.failed,
+              problemNo: p.problemNo, solved: p.solved, failed: p.failed, timedOut: p.timedOut,
             },
           }));
         }
@@ -1480,7 +1483,7 @@ function App() {
     setActiveProblem(problem);
     setProblemTargets(targets);
     setProblemResults({});
-    setViewMode('problem');
+    // 先生の画面はホームのまま（モニターは別ウィンドウ）
     void classroomRef.current?.sendToOrAll({
       type: 'PROBLEM_ASSIGN',
       payload: { problem, targetStudents: targets ?? [] },
@@ -1489,7 +1492,6 @@ function App() {
 
   // 詰碁: 配信終了（先生用）。出題した生徒にだけREVIEW_ENDを送って詰碁モードから戻す。
   const handleProblemMonitorBack = () => {
-    setViewMode('lobby');
     setActiveProblem(null);
     void classroomRef.current?.sendToOrAll({ type: 'REVIEW_END', payload: {} }, problemTargets);
     setProblemTargets(null);
@@ -2183,6 +2185,11 @@ function App() {
     role === 'TEACHER' && effectiveViewMode === 'review' && !reviewWindowBlocked;
   // 別ウィンドウに出ている間、本体は教室ホームを表示する
   const mainViewMode: typeof effectiveViewMode = reviewInWindow ? 'lobby' : effectiveViewMode;
+  // 詰碁の出題中、先生のモニターは別ウィンドウに出し、本体では対局や生徒の様子を
+  // 見られるようにする（2026-09-19 三村さん「対局、検討と同じ様に」）。
+  // 画面の状態（viewMode）とは切り離し「出題中か」だけで出す。viewMode に載せると、
+  // 先生の対局が始まったり検討を開いたりした瞬間にモニターごと消え、配信終了できなくなる。
+  const problemMonitorOpen = role === 'TEACHER' && !!activeProblem;
 
   const isBoardFocusMode =
     mainViewMode === 'game' ||
@@ -2499,20 +2506,35 @@ function App() {
           </div>
         )}
 
-        {mainViewMode === 'problem' && activeProblem && role === 'TEACHER' && (
-          <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4"><ErrorBoundary label="この画面">
-            <ProblemMonitorPanel
-              problem={activeProblem}
-              students={students}
-              participants={participants}
-              results={problemResults}
-              localIdentity={classroomRef.current?.localIdentity ?? TEACHER_IDENTITY}
-              targets={problemTargets}
-              onBack={handleProblemMonitorBack}
-            />
-          </ErrorBoundary>
-          </div>
-        )}
+        {/* 詰碁モニター（先生）。別ウィンドウ、ポップアップを塞がれている場合だけ全面表示 */}
+        {problemMonitorOpen && activeProblem && (() => {
+          const monitor = (
+            <ErrorBoundary label="この画面">
+              <ProblemMonitorPanel
+                problem={activeProblem}
+                students={students}
+                participants={participants}
+                results={problemResults}
+                localIdentity={classroomRef.current?.localIdentity ?? TEACHER_IDENTITY}
+                targets={problemTargets}
+                onBack={handleProblemMonitorBack}
+              />
+            </ErrorBoundary>
+          );
+          return !problemWindowBlocked ? (
+            <PopupPortal
+              name={TEACHER_PROBLEM_WINDOW_NAME}
+              title="詰碁出題 — 三村囲碁オンライン"
+              className="w-full h-screen overflow-y-auto bg-ground p-2 sm:p-4"
+              onClose={handleProblemMonitorBack}
+              onBlocked={() => setProblemWindowBlocked(true)}
+            >
+              {monitor}
+            </PopupPortal>
+          ) : (
+            <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4">{monitor}</div>
+          );
+        })()}
 
         {/* 詰碁モード（生徒） */}
         {mainViewMode === 'problem' && activeProblem && role === 'STUDENT' && (
@@ -2535,6 +2557,7 @@ function App() {
                     problemNo: progress.problemNo,
                     solved: progress.solved,
                     failed: progress.failed,
+                    timedOut: progress.timedOut,
                   },
                 });
               }}

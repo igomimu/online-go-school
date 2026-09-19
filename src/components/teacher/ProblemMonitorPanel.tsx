@@ -152,7 +152,7 @@ export default function ProblemMonitorPanel({
               {row.result === 'incorrect' && (
                 <span data-testid="problem-monitor-status" className="flex items-center gap-1 text-alert-text font-bold shrink-0">
                   <X className="w-4 h-4" />
-                  {row.view?.livesLeft === 0 ? 'ライフ切れ' : '不正解'}
+                  {row.view?.timedOut ? '時間切れ' : row.view?.livesLeft === 0 ? 'ライフ切れ' : '不正解'}
                   {row.view?.livesLeft ? <span className="font-normal">残り{row.view.livesLeft}</span> : null}
                 </span>
               )}

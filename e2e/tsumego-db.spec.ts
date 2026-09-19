@@ -51,15 +51,18 @@ test('詰碁データベースから配信した問題が生徒側で解答可�
     // プレビューの碁盤が表示されるまで待つ
     await teacherPage.getByTestId('go-board').waitFor({ timeout: 15_000 });
 
-    // 配信
+    // 配信。先生のモニターは別ウィンドウに開き、本体はホームのまま（2026-09-19）
+    const monitorPromise = teacherPage.context().waitForEvent('page', { timeout: 10_000 });
     await teacherPage.getByRole('button', { name: /この問題を出題/ }).click();
+    const monitorPage = await monitorPromise;
+    await expect(teacherPage.getByTestId('create-game-toolbar-button')).toBeVisible();
 
     // 先生側: 一緒に解く画面(ProblemBoard)ではなく、モニター画面(ProblemMonitorPanel)に
     // なっていることを確認。「配信終了」ボタンがあり、碁盤はreadOnly(data-cellが無い=クリック不可)。
-    await teacherPage.getByRole('button', { name: '配信終了' }).waitFor({ timeout: 10_000 });
-    await expect(teacherPage.getByTestId('go-board').locator('[data-cell]')).toHaveCount(0);
+    await monitorPage.getByRole('button', { name: '配信終了' }).waitFor({ timeout: 10_000 });
+    await expect(monitorPage.getByTestId('go-board').locator('[data-cell]')).toHaveCount(0);
     // 生徒が結果を送るまでは「挑戦中」表示
-    const teacherStudentRow = teacherPage.getByTestId('problem-monitor-row').filter({ hasText: 'テスト生徒A' });
+    const teacherStudentRow = monitorPage.getByTestId('problem-monitor-row').filter({ hasText: 'テスト生徒A' });
     await teacherStudentRow.waitFor({ timeout: 10_000 });
     await expect(teacherStudentRow.getByTestId('problem-monitor-status')).toHaveText(/挑戦中/);
 
@@ -86,8 +89,9 @@ test('詰碁データベースから配信した問題が生徒側で解答可�
     await expect(teacherStudentRow.getByTestId('problem-monitor-status')).toHaveText(/手|不正解/, { timeout: 10_000 });
 
     // 先生: 配信終了 → 生徒側も詰碁画面から抜ける(REVIEW_END連携)
-    await teacherPage.getByRole('button', { name: '配信終了' }).click();
+    await monitorPage.getByRole('button', { name: '配信終了' }).click();
     await expect(studentAPage.getByTestId('go-board')).not.toBeVisible({ timeout: 10_000 });
+    await expect.poll(() => monitorPage.isClosed(), { timeout: 5_000 }).toBe(true);
   } finally {
     for (const ctx of contexts) await ctx.close().catch(() => {});
     await teardownSupabaseRoster(classroomId);

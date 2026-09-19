@@ -170,6 +170,15 @@ export function useProblemSession() {
     }
   }, []);
 
+  // 制限時間切れ。正解済みなら何もしない。やり直し待ちの不正解も時間切れで締める
+  const timeUp = useCallback(() => {
+    const state = stateRef.current;
+    if (!state || state.status === 'correct') return;
+    const newState: ProblemState = { ...state, status: 'incorrect', message: '時間切れ' };
+    stateRef.current = newState;
+    setProblemState(newState);
+  }, []);
+
   const retry = useCallback(() => {
     if (!stateRef.current) return;
     startProblem(stateRef.current.problem);
@@ -199,6 +208,7 @@ export function useProblemSession() {
     attempts,
     startProblem,
     makeMove,
+    timeUp,
     retry,
     closeProblem,
     recordAttempt,

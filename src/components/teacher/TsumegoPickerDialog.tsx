@@ -35,6 +35,9 @@ const BOARD_SIZE_OPTIONS = [19, 13, 9];
 const LIFE_OPTIONS = [1, 2, 3, 4, 5];
 const DEFAULT_LIVES = 3;
 
+/** 1問ごとの制限時間（分）。null=なし */
+const TIME_LIMIT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
 export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: TsumegoPickerDialogProps) {
   const [level, setLevel] = useState<string | null>(null);
   const [boardSize, setBoardSize] = useState(19);
@@ -44,6 +47,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
   // 既定は全員。対局中の生徒など、出さない生徒だけを外す（三村さん 2026-09-19）
   const [excluded, setExcluded] = useState<Set<string>>(() => new Set());
   const [lives, setLives] = useState(DEFAULT_LIVES);
+  const [timeLimitMin, setTimeLimitMin] = useState<number | null>(null);
 
   const selectedRecipients = recipients?.filter(r => !excluded.has(r.identity)) ?? [];
   const noneSelected = !!recipients && selectedRecipients.length === 0;
@@ -81,7 +85,12 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
     const targets = recipients && excluded.size > 0
       ? selectedRecipients.map(r => r.identity)
       : null;
-    onAssign(recipients ? { ...preview, lives } : preview, targets);
+    onAssign(
+      recipients
+        ? { ...preview, lives, ...(timeLimitMin ? { timeLimitSec: timeLimitMin * 60 } : {}) }
+        : preview,
+      targets,
+    );
     onClose();
   };
 
@@ -208,6 +217,28 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
                   }`}
                 >
                   {n}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {recipients && (
+          <div>
+            <label className="block text-sm text-muted mb-1.5">制限時間（1問ごと）</label>
+            <div className="flex flex-wrap gap-1.5">
+              {[null, ...TIME_LIMIT_OPTIONS].map((m) => (
+                <button
+                  key={m ?? 'none'}
+                  data-testid={`tsumego-time-${m ?? 'none'}`}
+                  onClick={() => setTimeLimitMin(m)}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
+                    timeLimitMin === m
+                      ? 'bg-accent border-accent text-accent-ink'
+                      : 'bg-ink/5 border-line text-muted hover:text-ink'
+                  }`}
+                >
+                  {m === null ? 'なし' : `${m}分`}
                 </button>
               ))}
             </div>

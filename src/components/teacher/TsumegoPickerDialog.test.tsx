@@ -34,6 +34,8 @@ describe('TsumegoPickerDialog の出題先', () => {
     await drawOne();
     fireEvent.click(screen.getByRole('button', { name: /この問題を出題（3名）/ }));
     expect(onAssign).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }), null);
+    // 制限時間の既定は「なし」
+    expect(onAssign.mock.calls[0][0].timeLimitSec).toBeUndefined();
   });
 
   it('外した生徒には出題しない', async () => {
@@ -42,9 +44,10 @@ describe('TsumegoPickerDialog の出題先', () => {
     expect(screen.getByText('・対局中')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('tsumego-recipient-sid:2'));
     fireEvent.click(screen.getByTestId('tsumego-lives-5'));
+    fireEvent.click(screen.getByTestId('tsumego-time-3'));
     await drawOne();
     fireEvent.click(screen.getByRole('button', { name: /この問題を出題（2名）/ }));
-    expect(onAssign).toHaveBeenCalledWith(expect.objectContaining({ lives: 5 }), ['sid:1', 'sid:3']);
+    expect(onAssign).toHaveBeenCalledWith(expect.objectContaining({ lives: 5, timeLimitSec: 180 }), ['sid:1', 'sid:3']);
   });
 
   it('全員外したら出題できない', async () => {
