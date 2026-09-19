@@ -41,8 +41,8 @@ test('詰碁データベースから配信した問題が生徒側で解答可�
     await waitForConnectedCount(studentAPage, 1);
 
     // 先生: 詰碁DBダイアログを開く
-    await clickToolbarMenuItem(teacherPage, '教材', '詰碁DB');
-    await teacherPage.getByText('詰碁データベースから配信').waitFor({ timeout: 5_000 });
+    await clickToolbarMenuItem(teacherPage, '教材', '詰碁出題');
+    await teacherPage.getByRole('heading', { name: '詰碁出題' }).waitFor({ timeout: 5_000 });
 
     // 9路で絞り込んでランダム取得(候補座標を絞りやすくするため)
     await teacherPage.getByRole('button', { name: '9路', exact: true }).click();
@@ -52,7 +52,7 @@ test('詰碁データベースから配信した問題が生徒側で解答可�
     await teacherPage.getByTestId('go-board').waitFor({ timeout: 15_000 });
 
     // 配信
-    await teacherPage.getByRole('button', { name: 'この問題を配信' }).click();
+    await teacherPage.getByRole('button', { name: /この問題を出題/ }).click();
 
     // 先生側: 一緒に解く画面(ProblemBoard)ではなく、モニター画面(ProblemMonitorPanel)に
     // なっていることを確認。「配信終了」ボタンがあり、碁盤はreadOnly(data-cellが無い=クリック不可)。
@@ -128,11 +128,11 @@ test('問題のまちがい報告ボタンでモーダルが開閉する', async
     await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
     await waitForConnectedCount(studentAPage, 1);
 
-    await clickToolbarMenuItem(teacherPage, '教材', '詰碁DB');
-    await teacherPage.getByText('詰碁データベースから配信').waitFor({ timeout: 5_000 });
+    await clickToolbarMenuItem(teacherPage, '教材', '詰碁出題');
+    await teacherPage.getByRole('heading', { name: '詰碁出題' }).waitFor({ timeout: 5_000 });
     await teacherPage.getByRole('button', { name: 'ランダムに1問取得' }).click();
     await teacherPage.getByTestId('go-board').waitFor({ timeout: 15_000 });
-    await teacherPage.getByRole('button', { name: 'この問題を配信' }).click();
+    await teacherPage.getByRole('button', { name: /この問題を出題/ }).click();
 
     const studentBoard = studentAPage.getByTestId('go-board');
     await studentBoard.waitFor({ timeout: 15_000 });

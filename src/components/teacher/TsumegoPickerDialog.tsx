@@ -5,9 +5,23 @@ import type { Problem } from '../../types/problem';
 import { fetchRandomTsumegoProblem } from '../../utils/tsumegoApi';
 import { tsumegoRowToProblem } from '../../utils/tsumegoConvert';
 
+/** 出題先の候補（接続中の生徒） */
+export interface TsumegoRecipient {
+  identity: string;
+  name: string;
+  /** 対局中。外し忘れを防ぐために札を出すだけで、既定で外しはしない */
+  playing?: boolean;
+}
+
 interface TsumegoPickerDialogProps {
-  onAssign: (problem: Problem) => void;
+  /** targets: 出題先の identity（null=全員） */
+  onAssign: (problem: Problem, targets: string[] | null) => void;
   onClose: () => void;
+  /**
+   * 渡したときだけ出題先を選ばせる（講師ホームの「詰碁出題」）。
+   * 検討盤で開くときは配る相手を検討の参加者が決めるので渡さない。
+   */
+  recipients?: TsumegoRecipient[];
 }
 
 const LEVEL_OPTIONS = [
@@ -17,12 +31,26 @@ const LEVEL_OPTIONS = [
 
 const BOARD_SIZE_OPTIONS = [19, 13, 9];
 
-export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPickerDialogProps) {
+export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: TsumegoPickerDialogProps) {
   const [level, setLevel] = useState<string | null>(null);
   const [boardSize, setBoardSize] = useState(19);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<Problem | null>(null);
+  // 既定は全員。対局中の生徒など、出さない生徒だけを外す（三村さん 2026-09-19）
+  const [excluded, setExcluded] = useState<Set<string>>(() => new Set());
+
+  const selectedRecipients = recipients?.filter(r => !excluded.has(r.identity)) ?? [];
+  const noneSelected = !!recipients && selectedRecipients.length === 0;
+
+  const toggleRecipient = (identity: string) => {
+    setExcluded(prev => {
+      const next = new Set(prev);
+      if (next.has(identity)) next.delete(identity);
+      else next.add(identity);
+      return next;
+    });
+  };
 
   const drawProblem = async () => {
     setLoading(true);
@@ -43,8 +71,12 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
   };
 
   const handleAssign = () => {
-    if (!preview) return;
-    onAssign(preview);
+    if (!preview || noneSelected) return;
+    // 誰も外していなければ「全員」。後から入った生徒にも出題が届く
+    const targets = recipients && excluded.size > 0
+      ? selectedRecipients.map(r => r.identity)
+      : null;
+    onAssign(preview, targets);
     onClose();
   };
 
@@ -55,7 +87,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">詰碁データベースから配信</h2>
+          <h2 className="text-lg font-bold">{recipients ? '詰碁出題' : '詰碁データベースから配信'}</h2>
           <button onClick={onClose} className="text-muted hover:text-ink">
             <X className="w-5 h-5" />
           </button>
@@ -109,6 +141,52 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
           </div>
         </div>
 
+        {recipients && (
+          <div>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <label className="block text-sm text-muted">
+                出題する生徒（{selectedRecipients.length}/{recipients.length}名）
+              </label>
+              {excluded.size > 0 && (
+                <button
+                  onClick={() => setExcluded(new Set())}
+                  className="text-xs text-muted hover:text-ink underline"
+                >
+                  全員に戻す
+                </button>
+              )}
+            </div>
+            {recipients.length === 0 ? (
+              <div className="text-sm text-muted">接続中の生徒がいません</div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {recipients.map(r => {
+                  const on = !excluded.has(r.identity);
+                  return (
+                    <button
+                      key={r.identity}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={on}
+                      data-testid={`tsumego-recipient-${r.identity}`}
+                      onClick={() => toggleRecipient(r.identity)}
+                      title={on ? '出題する（押すと外す）' : '出題しない（押すと戻す）'}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
+                        on
+                          ? 'bg-accent border-accent text-accent-ink'
+                          : 'bg-ink/5 border-line text-muted line-through'
+                      }`}
+                    >
+                      {r.name}
+                      {r.playing && <span className="font-normal no-underline opacity-80">・対局中</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         <button
           onClick={drawProblem}
           disabled={loading}
@@ -149,9 +227,11 @@ export default function TsumegoPickerDialog({ onAssign, onClose }: TsumegoPicker
               </button>
               <button
                 onClick={handleAssign}
-                className="premium-button flex-1 flex items-center justify-center gap-2 text-sm"
+                disabled={noneSelected}
+                className="premium-button flex-1 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
               >
-                <Send className="w-4 h-4" /> この問題を配信
+                <Send className="w-4 h-4" />
+                {recipients ? `この問題を出題（${selectedRecipients.length}名）` : 'この問題を配信'}
               </button>
             </div>
           </div>

@@ -11,6 +11,8 @@ interface ProblemMonitorPanelProps {
   participants: ParticipantInfo[];
   results: Record<string, { result: 'correct' | 'incorrect'; moveCount: number }>;
   localIdentity: string;
+  /** 出題先（null=全員）。出していない生徒は一覧に出さない */
+  targets?: string[] | null;
   onBack: () => void;
 }
 
@@ -76,9 +78,11 @@ export default function ProblemMonitorPanel({
   participants,
   results,
   localIdentity,
+  targets = null,
   onBack,
 }: ProblemMonitorPanelProps) {
-  const rows = buildRows(students, participants, results, localIdentity);
+  const rows = buildRows(students, participants, results, localIdentity)
+    .filter(r => targets === null || targets.includes(r.identity));
   const correctCount = rows.filter(r => r.result === 'correct').length;
   const connectedCount = rows.filter(r => r.isConnected).length;
 

@@ -366,6 +366,8 @@ function App() {
   const [activeProblem, setActiveProblem] = useState<import('./types/problem').Problem | null>(null);
   // 先生用: 生徒identityごとの解答状況(PROBLEM_RESULT受信結果)
   const [problemResults, setProblemResults] = useState<Record<string, { result: 'correct' | 'incorrect'; moveCount: number }>>({});
+  // 先生用: 詰碁の出題先（null=全員）。配信終了の合図もここへだけ送る
+  const [problemTargets, setProblemTargets] = useState<string[] | null>(null);
 
   // オーディオデバッグ
   const [audioDebug, setAudioDebug] = useState('');
@@ -1464,23 +1466,26 @@ function App() {
   };
 
   // 詰碁: 配信
-  const handleProblemAssign = (problem: import('./types/problem').Problem) => {
+  // 出題先は選んだ生徒だけ（null=全員）。対局中の生徒を詰碁へ引き剥がさない（2026-09-19）
+  const handleProblemAssign = (problem: import('./types/problem').Problem, targets: string[] | null) => {
     if (role !== 'TEACHER') return;
     endReviewIfOpen();
     setActiveProblem(problem);
+    setProblemTargets(targets);
     setProblemResults({});
     setViewMode('problem');
-    classroomRef.current?.broadcast({
+    void classroomRef.current?.sendToOrAll({
       type: 'PROBLEM_ASSIGN',
-      payload: { problem, targetStudents: [] },
-    });
+      payload: { problem, targetStudents: targets ?? [] },
+    }, targets);
   };
 
-  // 詰碁: 配信終了（先生用）。生徒側にもREVIEW_ENDを送って詰碁モードから戻す。
+  // 詰碁: 配信終了（先生用）。出題した生徒にだけREVIEW_ENDを送って詰碁モードから戻す。
   const handleProblemMonitorBack = () => {
     setViewMode('lobby');
     setActiveProblem(null);
-    classroomRef.current?.broadcast({ type: 'REVIEW_END', payload: {} });
+    void classroomRef.current?.sendToOrAll({ type: 'REVIEW_END', payload: {} }, problemTargets);
+    setProblemTargets(null);
   };
 
   /**
@@ -2495,6 +2500,7 @@ function App() {
               participants={participants}
               results={problemResults}
               localIdentity={classroomRef.current?.localIdentity ?? TEACHER_IDENTITY}
+              targets={problemTargets}
               onBack={handleProblemMonitorBack}
             />
           </ErrorBoundary>

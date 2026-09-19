@@ -25,7 +25,7 @@ import StudentLinkGenerator from './StudentLinkGenerator';
 import AutoPairingDialog from './AutoPairingDialog';
 import GameObserverPanel from './GameObserverPanel';
 import StudentEditDialog from './StudentEditDialog';
-import TsumegoPickerDialog from './TsumegoPickerDialog';
+import TsumegoPickerDialog, { type TsumegoRecipient } from './TsumegoPickerDialog';
 import RankDisplaySwitcher from './RankDisplaySwitcher';
 import { updateClassroomRankDisplay, upsertClassroom } from '../../utils/classroomStore';
 import { applyLiveBoardSnapshotsToSessions, useLiveBoards } from '../../hooks/useLiveBoards';
@@ -66,7 +66,7 @@ interface TeacherDashboardProps {
   /** 棋力表示を切り替えたことを生徒へ配る（名簿を読み直さない生徒のため） */
   onRankDisplayChanged?: (value: RankDisplay) => void;
   onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number; clock?: import('../../types/game').GameClock }[]) => void;
-  onProblemAssign?: (problem: import('../../types/problem').Problem) => void;
+  onProblemAssign?: (problem: import('../../types/problem').Problem, targets: string[] | null) => void;
   onClearAudioM?: () => void;
   onClearAudioS?: () => void;
   onClearSharing?: () => void;
@@ -184,6 +184,18 @@ export default function TeacherDashboard({
 
   // 詰碁データベース選択ダイアログ
   const [showTsumegoPicker, setShowTsumegoPicker] = useState(false);
+  // 出題先の候補＝接続中の生徒。対局中かどうかは札で知らせる
+  const tsumegoRecipients = useMemo<TsumegoRecipient[]>(() => (
+    participants
+      .filter(p => p.identity !== localIdentity)
+      .map(p => ({
+        identity: p.identity,
+        name: p.name || p.identity,
+        playing: games.some(g =>
+          (g.status === 'playing' || g.status === 'scoring')
+          && (identityMatchesPlayer(p.identity, g.blackPlayer) || identityMatchesPlayer(p.identity, g.whitePlayer))),
+      }))
+  ), [participants, localIdentity, games]);
 
   // 教室が未選択で教室データがあれば最初の教室を自動選択
   useEffect(() => {
@@ -701,6 +713,7 @@ export default function TeacherDashboard({
       {showTsumegoPicker && onProblemAssign && (
         <TsumegoPickerDialog
           onAssign={onProblemAssign}
+          recipients={tsumegoRecipients}
           onClose={() => setShowTsumegoPicker(false)}
         />
       )}

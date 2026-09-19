@@ -383,7 +383,7 @@ export default function TeacherToolbar({
         <input ref={fileInputRef} type="file" accept=".sgf" onChange={onLoadSgf} className="hidden" />
         <DropdownButton label="教材">
           <MenuItem label="SGF読込" onClick={() => fileInputRef.current?.click()} />
-          {onOpenTsumegoPicker && <MenuItem label="詰碁DB" onClick={onOpenTsumegoPicker} />}
+          {onOpenTsumegoPicker && <MenuItem label="詰碁出題" onClick={onOpenTsumegoPicker} />}
           {onOpenRecord && <MenuItem label="棋譜作成" onClick={onOpenRecord} />}
         </DropdownButton>
         <DropdownButton label="生徒管理">
