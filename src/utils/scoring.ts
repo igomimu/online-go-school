@@ -206,6 +206,15 @@ export function isTimeoutResult(result: string | null | undefined): boolean {
 }
 
 /**
+ * 投了で終局した対局か。講師が判断して「続きを打ってみよう」と促すときに再開できる
+ * （2026-09-19 三村さん）。時間切れと違い、授業中に急いで戻すものではないので
+ * 生徒一覧には出さず、終局した盤と棋譜履歴から行う。
+ */
+export function isResignResult(result: string | null | undefined): boolean {
+  return /^[BW]\+R$/i.test(result?.trim() ?? '');
+}
+
+/**
  * 目数を囲碁の言い方にする。0.5 は「0目半」ではなく「半目」。
  * 2.5→「2目半」 / 5→「5目」 / 0.5→「半目」
  */

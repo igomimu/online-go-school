@@ -8,7 +8,7 @@ import type { ChatMessage } from '../../types/chat';
 import { identityMatchesPlayer, parseIdentity, resolvePlayerName, stripSid, studentIdentityCandidates } from '../../utils/identityUtils';
 import { deleteSavedGame, deleteSavedGames, fetchActiveLiveGamesForPlayers, finishGame, getSupabase, interruptGame, liveRowToSession, type LiveGameRow } from '../../utils/liveGameApi';
 import { loadSavedGamesForStudent } from '../../utils/savedGames';
-import { isTimeoutResult } from '../../utils/scoring';
+import { isResignResult, isTimeoutResult } from '../../utils/scoring';
 
 import StudentTable from './StudentTable';
 import BoardThumbnailGrid from './BoardThumbnailGrid';
@@ -864,7 +864,9 @@ export default function TeacherDashboard({
                     // liveStatus で判定する（2026-08-27）。
                     const isInterrupted = game.liveStatus === 'interrupted';
                     const isTimeoutFinished = game.liveStatus === 'finished' && isTimeoutResult(game.result);
-                    const resumable = isInterrupted || isTimeoutFinished;
+                    // 投了も講師の判断で続きを打たせられる（2026-09-19）
+                    const isResignFinished = game.liveStatus === 'finished' && isResignResult(game.result);
+                    const resumable = isInterrupted || isTimeoutFinished || isResignFinished;
                     // この生徒がその対局で黒か白か（保存値は sid:/uuid/コード/名前 いずれか）
                     const matchesHistoryStudent = (raw: string) => {
                       const v = stripSid(raw || '');
@@ -962,6 +964,8 @@ export default function TeacherDashboard({
                                   e.stopPropagation();
                                   if (isTimeoutFinished &&
                                       !confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')) return;
+                                  if (isResignFinished &&
+                                      !confirm('投了で終わったこの対局を再開しますか？（投了を取り消して続きから打ちます）')) return;
                                   onResumeGame(game.id);
                                   setHistoryStudent(null);
                                 }}

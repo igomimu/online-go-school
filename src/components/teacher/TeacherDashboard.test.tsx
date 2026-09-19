@@ -178,9 +178,9 @@ describe('棋譜履歴からの再開', () => {
     expect(onResumeGame).toHaveBeenCalledWith('g-int');
   });
 
-  it('終局した棋譜には再開ボタンを出さない', async () => {
+  it('目数で終局した棋譜には再開ボタンを出さない', async () => {
     api.loadSavedGamesForStudent.mockResolvedValue([
-      { ...savedGame('g-done', '2026-08-27', 'B+R'), liveStatus: 'finished' },
+      { ...savedGame('g-done', '2026-08-27', 'B+3.5'), liveStatus: 'finished' },
     ]);
     await openHistory({ onResumeGame: vi.fn() });
 
@@ -200,6 +200,23 @@ describe('棋譜履歴からの再開', () => {
 
     fireEvent.click(screen.getByText('再開'));
     expect(onResumeGame).toHaveBeenCalledWith('g-timeout');
+  });
+
+  it('投了で終わった棋譜は、確認のうえ再開できる（講師が続きを打たせる）', async () => {
+    api.loadSavedGamesForStudent.mockResolvedValue([
+      { ...savedGame('g-resign', '2026-09-19', 'W+R'), liveStatus: 'finished' },
+    ]);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const onResumeGame = vi.fn();
+    await openHistory({ onResumeGame });
+
+    fireEvent.click(screen.getByText('再開'));
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('投了'));
+    expect(onResumeGame).not.toHaveBeenCalled();
+
+    confirmSpy.mockReturnValue(true);
+    fireEvent.click(screen.getByText('再開'));
+    expect(onResumeGame).toHaveBeenCalledWith('g-resign');
   });
 
   it('どの棋譜にも削除ボタンがある', async () => {

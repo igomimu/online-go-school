@@ -3,7 +3,7 @@ import GoBoard from './GoBoard';
 import ZoomTapConfirm from './ZoomTapConfirm';
 import type { Drawing, Marker } from './GoBoard';
 import { Flag, SkipForward, Check, RefreshCw, Pause, X, Undo2, Pen, ArrowRight as ArrowRightIcon, Trash2, Volume2, VolumeX, Ban, Triangle, MousePointerClick, Eye, Calculator } from 'lucide-react';
-import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, formatKomiLabel, isTimeoutResult } from '../utils/scoring';
+import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, formatKomiLabel, isResignResult, isTimeoutResult } from '../utils/scoring';
 import { findGroup } from '../utils/gameLogic';
 import { formatTime } from '../hooks/useGameClock';
 import { useLiveGame } from '../hooks/useLiveGame';
@@ -860,6 +860,18 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
               data-testid="resume-timeout-game"
               onClick={async () => {
                 if (!confirm('時間切れで終わったこの対局を再開しますか？（切れた側の時間は戻します）')) return;
+                await resumeGame();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/15 hover:bg-accent/20 text-accent-text border border-accent/30 rounded-lg transition-colors duration-150 font-bold"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> 対局を再開する
+            </button>
+          )}
+          {isTeacher && game.status === 'finished' && isResignResult(game.result) && (
+            <button
+              data-testid="resume-resigned-game"
+              onClick={async () => {
+                if (!confirm('投了で終わったこの対局を再開しますか？（投了を取り消して続きから打ちます）')) return;
                 await resumeGame();
               }}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent/15 hover:bg-accent/20 text-accent-text border border-accent/30 rounded-lg transition-colors duration-150 font-bold"

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, formatKomiLabel, timedOutColorFromResult, isTimeoutResult, formatResultSpeech } from './scoring';
+import { calculateTerritory, formatScoringResult, formatScoringResultJa, formatGameResultMessage, formatKomiLabel, timedOutColorFromResult, isTimeoutResult, isResignResult, formatResultSpeech } from './scoring';
 import type { BoardState, Stone } from '../components/GoBoard';
 
 function makeBoard(size: number, stones: { x: number; y: number; color: 'BLACK' | 'WHITE' }[]): BoardState {
@@ -207,5 +207,15 @@ describe('formatResultSpeech（終局の読み上げ）', () => {
     expect(formatResultSpeech('ジゴ')).toBeNull();
     expect(formatResultSpeech('強制終局')).toBeNull();
     expect(formatResultSpeech(null)).toBeNull();
+  });
+});
+
+describe('isResignResult', () => {
+  it('投了（中押し）の結果だけを拾う', () => {
+    expect(isResignResult('W+R')).toBe(true);
+    expect(isResignResult('b+r')).toBe(true);
+    expect(isResignResult('B+T')).toBe(false);
+    expect(isResignResult('W+1.5')).toBe(false);
+    expect(isResignResult(null)).toBe(false);
   });
 });
