@@ -46,6 +46,8 @@ test('詰碁データベースから配信した問題が生徒側で解答可�
 
     // 9路で絞り込んでランダム取得(候補座標を絞りやすくするため)
     await teacherPage.getByRole('button', { name: '9路', exact: true }).click();
+    // ライフ1: 正解でも1回のまちがいでもその問題は終わり、次の問題へ進む
+    await teacherPage.getByTestId('tsumego-lives-1').click();
     await teacherPage.getByRole('button', { name: 'ランダムに1問取得' }).click();
 
     // プレビューの碁盤が表示されるまで待つ
@@ -86,7 +88,11 @@ test('詰碁データベースから配信した問題が生徒側で解答可�
     expect(feedbackShown).toBe(true);
 
     // 先生側: 生徒の解答結果(正解/不正解)がモニター一覧に反映される
-    await expect(teacherStudentRow.getByTestId('problem-monitor-status')).toHaveText(/手|不正解/, { timeout: 10_000 });
+    await expect(teacherStudentRow.getByTestId('problem-monitor-status')).toHaveText(/手|不正解|ライフ切れ/, { timeout: 10_000 });
+
+    // 生徒側: 解けても・ライフが尽きても、同じレベルの次の問題へ自動で進む（2026-09-19）
+    await expect(studentAPage.getByTestId('problem-number')).toHaveText('2問目', { timeout: 15_000 });
+    await expect(teacherStudentRow.getByTestId('problem-monitor-progress')).toContainText('1問目', { timeout: 10_000 });
 
     // 先生: 配信終了 → 生徒側も詰碁画面から抜ける(REVIEW_END連携)
     await monitorPage.getByRole('button', { name: '配信終了' }).click();
