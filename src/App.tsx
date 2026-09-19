@@ -63,6 +63,7 @@ import TeacherDashboard from './components/teacher/TeacherDashboard';
 import ClassroomManager from './components/teacher/ClassroomManager';
 import ProblemBoard from './components/ProblemBoard';
 import ProblemMonitorPanel from './components/teacher/ProblemMonitorPanel';
+import type { ProblemResultView } from './types/problem';
 import { useChat } from './hooks/useChat';
 import { useNotificationSound } from './hooks/useNotificationSound';
 import { useParticipantLog } from './hooks/useParticipantLog';
@@ -365,7 +366,7 @@ function App() {
   // 詰碁モード用
   const [activeProblem, setActiveProblem] = useState<import('./types/problem').Problem | null>(null);
   // 先生用: 生徒identityごとの解答状況(PROBLEM_RESULT受信結果)
-  const [problemResults, setProblemResults] = useState<Record<string, { result: 'correct' | 'incorrect'; moveCount: number }>>({});
+  const [problemResults, setProblemResults] = useState<Record<string, ProblemResultView>>({});
   // 先生用: 詰碁の出題先（null=全員）。配信終了の合図もここへだけ送る
   const [problemTargets, setProblemTargets] = useState<string[] | null>(null);
 
@@ -736,7 +737,13 @@ function App() {
         // 詰碁の解答結果（先生用: 生徒ごとの挑戦中/正解/不正解を集計する）
         if (msg.type === 'PROBLEM_RESULT' && connectRole === 'TEACHER' && msg.payload && sender) {
           const p = msg.payload as import('./types/problem').ProblemResultPayload;
-          setProblemResults(prev => ({ ...prev, [sender]: { result: p.result, moveCount: p.moveCount } }));
+          setProblemResults(prev => ({
+            ...prev,
+            [sender]: {
+              result: p.result, moveCount: p.moveCount, attempt: p.attempt, livesLeft: p.livesLeft,
+              problemNo: p.problemNo, solved: p.solved, failed: p.failed,
+            },
+          }));
         }
 
         // 着手権限の配布（生徒用）。自分が入っていれば打てる
@@ -2516,13 +2523,18 @@ function App() {
                 setViewMode('lobby');
                 setActiveProblem(null);
               }}
-              onResult={(result, moveCount) => {
+              onResult={(result, moveCount, progress) => {
                 classroomRef.current?.broadcast({
                   type: 'PROBLEM_RESULT',
                   payload: {
                     problemId: activeProblem.id,
                     result,
                     moveCount,
+                    attempt: progress.attempt,
+                    livesLeft: progress.livesLeft,
+                    problemNo: progress.problemNo,
+                    solved: progress.solved,
+                    failed: progress.failed,
                   },
                 });
               }}

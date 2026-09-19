@@ -1,6 +1,6 @@
 import type { ParticipantInfo } from '../../utils/classroomRtc';
 import type { Student } from '../../types/classroom';
-import type { Problem } from '../../types/problem';
+import type { Problem, ProblemResultView } from '../../types/problem';
 import GoBoard from '../GoBoard';
 import { identityMatchesPlayer, studentIdentityCandidates } from '../../utils/identityUtils';
 import { Check, X, Clock } from 'lucide-react';
@@ -9,7 +9,7 @@ interface ProblemMonitorPanelProps {
   problem: Problem;
   students: Student[];
   participants: ParticipantInfo[];
-  results: Record<string, { result: 'correct' | 'incorrect'; moveCount: number }>;
+  results: Record<string, ProblemResultView>;
   localIdentity: string;
   /** 出題先（null=全員）。出していない生徒は一覧に出さない */
   targets?: string[] | null;
@@ -22,12 +22,13 @@ interface MonitorRow {
   isConnected: boolean;
   result: 'correct' | 'incorrect' | null;
   moveCount: number | null;
+  view: ProblemResultView | null;
 }
 
 function buildRows(
   students: Student[],
   participants: ParticipantInfo[],
-  results: Record<string, { result: 'correct' | 'incorrect'; moveCount: number }>,
+  results: Record<string, ProblemResultView>,
   localIdentity: string,
 ): MonitorRow[] {
   const rows: MonitorRow[] = [];
@@ -46,6 +47,7 @@ function buildRows(
       isConnected,
       result: r?.result ?? null,
       moveCount: r?.moveCount ?? null,
+      view: r ?? null,
     });
     matched.add(s.id);
   }
@@ -62,6 +64,7 @@ function buildRows(
       isConnected: true,
       result: r?.result ?? null,
       moveCount: r?.moveCount ?? null,
+      view: r ?? null,
     });
   }
 
@@ -132,15 +135,25 @@ export default function ProblemMonitorPanel({
                 row.isConnected ? 'bg-ink/5' : 'bg-ink/[0.03] text-muted/75'
               }`}
             >
-              <span className="truncate">{row.displayName}</span>
+              <span className="min-w-0">
+                <span className="block truncate">{row.displayName}</span>
+                {row.view && row.view.problemNo !== undefined && (
+                  <span data-testid="problem-monitor-progress" className="block text-xs text-muted">
+                    {row.view.problemNo}問目・正解{row.view.solved ?? 0}・失敗{row.view.failed ?? 0}
+                  </span>
+                )}
+              </span>
               {row.result === 'correct' && (
                 <span data-testid="problem-monitor-status" className="flex items-center gap-1 text-accent-text font-bold shrink-0">
                   <Check className="w-4 h-4" /> {row.moveCount}手
+                  {row.view?.attempt && row.view.attempt > 1 ? <span className="font-normal">{row.view.attempt}回目</span> : null}
                 </span>
               )}
               {row.result === 'incorrect' && (
                 <span data-testid="problem-monitor-status" className="flex items-center gap-1 text-alert-text font-bold shrink-0">
-                  <X className="w-4 h-4" /> 不正解
+                  <X className="w-4 h-4" />
+                  {row.view?.livesLeft === 0 ? 'ライフ切れ' : '不正解'}
+                  {row.view?.livesLeft ? <span className="font-normal">残り{row.view.livesLeft}</span> : null}
                 </span>
               )}
               {row.result === null && row.isConnected && (

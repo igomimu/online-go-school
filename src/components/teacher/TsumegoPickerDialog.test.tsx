@@ -41,9 +41,10 @@ describe('TsumegoPickerDialog の出題先', () => {
     render(<TsumegoPickerDialog onAssign={onAssign} onClose={() => {}} recipients={recipients} />);
     expect(screen.getByText('・対局中')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('tsumego-recipient-sid:2'));
+    fireEvent.click(screen.getByTestId('tsumego-lives-5'));
     await drawOne();
     fireEvent.click(screen.getByRole('button', { name: /この問題を出題（2名）/ }));
-    expect(onAssign).toHaveBeenCalledWith(expect.anything(), ['sid:1', 'sid:3']);
+    expect(onAssign).toHaveBeenCalledWith(expect.objectContaining({ lives: 5 }), ['sid:1', 'sid:3']);
   });
 
   it('全員外したら出題できない', async () => {
@@ -63,6 +64,7 @@ describe('TsumegoPickerDialog の出題先', () => {
     expect(screen.queryByText(/出題する生徒/)).toBeNull();
     await drawOne();
     fireEvent.click(screen.getByRole('button', { name: 'この問題を配信' }));
-    expect(onAssign).toHaveBeenCalledWith(expect.anything(), null);
+    // 検討盤で開く詰碁にはライフを付けない（次の問題へも進まない）
+    expect(onAssign.mock.calls[0][0].lives).toBeUndefined();
   });
 });

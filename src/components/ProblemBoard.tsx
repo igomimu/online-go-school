@@ -1,15 +1,33 @@
 import GoBoard from './GoBoard';
 import type { Problem } from '../types/problem';
 import { useProblemSession } from '../hooks/useProblemSession';
-import { useEffect, useState } from 'react';
-import { Check, X, RotateCcw, Flag } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchRandomTsumegoProblem } from '../utils/tsumegoApi';
+import { tsumegoRowToProblem } from '../utils/tsumegoConvert';
+import { Check, X, RotateCcw, Flag, Heart } from 'lucide-react';
 import TsumegoReportModal from './TsumegoReportModal';
+
+export interface ProblemProgress {
+  attempt: number;          // この問題の何回目の挑戦か
+  livesLeft: number | null; // 残りライフ（null=無制限）
+  problemNo: number;        // 出題から数えて何問目か
+  solved: number;           // 解けた問題数
+  failed: number;           // ライフが尽きた問題数
+}
 
 interface ProblemBoardProps {
   problem: Problem;
   onBack: () => void;
-  onResult?: (result: 'correct' | 'incorrect', moveCount: number) => void;
+  onResult?: (result: 'correct' | 'incorrect', moveCount: number, progress: ProblemProgress) => void;
   isTeacher?: boolean;
+}
+
+/** 結果を見せてから次の問題へ進むまでの間 */
+const NEXT_PROBLEM_DELAY_MS = 2500;
+
+/** 「5K+」も「5K」と同じレベルとして次の問題を引く */
+function baseLevel(level: string | undefined): string | undefined {
+  return level ? level.replace(/\+$/, '') : undefined;
 }
 
 export default function ProblemBoard({
@@ -20,18 +38,98 @@ export default function ProblemBoard({
 }: ProblemBoardProps) {
   const { problemState, startProblem, makeMove, retry } = useProblemSession();
   const [showReport, setShowReport] = useState(false);
+  // いま解いている問題。ライフ付きの出題では、解けたら・ライフが尽きたら生徒ごとに次へ進む
+  const [current, setCurrent] = useState<Problem>(problem);
+  // まちがえた回数。結果を送る effect から読むので ref も持つ（state を依存に入れると二重に送る）
+  const [misses, setMisses] = useState(0);
+  const missesRef = useRef(0);
+  const statsRef = useRef({ problemNo: 1, solved: 0, failed: 0 });
+  const seenIdsRef = useRef<Set<string>>(new Set([problem.id]));
+  const [nextError, setNextError] = useState<string | null>(null);
+  const [loadingNext, setLoadingNext] = useState(false);
+  const lives = current.lives;
+  const autoNext = problem.lives !== undefined;
+
+  // 先生が新しく出題したら最初から
+  useEffect(() => {
+    statsRef.current = { problemNo: 1, solved: 0, failed: 0 };
+    seenIdsRef.current = new Set([problem.id]);
+    setCurrent(problem);
+  }, [problem]);
 
   useEffect(() => {
-    startProblem(problem);
-  }, [problem, startProblem]);
+    missesRef.current = 0;
+    setMisses(0);
+    setNextError(null);
+    startProblem(current);
+  }, [current, startProblem]);
 
-  useEffect(() => {
-    if (problemState?.status === 'correct' || problemState?.status === 'incorrect') {
-      onResult?.(problemState.status, problemState.movesMade.length);
+  const goNext = useCallback(async () => {
+    setLoadingNext(true);
+    setNextError(null);
+    try {
+      let row = null;
+      // 同じ問題を続けて引かないよう、数回まで引き直す
+      for (let i = 0; i < 5; i++) {
+        const candidate = await fetchRandomTsumegoProblem({
+          level: baseLevel(current.difficulty),
+          boardSize: current.boardSize,
+        });
+        if (!candidate) break;
+        row = candidate;
+        if (!seenIdsRef.current.has(candidate.id)) break;
+      }
+      if (!row) {
+        setNextError('次の問題が見つかりませんでした');
+        return;
+      }
+      seenIdsRef.current.add(row.id);
+      statsRef.current = { ...statsRef.current, problemNo: statsRef.current.problemNo + 1 };
+      setCurrent({ ...tsumegoRowToProblem(row), lives: current.lives });
+    } catch (err) {
+      setNextError(err instanceof Error ? err.message : '次の問題を取得できませんでした');
+    } finally {
+      setLoadingNext(false);
     }
+  }, [current]);
+
+  useEffect(() => {
+    const status = problemState?.status;
+    if (status !== 'correct' && status !== 'incorrect') return;
+    const attempt = missesRef.current + 1;
+    if (status === 'incorrect') {
+      missesRef.current = attempt;
+      setMisses(attempt);
+    }
+    const livesLeft = lives === undefined ? null : Math.max(0, lives - missesRef.current);
+    const finished = status === 'correct' || livesLeft === 0;
+    if (autoNext && finished) {
+      statsRef.current = status === 'correct'
+        ? { ...statsRef.current, solved: statsRef.current.solved + 1 }
+        : { ...statsRef.current, failed: statsRef.current.failed + 1 };
+    }
+    onResult?.(status, problemState?.movesMade.length ?? 0, { attempt, livesLeft, ...statsRef.current });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problemState?.status, problemState?.movesMade.length, onResult]);
 
+  const livesLeft = lives === undefined ? null : Math.max(0, lives - misses);
+  const outOfLives = livesLeft === 0;
+  const finished = problemState?.status === 'correct'
+    || (problemState?.status === 'incorrect' && outOfLives);
+
+  // 解けたら・ライフが尽きたら、結果を少し見せてから同じレベルの次の問題へ
+  useEffect(() => {
+    if (!autoNext || !finished) return;
+    const timer = setTimeout(() => { void goNext(); }, NEXT_PROBLEM_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [autoNext, finished, goNext]);
+
   if (!problemState) return null;
+
+  // ライフありの出題では正解・ライフ切れで次へ進む。やり直せるのはライフが残っている不正解だけ
+  const canRetry = problemState.status === 'incorrect'
+    ? !outOfLives
+    : problemState.status === 'correct' && !autoNext;
 
   const handleCellClick = (x: number, y: number) => {
     if (problemState.status !== 'solving') return;
@@ -63,11 +161,14 @@ export default function ProblemBoard({
           >
             <X className="w-4 h-4" /> 閉じてホーム
           </button>
-          <span className="font-bold">{problem.title || '詰碁'}</span>
-          {problem.difficulty && (
-            <span className="text-xs text-muted bg-ink/5 px-2 py-0.5 rounded">{problem.difficulty}</span>
+          {autoNext && (
+            <span className="text-sm text-muted" data-testid="problem-number">{statsRef.current.problemNo}問目</span>
           )}
-          {problem.sourceId !== undefined && (
+          <span className="font-bold">{current.title || '詰碁'}</span>
+          {current.difficulty && (
+            <span className="text-xs text-muted bg-ink/5 px-2 py-0.5 rounded">{current.difficulty}</span>
+          )}
+          {current.sourceId !== undefined && (
             <button
               onClick={() => setShowReport(true)}
               title="この問題のまちがいを報告"
@@ -78,16 +179,33 @@ export default function ProblemBoard({
             </button>
           )}
         </div>
-        <div className={`flex items-center gap-2 font-bold ${statusColor}`}>
-          {statusIcon}
-          {problemState.message}
+        <div className="flex items-center gap-3">
+          {lives !== undefined && livesLeft !== null && (
+            <div className="flex items-center gap-0.5" aria-label={`ライフ 残り${livesLeft}`} data-testid="problem-lives">
+              {Array.from({ length: lives }, (_, i) => (
+                <Heart
+                  key={i}
+                  className={`w-4 h-4 ${i < livesLeft ? 'text-alert-text fill-current' : 'text-muted/40'}`}
+                />
+              ))}
+            </div>
+          )}
+          <div className={`flex items-center gap-2 font-bold ${statusColor}`}>
+            {statusIcon}
+            {outOfLives && problemState.status === 'incorrect' ? 'ライフがなくなりました' : problemState.message}
+            {autoNext && finished && (
+              <span className="text-sm font-normal text-muted">
+                {nextError ?? (loadingNext ? '次の問題を準備中…' : 'まもなく次の問題')}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      {showReport && problem.sourceId !== undefined && (
+      {showReport && current.sourceId !== undefined && (
         <TsumegoReportModal
-          problemId={problem.id}
-          sourceId={problem.sourceId}
+          problemId={current.id}
+          sourceId={current.sourceId}
           onClose={() => setShowReport(false)}
         />
       )}
@@ -96,8 +214,8 @@ export default function ProblemBoard({
       <div className="glass-panel flex flex-1 min-h-0 justify-center items-center p-2 sm:p-3 shadow-2xl">
         <GoBoard
           boardState={problemState.boardState}
-          boardSize={problem.boardSize}
-          viewRange={problem.viewRange}
+          boardSize={current.boardSize}
+          viewRange={current.viewRange}
           className="max-w-[min(100%,calc(100dvh-8.5rem))]"
           maxHeight="calc(100dvh - 8.5rem)"
           onCellClick={problemState.status === 'solving' ? handleCellClick : undefined}
@@ -107,7 +225,15 @@ export default function ProblemBoard({
 
       {/* 操作ボタン */}
       <div className="shrink-0 flex justify-center gap-3">
-        {(problemState.status === 'incorrect' || problemState.status === 'correct') && (
+        {autoNext && finished && nextError && (
+          <button
+            onClick={() => { void goNext(); }}
+            className="secondary-button flex items-center gap-2 text-sm"
+          >
+            次の問題へ
+          </button>
+        )}
+        {canRetry && (
           <button
             onClick={retry}
             className="secondary-button flex items-center gap-2 text-sm"
@@ -122,7 +248,7 @@ export default function ProblemBoard({
         {problemState.movesMade.length}手
         {isTeacher && (
           <span className="ml-4 text-muted/60">
-            {problem.correctColor === 'BLACK' ? '黒' : '白'}先
+            {current.correctColor === 'BLACK' ? '黒' : '白'}先
           </span>
         )}
       </div>

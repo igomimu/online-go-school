@@ -31,6 +31,10 @@ const LEVEL_OPTIONS = [
 
 const BOARD_SIZE_OPTIONS = [19, 13, 9];
 
+/** ライフ＝まちがえてよい回数。0になるとその問題は終わり（三村さん 2026-09-19） */
+const LIFE_OPTIONS = [1, 2, 3, 4, 5];
+const DEFAULT_LIVES = 3;
+
 export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: TsumegoPickerDialogProps) {
   const [level, setLevel] = useState<string | null>(null);
   const [boardSize, setBoardSize] = useState(19);
@@ -39,6 +43,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
   const [preview, setPreview] = useState<Problem | null>(null);
   // 既定は全員。対局中の生徒など、出さない生徒だけを外す（三村さん 2026-09-19）
   const [excluded, setExcluded] = useState<Set<string>>(() => new Set());
+  const [lives, setLives] = useState(DEFAULT_LIVES);
 
   const selectedRecipients = recipients?.filter(r => !excluded.has(r.identity)) ?? [];
   const noneSelected = !!recipients && selectedRecipients.length === 0;
@@ -76,7 +81,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
     const targets = recipients && excluded.size > 0
       ? selectedRecipients.map(r => r.identity)
       : null;
-    onAssign(preview, targets);
+    onAssign(recipients ? { ...preview, lives } : preview, targets);
     onClose();
   };
 
@@ -184,6 +189,28 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {recipients && (
+          <div>
+            <label className="block text-sm text-muted mb-1.5">ライフ（まちがえてよい回数）</label>
+            <div className="flex gap-1.5">
+              {LIFE_OPTIONS.map((n) => (
+                <button
+                  key={n}
+                  data-testid={`tsumego-lives-${n}`}
+                  onClick={() => setLives(n)}
+                  className={`px-3 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
+                    lives === n
+                      ? 'bg-accent border-accent text-accent-ink'
+                      : 'bg-ink/5 border-line text-muted hover:text-ink'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
