@@ -15,6 +15,7 @@ import { isStoneSoundEnabled, setStoneSoundEnabled, playStoneSound, playCaptureS
 import { isLastMoveMarkerEnabled, setLastMoveMarkerEnabled, isTapConfirmEnabled, setTapConfirmEnabled } from '../utils/boardPrefs';
 import { useLastPointerType } from '../hooks/useLastPointerType';
 import type { Student } from '../types/classroom';
+import type { GameClock } from '../types/game';
 
 interface GameBoardProps {
   gameId: string;
@@ -25,6 +26,25 @@ interface GameBoardProps {
   classroom?: ClassroomRtc | null;
   students?: Student[];  // 対局者名を解決するための名簿（IDは一切表示しない）
   syncedDrawings?: Drawing[];
+}
+
+/** 読み上げ・時計欄・盤上表示で共通の、0から増える秒読み秒数。 */
+function getByoyomiElapsed(clock: GameClock, color: 'BLACK' | 'WHITE'): number | null {
+  const isBlack = color === 'BLACK';
+  const isByoyomi = isBlack ? !!clock.blackInByoyomi : !!clock.whiteInByoyomi;
+  if (!isByoyomi) return null;
+
+  const timeLeft = isBlack ? clock.blackTimeLeft : clock.whiteTimeLeft;
+  const isConsideration = isBlack
+    ? !!clock.blackInConsideration
+    : !!clock.whiteInConsideration;
+  const activePeriodSeconds = clock.timeSystem === 'NHK' && isConsideration
+    ? (clock.considerationSeconds ?? 60)
+    : clock.byoyomiSeconds;
+  return Math.min(
+    activePeriodSeconds,
+    Math.max(0, Math.floor(activePeriodSeconds - timeLeft)),
+  );
 }
 
 export default function GameBoard(props: GameBoardProps) {
@@ -135,13 +155,25 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     if (totalCaptures > prevCaptures) playCaptureSound(totalCaptures - prevCaptures);
   }, [moveNumber, lastMove, blackCaptures, whiteCaptures]);
 
-  // 直前の一手に▲。パスには座標が無いので付かない。整地中は死石の判断が主なので出さない。
+  // 秒読み中は、時計欄・読み上げと同じ経過秒を直前の石へ表示する。
+  // NHK杯方式の考慮時間中は、その60秒を同じ向き（0→60）で数える。
+  const activeByoyomiElapsed = useMemo(() => {
+    if (!clock || game?.status !== 'playing') return null;
+    return getByoyomiElapsed(clock, currentColor);
+  }, [clock, game?.status, currentColor]);
+
+  // 直前の一手に秒読み数字、通常時は設定に応じて▲を出す。
+  // パスには座標が無いので付かない。整地中は死石の判断が主なので出さない。
   const lastMoveMarkers = useMemo<Marker[] | undefined>(() => {
-    if (!lastMoveMarkerOn || isScoring) return undefined;
+    if (isScoring) return undefined;
     // パスは (0,0) で記録される（盤上の座標ではない）ので▲を付けない
     if (!lastMove || (lastMove.x === 0 && lastMove.y === 0)) return undefined;
+    if (activeByoyomiElapsed !== null) {
+      return [{ x: lastMove.x, y: lastMove.y, type: 'LABEL', value: String(activeByoyomiElapsed) }];
+    }
+    if (!lastMoveMarkerOn) return undefined;
     return [{ x: lastMove.x, y: lastMove.y, type: 'SYMBOL', value: 'TRI' }];
-  }, [lastMoveMarkerOn, isScoring, lastMove]);
+  }, [lastMoveMarkerOn, isScoring, lastMove, activeByoyomiElapsed]);
 
   const deadStonesSet = useMemo(
     () => new Set(game?.scoring_dead_stones ?? []),
@@ -318,13 +350,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     const highlight = (isLow || isByoyomi) && !isTeacherSide;
     // 音声は「10秒、20秒…」と経過時間を読むため、文字も同じ向きで0→B秒と増やす。
     // 内部の timeLeft は時間切れ判定に使う残り秒なので、表示時だけ経過秒へ変換する。
-    const activePeriodSeconds = isNhk && isConsideration
-      ? (clock.considerationSeconds ?? 60)
-      : clock.byoyomiSeconds;
-    const byoyomiElapsed = Math.min(
-      activePeriodSeconds,
-      Math.max(0, Math.floor(activePeriodSeconds - timeLeft)),
-    );
+    const byoyomiElapsed = getByoyomiElapsed(clock, color) ?? 0;
     return (
       <span
         data-testid={isBlack ? 'clock-black' : 'clock-white'}

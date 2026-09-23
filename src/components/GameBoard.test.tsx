@@ -549,6 +549,35 @@ describe('GameBoard', () => {
 
   // 2026-08-04 三村さん指定: 直前に打たれた石に▲。今どこに打たれたかがひと目で分かる
   describe('最終手の▲', () => {
+    it('秒読み中は手番側の経過秒を最終手の石に表示し、▲とは重ねない', () => {
+      const boardState = createEmptyBoard(9);
+      boardState[3][3] = { color: 'WHITE' };
+      const game = createMockGame({
+        boardState,
+        currentColor: 'BLACK',
+        moveNumber: 1,
+      });
+      setupMock({
+        game,
+        lastMove: { move_number: 1, x: 4, y: 4, color: 'WHITE' },
+        clock: {
+          mainTimeSeconds: 0, byoyomiSeconds: 30, byoyomiPeriods: 3,
+          blackTimeLeft: 25, whiteTimeLeft: 12,
+          blackByoyomiLeft: 3, whiteByoyomiLeft: 3,
+          blackInByoyomi: true, whiteInByoyomi: true,
+          lastTickTime: null,
+        },
+      });
+      render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+
+      expect(screen.getByTestId('marker-LABEL-4-4')).toHaveTextContent('5');
+      expect(screen.queryByTestId('marker-TRI-4-4')).not.toBeInTheDocument();
+
+      // ▲の端末設定とは別の対局情報なので、▲をオフにしても秒読みは消えない。
+      fireEvent.click(screen.getByTestId('last-move-marker-toggle'));
+      expect(screen.getByTestId('marker-LABEL-4-4')).toHaveTextContent('5');
+    });
+
     it('直前の一手に▲を出し、ボタンで消せる', () => {
       const game = createMockGame({ moveNumber: 1 });
       setupMock({

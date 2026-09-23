@@ -491,3 +491,17 @@
 - 検証: `npm run test` 309/309 passed、`npm run build` 成功、`deno test --allow-env --allow-net supabase/functions/_shared/sgf.test.ts supabase/functions/_shared/identity.test.ts` 成功。
 - 2026-07-07: 対局・検討/棋譜・問題を碁盤フォーカスの全画面表示に統一し、全画面中はホーム画面のヘッダー/参加者/音声パネルを隠すように修正。各画面に「閉じてホーム」ボタンを追加。
 - 検証: `npm run test` 309/309 passed、`npm run build` 成功。
+
+# 2026-09-23: 秒読みを最終手の石へ表示
+
+- [x] 時計欄と同じ秒読み経過秒を最終手マーカーへ反映する
+- [x] 秒読み数字と最終手の▲が重ならず、パス時は盤外表示しないようにする
+- [x] 関連テスト・全体テスト・lint・production buildを検証する
+- [ ] 授業終了後にmainへpushして本番反映する
+
+## レビュー結果
+
+- 手番側が秒読み中のとき、時計欄・読み上げと同じ経過秒（0から増加）を最終手の石へ表示する。NHK杯方式の60秒考慮時間にも対応する。
+- 秒読み中は数字を▲より優先し、▲設定をオフにしていても数字は表示する。パス・整地中は表示しない。
+- 検証: 対象65テスト、全99 files / 927 tests、ESLint、production build、`git diff --check` がすべて成功。
+- 18時台の在室確認で「ネット道場」に4名在室していたため、本番へのpushは授業終了後まで保留。

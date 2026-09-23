@@ -564,6 +564,7 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             if (marker.type === 'LABEL') {
                 markerElements.push(
                     <text key={k} x={mx} y={my} dy=".35em" textAnchor="middle"
+                        data-testid={`marker-LABEL-${marker.x}-${marker.y}`}
                         fill={color}
                         fontSize={FONT_SIZE * 0.8}
                         fontWeight="bold"
