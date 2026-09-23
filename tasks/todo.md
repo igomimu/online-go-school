@@ -513,4 +513,11 @@
 - [x] マイク切替・保存済み機器からのフォールバックを警告する
 - [x] 講師画面へマイク名・レベルメーター・警告を常時表示する
 - [x] 関連テスト・全体テスト・lint・production buildを検証する
-- [ ] 在室確認後にcommit・pushし、本番反映とhandoffを確認する
+- [x] 在室確認後にcommit・pushし、本番反映とhandoffを確認する
+
+## レビュー結果
+
+- 実際に配信中の音声トラックからマイク名と入力レベルを取得し、講師ヘッダーへ表示する。
+- 保存済みマイクとの不一致、途中のマイク切替、音声トラック消失を警告する。
+- 検証: 全100 files / 933 tests、ESLint、production build、`git diff --check` がすべて成功。
+- 在室者0名を確認後、`2653347` をpush。Vercel Production `dpl_ASWkoMTfvMxR9udYbzG45LqXXVt2` のReadyと本番aliasを確認。
