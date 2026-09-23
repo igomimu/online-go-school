@@ -559,7 +559,8 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
       deviceId,
       kind === 'audioinput' ? 'audio' : 'video',
     );
-    if (device) await meeting.self.setDevice(device);
+    if (!device) throw new Error('選択した機器が接続されていません');
+    await meeting.self.setDevice(device);
   }
 
   async applySavedDevices(): Promise<void> {
@@ -650,6 +651,10 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
       if (p.audioTrack) tracks.push(p.audioTrack);
     });
     return tracks;
+  }
+
+  getLocalAudioTrack(): MediaStreamTrack | undefined {
+    return this.meeting?.self.audioTrack ?? undefined;
   }
 
   getLocalVideoElement(): HTMLVideoElement | undefined {

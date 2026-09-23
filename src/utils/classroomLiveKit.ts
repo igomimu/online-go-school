@@ -276,6 +276,11 @@ export class ClassroomLiveKit implements ClassroomRtc {
     return tracks;
   }
 
+  getLocalAudioTrack(): MediaStreamTrack | undefined {
+    return this.room.localParticipant
+      ?.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
+  }
+
   // リモート参加者の名前一覧（先生を除く）
   get remoteIdentities(): string[] {
     const identities: string[] = [];

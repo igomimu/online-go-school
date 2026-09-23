@@ -68,6 +68,7 @@ import { useChat } from './hooks/useChat';
 import { useNotificationSound } from './hooks/useNotificationSound';
 import { useParticipantLog } from './hooks/useParticipantLog';
 import { useIdleAloneExit } from './hooks/useIdleAloneExit';
+import { useMicrophoneMonitor } from './hooks/useMicrophoneMonitor';
 import type { ChatMessagePayload } from './types/chat';
 import type { AiAnalysisSyncPayload } from './types/ai';
 import { resolveEffectiveViewMode } from './utils/viewMode';
@@ -453,6 +454,10 @@ function App() {
     ?? DEFAULT_RANK_DISPLAY;
 
   const classroomRef = useRef<ClassroomRtc | null>(null);
+  const microphoneMonitor = useMicrophoneMonitor(
+    classroomRef.current,
+    role === 'TEACHER' && connectionState === ConnectionState.Connected && isMicEnabled,
+  );
   // 自動入室・先生待ちの再試行・手動ボタンが重なっても接続を1本だけ開始する。
   const connectionAttemptRef = useRef<Promise<void> | null>(null);
   // 教室への出入り。対局や検討へ移っても消えないよう、教室ホームではなくここで控える
@@ -2244,6 +2249,10 @@ function App() {
           isCameraEnabled={isCameraEnabled}
           onToggleCamera={handleToggleCamera}
           isSpeaking={activeSpeakers.includes(classroomRef.current?.localIdentity ?? '')}
+          microphoneDeviceLabel={role === 'TEACHER' ? microphoneMonitor.deviceLabel : undefined}
+          microphoneLevel={microphoneMonitor.level}
+          microphoneWarning={role === 'TEACHER' ? microphoneMonitor.warning : undefined}
+          onDismissMicrophoneWarning={microphoneMonitor.dismissWarning}
           onDisconnect={handleDisconnect}
         />
       )}

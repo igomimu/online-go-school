@@ -1,4 +1,4 @@
-import { Download, LogOut, Volume2, VolumeX, Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { AlertTriangle, Download, LogOut, Volume2, VolumeX, Mic, MicOff, Video, VideoOff, X } from 'lucide-react';
 import { ConnectionState } from '../utils/classroomRtc';
 import type { Role } from '../utils/classroomRtc';
 import RecordingControls from './RecordingControls';
@@ -24,6 +24,12 @@ interface HeaderProps {
   onDisconnect: () => void;
   /** 使用マイク・カメラの切り替えに使う */
   classroom?: ClassroomRtc | null;
+  /** 講師が実際に配信しているマイク（ブラウザの既定値ではなく音声トラックの実値） */
+  microphoneDeviceLabel?: string;
+  /** 入力音量 0〜1 */
+  microphoneLevel?: number;
+  microphoneWarning?: string;
+  onDismissMicrophoneWarning?: () => void;
 }
 
 export default function Header({
@@ -40,6 +46,10 @@ export default function Header({
   isSpeaking = false,
   onDisconnect,
   classroom,
+  microphoneDeviceLabel,
+  microphoneLevel = 0,
+  microphoneWarning = '',
+  onDismissMicrophoneWarning,
 }: HeaderProps) {
   const isConnected = connectionState === ConnectionState.Connected;
   const pwaInstall = usePwaInstall();
@@ -69,7 +79,7 @@ export default function Header({
     }`;
 
   return (
-    <header className="glass-panel flex flex-col gap-2 overflow-x-hidden px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3">
+    <header className="glass-panel flex flex-col gap-2 overflow-x-hidden px-3 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3 sm:px-4 sm:py-3">
       {/* 1段目: 状態。テキストは潰さない（nowrap / truncate）。 */}
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
         {/* 接続状態は色相ではなく明度で示す。繋がっていれば地に対してはっきりと、
@@ -171,6 +181,30 @@ export default function Header({
                 {isCameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5 text-alert-text" />}
               </button>
             )}
+            {microphoneDeviceLabel && (
+              <div
+                data-testid="teacher-microphone-monitor"
+                className="flex min-w-0 max-w-60 items-center gap-2 rounded-md border border-line bg-ground px-2 py-1"
+                title={`使用中のマイク: ${microphoneDeviceLabel}`}
+              >
+                <span className="block min-w-0 max-w-40 truncate text-[11px] text-muted">
+                  {microphoneDeviceLabel}
+                </span>
+                <span
+                  role="meter"
+                  aria-label="マイク入力レベル"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(Math.max(0, Math.min(1, microphoneLevel)) * 100)}
+                  className="h-2 w-14 shrink-0 overflow-hidden rounded-sm bg-line"
+                >
+                  <span
+                    className="block h-full bg-accent transition-[width] duration-100"
+                    style={{ width: `${Math.max(0, Math.min(1, microphoneLevel)) * 100}%` }}
+                  />
+                </span>
+              </div>
+            )}
           </>
         )}
         <div className="flex shrink-0 items-center gap-1">
@@ -196,6 +230,26 @@ export default function Header({
           </button>
         </div>
       </div>
+      {isConnected && role === 'TEACHER' && microphoneWarning && (
+        <div
+          role="alert"
+          data-testid="teacher-microphone-warning"
+          className="order-last flex basis-full items-center gap-2 rounded-md border border-alert/40 bg-alert/12 px-3 py-2 text-xs text-alert-text"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span className="flex-1">{microphoneWarning}</span>
+          {onDismissMicrophoneWarning && (
+            <button
+              type="button"
+              onClick={onDismissMicrophoneWarning}
+              className="rounded p-1 hover:bg-alert/15"
+              aria-label="マイク警告を閉じる"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
     </header>
   );
 }

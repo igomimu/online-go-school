@@ -168,6 +168,8 @@ export interface ClassroomRtc {
 
   /** 録画に混ぜるため、いま鳴っている音声トラックを集める */
   collectAudioTracks(): MediaStreamTrack[];
+  /** 講師画面のマイク名・入力レベル監視に使う、現在配信中の自分のマイク */
+  getLocalAudioTrack(): MediaStreamTrack | undefined;
   getLocalVideoElement(): HTMLVideoElement | undefined;
   getVideoElements(): Map<string, HTMLVideoElement>;
 

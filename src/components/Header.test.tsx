@@ -123,4 +123,31 @@ describe('Header', () => {
     fireEvent.click(screen.getByTitle('カメラOFF'));
     expect(onToggleCamera).toHaveBeenCalled();
   });
+
+  it('講師には実際のマイク名と入力レベルを表示する', () => {
+    render(
+      <Header
+        {...defaultProps}
+        microphoneDeviceLabel="ヘッドセット (WF-1000XM5)"
+        microphoneLevel={0.63}
+      />,
+    );
+    expect(screen.getByTestId('teacher-microphone-monitor')).toHaveTextContent('WF-1000XM5');
+    expect(screen.getByRole('meter', { name: 'マイク入力レベル' })).toHaveAttribute('aria-valuenow', '63');
+  });
+
+  it('マイク切替警告を表示し、閉じられる', () => {
+    const onDismiss = vi.fn();
+    render(
+      <Header
+        {...defaultProps}
+        microphoneDeviceLabel="マイク (Logi C270 HD WebCam)"
+        microphoneWarning="使用中のマイクが切り替わりました。"
+        onDismissMicrophoneWarning={onDismiss}
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('使用中のマイクが切り替わりました');
+    fireEvent.click(screen.getByRole('button', { name: 'マイク警告を閉じる' }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
 });
