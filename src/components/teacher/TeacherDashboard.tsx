@@ -23,6 +23,7 @@ import VideoTiles from '../VideoTiles';
 import ClassroomSettingsDialog from './ClassroomSettingsDialog';
 import StudentLinkGenerator from './StudentLinkGenerator';
 import AutoPairingDialog from './AutoPairingDialog';
+import TournamentManagerDialog from '../tournament/TournamentManagerDialog';
 import GameObserverPanel from './GameObserverPanel';
 import StudentEditDialog from './StudentEditDialog';
 import TsumegoPickerDialog, { type TsumegoRecipient } from './TsumegoPickerDialog';
@@ -123,6 +124,7 @@ export default function TeacherDashboard({
   const [editingClassroom, setEditingClassroom] = useState<Classroom | null>(null);
   const [showStudentLinks, setShowStudentLinks] = useState(false);
   const [showAutoPairing, setShowAutoPairing] = useState(false);
+  const [showTournament, setShowTournament] = useState(false);
   const [observingGameId, setObservingGameId] = useState<string | null>(null);
   const [editingStudentInfo, setEditingStudentInfo] = useState<Student | null>(null);
   const [orphanLiveGames, setOrphanLiveGames] = useState<LiveGameRow[]>([]);
@@ -703,6 +705,7 @@ export default function TeacherDashboard({
         }}
         onShowStudentLinks={() => setShowStudentLinks(true)}
         onAutoPairing={() => setShowAutoPairing(true)}
+        onOpenTournament={() => setShowTournament(true)}
         onClearAudioM={onClearAudioM}
         onClearAudioS={onClearAudioS}
         onClearSharing={onClearSharing}
@@ -761,6 +764,23 @@ export default function TeacherDashboard({
             .filter(game => game.status === 'playing' || game.status === 'scoring')
             .flatMap(game => [game.blackPlayer, game.whitePlayer])}
           onClose={() => setShowAutoPairing(false)}
+          onCreateGames={onCreateGames}
+        />
+      )}
+
+      {/* 大会マネージャー（トーナメント・リーグ戦） */}
+      {showTournament && (
+        <TournamentManagerDialog
+          classroomId={selectedClassroomId}
+          classroomName={selectedClassroom?.name}
+          isTeacher={true}
+          students={filteredStudents}
+          connectedIdentities={participants.map(p => p.identity)}
+          onClose={() => setShowTournament(false)}
+          onSelectGame={gameId => {
+            onResumeGame?.(gameId);
+            setShowTournament(false);
+          }}
           onCreateGames={onCreateGames}
         />
       )}
