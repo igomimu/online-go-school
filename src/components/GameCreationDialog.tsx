@@ -19,7 +19,7 @@ interface GameCreationDialogProps {
     komi: number;
     clock?: GameClock;
     /** 道場ランクの3連勝・3連敗に数えない */
-    ratingExcluded?: boolean;
+    ratingExcluded: boolean;
   }) => void | Promise<void>;
   registeredStudents?: Student[];
   /** 既に対局中（playing/scoring）の生徒。対局相手の候補から除外する。 */

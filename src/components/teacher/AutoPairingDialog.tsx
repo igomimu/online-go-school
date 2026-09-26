@@ -53,7 +53,7 @@ interface AutoPairingDialogProps {
     handicap: number;
     komi: number;
     clock?: GameClock;
-    ratingExcluded?: boolean;
+    ratingExcluded: boolean;
   }[]) => void;
 }
 

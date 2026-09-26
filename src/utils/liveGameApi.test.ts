@@ -8,7 +8,7 @@ vi.mock('@supabase/supabase-js', () => ({
   }),
 }));
 
-import { deleteSavedGames } from './liveGameApi';
+import { createLiveGame, deleteSavedGames } from './liveGameApi';
 
 describe('deleteSavedGames（棋譜の一括削除）', () => {
   beforeEach(() => {
@@ -58,5 +58,28 @@ describe('deleteSavedGames（棋譜の一括削除）', () => {
 
     expect(result).toEqual({ deleted: [], failed: [] });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('createLiveGame（道場ランクに数えるか）', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_DOJO_SUPABASE_URL', 'https://example.supabase.co');
+    vi.stubEnv('VITE_DOJO_SUPABASE_KEY', 'test-key');
+    vi.restoreAllMocks();
+  });
+
+  it.each([true, false])('rating_excluded=%s をそのまま送る', async (ratingExcluded) => {
+    let sent: Record<string, unknown> | null = null;
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+      sent = JSON.parse(String(init.body));
+      return { ok: true, json: async () => ({ ok: true, game: { id: 'g1' } }) } as Response;
+    }));
+
+    await createLiveGame({
+      classroomId: 'c1', blackPlayer: 'sid:a', whitePlayer: 'sid:b',
+      boardSize: 19, handicap: 0, komi: 6.5, ratingExcluded,
+    });
+
+    expect(sent).toMatchObject({ action: 'create', params: { rating_excluded: ratingExcluded } });
   });
 });

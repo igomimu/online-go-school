@@ -1653,7 +1653,7 @@ function App() {
     handicap: number;
     komi: number;
     clock?: import('./types/game').GameClock;
-    ratingExcluded?: boolean;
+    ratingExcluded: boolean;
   }) => {
     // 先生自身が対局者（黒/白）なら講師専用の別ウィンドウ（常に1盤表示・手番ローテーション）で開く。
     // ポップアップブロッカー対策のため、await createGame() より前・クリックの同期区間内で呼ぶ。

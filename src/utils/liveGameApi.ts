@@ -120,8 +120,11 @@ export interface CreateLiveGameOpts {
   handicap: number;
   komi: number;
   clock?: GameClock | null;
-  /** 道場ランクの3連勝・3連敗に数えない（13路・短い持ち時間など） */
-  ratingExcluded?: boolean;
+  /**
+   * 道場ランクの3連勝・3連敗に数えない（13路・短い持ち時間など）。
+   * 🔴 必須。書き忘れた経路（大会など）の対局が黙ってランクに数えられていた（2026-09-27）
+   */
+  ratingExcluded: boolean;
 }
 
 /**
@@ -197,7 +200,7 @@ export async function createLiveGame(opts: CreateLiveGameOpts): Promise<LiveGame
     handicap: opts.handicap,
     komi: opts.komi,
     clock: opts.clock ?? null,
-    rating_excluded: opts.ratingExcluded ?? false,
+    rating_excluded: opts.ratingExcluded,
   });
   if (!res || !res.game) {
     throw new Error('createLiveGame failed: no game returned from manage_game_action');

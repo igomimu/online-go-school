@@ -37,6 +37,7 @@ interface TournamentManagerDialogProps {
       handicap: number;
       komi: number;
       clock?: GameClock;
+      ratingExcluded: boolean;
     }[],
   ) => void;
 }
@@ -161,6 +162,8 @@ export default function TournamentManagerDialog({
         boardSize: match.boardSize,
         handicap: match.handicap,
         komi: match.komi,
+        // 大会の対局は道場ランクの連勝・連敗に数えない（2026-09-27）
+        ratingExcluded: true,
       },
     ]);
 
@@ -191,6 +194,8 @@ export default function TournamentManagerDialog({
       boardSize: m.boardSize,
       handicap: m.handicap,
       komi: m.komi,
+      // 大会の対局は道場ランクの連勝・連敗に数えない（2026-09-27）
+      ratingExcluded: true,
     }));
 
     onCreateGames(pairs);
