@@ -92,7 +92,11 @@ test('詰碁データベースから配信した問題が生徒側で解答可�
 
     // 生徒側: 解けても・ライフが尽きても、同じレベルの次の問題へ自動で進む（2026-09-19）
     await expect(studentAPage.getByTestId('problem-number')).toHaveText('2問目', { timeout: 15_000 });
-    await expect(teacherStudentRow.getByTestId('problem-monitor-progress')).toContainText('1問目', { timeout: 10_000 });
+    // 先生側も生徒に合わせて進む。以前は次の結果が出るまで「1問目」のまま、盤も1問目のままだった（2026-09-26）
+    await expect(teacherStudentRow.getByTestId('problem-monitor-progress')).toContainText('2問目', { timeout: 10_000 });
+    await expect(teacherStudentRow.getByTestId('problem-monitor-status')).toHaveText(/挑戦中/);
+    await teacherStudentRow.click();
+    await expect(monitorPage.getByTestId('problem-monitor-shown')).toContainText('2問目');
 
     // 先生: 配信終了 → 生徒側も詰碁画面から抜ける(REVIEW_END連携)
     await monitorPage.getByRole('button', { name: '配信終了' }).click();

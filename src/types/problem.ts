@@ -29,9 +29,13 @@ export interface ProblemAssignPayload {
   targetStudents: string[];    // Empty = all
 }
 
+/** 先生のモニターで「この生徒がいま解いている問題」を映すための最小限の中身（解答手順は含めない） */
+export type ProblemPreview = Pick<Problem, 'id' | 'title' | 'boardSize' | 'initialBoard' | 'viewRange' | 'difficulty'>;
+
 export interface ProblemResultPayload {
   problemId: string;
-  result: 'correct' | 'incorrect';
+  /** null = 次の問題へ進んで挑戦中 */
+  result: 'correct' | 'incorrect' | null;
   moveCount: number;
   attempt?: number;            // 何回目の挑戦か（1始まり）
   livesLeft?: number | null;   // 残りライフ（null=無制限）
@@ -39,6 +43,7 @@ export interface ProblemResultPayload {
   solved?: number;             // 解けた問題数
   failed?: number;             // ライフが尽きた・時間切れの問題数
   timedOut?: boolean;          // この結果が時間切れによるものか
+  current?: ProblemPreview;    // 問題が変わったときだけ付ける（生徒ごとに違う問題へ進むため）
 }
 
 /** 先生のモニターが生徒ごとに覚えておく最新の状況 */

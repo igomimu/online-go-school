@@ -20,6 +20,8 @@ interface ProblemBoardProps {
   problem: Problem;
   onBack: () => void;
   onResult?: (result: 'correct' | 'incorrect', moveCount: number, progress: ProblemProgress) => void;
+  /** 問題を解き始めたとき（最初の1問と、自動で次へ進んだとき）。先生のモニターへ知らせる */
+  onProblemStart?: (problem: Problem, progress: ProblemProgress) => void;
   isTeacher?: boolean;
 }
 
@@ -40,6 +42,7 @@ export default function ProblemBoard({
   problem,
   onBack,
   onResult,
+  onProblemStart,
   isTeacher,
 }: ProblemBoardProps) {
   const { problemState, startProblem, makeMove, timeUp, retry } = useProblemSession();
@@ -76,6 +79,16 @@ export default function ProblemBoard({
     timedOutRef.current = false;
     setTimedOut(false);
     startProblem(current);
+    // 🔴 これが無いと、先生には次の結果が出るまで前の問題の「正解」が残り、
+    // 碁盤も最初に出題した1問目のままだった（2026-09-26 三村さん）
+    onProblemStart?.(current, {
+      attempt: 1,
+      livesLeft: current.lives ?? null,
+      ...statsRef.current,
+      timedOut: false,
+    });
+    // onProblemStart は親の再描画で作り直されるので依存に入れない（入れると同じ問題で何度も送る）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, startProblem]);
 
   useEffect(() => {

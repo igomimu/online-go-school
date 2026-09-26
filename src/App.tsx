@@ -751,6 +751,8 @@ function App() {
             [sender]: {
               result: p.result, moveCount: p.moveCount, attempt: p.attempt, livesLeft: p.livesLeft,
               problemNo: p.problemNo, solved: p.solved, failed: p.failed, timedOut: p.timedOut,
+              // 問題は変わったときにしか付いてこないので、結果だけの知らせでは前のものを残す
+              current: p.current ?? prev[sender]?.current,
             },
           }));
         }
@@ -2611,6 +2613,30 @@ function App() {
                     timedOut: progress.timedOut,
                   },
                 });
+              }}
+              onProblemStart={(problem, progress) => {
+                void classroomRef.current?.sendTo({
+                  type: 'PROBLEM_RESULT',
+                  payload: {
+                    problemId: problem.id,
+                    result: null,
+                    moveCount: 0,
+                    attempt: progress.attempt,
+                    livesLeft: progress.livesLeft,
+                    problemNo: progress.problemNo,
+                    solved: progress.solved,
+                    failed: progress.failed,
+                    timedOut: false,
+                    current: {
+                      id: problem.id,
+                      title: problem.title,
+                      boardSize: problem.boardSize,
+                      initialBoard: problem.initialBoard,
+                      viewRange: problem.viewRange,
+                      difficulty: problem.difficulty,
+                    },
+                  } satisfies import('./types/problem').ProblemResultPayload,
+                }, [TEACHER_IDENTITY]);
               }}
             />
           </ErrorBoundary>

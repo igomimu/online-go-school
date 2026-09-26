@@ -81,6 +81,22 @@ describe('ProblemBoard のライフと次の問題', () => {
     expect(screen.getByText('問題next')).toBeInTheDocument();
   });
 
+  it('次の問題へ進んだら、何問目の何を解き始めたかを知らせる（先生のモニター用）', async () => {
+    const onProblemStart = vi.fn();
+    render(<ProblemBoard problem={makeProblem('a', 3)} onBack={() => {}} onProblemStart={onProblemStart} />);
+    expect(onProblemStart).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 'a' }),
+      expect.objectContaining({ problemNo: 1, solved: 0 }),
+    );
+    fireEvent.click(screen.getByText('正解の手'));
+    await act(async () => { await vi.advanceTimersByTimeAsync(2600); });
+    expect(onProblemStart).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 'next' }),
+      expect.objectContaining({ problemNo: 2, solved: 1, livesLeft: 3 }),
+    );
+    expect(onProblemStart).toHaveBeenCalledTimes(2);
+  });
+
   it('ライフなし（検討などの従来の出題）は次へ進まず、何度でもやり直せる', async () => {
     render(<ProblemBoard problem={makeProblem('a')} onBack={() => {}} />);
     fireEvent.click(screen.getByText('まちがいの手'));
