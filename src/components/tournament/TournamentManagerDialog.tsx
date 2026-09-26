@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Student } from '../../types/classroom';
 import type { GameClock } from '../../types/game';
 import type {
@@ -51,8 +51,10 @@ export default function TournamentManagerDialog({
   onSelectGame,
   onCreateGames,
 }: TournamentManagerDialogProps) {
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [activeTournamentId, setActiveTournamentId] = useState<string | null>(null);
+  const [tournaments, setTournaments] = useState<Tournament[]>(() => getTournaments(classroomId));
+  const [activeTournamentId, setActiveTournamentId] = useState<string | null>(
+    () => getTournaments(classroomId)[0]?.id ?? null,
+  );
   const [isCreating, setIsCreating] = useState(false);
   const [celebrationWinner, setCelebrationWinner] = useState<TournamentParticipant | null>(null);
 
@@ -71,10 +73,6 @@ export default function TournamentManagerDialog({
       setActiveTournamentId(list[0].id);
     }
   };
-
-  useEffect(() => {
-    reloadTournaments();
-  }, [classroomId]);
 
   // 新規作成ダイアログを開いた際、接続中の生徒を初期選択
   const startCreate = () => {

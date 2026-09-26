@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { TournamentParticipant } from '../../types/tournament';
 
 interface TournamentCelebrationProps {
@@ -12,20 +12,17 @@ export default function TournamentCelebration({
   tournamentName,
   onClose,
 }: TournamentCelebrationProps) {
-  const [particles, setParticles] = useState<{ id: number; x: number; y: number; color: string; size: number }[]>([]);
-
-  useEffect(() => {
+  const [particles] = useState(() => {
     // 祝賀パーティクル（紙吹雪）を生成
     const colors = ['#f59e0b', '#ef4444', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'];
-    const p = Array.from({ length: 50 }, (_, i) => ({
+    return Array.from({ length: 50 }, (_, i) => ({
       id: i,
       x: Math.random() * 100,
       y: Math.random() * 100,
       color: colors[Math.floor(Math.random() * colors.length)],
       size: Math.random() * 8 + 6,
     }));
-    setParticles(p);
-  }, []);
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
