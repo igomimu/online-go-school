@@ -258,6 +258,8 @@ function App() {
   useEffect(() => { reviewTargetStudentsRef.current = reviewTargetStudents; }, [reviewTargetStudents]);
   // 検討中に対象へ戻した生徒へ、同じ棋譜を途中参加として開かせるための開始データ。
   const reviewSourceSgfRef = useRef<string | null>(null);
+  // 生徒側: 先生が検討を閉じてから次に開くまで。この間に遅れて届いた盤は受け取らない
+  const reviewClosedRef = useRef(false);
   // 生徒が自分の対局を持っているか。LiveKitのメッセージ処理は接続時に作った関数の中で
   // 走るので、そこから最新の状態を見るために ref に写す
   const myLiveGameIdRef = useRef<string | null>(null);
@@ -620,6 +622,10 @@ function App() {
         void sender;
 
         // 授業/検討の碁盤同期（生徒用）
+        // 🔴 検討を閉じた合図のあとに届いた盤は捨てる。送信の列に残っていた古い盤が
+        // REVIEW_END より後に着くと、外された生徒の画面が「授業モード」で盤ごと戻っていた
+        // （2026-09-26 RealtimeKit の E2E で3回に2回再現）。次の REVIEW_START で受け付けを再開する。
+        if (msg.type === 'BOARD_UPDATE' && connectRole === 'STUDENT' && reviewClosedRef.current) return;
         if (msg.type === 'BOARD_UPDATE' && connectRole === 'STUDENT' && msg.payload) {
           const p = msg.payload as {
             boardState: GameNode['board'];
@@ -717,6 +723,7 @@ function App() {
 
         // 検討モード開始（生徒用）
         if (msg.type === 'REVIEW_START' && connectRole === 'STUDENT' && msg.payload) {
+          reviewClosedRef.current = false;
           // 棋譜作成の途中なら下書きに残してから切り替える。
           // 授業の主導は先生側、という今の作りは変えない（2026-09-07）
           stashRecordDraft();
@@ -799,6 +806,7 @@ function App() {
         }
 
         if (msg.type === 'REVIEW_END' && connectRole === 'STUDENT') {
+          reviewClosedRef.current = true;
           // 先生がロビーに戻った: 検討/授業/詰碁の全セッション状態をクリア。
           // ただし自分が対局中なら自分の盤へ戻す。ロビーに落とすと対局から締め出され、
           // 自分で入り直すまで打てなくなる（自動で開き直す仕組みは初回しか働かない）。
