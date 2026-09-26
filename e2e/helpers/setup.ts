@@ -156,6 +156,14 @@ async function seedSupabaseRoster(classroomId: string, classroomName: string): P
   if (membershipError) throw new Error(`Failed to seed memberships: ${membershipError.message}`);
 }
 
+/** 名簿や対局を直接いじる試験用の口（service role）。本番の教室には使わない */
+export function serviceClient(): ReturnType<typeof createClient> {
+  const { url, serviceRoleKey } = getRosterSeedEnv();
+  return createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 /** 教室に発行された共有PC用の鍵を読む（先生が「道場PC用リンクをコピー」で得るもの） */
 export async function fetchRosterToken(classroomId: string): Promise<string> {
   const { url, serviceRoleKey } = getRosterSeedEnv();

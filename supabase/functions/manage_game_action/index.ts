@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'create') {
-      const { classroom_id, black_player, white_player, board_size, handicap, komi, clock } = params || {}
+      const { classroom_id, black_player, white_player, board_size, handicap, komi, clock, rating_excluded } = params || {}
       if (!classroom_id || !black_player || !white_player || !board_size) {
         return json({ error: 'Missing params for create' }, 400)
       }
@@ -215,6 +215,8 @@ Deno.serve(async (req) => {
           handicap: handicap ?? 0,
           komi: komi ?? 6.5,
           clock: clock ?? null,
+          // 道場ランクに数えない対局（講師が対局作成で選ぶ）。判定はDBのトリガー
+          rating_excluded: rating_excluded === true,
           status: 'playing',
         })
         .select()

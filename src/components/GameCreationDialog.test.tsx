@@ -48,6 +48,18 @@ describe('GameCreationDialog', () => {
     })));
   });
 
+  it('19路以外を選ぶと「ランクに入れない」が入り、外せばランクに入る', async () => {
+    const onCreate = vi.fn();
+    render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);
+    const excluded = screen.getByTestId('rating-excluded-checkbox') as HTMLInputElement;
+    expect(excluded.checked).toBe(false);
+
+    fireEvent.change(screen.getByTestId('board-size-select'), { target: { value: '13' } });
+    expect(excluded.checked).toBe(true);
+    fireEvent.click(screen.getByTestId('create-game-button'));
+    await waitFor(() => expect(onCreate).toHaveBeenLastCalledWith(expect.objectContaining({ boardSize: 13, ratingExcluded: true })));
+  });
+
   it('秒読みありを選ぶと、持ち時間0分・3回・30秒で作成する', async () => {
     const onCreate = vi.fn();
     render(<GameCreationDialog {...defaultProps} onCreate={onCreate} />);

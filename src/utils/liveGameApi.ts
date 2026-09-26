@@ -69,6 +69,10 @@ export interface LiveGameRow {
   undo_request: UndoRequest | null;
   created_at: string;
   updated_at: string;
+  /** 終局した時刻（DBのトリガーが入れる。2026-09-26 より前の対局は無い） */
+  finished_at?: string | null;
+  /** 道場ランクに数えない対局 */
+  rating_excluded?: boolean;
 }
 
 export interface LiveMoveRow {
@@ -116,6 +120,8 @@ export interface CreateLiveGameOpts {
   handicap: number;
   komi: number;
   clock?: GameClock | null;
+  /** 道場ランクの3連勝・3連敗に数えない（13路・短い持ち時間など） */
+  ratingExcluded?: boolean;
 }
 
 /**
@@ -191,6 +197,7 @@ export async function createLiveGame(opts: CreateLiveGameOpts): Promise<LiveGame
     handicap: opts.handicap,
     komi: opts.komi,
     clock: opts.clock ?? null,
+    rating_excluded: opts.ratingExcluded ?? false,
   });
   if (!res || !res.game) {
     throw new Error('createLiveGame failed: no game returned from manage_game_action');
@@ -485,6 +492,41 @@ export function subscribeClassroomGames(
     )
     .subscribe();
   return channel;
+}
+
+/** 道場ランクの自動昇降の記録（DBのトリガーが書く） */
+export interface RankChangeRow {
+  id: string;
+  classroom_id: string;
+  login_id: string;
+  identity: string;
+  from_rating: string;
+  to_rating: string;
+  reason: 'win_streak' | 'loss_streak';
+  game_id: string;
+  created_at: string;
+  reverted_at: string | null;
+}
+
+/**
+ * ランクが変わった・取り消されたのを受け取る。
+ * 追加=昇降、更新（reverted_at が入る）=時間切れ局の再開による取り消し。
+ */
+export function subscribeRankChanges(
+  classroomId: string,
+  onChange: (row: RankChangeRow) => void,
+): RealtimeChannel {
+  const sb = getSupabase();
+  return sb
+    .channel(`classroom-rank-changes:${classroomId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'go_school_rank_changes', filter: `classroom_id=eq.${classroomId}` },
+      (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') onChange(payload.new as RankChangeRow);
+      },
+    )
+    .subscribe();
 }
 
 /** 対局を初期状態（0手目、石なし）に強制リセットする（先生権限） */

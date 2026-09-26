@@ -35,6 +35,8 @@ interface PairingPair {
   handicap: number;
   komi: number;
   boardSize: number;
+  /** 道場ランクに数えない。19路以外は最初から入れる */
+  ratingExcluded: boolean;
 }
 
 interface AutoPairingDialogProps {
@@ -51,6 +53,7 @@ interface AutoPairingDialogProps {
     handicap: number;
     komi: number;
     clock?: GameClock;
+    ratingExcluded?: boolean;
   }[]) => void;
 }
 
@@ -91,6 +94,7 @@ function autoPair(
       handicap: suggestion.handicap,
       komi: suggestion.komi,
       boardSize: 19,
+      ratingExcluded: false,
     });
   }
 
@@ -143,7 +147,7 @@ export default function AutoPairingDialog({
 
   // 碁盤サイズ変更
   const changeBoardSize = (index: number, size: number) => {
-    setPairs(prev => prev.map((p, i) => i === index ? { ...p, boardSize: size } : p));
+    setPairs(prev => prev.map((p, i) => i === index ? { ...p, boardSize: size, ratingExcluded: size !== 19 } : p));
   };
 
   // 手合割の手動変更（コミも一緒に決まる）
@@ -172,6 +176,7 @@ export default function AutoPairingDialog({
       handicap: p.handicap,
       komi: p.komi,
       clock,
+      ratingExcluded: p.ratingExcluded,
     })));
     onClose();
   };
@@ -223,6 +228,7 @@ export default function AutoPairingDialog({
                   <th style={{ ...cellStyle, width: 40 }}>手合</th>
                   <th style={{ ...cellStyle, width: 42 }}>コミ</th>
                   <th style={{ ...cellStyle, width: 40 }}>盤</th>
+                  <th style={{ ...cellStyle, width: 44 }} title="チェックした対局は3連勝・3連敗に数えない">ランク外</th>
                   <th style={{ ...cellStyle, width: 60 }}>操作</th>
                 </tr>
               </thead>
@@ -270,6 +276,14 @@ export default function AutoPairingDialog({
                         <option value={13}>13</option>
                         <option value={9}>9</option>
                       </select>
+                    </td>
+                    <td style={cellStyle}>
+                      <input
+                        type="checkbox"
+                        aria-label={`${i + 1}局目をランクに入れない`}
+                        checked={p.ratingExcluded}
+                        onChange={e => setPairs(prev => prev.map((q, j) => j === i ? { ...q, ratingExcluded: e.target.checked } : q))}
+                      />
                     </td>
                     <td style={cellStyle}>
                       <button

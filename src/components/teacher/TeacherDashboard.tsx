@@ -66,7 +66,7 @@ interface TeacherDashboardProps {
   onReloadGames?: () => void | Promise<void>;
   /** 棋力表示を切り替えたことを生徒へ配る（名簿を読み直さない生徒のため） */
   onRankDisplayChanged?: (value: RankDisplay) => void;
-  onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number; clock?: import('../../types/game').GameClock }[]) => void;
+  onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number; clock?: import('../../types/game').GameClock; ratingExcluded?: boolean }[]) => void;
   onProblemAssign?: (problem: import('../../types/problem').Problem, targets: string[] | null) => void;
   onClearAudioM?: () => void;
   onClearAudioS?: () => void;

@@ -1,4 +1,4 @@
-import { X, WifiOff, Wifi, Clock } from 'lucide-react';
+import { X, WifiOff, Wifi, Clock, TrendingUp, TrendingDown, Undo2 } from 'lucide-react';
 import type { Student } from '../../types/classroom';
 import { getDisplayName } from '../../utils/identityUtils';
 
@@ -14,7 +14,9 @@ import { getDisplayName } from '../../utils/identityUtils';
 export type ClassroomAlert =
   | { id: number; kind: 'disconnect'; identity: string }
   | { id: number; kind: 'rejoin'; identity: string }
-  | { id: number; kind: 'timeout'; identity: string; gameId: string };
+  | { id: number; kind: 'timeout'; identity: string; gameId: string }
+  /** 道場ランクの自動昇降（3連勝・3連敗）。reverted は時間切れ局の再開による取り消し */
+  | { id: number; kind: 'rank'; identity: string; from: string; to: string; up: boolean; reverted: boolean };
 
 /** id を付ける前の知らせ。ユニオンのまま Omit したいので分配して剥がす */
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
@@ -39,6 +41,41 @@ export default function ClassroomAlerts({ alerts, students, onDismiss, onResumeG
         const name = getDisplayName(alert.identity, students);
         const isTimeout = alert.kind === 'timeout';
         const isRejoin = alert.kind === 'rejoin';
+        if (alert.kind === 'rank') {
+          return (
+            <div
+              key={alert.id}
+              data-testid="classroom-alert-rank"
+              role="status"
+              className="pointer-events-auto rounded-lg border border-line bg-surface/95 px-3 py-2.5 shadow-lg backdrop-blur-sm"
+            >
+              <div className="flex items-start gap-2.5">
+                <span className="mt-0.5 shrink-0 text-accent-text">
+                  {alert.reverted ? <Undo2 className="h-5 w-5" strokeWidth={1.5} />
+                    : alert.up ? <TrendingUp className="h-5 w-5" strokeWidth={1.5} />
+                      : <TrendingDown className="h-5 w-5" strokeWidth={1.5} />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-ink">
+                    {name} {alert.reverted ? `${alert.to}→${alert.from}` : `${alert.from}→${alert.to}`}
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted">
+                    {alert.reverted
+                      ? '対局を再開したので、ランクの変更を取り消しました'
+                      : alert.up ? '3連勝でランクが上がりました' : '3連敗でランクが下がりました'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => onDismiss(alert.id)}
+                  aria-label="閉じる"
+                  className="shrink-0 text-muted transition-colors duration-150 hover:text-ink"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          );
+        }
         return (
           <div
             key={alert.id}

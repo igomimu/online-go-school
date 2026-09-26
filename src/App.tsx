@@ -20,12 +20,12 @@ import type { ViewMode, AudioPermissions, SavedGame, RankDisplayPayload } from '
 import type { Student, Classroom, RankDisplay } from './types/classroom';
 import { DEFAULT_RANK_DISPLAY } from './types/classroom';
 import { fetchToken, TeacherAbsentError } from './utils/livekitToken';
-import { getDisplayName, getTeacherDisplayName, identityMatchesPlayer, makeStudentIdentity, TEACHER_IDENTITY } from './utils/identityUtils';
+import { findStudentByIdentity, getDisplayName, getTeacherDisplayName, identityMatchesPlayer, makeStudentIdentity, TEACHER_IDENTITY } from './utils/identityUtils';
 import { readStudentCodeFromParams } from './utils/studentLoginLink';
 import { runSingleFlight } from './utils/singleFlight';
 import { ConnectionState } from './utils/classroomRtc';
 import { useLiveGameList } from './hooks/useLiveGameList';
-import { liveRowToSession, interruptAllGames, interruptGame, resumeLiveGame } from './utils/liveGameApi';
+import { liveRowToSession, interruptAllGames, interruptGame, resumeLiveGame, subscribeRankChanges } from './utils/liveGameApi';
 import { isTimeoutResult, timedOutColorFromResult } from './utils/scoring';
 import { speakGameResultOnce } from './utils/byoyomiVoice';
 import {
@@ -82,7 +82,7 @@ import {
   TEACHER_GAME_WINDOW_NAME,
 } from './utils/teacherGameWindow';
 
-import { Settings } from 'lucide-react';
+import { Settings, X } from 'lucide-react';
 
 // 講師専用の検討別ウィンドウ。中身は本体からポータルで描く（PopupPortal 参照）。
 const TEACHER_REVIEW_WINDOW_NAME = 'teacher-review-window';
@@ -364,6 +364,9 @@ function App() {
     }
   }, []);
 
+  // 生徒本人に出す「ランクが変わりました」。上がっても下がっても出す（2026-09-26 三村さん）
+  const [rankNotice, setRankNotice] = useState<{ to: string; up: boolean; reverted: boolean } | null>(null);
+
   // 対局者に見せるニギリ（先生が押すたびに届く。drawIdで引き直しも作り直す）
   const [nigiriDraw, setNigiriDraw] = useState<{ iAmBlack: boolean; opponent: string; drawId: number } | null>(null);
   // ポップアップを塞がれていて検討の別ウィンドウを開けなかった（全面表示に落とす）
@@ -440,6 +443,35 @@ function App() {
     const current = classrooms.find(c => c.id === (selectedClassroomId ?? studentClassroomId))?.rankDisplay;
     if (current) rankDisplayRef.current = current;
   }, [classrooms, selectedClassroomId, studentClassroomId]);
+
+  // 道場ランクの自動昇降（3連勝・3連敗）。判定と書き換えはDBのトリガーがやり、ここは知らせるだけ。
+  // 講師には誰が何から何へ、本人には自分のことだけを出す。名簿の表示もその場で合わせる
+  const rankClassroomId = role === 'TEACHER' ? selectedClassroomId : studentClassroomId;
+  const isClassroomConnected = connectionState === ConnectionState.Connected;
+  useEffect(() => {
+    if (!rankClassroomId || !isClassroomConnected) return;
+    const channel = subscribeRankChanges(rankClassroomId, row => {
+      const reverted = !!row.reverted_at;
+      const current = reverted ? row.from_rating : row.to_rating;
+      const up = Number(row.to_rating.slice(1)) < Number(row.from_rating.slice(1));
+      setStudents(prev => {
+        const target = findStudentByIdentity(row.identity, prev);
+        return target ? prev.map(s => (s === target ? { ...s, internalRating: current } : s)) : prev;
+      });
+      if (role === 'TEACHER') {
+        pushAlert({ kind: 'rank', identity: row.identity, from: row.from_rating, to: row.to_rating, up, reverted });
+      } else if (identityMatchesPlayer(classroomRef.current?.localIdentity ?? '', row.identity)) {
+        setRankNotice({ to: current, up, reverted });
+      }
+    });
+    return () => { void channel.unsubscribe(); };
+  }, [rankClassroomId, isClassroomConnected, role, pushAlert]);
+
+  useEffect(() => {
+    if (!rankNotice) return;
+    const timer = window.setTimeout(() => setRankNotice(null), 10_000);
+    return () => window.clearTimeout(timer);
+  }, [rankNotice]);
 
   // 講師が授業中に切り替えたら、その場で生徒へ配る（生徒は名簿を読み直さない）
   const handleRankDisplayChanged = useCallback((value: RankDisplay) => {
@@ -1492,6 +1524,7 @@ function App() {
     handicap: number;
     komi: number;
     clock?: import('./types/game').GameClock;
+    ratingExcluded?: boolean;
   }) => {
     // 先生自身が対局者（黒/白）なら講師専用の別ウィンドウ（常に1盤表示・手番ローテーション）で開く。
     // ポップアップブロッカー対策のため、await createGame() より前・クリックの同期区間内で呼ぶ。
@@ -2709,6 +2742,33 @@ function App() {
           registeredStudents={students}
           onNigiriDraw={handleNigiriDraw}
         />
+      )}
+
+      {/* 生徒本人へ: ランクが変わった */}
+      {role === 'STUDENT' && rankNotice && (
+        <div
+          data-testid="rank-notice"
+          role="status"
+          className="fixed left-1/2 top-16 z-[70] w-[min(22rem,calc(100vw-1.5rem))] -translate-x-1/2 rounded-lg border border-line bg-surface/95 px-4 py-3 shadow-lg"
+        >
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-base font-bold text-ink">
+                {rankNotice.reverted
+                  ? `ランクは ${rankNotice.to} にもどりました`
+                  : rankNotice.up ? `${rankNotice.to} に上がりました` : `${rankNotice.to} に下がりました`}
+              </div>
+              <p className="mt-0.5 text-xs text-muted">
+                {rankNotice.reverted
+                  ? '先生が対局を再開したので、さっきの変更は取り消しです'
+                  : rankNotice.up ? '3連勝です。この調子で！' : '3連敗でした。次の対局からまた数えます'}
+              </p>
+            </div>
+            <button onClick={() => setRankNotice(null)} aria-label="閉じる" className="shrink-0 text-muted hover:text-ink">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       )}
 
       {/* 講師への即時通知（接続切れ・時間切れ） */}

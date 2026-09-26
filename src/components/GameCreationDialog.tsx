@@ -18,6 +18,8 @@ interface GameCreationDialogProps {
     handicap: number;
     komi: number;
     clock?: GameClock;
+    /** 道場ランクの3連勝・3連敗に数えない */
+    ratingExcluded?: boolean;
   }) => void | Promise<void>;
   registeredStudents?: Student[];
   /** 既に対局中（playing/scoring）の生徒。対局相手の候補から除外する。 */
@@ -66,6 +68,8 @@ export default function GameCreationDialog({
   const [selfColor, setSelfColor] = useState<PlayerColor>('WHITE');
   const [studentVsStudent, setStudentVsStudent] = useState(false);
   const [boardSize, setBoardSize] = useState(19);
+  // 19路以外は最初からランクに入れない（講師が外せば入る。2026-09-26 三村さん）
+  const [ratingExcluded, setRatingExcluded] = useState(false);
   const [handicap, setHandicap] = useState(0);
   const [komi, setKomi] = useState(EVEN_KOMI);
   const [customKomi, setCustomKomi] = useState('6.5');
@@ -154,6 +158,7 @@ export default function GameCreationDialog({
         handicap,
         komi: customKomiEnabled ? customKomiNumber : komi,
         clock,
+        ratingExcluded,
       });
       onClose();
     } finally {
@@ -177,7 +182,11 @@ export default function GameCreationDialog({
             id="board-size-select"
             data-testid="board-size-select"
             value={boardSize}
-            onChange={event => setBoardSize(Number(event.target.value))}
+            onChange={event => {
+              const size = Number(event.target.value);
+              setBoardSize(size);
+              setRatingExcluded(size !== 19);
+            }}
             className={`${selectClassName} w-full`}
           >
             {BOARD_SIZES.map(size => <option key={size} value={size}>{size}x{size}</option>)}
@@ -366,6 +375,22 @@ export default function GameCreationDialog({
             )}
           </fieldset>
         </section>
+
+        <label className="flex items-start gap-2 text-sm cursor-pointer border-t border-line pt-4">
+          <input
+            type="checkbox"
+            data-testid="rating-excluded-checkbox"
+            checked={ratingExcluded}
+            onChange={event => setRatingExcluded(event.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-semibold">ランクに入れない</span>
+            <span className="block text-xs text-muted">
+              この対局は3連勝・3連敗に数えません。19路以外は最初から入っています。
+            </span>
+          </span>
+        </label>
 
         {!playersAreValid && <p className="text-alert-text text-sm">対局する生徒を選択してください</p>}
 
