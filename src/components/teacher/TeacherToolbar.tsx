@@ -17,6 +17,7 @@ interface TeacherToolbarProps {
   onEditClassroom?: () => void;
   onShowStudentLinks?: () => void;
   onAutoPairing?: () => void;
+  onOpenTournament?: () => void;
   onOpenTsumegoPicker?: () => void;
   /** 棋譜作成（SGFを読み込む／盤に入力して保存する） */
   onOpenRecord?: () => void;
@@ -233,6 +234,7 @@ export default function TeacherToolbar({
   onEditClassroom,
   onShowStudentLinks,
   onAutoPairing,
+  onOpenTournament,
   onOpenTsumegoPicker,
   onOpenRecord,
   onClearAudioM,
@@ -375,6 +377,9 @@ export default function TeacherToolbar({
           <IgcButton label="対局ウィンドウ" outline onClick={onOpenTeacherGameWindow} data-testid="open-teacher-game-window-button" />
         )}
         <IgcButton label="自動対局" color="var(--color-raised)" onClick={onAutoPairing} />
+        {onOpenTournament && (
+          <IgcButton label="大会" color="var(--color-raised)" onClick={onOpenTournament} data-testid="open-tournament-button" />
+        )}
         <IgcButton label="検討" color="var(--color-raised)" onClick={onStartLecture} />
 
         <Divider />
