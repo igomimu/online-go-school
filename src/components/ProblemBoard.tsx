@@ -71,6 +71,15 @@ export default function ProblemBoard({
     newRankId: string;
   } | null>(null);
   const hasRatedCurrentRef = useRef(false);
+  // 🔴 格付けの更新で effect が走り直すと、同じ結果を二度数えて二度送っていた
+  // （正解1問で「解けた」が2、時間制限の時計も満タンに戻る）。最新の格と
+  // コールバックは ref から読み、effect の依存に入れない
+  const currentRatingRef = useRef(currentRating);
+  currentRatingRef.current = currentRating;
+  const onRatingUpdateRef = useRef(onRatingUpdate);
+  onRatingUpdateRef.current = onRatingUpdate;
+  // 結果を送り済みの盤の状態。着手のたびに新しいオブジェクトになるので、同じ結果の二重処理を防げる
+  const handledStateRef = useRef<typeof problemState>(null);
 
   // まちがえた回数。結果を送る effect から読むので ref も持つ（state を依存に入れると二重に送る）
   const [misses, setMisses] = useState(0);
@@ -146,13 +155,15 @@ export default function ProblemBoard({
       if (autoNext) statsRef.current = { ...statsRef.current, failed: statsRef.current.failed + 1 };
       
       // 格付け更新（時間切れ失敗）
-      let ratingAfter = currentRating;
-      if (currentRating && !hasRatedCurrentRef.current) {
+      const ratingBefore = currentRatingRef.current;
+      let ratingAfter = ratingBefore;
+      if (ratingBefore && !hasRatedCurrentRef.current) {
         hasRatedCurrentRef.current = true;
-        const res = processRatingUpdate(currentRating, false);
+        const res = processRatingUpdate(ratingBefore, false);
+        currentRatingRef.current = res.nextState;
         setCurrentRating(res.nextState);
         ratingAfter = res.nextState;
-        onRatingUpdate?.(res);
+        onRatingUpdateRef.current?.(res);
         if (res.event !== 'none') {
           setTransitionModal({ event: res.event, prevRankId: res.previousRankId, newRankId: res.nextState.rankId });
         }
@@ -169,7 +180,7 @@ export default function ProblemBoard({
     }, 250);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current, timeUp, currentRating, onRatingUpdate]);
+  }, [current, timeUp]);
 
   const goNext = useCallback(async () => {
     setLoadingNext(true);
@@ -209,6 +220,8 @@ export default function ProblemBoard({
     const status = problemState?.status;
     if (status !== 'correct' && status !== 'incorrect') return;
     if (timedOutRef.current) return; // 時間切れはタイマー側で送り済み
+    if (handledStateRef.current === problemState) return; // 親の再描画などで走り直しただけ
+    handledStateRef.current = problemState;
     const attempt = missesRef.current + 1;
     if (status === 'incorrect') {
       missesRef.current = attempt;
@@ -223,14 +236,16 @@ export default function ProblemBoard({
     }
 
     // 格付け更新（正解、またはライフ切れ失敗）
-    let ratingAfter = currentRating;
-    if (currentRating && finished && !hasRatedCurrentRef.current) {
+    const ratingBefore = currentRatingRef.current;
+    let ratingAfter = ratingBefore;
+    if (ratingBefore && finished && !hasRatedCurrentRef.current) {
       hasRatedCurrentRef.current = true;
       const isCorrect = status === 'correct';
-      const res = processRatingUpdate(currentRating, isCorrect);
+      const res = processRatingUpdate(ratingBefore, isCorrect);
+      currentRatingRef.current = res.nextState;
       setCurrentRating(res.nextState);
       ratingAfter = res.nextState;
-      onRatingUpdate?.(res);
+      onRatingUpdateRef.current?.(res);
       if (res.event !== 'none') {
         setTransitionModal({ event: res.event, prevRankId: res.previousRankId, newRankId: res.nextState.rankId });
       }
@@ -244,7 +259,7 @@ export default function ProblemBoard({
       ratingState: ratingAfter,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [problemState?.status, problemState?.movesMade.length, onResult, currentRating, onRatingUpdate]);
+  }, [problemState, onResult]);
 
   const livesLeft = lives === undefined ? null : Math.max(0, lives - misses);
   const outOfLives = livesLeft === 0;

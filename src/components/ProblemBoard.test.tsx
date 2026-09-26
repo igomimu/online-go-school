@@ -212,4 +212,75 @@ describe('ProblemBoard のライフと次の問題', () => {
     fireEvent.click(screen.getByText('正解の手'));
     expect(onRatingUpdate).not.toHaveBeenCalled();
   });
+
+  describe('格付けの更新で結果を二重に数えない', () => {
+    const rating = () => ({
+      rankId: 'bronze_4',
+      points: 2,
+      consecutiveWins: 1,
+      protectionCount: 0,
+      totalSolved: 10,
+      totalAttempts: 15,
+      highestRankId: 'bronze_4',
+      lastUpdated: new Date().toISOString(),
+    });
+
+    it('正解1問で「解けた」は1、結果の送信も1回', () => {
+      const onResult = vi.fn();
+      render(
+        <ProblemBoard
+          problem={{ ...makeProblem('a', 3), ratingMode: true }}
+          onBack={() => {}}
+          onResult={onResult}
+          ratingState={rating()}
+          onRatingUpdate={() => {}}
+        />
+      );
+      fireEvent.click(screen.getByText('正解の手'));
+      expect(onResult).toHaveBeenCalledTimes(1);
+      expect(onResult).toHaveBeenLastCalledWith('correct', 1, expect.objectContaining({ solved: 1 }));
+    });
+
+    it('ライフが尽きても挑戦回数と「失敗」は1回ぶん', () => {
+      const onResult = vi.fn();
+      const onRatingUpdate = vi.fn();
+      render(
+        <ProblemBoard
+          problem={{ ...makeProblem('a', 1), ratingMode: true }}
+          onBack={() => {}}
+          onResult={onResult}
+          ratingState={rating()}
+          onRatingUpdate={onRatingUpdate}
+        />
+      );
+      fireEvent.click(screen.getByText('まちがいの手'));
+      expect(onResult).toHaveBeenCalledTimes(1);
+      expect(onResult).toHaveBeenLastCalledWith('incorrect', 1, expect.objectContaining({ attempt: 1, failed: 1 }));
+      expect(onRatingUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it('親が作り直したコールバックを渡しても同じ結果は送り直さない', () => {
+      const onResult = vi.fn();
+      const problem = makeProblem('a', 3);
+      const { rerender } = render(
+        <ProblemBoard problem={problem} onBack={() => {}} onResult={(...a) => onResult(...a)} />
+      );
+      fireEvent.click(screen.getByText('正解の手'));
+      rerender(<ProblemBoard problem={problem} onBack={() => {}} onResult={(...a) => onResult(...a)} />);
+      expect(onResult).toHaveBeenCalledTimes(1);
+    });
+
+    it('問題の途中で格が届き直しても、制限時間は戻らない', async () => {
+      const problem = { ...makeProblem('a', 3, 60), ratingMode: true };
+      const { rerender } = render(
+        <ProblemBoard problem={problem} onBack={() => {}} ratingState={rating()} />
+      );
+      await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+      expect(screen.getByTestId('problem-timer')).toHaveTextContent('0:40');
+      // アカウント側の格の読み込みが遅れて届いた（別オブジェクトの格）
+      rerender(<ProblemBoard problem={problem} onBack={() => {}} ratingState={rating()} />);
+      await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+      expect(screen.getByTestId('problem-timer')).toHaveTextContent('0:39');
+    });
+  });
 });
