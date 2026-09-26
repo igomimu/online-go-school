@@ -237,9 +237,11 @@ export default function ProblemBoard({
               onClick={() => setShowReport(true)}
               title="この問題のまちがいを報告"
               aria-label="この問題のまちがいを報告"
-              className="text-muted hover:text-alert-text transition-colors p-1"
+              // 旗のアイコンだけでは気づかれなかった（2026-09-26 三村さん）。文字を付けて押せると分かる形に
+              className="flex items-center gap-1 shrink-0 rounded-md border border-line bg-raised px-2 py-1 text-xs font-semibold text-muted hover:text-alert-text hover:border-alert-text/50 transition-colors duration-150"
             >
-              <Flag className="w-4 h-4" />
+              <Flag className="w-3.5 h-3.5" />
+              まちがいを報告
             </button>
           )}
         </div>
