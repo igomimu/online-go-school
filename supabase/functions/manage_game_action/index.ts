@@ -5,6 +5,7 @@ import { exportLiveGameToSgf, formatTokyoSgfDate } from '../_shared/sgf.ts'
 import { restoreClockForTimeout, startClock, timedOutColorFromResult } from '../_shared/clock.ts'
 import { NEW_GAME_BLOCKING_STATUSES, shouldCloseLiveGameWhenDeletingHistory } from '../_shared/game_lifecycle.ts'
 import { applyScoringConfirmation } from '../_shared/scoring_confirm.ts'
+import { isStudentMutableStatus, scoringResultsAgree, studentMayFinishWith } from '../_shared/result_policy.ts'
 import { versionResponse } from '../_shared/version.ts'
 
 const corsHeaders = {
@@ -185,6 +186,11 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'create') {
+      // 対局を作るのは講師だけ（画面も講師にしか出していない）。生徒が作れると、
+      // 好きな相手との対局を作って道場ランクを動かせてしまう（2026-09-27）
+      if (!isTeacher && !isServiceRole) {
+        return json({ error: 'Forbidden: Only teachers can create games' }, 403)
+      }
       const { classroom_id, black_player, white_player, board_size, handicap, komi, clock, rating_excluded } = params || {}
       if (!classroom_id || !black_player || !white_player || !board_size) {
         return json({ error: 'Missing params for create' }, 400)
@@ -227,15 +233,21 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'enter_scoring') {
-      const { error } = await supabase
+      let query = supabase
         .from('go_school_live_games')
         .update({
           status: 'scoring',
           scoring_dead_stones: [],
           scoring_confirmed: [],
+          scoring_proposed_result: null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', game_id)
+      // 🔴 生徒は対局中の対局しか整地に入れない。終局済みを整地へ戻せると、
+      // その対局で起きたランクの変更がトリガーで取り消されてしまう
+      if (!isTeacher && !isServiceRole) query = query.eq('status', 'playing')
+
+      const { error } = await query
 
       if (error) throw error
       return json({ ok: true })
@@ -285,15 +297,19 @@ Deno.serve(async (req) => {
 
     if (action === 'update_dead_stones') {
       const { dead_stones } = params || {}
-      const { error } = await supabase
+      let query = supabase
         .from('go_school_live_games')
         .update({
           scoring_dead_stones: dead_stones ?? [],
-          // 死石が変わったら、前の盤面への同意は無効にする
+          // 死石が変わったら、前の盤面への同意（と控えた結果）は無効にする
           scoring_confirmed: [],
+          scoring_proposed_result: null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', game_id)
+      if (!isTeacher && !isServiceRole) query = query.eq('status', 'scoring')
+
+      const { error } = await query
 
       if (error) throw error
       return json({ ok: true })
@@ -312,7 +328,7 @@ Deno.serve(async (req) => {
 
       const { data: gameToConfirm, error: confirmGameErr } = await supabase
         .from('go_school_live_games')
-        .select('id, black_player, white_player, board_size, handicap, komi, status, scoring_confirmed')
+        .select('id, black_player, white_player, board_size, handicap, komi, status, scoring_confirmed, scoring_proposed_result')
         .eq('id', game_id)
         .single()
 
@@ -336,12 +352,28 @@ Deno.serve(async (req) => {
       )
 
       if (!finished) {
+        // 先に確定した側の結果を控える。後から確定した側と同じ結果でなければ終局させない
         const { error: confirmErr } = await supabase
           .from('go_school_live_games')
-          .update({ scoring_confirmed: confirmed, updated_at: new Date().toISOString() })
+          .update({
+            scoring_confirmed: confirmed,
+            scoring_proposed_result: String(result),
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', game_id)
         if (confirmErr) throw confirmErr
         return json({ ok: true, confirmed, finished: false })
+      }
+
+      // 🔴 生徒どうしの確定は、両者の結果が一致したときだけ終局する。
+      // 最後に押した側の結果をそのまま書くと、勝敗を好きに書き換えられた（2026-09-27）
+      if (!isTeacher && !isServiceRole && !scoringResultsAgree(gameToConfirm.scoring_proposed_result, result)) {
+        const { error: resetErr } = await supabase
+          .from('go_school_live_games')
+          .update({ scoring_confirmed: [], scoring_proposed_result: null, updated_at: new Date().toISOString() })
+          .eq('id', game_id)
+        if (resetErr) throw resetErr
+        return json({ error: 'Scoring results do not match. Please confirm again.' }, 409)
       }
 
       const { error: finishErr } = await supabase
@@ -372,11 +404,23 @@ Deno.serve(async (req) => {
 
       const { data: gameForHistory, error: historyGameErr } = await supabase
         .from('go_school_live_games')
-        .select('id, black_player, white_player, board_size, handicap, komi')
+        .select('id, black_player, white_player, board_size, handicap, komi, status')
         .eq('id', game_id)
         .single()
 
       if (historyGameErr) throw historyGameErr
+
+      // 🔴 生徒が書ける結果は「自分の負け」（投了・自分の時間切れ）だけ。
+      // 好きな結果を書けると、APIを直接呼んで道場ランクの連勝を作れてしまう（2026-09-27）
+      if (!isTeacher && !isServiceRole) {
+        if (!isStudentMutableStatus(gameForHistory.status)) {
+          return json({ error: 'Game is not in progress' }, 409)
+        }
+        const callerColor = resolvePlayerColor({ isTeacher, studentId: validatedStudentId }, gameForHistory)
+        if (!studentMayFinishWith(normalizedResult, callerColor)) {
+          return json({ error: 'Forbidden: students can only resign or report their own timeout' }, 403)
+        }
+      }
 
       // 講師は時間切れ負けにしない（指導碁で複数面を持つため）。
       // 古い/別端末のクライアントが切れ負けを投げてきても、ここで無視して対局を続行させる。
@@ -390,7 +434,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      const { error } = await supabase
+      let finishQuery = supabase
         .from('go_school_live_games')
         .update({
           status: 'finished',
@@ -399,6 +443,10 @@ Deno.serve(async (req) => {
           updated_at: new Date().toISOString(),
         })
         .eq('id', game_id)
+      // 確かめてから書くまでの間に終局していたら、生徒の書き込みでは上書きしない
+      if (!isTeacher && !isServiceRole) finishQuery = finishQuery.in('status', ['playing', 'scoring'])
+
+      const { error } = await finishQuery
 
       if (error) throw error
 

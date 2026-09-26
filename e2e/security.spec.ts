@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
-import { teardownSupabaseRoster } from './helpers/setup';
+import { insertTestLiveGame, readTestLiveGame, teardownSupabaseRoster } from './helpers/setup';
 
 // 環境変数
 const supabaseUrl = process.env.VITE_DOJO_SUPABASE_URL || 'https://yzsyrtesydpulctjgdog.supabase.co';
@@ -74,71 +74,77 @@ test.describe('セキュリティ・認可バリデーション検証 (Stage 9)'
     expect(resInvalidToken.status()).toBe(403);
   });
 
-  test('別教室のJWTで対局に介入しようとした場合 403 Forbidden になる', async ({ request }) => {
-    // 1. 生徒B の権限で classroomB に対局を作成する
-    const createRes = await request.post(`${supabaseUrl}/functions/v1/manage_game_action`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwtB}`
-      },
-      data: {
-        action: 'create',
-        params: {
-          classroom_id: classroomB,
-          black_player: studentB.uuid,
-          white_player: 'teacher-id',
-          board_size: 9,
-        }
-      }
+  // 生徒のJWTで manage_game_action を呼ぶ
+  function callAction(request: import('@playwright/test').APIRequestContext, jwt: string, data: Record<string, unknown>) {
+    return request.post(`${supabaseUrl}/functions/v1/manage_game_action`, {
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}` },
+      data,
     });
-    expect(createRes.status()).toBe(200);
-    const { game } = await createRes.json();
-    const gameId = game.id;
+  }
+
+  test('生徒のJWTでは対局を作れない（道場ランクの操作を防ぐ）', async ({ request }) => {
+    const createRes = await callAction(request, jwtA, {
+      action: 'create',
+      params: {
+        classroom_id: classroomA,
+        black_player: studentA.uuid,
+        white_player: 'teacher',
+        board_size: 9,
+      },
+    });
+    expect(createRes.status()).toBe(403);
+  });
+
+  test('別教室のJWTで対局に介入しようとした場合 403 Forbidden になる', async ({ request }) => {
+    // 1. 生徒B が対局者の対局を classroomB に用意する（対局を作れるのは講師だけ）
+    const game = await insertTestLiveGame({
+      classroomId: classroomB,
+      blackPlayer: `sid:${studentB.uuid}`,
+      whitePlayer: 'teacher',
+    });
 
     // 2. 生徒A (classroomA所属) の JWT を用いて、生徒B (classroomB所属) の対局を操作しようと試みる (enter_scoring)
-    const hackRes = await request.post(`${supabaseUrl}/functions/v1/manage_game_action`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwtA}`
-      },
-      data: {
-        action: 'enter_scoring',
-        game_id: gameId,
-      }
-    });
+    const hackRes = await callAction(request, jwtA, { action: 'enter_scoring', game_id: game.id });
     expect(hackRes.status()).toBe(403);
+
+    // 対局者本人（生徒B）なら同じ操作が通る＝上の 403 は対局者でないことによるもの
+    const ownRes = await callAction(request, jwtB, { action: 'enter_scoring', game_id: game.id });
+    expect(ownRes.status()).toBe(200);
   });
 
   test('生徒のJWTを用いて先生専用操作（reset）をしようとした場合 403 Forbidden になる', async ({ request }) => {
-    // まず対局を作る
-    const createRes = await request.post(`${supabaseUrl}/functions/v1/manage_game_action`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwtA}`
-      },
-      data: {
-        action: 'create',
-        params: {
-          classroom_id: classroomA,
-          black_player: studentA.uuid,
-          white_player: 'teacher-id',
-          board_size: 9,
-        }
-      }
+    const game = await insertTestLiveGame({
+      classroomId: classroomA,
+      blackPlayer: `sid:${studentA.uuid}`,
+      whitePlayer: 'teacher',
     });
-    const { game } = await createRes.json();
 
     // 生徒JWTで reset を呼び出す
-    const resetRes = await request.post(`${supabaseUrl}/functions/v1/manage_game_action`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwtA}`
-      },
-      data: {
-        action: 'reset',
-        game_id: game.id,
-      }
-    });
+    const resetRes = await callAction(request, jwtA, { action: 'reset', game_id: game.id });
     expect(resetRes.status()).toBe(403);
+  });
+
+  test('生徒は自分の勝ちを書き込めず、自分の投了だけ書ける', async ({ request }) => {
+    const game = await insertTestLiveGame({
+      classroomId: classroomA,
+      blackPlayer: `sid:${studentA.uuid}`,
+      whitePlayer: 'teacher',
+    });
+
+    // 黒（生徒A）の勝ちは書けない
+    for (const result of ['B+R', 'B+T', 'B+10.5']) {
+      const res = await callAction(request, jwtA, { action: 'finish', game_id: game.id, params: { result } });
+      expect(res.status(), result).toBe(403);
+    }
+    expect((await readTestLiveGame(game.id)).status).toBe('playing');
+
+    // 自分の投了は書ける
+    const resign = await callAction(request, jwtA, { action: 'finish', game_id: game.id, params: { result: 'W+R' } });
+    expect(resign.status()).toBe(200);
+    expect(await readTestLiveGame(game.id)).toEqual({ status: 'finished', result: 'W+R' });
+
+    // 終局した対局を整地に戻して、ランクの変更を取り消すことはできない
+    await callAction(request, jwtA, { action: 'enter_scoring', game_id: game.id });
+    expect((await readTestLiveGame(game.id)).status).toBe('finished');
   });
 });

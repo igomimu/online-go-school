@@ -198,6 +198,50 @@ export async function clearLiveGames(classroomId: string): Promise<void> {
 }
 
 /**
+ * テスト用の対局をサービス権限で直接作る（生徒は対局を作れないため、2026-09-27）。
+ * rating_excluded は既定の true のまま＝道場ランクには数えない。
+ */
+export async function insertTestLiveGame(game: {
+  classroomId: string;
+  blackPlayer: string;
+  whitePlayer: string;
+  boardSize?: number;
+}): Promise<{ id: string }> {
+  const { url, serviceRoleKey } = getRosterSeedEnv();
+  const supabase = createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await supabase
+    .from('go_school_live_games')
+    .insert({
+      classroom_id: game.classroomId,
+      black_player: game.blackPlayer,
+      white_player: game.whitePlayer,
+      board_size: game.boardSize ?? 9,
+      status: 'playing',
+    })
+    .select('id')
+    .single();
+  if (error || !data) throw new Error(`Failed to insert test live game: ${error?.message}`);
+  return data as { id: string };
+}
+
+/** テスト用の対局の今の状態と結果（サービス権限で読む） */
+export async function readTestLiveGame(gameId: string): Promise<{ status: string; result: string | null }> {
+  const { url, serviceRoleKey } = getRosterSeedEnv();
+  const supabase = createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await supabase
+    .from('go_school_live_games')
+    .select('status, result')
+    .eq('id', gameId)
+    .single();
+  if (error || !data) throw new Error(`Failed to read test live game: ${error?.message}`);
+  return data as { status: string; result: string | null };
+}
+
+/**
  * テストで作った持込棋譜（棋譜作成・SGFアップロード）を消す。
  *
  * 🔴 go_school_games は本番の棋譜庫。E2E の残骸を置いていくと、生徒の棋譜履歴に
