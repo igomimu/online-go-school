@@ -14,6 +14,7 @@ export interface Problem {
   sourceId?: number;           // 詰碁データベース由来: tsumego_problems.source_id（まちがい報告用）
   lives?: number;              // 出題時に講師が決めたライフ（1〜5）。まちがえるたびに1減り0で終わり。未設定=無制限
   timeLimitSec?: number;       // 1問ごとの制限時間（秒）。切れたらその問題は失敗で次へ。未設定=なし
+  ratingMode?: boolean;        // 格付け出題モード（生徒各自の格に応じた難易度が自動出題・昇降格）
 }
 
 export interface ProblemAttempt {

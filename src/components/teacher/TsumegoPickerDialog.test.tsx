@@ -70,4 +70,29 @@ describe('TsumegoPickerDialog の出題先', () => {
     // 検討盤で開く詰碁にはライフを付けない（次の問題へも進まない）
     expect(onAssign.mock.calls[0][0].lives).toBeUndefined();
   });
+
+  it('格付け連動出題モードで一斉配信できる', () => {
+    const onAssign = vi.fn();
+    render(<TsumegoPickerDialog onAssign={onAssign} onClose={() => {}} recipients={recipients} />);
+
+    // 格付け連動タブをクリック
+    fireEvent.click(screen.getByTestId('delivery-mode-rating'));
+    expect(screen.getByText('生徒各自の格付けに合わせた問題が届きます')).toBeInTheDocument();
+
+    // ライフを5に設定
+    fireEvent.click(screen.getByTestId('tsumego-lives-5'));
+
+    // 格付け一斉配信ボタンを押す
+    fireEvent.click(screen.getByTestId('assign-rating-problems-btn'));
+
+    expect(onAssign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: '詰碁 格付けチャレンジ',
+        ratingMode: true,
+        lives: 5,
+      }),
+      null
+    );
+  });
 });
+

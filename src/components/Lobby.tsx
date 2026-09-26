@@ -1,13 +1,10 @@
-import { Copy, Check, Upload, Users, Plus, BookOpen, Link, Trophy } from 'lucide-react';
+import { Copy, Check, Upload, Users, Plus, BookOpen, Link } from 'lucide-react';
 import { useState, useRef } from 'react';
 import type { GameSession, SavedGame } from '../types/game';
 import type { ParticipantInfo } from '../utils/classroomRtc';
 import type { ParticipantLogEntry } from '../hooks/useParticipantLog';
 import type { Student, Classroom } from '../types/classroom';
 import type { ChatMessage } from '../types/chat';
-import type { TsumegoRatingState } from '../types/tsumegoRating';
-import { getRankById } from '../utils/tsumegoRating';
-import TsumegoRatingBadge from './tsumego/TsumegoRatingBadge';
 import { findStudentByIdentity, getDisplayName, identityMatchesPlayer } from '../utils/identityUtils';
 import { displayRank, DEFAULT_RANK_DISPLAY, type RankDisplay } from '../types/classroom';
 import InstallHint from './InstallHint';
@@ -56,10 +53,6 @@ interface LobbyProps {
   onResumeGame?: (gameId: string) => void;
   /** 棋譜作成（SGFの読み込み・盤に入力して保存） */
   onCreateRecord?: () => void;
-  /** 詰碁格付けチャレンジの状態 */
-  tsumegoRatingState?: TsumegoRatingState | null;
-  /** 詰碁格付けチャレンジの開始 */
-  onStartTsumegoRating?: () => void;
 }
 
 export default function Lobby({
@@ -88,8 +81,6 @@ export default function Lobby({
   onChatSend,
   onResumeGame,
   onCreateRecord,
-  tsumegoRatingState,
-  onStartTsumegoRating,
 }: LobbyProps) {
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -169,38 +160,6 @@ export default function Lobby({
                 </button>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* 生徒用: 詰碁 格付けチャレンジ */}
-        {role === 'STUDENT' && onStartTsumegoRating && (
-          <div className="glass-panel p-4 flex flex-wrap items-center justify-between gap-3 border-l-2 border-l-amber-500 bg-amber-500/5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-950 flex items-center justify-center text-xl shrink-0">
-                {tsumegoRatingState ? getRankById(tsumegoRatingState.rankId).badgeEmoji : '🧩'}
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-sm text-foreground">詰碁 格付けチャレンジ</h3>
-                  {tsumegoRatingState && (
-                    <TsumegoRatingBadge state={tsumegoRatingState} showPoints />
-                  )}
-                </div>
-                <p className="text-xs text-muted">
-                  {tsumegoRatingState
-                    ? `現在の格: ${getRankById(tsumegoRatingState.rankId).name}。問題を解いて上位の棋士を目指そう！`
-                    : '実力に合った問題に挑戦して、棋士の格（石ころ〜伝説）を上げよう！'}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={onStartTsumegoRating}
-              className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-bold shadow-sm transition-colors shrink-0"
-              data-testid="start-tsumego-rating-btn"
-            >
-              <Trophy className="w-4 h-4" />
-              {tsumegoRatingState ? '格付けに挑戦する' : '格付けを始める'}
-            </button>
           </div>
         )}
 

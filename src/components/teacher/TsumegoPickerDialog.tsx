@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { X, Shuffle, Send } from 'lucide-react';
+import { X, Shuffle, Send, Trophy, Sparkles } from 'lucide-react';
 import GoBoard from '../GoBoard';
 import type { Problem } from '../../types/problem';
 import { fetchRandomTsumegoProblem } from '../../utils/tsumegoApi';
 import { tsumegoRowToProblem } from '../../utils/tsumegoConvert';
+import { createEmptyBoard } from '../../utils/gameLogic';
 
 /** 出題先の候補（接続中の生徒） */
 export interface TsumegoRecipient {
@@ -39,6 +40,8 @@ const DEFAULT_LIVES = 3;
 const TIME_LIMIT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: TsumegoPickerDialogProps) {
+  // 出題形式: 格付け出題（生徒各自の実力連動）or 指定の1問
+  const [deliveryMode, setDeliveryMode] = useState<'rating' | 'specific'>('specific');
   const [level, setLevel] = useState<string | null>(null);
   const [boardSize, setBoardSize] = useState(19);
   const [loading, setLoading] = useState(false);
@@ -80,11 +83,32 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
   };
 
   const handleAssign = () => {
-    if (!preview || noneSelected) return;
-    // 誰も外していなければ「全員」。後から入った生徒にも出題が届く
+    if (noneSelected) return;
     const targets = recipients && excluded.size > 0
       ? selectedRecipients.map(r => r.identity)
       : null;
+
+    if (deliveryMode === 'rating') {
+      // 格付け連動モード出題
+      const ratingProblem: Problem = {
+        id: `rating-${Date.now()}`,
+        title: '詰碁 格付けチャレンジ',
+        boardSize: 19,
+        initialBoard: createEmptyBoard(19),
+        correctColor: 'BLACK',
+        sgfTree: { children: [] },
+        createdAt: new Date().toISOString(),
+        lives,
+        ...(timeLimitMin ? { timeLimitSec: timeLimitMin * 60 } : {}),
+        ratingMode: true,
+      };
+      onAssign(ratingProblem, targets);
+      onClose();
+      return;
+    }
+
+    if (!preview) return;
+    // 誰も外していなければ「全員」。後から入った生徒にも出題が届く
     onAssign(
       recipients
         ? { ...preview, lives, ...(timeLimitMin ? { timeLimitSec: timeLimitMin * 60 } : {}) }
@@ -107,53 +131,103 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
           </button>
         </div>
 
-        <div>
-          <label className="block text-sm text-muted mb-1.5">レベル</label>
-          <div className="flex flex-wrap gap-1.5">
+        {/* 出題形式の切り替え（講師ホームから配る場合のみ格付け連動を選べる） */}
+        {recipients && (
+          <div className="flex rounded-lg p-1 bg-ink/5 border border-line">
             <button
-              onClick={() => setLevel(null)}
-              className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
-                level === null
-                  ? 'bg-accent border-accent text-accent-ink'
-                  : 'bg-ink/5 border-line text-muted hover:text-ink'
+              type="button"
+              data-testid="delivery-mode-rating"
+              onClick={() => setDeliveryMode('rating')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-bold transition-all ${
+                deliveryMode === 'rating'
+                  ? 'bg-amber-500 text-white shadow-xs'
+                  : 'text-muted hover:text-ink'
               }`}
             >
-              指定なし
+              <Trophy className="w-4 h-4 fill-current" />
+              格付け連動出題（生徒各自の実力に合わせる）
             </button>
-            {LEVEL_OPTIONS.map((l) => (
-              <button
-                key={l}
-                onClick={() => setLevel(l)}
-                className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
-                  level === l
-                    ? 'bg-accent border-accent text-accent-ink'
-                    : 'bg-ink/5 border-line text-muted hover:text-ink'
-                }`}
-              >
-                {l}
-              </button>
-            ))}
+            <button
+              type="button"
+              data-testid="delivery-mode-specific"
+              onClick={() => setDeliveryMode('specific')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-bold transition-all ${
+                deliveryMode === 'specific'
+                  ? 'bg-accent border-accent text-accent-ink shadow-xs'
+                  : 'text-muted hover:text-ink'
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              指定した1問を出題
+            </button>
           </div>
-        </div>
+        )}
 
-        <div>
-          <label className="block text-sm text-muted mb-1.5">盤サイズ</label>
-          <div className="flex gap-1.5">
-            {BOARD_SIZE_OPTIONS.map((size) => (
-              <button
-                key={size}
-                onClick={() => setBoardSize(size)}
-                className={`px-3 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
-                  boardSize === size
-                    ? 'bg-accent border-accent text-accent-ink'
-                    : 'bg-ink/5 border-line text-muted hover:text-ink'
-                }`}
-              >
-                {size}路
-              </button>
-            ))}
+        {/* 格付けモードの説明 */}
+        {deliveryMode === 'rating' && (
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-1.5">
+            <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300 text-sm">
+              <Trophy className="w-4 h-4 fill-amber-500 text-amber-500" />
+              生徒各自の格付けに合わせた問題が届きます
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              接続中の生徒それぞれに、現在保持している格（石ころ棋士〜伝説の棋士）に応じた問題が自動で出題されます。
+              正解・不正解で各生徒の格付けゲージが増減し、昇格・降格します。
+            </p>
           </div>
-        </div>
+        )}
+
+        {deliveryMode === 'specific' && (
+          <>
+            <div>
+              <label className="block text-sm text-muted mb-1.5">レベル</label>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => setLevel(null)}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
+                    level === null
+                      ? 'bg-accent border-accent text-accent-ink'
+                      : 'bg-ink/5 border-line text-muted hover:text-ink'
+                  }`}
+                >
+                  指定なし
+                </button>
+                {LEVEL_OPTIONS.map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => setLevel(l)}
+                    className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
+                      level === l
+                        ? 'bg-accent border-accent text-accent-ink'
+                        : 'bg-ink/5 border-line text-muted hover:text-ink'
+                    }`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm text-muted mb-1.5">盤サイズ</label>
+              <div className="flex gap-1.5">
+                {BOARD_SIZE_OPTIONS.map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => setBoardSize(size)}
+                    className={`px-3 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
+                      boardSize === size
+                        ? 'bg-accent border-accent text-accent-ink'
+                        : 'bg-ink/5 border-line text-muted hover:text-ink'
+                    }`}
+                  >
+                    {size}路
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
 
         {recipients && (
           <div>
@@ -245,54 +319,70 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
           </div>
         )}
 
-        <button
-          onClick={drawProblem}
-          disabled={loading}
-          className="premium-button w-full flex items-center justify-center gap-2 text-sm disabled:opacity-50"
-        >
-          <Shuffle className="w-4 h-4" />
-          {loading ? '取得中...' : 'ランダムに1問取得'}
-        </button>
-
-        {error && (
-          <div className="text-sm text-alert-text bg-alert/10 border border-alert/25 rounded-lg px-4 py-3">
-            {error}
+        {deliveryMode === 'rating' ? (
+          <div className="pt-2">
+            <button
+              onClick={handleAssign}
+              disabled={noneSelected}
+              className="premium-button w-full flex items-center justify-center gap-2 py-3 text-sm font-bold disabled:opacity-50"
+              data-testid="assign-rating-problems-btn"
+            >
+              <Trophy className="w-4 h-4 fill-current text-amber-500" />
+              {recipients ? `格付け詰碁を一斉配信（${selectedRecipients.length}名）` : '格付け詰碁を配信'}
+            </button>
           </div>
-        )}
+        ) : (
+          <>
+            <button
+              onClick={drawProblem}
+              disabled={loading}
+              className="premium-button w-full flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+            >
+              <Shuffle className="w-4 h-4" />
+              {loading ? '取得中...' : 'ランダムに1問取得'}
+            </button>
 
-        {preview && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-ink font-semibold">{preview.title}</span>
-              <span className="text-muted">{preview.correctColor === 'BLACK' ? '黒' : '白'}先</span>
-            </div>
-            <div className="glass-panel flex justify-center items-center p-2">
-              <GoBoard
-                boardState={preview.initialBoard}
-                boardSize={preview.boardSize}
-                viewRange={preview.viewRange}
-                maxHeight="40vh"
-                readOnly
-              />
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={drawProblem}
-                disabled={loading}
-                className="secondary-button flex-1 flex items-center justify-center gap-2 text-sm"
-              >
-                <Shuffle className="w-4 h-4" /> 引き直す
-              </button>
-              <button
-                onClick={handleAssign}
-                disabled={noneSelected}
-                className="premium-button flex-1 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
-              >
-                <Send className="w-4 h-4" />
-                {recipients ? `この問題を出題（${selectedRecipients.length}名）` : 'この問題を配信'}
-              </button>
-            </div>
-          </div>
+            {error && (
+              <div className="text-sm text-alert-text bg-alert/10 border border-alert/25 rounded-lg px-4 py-3">
+                {error}
+              </div>
+            )}
+
+            {preview && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-ink font-semibold">{preview.title}</span>
+                  <span className="text-muted">{preview.correctColor === 'BLACK' ? '黒' : '白'}先</span>
+                </div>
+                <div className="glass-panel flex justify-center items-center p-2">
+                  <GoBoard
+                    boardState={preview.initialBoard}
+                    boardSize={preview.boardSize}
+                    viewRange={preview.viewRange}
+                    maxHeight="40vh"
+                    readOnly
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={drawProblem}
+                    disabled={loading}
+                    className="secondary-button flex-1 flex items-center justify-center gap-2 text-sm"
+                  >
+                    <Shuffle className="w-4 h-4" /> 引き直す
+                  </button>
+                  <button
+                    onClick={handleAssign}
+                    disabled={noneSelected}
+                    className="premium-button flex-1 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                  >
+                    <Send className="w-4 h-4" />
+                    {recipients ? `この問題を出題（${selectedRecipients.length}名）` : 'この問題を配信'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

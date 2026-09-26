@@ -464,13 +464,18 @@ function App() {
     }
   }, [role, tsumegoScope]);
 
-  const startRatingProblem = useCallback(async (rating: TsumegoRatingState) => {
+  // 講師から格付け出題が届いた時に保持するベース出題
+  const pendingRatingProblemRef = useRef<import('./types/problem').Problem | null>(null);
+
+  const startRatingProblem = useCallback(async (rating: TsumegoRatingState, baseProblem?: import('./types/problem').Problem) => {
     try {
       const level = pickRandomLevelForRank(rating.rankId);
       const row = await fetchRandomTsumegoProblem({ level, boardSize: 19 });
       if (row) {
         const p = tsumegoRowToProblem(row);
-        p.lives = 3;
+        p.lives = baseProblem?.lives ?? 3;
+        p.timeLimitSec = baseProblem?.timeLimitSec;
+        p.ratingMode = true;
         setActiveProblem(p);
         setViewMode('problem');
       }
@@ -479,17 +484,18 @@ function App() {
     }
   }, []);
 
-  const handleStartTsumegoRating = useCallback(async () => {
+  const handleIncomingRatingProblem = useCallback(async (baseProblem: import('./types/problem').Problem) => {
     let rating = tsumegoRating;
     if (!rating) {
       rating = loadTsumegoRatingFromStorage(tsumegoScope);
       if (rating) setTsumegoRating(rating);
     }
     if (!rating) {
+      pendingRatingProblemRef.current = baseProblem;
       setShowInitialRankDialog(true);
       return;
     }
-    await startRatingProblem(rating);
+    await startRatingProblem(rating, baseProblem);
   }, [tsumegoRating, tsumegoScope, startRatingProblem]);
 
   const handleSelectInitialRank = useCallback(async (selectedRankId: string) => {
@@ -497,7 +503,9 @@ function App() {
     const initial = createInitialRatingState(selectedRankId);
     setTsumegoRating(initial);
     saveTsumegoRatingToStorage(initial, tsumegoScope);
-    await startRatingProblem(initial);
+    const pending = pendingRatingProblemRef.current;
+    pendingRatingProblemRef.current = null;
+    await startRatingProblem(initial, pending ?? undefined);
   }, [tsumegoScope, startRatingProblem]);
 
   const handleTsumegoRatingUpdate = useCallback((result: RatingUpdateResult) => {
@@ -845,8 +853,12 @@ function App() {
         if (msg.type === 'PROBLEM_ASSIGN' && connectRole === 'STUDENT' && msg.payload) {
           stashRecordDraft();
           const p = msg.payload as import('./types/problem').ProblemAssignPayload;
-          setActiveProblem(p.problem);
-          setViewMode('problem');
+          if (p.problem.ratingMode) {
+            void handleIncomingRatingProblem(p.problem);
+          } else {
+            setActiveProblem(p.problem);
+            setViewMode('problem');
+          }
         }
 
         // 詰碁の解答結果（先生用: 生徒ごとの挑戦中/正解/不正解を集計する）
@@ -2538,8 +2550,6 @@ function App() {
             onResumeGame={handleResumeGame}
             onSelectSavedGame={handleSelectSavedGame}
             onCreateRecord={openRecordStart}
-            tsumegoRatingState={tsumegoRating}
-            onStartTsumegoRating={handleStartTsumegoRating}
           />
         )}
 
