@@ -80,6 +80,7 @@ import { useNotificationSound } from './hooks/useNotificationSound';
 import { useParticipantLog } from './hooks/useParticipantLog';
 import { useIdleAloneExit } from './hooks/useIdleAloneExit';
 import { useMicrophoneMonitor } from './hooks/useMicrophoneMonitor';
+import { useCameraMonitor } from './hooks/useCameraMonitor';
 import type { ChatMessagePayload } from './types/chat';
 import type { AiAnalysisSyncPayload } from './types/ai';
 import { resolveEffectiveViewMode } from './utils/viewMode';
@@ -567,6 +568,15 @@ function App() {
   const microphoneMonitor = useMicrophoneMonitor(
     classroomRef.current,
     role === 'TEACHER' && connectionState === ConnectionState.Connected && isMicEnabled,
+  );
+  const cameraMonitor = useCameraMonitor(
+    classroomRef.current,
+    // 対局盤などで映像タイルを外している間は、video要素が止まって見えるため監視しない。
+    // 講師ホームにいる間だけ、実際に表示中のカメラを監視する。
+    role === 'TEACHER'
+      && connectionState === ConnectionState.Connected
+      && isCameraEnabled
+      && viewMode === 'lobby',
   );
   // 自動入室・先生待ちの再試行・手動ボタンが重なっても接続を1本だけ開始する。
   const connectionAttemptRef = useRef<Promise<void> | null>(null);
@@ -2417,6 +2427,10 @@ function App() {
           microphoneLevel={microphoneMonitor.level}
           microphoneWarning={role === 'TEACHER' ? microphoneMonitor.warning : undefined}
           onDismissMicrophoneWarning={microphoneMonitor.dismissWarning}
+          cameraWarning={role === 'TEACHER' ? cameraMonitor.warning : undefined}
+          cameraRecovering={cameraMonitor.recovering}
+          onRetryCamera={() => { void cameraMonitor.restartCamera(); }}
+          onDismissCameraWarning={cameraMonitor.dismissWarning}
           onDisconnect={handleDisconnect}
         />
       )}

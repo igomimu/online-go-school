@@ -150,4 +150,22 @@ describe('Header', () => {
     fireEvent.click(screen.getByRole('button', { name: 'マイク警告を閉じる' }));
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
+
+  it('カメラ停止の警告から再起動と閉じる操作ができる', () => {
+    const onRetry = vi.fn();
+    const onDismiss = vi.fn();
+    render(
+      <Header
+        {...defaultProps}
+        cameraWarning="カメラ映像を再開できませんでした。"
+        onRetryCamera={onRetry}
+        onDismissCameraWarning={onDismiss}
+      />,
+    );
+    expect(screen.getByTestId('teacher-camera-warning')).toHaveTextContent('カメラ映像を再開できませんでした');
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' }));
+    fireEvent.click(screen.getByRole('button', { name: 'カメラ警告を閉じる' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
 });

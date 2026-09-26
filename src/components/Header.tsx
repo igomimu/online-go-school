@@ -30,6 +30,10 @@ interface HeaderProps {
   microphoneLevel?: number;
   microphoneWarning?: string;
   onDismissMicrophoneWarning?: () => void;
+  cameraWarning?: string;
+  cameraRecovering?: boolean;
+  onRetryCamera?: () => void;
+  onDismissCameraWarning?: () => void;
 }
 
 export default function Header({
@@ -50,6 +54,10 @@ export default function Header({
   microphoneLevel = 0,
   microphoneWarning = '',
   onDismissMicrophoneWarning,
+  cameraWarning = '',
+  cameraRecovering = false,
+  onRetryCamera,
+  onDismissCameraWarning,
 }: HeaderProps) {
   const isConnected = connectionState === ConnectionState.Connected;
   const pwaInstall = usePwaInstall();
@@ -244,6 +252,36 @@ export default function Header({
               onClick={onDismissMicrophoneWarning}
               className="rounded p-1 hover:bg-alert/15"
               aria-label="マイク警告を閉じる"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+      {isConnected && role === 'TEACHER' && cameraWarning && (
+        <div
+          role="alert"
+          data-testid="teacher-camera-warning"
+          className="order-last flex basis-full items-center gap-2 rounded-md border border-alert/40 bg-alert/12 px-3 py-2 text-xs text-alert-text"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span className="flex-1">{cameraWarning}</span>
+          {onRetryCamera && (
+            <button
+              type="button"
+              onClick={onRetryCamera}
+              disabled={cameraRecovering}
+              className="rounded border border-alert/30 px-2 py-1 font-bold hover:bg-alert/15 disabled:opacity-50"
+            >
+              {cameraRecovering ? '再起動中…' : 'もう一度試す'}
+            </button>
+          )}
+          {onDismissCameraWarning && (
+            <button
+              type="button"
+              onClick={onDismissCameraWarning}
+              className="rounded p-1 hover:bg-alert/15"
+              aria-label="カメラ警告を閉じる"
             >
               <X className="h-3.5 w-3.5" />
             </button>
