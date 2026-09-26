@@ -83,3 +83,52 @@ test('共有を外した生徒には検討が届かない', async ({ browser }) 
     await teardownSupabaseRoster(classroomId);
   }
 });
+
+// 2026-09-26 三村さん「検討の時に、選択されている生徒に碁盤が見えないことがある。オンオフすると表示される」。
+// 開始の合図は入室中の生徒にしか届かないので、検討中に入り直した生徒はロビーに取り残されていた。
+test('検討中に入り直した生徒にも、今の検討が届く', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const classroomId = generateClassroomId('rejoin');
+  const contexts: BrowserContext[] = [];
+  const newPage = async (): Promise<Page> => {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    contexts.push(ctx);
+    return ctx.newPage();
+  };
+
+  try {
+    const teacherPage = await newPage();
+    const studentPage = await newPage();
+
+    await teacherPage.goto('/');
+    await clearAllData(teacherPage);
+    await setupTeacherPassword(teacherPage, TEST_TEACHER_PASSWORD);
+    await setupClassroomData(teacherPage, classroomId);
+    await teacherPage.reload();
+
+    await studentPage.goto('/');
+    await clearAllData(studentPage);
+    await setupClassroomData(studentPage, classroomId);
+    await studentPage.reload();
+
+    await loginAsTeacher(teacherPage);
+    await openClassroomAndConnect(teacherPage);
+    await loginAsStudent(studentPage, { studentCode: TEST_STUDENT_A.code, classroomId });
+    await waitForStudentJoined(teacherPage, TEST_STUDENT_A.id);
+
+    const review = await loadSgfForReview(teacherPage, '(;FF[4]GM[1]SZ[9];B[ee];W[cc])');
+    await expect(studentPage.getByText('検討モード')).toBeVisible({ timeout: 15_000 });
+    await review.getByTitle('一手進む').click();
+    await expect(review.getByText('1手目')).toBeVisible({ timeout: 10_000 });
+    await expect(studentPage.getByText('1手目')).toBeVisible({ timeout: 10_000 });
+
+    // 生徒が再読み込みして入り直す（iPadのスリープ復帰・回線復旧と同じ）
+    await studentPage.reload();
+    await expect(studentPage.getByText('検討モード')).toBeVisible({ timeout: 30_000 });
+    // 開始時の0手目ではなく、先生が今見せている局面
+    await expect(studentPage.getByText('1手目')).toBeVisible({ timeout: 10_000 });
+  } finally {
+    for (const ctx of contexts) await ctx.close().catch(() => {});
+    await teardownSupabaseRoster(classroomId);
+  }
+});

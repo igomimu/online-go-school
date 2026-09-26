@@ -6,6 +6,7 @@ import { generateSGFTree, parseSGFTree } from './utils/sgfUtils';
 import { playReviewMove } from './utils/reviewMove';
 import {
   getSharingTargetChanges,
+  isSharingTarget,
   toggleSharingTarget,
   type SharingTargets,
 } from './utils/sharingTargets';
@@ -773,6 +774,11 @@ function App() {
           }
         }
 
+        // 入り直した生徒からの「今の検討をください」（先生用）
+        if (msg.type === 'REVIEW_SYNC_REQUEST' && connectRole === 'TEACHER' && sender) {
+          rejoinReviewRef.current(sender);
+        }
+
         // 許可した生徒の手順移動（先生用）。動かすのは先生の盤で、結果が全員に返る
         if (msg.type === 'REVIEW_STUDENT_NAV' && connectRole === 'TEACHER' && msg.payload && sender) {
           const p = msg.payload as import('./types/game').ReviewStudentNavPayload;
@@ -894,6 +900,9 @@ function App() {
       // LiveKitのReconnectedイベントを正本にして直前の利用状態を再適用する。
       onReconnected: () => {
         void restoreMediaIntent(classroom, connectRole);
+        if (connectRole === 'STUDENT') {
+          void classroom.sendTo({ type: 'REVIEW_SYNC_REQUEST', payload: {} }, [TEACHER_IDENTITY]);
+        }
       },
       onActiveSpeakersChanged: (speakers: string[]) => {
         setActiveSpeakers(speakers);
@@ -939,11 +948,16 @@ function App() {
 
       await classroom.connect({ url: livekitUrl, token: connectToken });
       await restoreMediaIntent(classroom, connectRole);
+      if (connectRole === 'STUDENT') {
+        // 検討の途中なら、今の盤を先生に頼む（rejoinReviewRef の説明を参照）
+        void classroom.sendTo({ type: 'REVIEW_SYNC_REQUEST', payload: {} }, [TEACHER_IDENTITY]);
+      }
       if (connectRole === 'TEACHER') {
         // 接続時点ですでに居る生徒は ParticipantJoined が発火しないため、ここで復元する。
         classroom.remoteIdentities.forEach(identity => {
           const permission = audioPermissionsRef.current[identity];
           if (permission) sendTeacherAudioPermission(classroom, identity, permission);
+          rejoinReviewRef.current(identity);
         });
       }
       setConnectionError('');
@@ -1177,6 +1191,45 @@ function App() {
     void classroomRef.current?.sendTo({ type: 'REVIEW_STUDENT_NAV', payload: { index } }, [TEACHER_IDENTITY]);
   }, []);
 
+  // 検討の途中から生徒を入れる: 開始データ → 今の盤 → 着手の許可の順で送る。
+  // 共有を入れ直したときと、検討中に生徒が入り直したときの共通の口。
+  const sendReviewJoin = useCallback(async (identities: string[]) => {
+    const room = classroomRef.current;
+    const sourceSgf = reviewSourceSgfRef.current;
+    if (!room?.isConnected || !sourceSgf || !reviewCurrentNode || identities.length === 0) return;
+    await room.sendTo({
+      type: 'REVIEW_START',
+      payload: { sgf: sourceSgf, boardSize: reviewBoardSize },
+    }, identities);
+    await room.sendTo({
+      type: 'BOARD_UPDATE',
+      payload: reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize, reviewNumberModeRef.current, reviewBranchStartIdRef.current),
+    }, identities);
+    await room.sendTo({
+      type: 'REVIEW_PERMISSIONS',
+      payload: { allowed: reviewMovePermissionsRef.current },
+    }, identities);
+  }, [reviewCurrentNode, reviewBoardSize]);
+
+  // 🔴 検討中に生徒が入り直したら、その生徒へ検討を送り直す（2026-09-26 三村さん
+  // 「選択されている生徒に碁盤が見えないことがある。オンオフすると表示される」）。
+  // 開始の合図は入室していた生徒にしか届かない。iPadのスリープ・再読み込み・回線復旧で
+  // 入り直した生徒は、先生の画面では共有中なのに自分はロビーのまま取り残されていた。
+  // 共有のオンオフで直るのは、そのときだけ上の sendReviewJoin が走るから。
+  //
+  // 合図は生徒から頼ませる（REVIEW_SYNC_REQUEST）。先生側で入室を見て送ると、
+  // 生徒の受け口が整う前に開始の合図が着いて捨てられ、盤だけが「授業モード」で残った
+  // （E2E で再現）。先生が入り直したときは、居る生徒全員へ先生から送り直す。
+  // ハンドラは接続時に作られるので、最新の状態は ref 越しに見る。
+  const rejoinReviewRef = useRef<(identity: string) => void>(() => {});
+  useEffect(() => {
+    rejoinReviewRef.current = (identity: string) => {
+      if (role !== 'TEACHER' || viewMode !== 'review') return;
+      if (!isSharingTarget(reviewTargetStudentsRef.current, identity)) return;
+      void sendReviewJoin([identity]);
+    };
+  }, [role, viewMode, sendReviewJoin]);
+
   // ホームと検討室で共通の参加者更新。
   // 検討中に外した生徒は即時退出、戻した生徒は開始データ→現在盤の順で途中参加させる。
   const updateReviewTargets = useCallback((next: SharingTargets) => {
@@ -1199,24 +1252,8 @@ function App() {
       void room.sendTo({ type: 'REVIEW_END', payload: {} }, removed);
     }
 
-    const sourceSgf = reviewSourceSgfRef.current;
-    if (added.length > 0 && sourceSgf && reviewCurrentNode) {
-      void (async () => {
-        await room.sendTo({
-          type: 'REVIEW_START',
-          payload: { sgf: sourceSgf, boardSize: reviewBoardSize },
-        }, added);
-        await room.sendTo({
-          type: 'BOARD_UPDATE',
-          payload: reviewBoardUpdatePayload(reviewCurrentNode, reviewBoardSize, reviewNumberModeRef.current, reviewBranchStartIdRef.current),
-        }, added);
-        await room.sendTo({
-          type: 'REVIEW_PERMISSIONS',
-          payload: { allowed: reviewMovePermissionsRef.current },
-        }, added);
-      })();
-    }
-  }, [role, viewMode, reviewCurrentNode, reviewBoardSize]);
+    if (added.length > 0) void sendReviewJoin(added);
+  }, [role, viewMode, sendReviewJoin]);
 
   // 生徒一覧の「共有」列。開始前の対象選択にも、検討中の入退室にも使う。
   const toggleSharingStudent = useCallback((identity: string) => {
