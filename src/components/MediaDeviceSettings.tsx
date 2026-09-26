@@ -4,12 +4,17 @@ import { Settings2, X } from 'lucide-react';
 import type { ClassroomRtc } from '../utils/classroomRtc';
 import {
   DEVICE_LABEL,
+  getExcludedMics,
   getSavedDeviceId,
+  isExcludedMic,
+  isPseudoDevice,
   listDevices,
   needsPermissionForLabels,
   saveDeviceId,
   saveMirrorLocalVideo,
+  setMicExcluded,
   type DeviceKind,
+  type ExcludedMic,
   type MediaDeviceChoice,
 } from '../utils/mediaDevices';
 import { useMirrorLocalVideo } from '../hooks/useMirrorLocalVideo';
@@ -38,7 +43,9 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
     audioinput: getSavedDeviceId('audioinput') ?? '',
     videoinput: getSavedDeviceId('videoinput') ?? '',
   });
+  const [excludedMics, setExcludedMics] = useState<ExcludedMic[]>(getExcludedMics);
   const [needsPermission, setNeedsPermission] = useState(false);
+  const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const mirrorLocalVideo = useMirrorLocalVideo();
 
@@ -95,6 +102,37 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
     }
   }, [classroom]);
 
+  // 「既定」「通信」は実機の別名。除外の判定は実機で行い、一覧にも実機だけ出す
+  const realMicOf = (d: MediaDeviceChoice) => (isPseudoDevice(d.deviceId)
+    ? devices.audioinput.find(m => !isPseudoDevice(m.deviceId) && m.groupId === d.groupId) ?? d
+    : d);
+  const micIsExcluded = (d: MediaDeviceChoice) => isExcludedMic(realMicOf(d), excludedMics);
+  const physicalMics = devices.audioinput.filter(d => !isPseudoDevice(d.deviceId));
+  // いまは挿さっていないが除外してある機器も、外せるように並べる
+  const absentExcluded = excludedMics.filter(m => !physicalMics.some(d => isExcludedMic(d, [m])));
+
+  const toggleExcluded = useCallback(async (mic: ExcludedMic, excluded: boolean) => {
+    const next = setMicExcluded(mic, excluded);
+    setExcludedMics(next);
+    setNotice('');
+    // 選んでいたマイクを除外したら、選択は「自動（除外以外）」へ戻す
+    const chosen = devices.audioinput.find(d => d.deviceId === selected.audioinput);
+    if (excluded && chosen && isExcludedMic(realMicOf(chosen), next)) {
+      setSelected(prev => ({ ...prev, audioinput: '' }));
+      saveDeviceId('audioinput', null);
+    }
+    if (!classroom?.enforceMicPolicy) return;
+    try {
+      const result = await classroom.enforceMicPolicy();
+      if (result === 'switched') setNotice('使わないマイクを拾っていたので、別のマイクへ切り替えました。');
+      setError('');
+    } catch (err) {
+      setError(`マイクを確かめられませんでした: ${err instanceof Error ? err.message : err}`);
+    }
+    // realMicOf は devices から作り直されるだけなので依存に入れない
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classroom, devices, selected.audioinput]);
+
   const renderRow = (kind: DeviceKind) => (
     <label className="block space-y-1">
       <span className="block text-xs text-muted">{DEVICE_LABEL[kind]}</span>
@@ -104,8 +142,10 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
         onChange={e => void choose(kind, e.target.value)}
         className="w-full rounded-md border border-field-line bg-ground px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none"
       >
-        <option value="">自動（ブラウザにまかせる）</option>
-        {devices[kind].map(d => (
+        <option value="">
+          {kind === 'audioinput' && excludedMics.length > 0 ? '自動（使わないマイク以外）' : '自動（ブラウザにまかせる）'}
+        </option>
+        {devices[kind].filter(d => kind !== 'audioinput' || !micIsExcluded(d)).map(d => (
           <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
         ))}
       </select>
@@ -157,6 +197,38 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
               )}
 
               {renderRow('audioinput')}
+
+              {/* 挿さっていても使わないマイク。既定になっても、選んだ機器が外れても掴まない。
+                  機器名が取れる前は仮の名前しか無く、名前で覚えると取り違えるので出さない */}
+              {!needsPermission && (physicalMics.length > 1 || excludedMics.length > 0) && (
+                <fieldset className="space-y-1" data-testid="excluded-mics">
+                  <legend className="text-xs text-muted">使わないマイク</legend>
+                  {physicalMics.map(d => (
+                    <label key={d.deviceId} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        data-testid={`exclude-mic-${d.deviceId}`}
+                        checked={isExcludedMic(d, excludedMics)}
+                        onChange={e => void toggleExcluded({ deviceId: d.deviceId, label: d.label }, e.target.checked)}
+                      />
+                      <span className="min-w-0 break-words">{d.label}</span>
+                    </label>
+                  ))}
+                  {absentExcluded.map(m => (
+                    <label key={`${m.deviceId}:${m.label}`} className="flex items-center gap-2 text-sm text-muted">
+                      <input
+                        type="checkbox"
+                        checked
+                        onChange={() => void toggleExcluded(m, false)}
+                      />
+                      <span className="min-w-0 break-words">{m.label}（いまは未接続）</span>
+                    </label>
+                  ))}
+                  <p className="text-xs text-muted">
+                    チェックしたマイクは、つながっていても使いません。
+                  </p>
+                </fieldset>
+              )}
               {renderRow('videoinput')}
 
               {/* 自分の映像の向き。生徒に届くのは常に実像で、ここは手元の見え方だけを変える */}
@@ -177,6 +249,7 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
                 </span>
               </label>
 
+              {notice && <p className="text-xs text-ink">{notice}</p>}
               {error && <p className="text-xs text-alert-text">{error}</p>}
 
               <p className="text-xs text-muted">

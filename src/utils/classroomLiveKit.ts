@@ -8,7 +8,8 @@ import {
   Track,
   type Participant,
 } from 'livekit-client';
-import { getSavedDeviceId } from './mediaDevices';
+import { getSavedDeviceId, NO_ALLOWED_MIC_MESSAGE } from './mediaDevices';
+import { enforceMic, prepareMic, watchMicDevices } from './micGuard';
 import { ConnectionState, RELIABLE_TYPES } from './classroomRtc';
 import type {
   AudioDebugInfo,
@@ -50,6 +51,7 @@ export class ClassroomLiveKit implements ClassroomRtc {
   onVideoTrackChanged?: (info: VideoTrackInfo) => void;
   /** 録画中に音声トラックが増減したときに知らせる（録画に途中参加の生徒の声を混ぜるため） */
   onAudioTracksChanged?: () => void;
+  private stopWatchingMics?: () => void;
 
   constructor() {
     this.room = new Room({
@@ -203,6 +205,8 @@ export class ClassroomLiveKit implements ClassroomRtc {
     await this.room.startAudio();
     // 「回線復旧」で Room を作り直しても、選んだマイク・カメラを使い続ける
     await this.applySavedDevices();
+    this.stopWatchingMics?.();
+    this.stopWatchingMics = watchMicDevices(() => void this.checkMicPolicy());
     // 接続時点で既に room に存在する remote participants は
     // ParticipantConnected イベントを発火させないため、明示的に初回同期を発火する。
     // （後から参加する client 側で初期 participants が React state に反映されない問題の対策）
@@ -210,6 +214,8 @@ export class ClassroomLiveKit implements ClassroomRtc {
   }
 
   async disconnect(): Promise<void> {
+    this.stopWatchingMics?.();
+    this.stopWatchingMics = undefined;
     await this.room.disconnect();
   }
 
@@ -360,7 +366,27 @@ export class ClassroomLiveKit implements ClassroomRtc {
   }
 
   async enableMicrophone(): Promise<void> {
+    // exact 指定で固定する。外れていても別のマイクへは逃げず、点けるのに失敗させる
+    await prepareMic(id => this.room.switchActiveDevice('audioinput', id, true).then(() => {}));
     await this.room.localParticipant.setMicrophoneEnabled(true);
+    if (await enforceMic(this) === 'blocked') throw new Error(NO_ALLOWED_MIC_MESSAGE);
+  }
+
+  async enforceMicPolicy(): Promise<'ok' | 'switched' | 'blocked'> {
+    const result = await enforceMic(this);
+    if (result === 'blocked') {
+      this.notifyParticipantsChanged();
+      this.handlers.onMicrophoneBlocked?.(NO_ALLOWED_MIC_MESSAGE);
+    }
+    return result;
+  }
+
+  private async checkMicPolicy(): Promise<void> {
+    try {
+      await this.enforceMicPolicy();
+    } catch (err) {
+      console.warn('[media] マイクの確認に失敗しました', err);
+    }
   }
 
   async disableMicrophone(): Promise<void> {
@@ -369,7 +395,8 @@ export class ClassroomLiveKit implements ClassroomRtc {
 
   async toggleMicrophone(): Promise<boolean> {
     const current = this.room.localParticipant.isMicrophoneEnabled;
-    await this.room.localParticipant.setMicrophoneEnabled(!current);
+    if (current) await this.disableMicrophone();
+    else await this.enableMicrophone();
     return !current;
   }
 

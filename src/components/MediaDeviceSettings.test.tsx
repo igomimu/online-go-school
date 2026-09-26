@@ -27,8 +27,8 @@ describe('MediaDeviceSettings', () => {
   it('開くと繋がっている機器を並べる', async () => {
     render(<MediaDeviceSettings classroom={null} />);
     fireEvent.click(screen.getByTestId('media-device-settings'));
-    await waitFor(() => expect(screen.getByText('ヤマハ AG03')).toBeInTheDocument());
-    expect(screen.getByText('内蔵マイク')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText('ヤマハ AG03').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('内蔵マイク').length).toBeGreaterThan(0);
     expect(screen.getByText('Logicool C920')).toBeInTheDocument();
     // 何も選ばなければブラウザ任せ
     expect(screen.getAllByText('自動（ブラウザにまかせる）').length).toBe(2);
@@ -60,7 +60,7 @@ describe('MediaDeviceSettings', () => {
     const switchDevice = vi.fn().mockResolvedValue(undefined);
     render(<MediaDeviceSettings classroom={{ switchDevice } as unknown as ClassroomRtc} />);
     fireEvent.click(screen.getByTestId('media-device-settings'));
-    await waitFor(() => expect(screen.getByText('ヤマハ AG03')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('ヤマハ AG03').length).toBeGreaterThan(0));
 
     fireEvent.change(screen.getByTestId('device-select-audioinput'), { target: { value: 'mic-a' } });
     await waitFor(() => expect(switchDevice).toHaveBeenCalledWith('audioinput', 'mic-a'));
@@ -72,12 +72,49 @@ describe('MediaDeviceSettings', () => {
     const switchDevice = vi.fn().mockRejectedValue(new Error('使用中です'));
     render(<MediaDeviceSettings classroom={{ switchDevice } as unknown as ClassroomRtc} />);
     fireEvent.click(screen.getByTestId('media-device-settings'));
-    await waitFor(() => expect(screen.getByText('ヤマハ AG03')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('ヤマハ AG03').length).toBeGreaterThan(0));
 
     fireEvent.change(screen.getByTestId('device-select-audioinput'), { target: { value: 'mic-a' } });
     await waitFor(() =>
       expect(screen.getByText(/マイクを切り替えられませんでした/)).toBeInTheDocument()
     );
+  });
+
+  it('使わないマイクに登録すると選択肢から消え、端末に残る', async () => {
+    const enforceMicPolicy = vi.fn().mockResolvedValue('switched');
+    render(<MediaDeviceSettings classroom={{ enforceMicPolicy } as unknown as ClassroomRtc} />);
+    fireEvent.click(screen.getByTestId('media-device-settings'));
+    await waitFor(() => expect(screen.getByTestId('exclude-mic-mic-b')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('exclude-mic-mic-b'));
+    await waitFor(() => expect(enforceMicPolicy).toHaveBeenCalled());
+    const select = screen.getByTestId('device-select-audioinput');
+    expect(select.querySelector('option[value="mic-b"]')).toBeNull();
+    expect(select.querySelector('option[value="mic-a"]')).not.toBeNull();
+    expect(screen.getByText('自動（使わないマイク以外）')).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('go-school-excluded-mics') ?? '[]'))
+      .toEqual([{ deviceId: 'mic-b', label: '内蔵マイク' }]);
+    expect(await screen.findByText(/別のマイクへ切り替えました/)).toBeInTheDocument();
+  });
+
+  it('選んでいたマイクを除外したら、選択を自動へ戻す', async () => {
+    localStorage.setItem('go-school-device-mic', 'mic-b');
+    render(<MediaDeviceSettings classroom={null} />);
+    fireEvent.click(screen.getByTestId('media-device-settings'));
+    await waitFor(() => expect(screen.getByTestId('exclude-mic-mic-b')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId('exclude-mic-mic-b'));
+    await waitFor(() => expect(localStorage.getItem('go-school-device-mic')).toBeNull());
+    expect((screen.getByTestId('device-select-audioinput') as HTMLSelectElement).value).toBe('');
+  });
+
+  it('いま挿さっていない除外済みのマイクも並べ、外せる', async () => {
+    localStorage.setItem('go-school-excluded-mics', JSON.stringify([{ deviceId: 'gone', label: 'USBマイク' }]));
+    render(<MediaDeviceSettings classroom={null} />);
+    fireEvent.click(screen.getByTestId('media-device-settings'));
+    const absent = await screen.findByText('USBマイク（いまは未接続）');
+    fireEvent.click(absent);
+    await waitFor(() => expect(localStorage.getItem('go-school-excluded-mics')).toBeNull());
   });
 
   it('機器名が空のときは、一度オンにするよう案内する', async () => {

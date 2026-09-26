@@ -898,6 +898,11 @@ function App() {
       onActiveSpeakersChanged: (speakers: string[]) => {
         setActiveSpeakers(speakers);
       },
+      // 除外したマイクしか残らず切った。黙って無音にすると誰も気づけない
+      onMicrophoneBlocked: (message: string) => {
+        setIsMicEnabled(false);
+        alert(`マイクを切りました。${message}`);
+      },
     });
 
     classroom.onSendError = (info) => {

@@ -80,6 +80,8 @@ export type ClassroomEventHandler = {
   onConnectionStateChanged?: (state: ConnectionState) => void;
   onReconnected?: () => void;
   onActiveSpeakersChanged?: (speakers: string[]) => void;
+  /** 除外したマイクしか残っておらず、マイクを切った（機器の抜き差しなどで起きる） */
+  onMicrophoneBlocked?: (message: string) => void;
 };
 
 export interface VideoTrackInfo {
@@ -160,6 +162,8 @@ export interface ClassroomRtc {
 
   switchDevice(kind: 'audioinput' | 'videoinput', deviceId: string): Promise<void>;
   applySavedDevices(): Promise<void>;
+  /** 除外したマイクを拾っていないか確かめ、拾っていれば切り替えるか切る */
+  enforceMicPolicy(): Promise<'ok' | 'switched' | 'blocked'>;
 
   /** 相手の声を鳴らすか止める。identities省略時は全員、指定時はその相手だけ */
   setRemoteAudioEnabled(enabled: boolean, identities?: string[]): void;

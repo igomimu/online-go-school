@@ -1,5 +1,6 @@
 import RealtimeKitClient from '@cloudflare/realtimekit';
-import { getSavedDeviceId } from './mediaDevices';
+import { getSavedDeviceId, NO_ALLOWED_MIC_MESSAGE } from './mediaDevices';
+import { enforceMic, prepareMic, watchMicDevices } from './micGuard';
 import { selectDuplicateStudentPeersToKick } from './realtimeParticipantDedup';
 import { ConnectionState, LATEST_ONLY_TYPES, RELIABLE_TYPES } from './classroomRtc';
 import type {
@@ -64,6 +65,7 @@ type QueuedMessage = { msg: ClassroomMessage; participantIds?: string[]; retried
 export class ClassroomRealtimeKit implements ClassroomRtc {
   private meeting: Meeting | null = null;
   private handlers: ClassroomEventHandler = {};
+  private stopWatchingMics?: () => void;
   private _videoElements = new Map<string, HTMLVideoElement>();
   private _audioElements = new Map<string, HTMLAudioElement>();
   private _state: ConnectionState = ConnectionState.Disconnected;
@@ -109,6 +111,8 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
 
     // 「回線復旧」で作り直しても、選んだマイク・カメラを使い続ける
     await this.applySavedDevices();
+    this.stopWatchingMics?.();
+    this.stopWatchingMics = watchMicDevices(() => void this.checkMicPolicy());
 
     // 入室した時点で既に居る人はイベントが飛ばないので、ここで拾っておく
     this.remotePeers().forEach((p) => {
@@ -366,6 +370,8 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   }
 
   async disconnect(): Promise<void> {
+    this.stopWatchingMics?.();
+    this.stopWatchingMics = undefined;
     await this.meeting?.leave();
     this.setState(ConnectionState.Disconnected);
   }
@@ -580,8 +586,26 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   // `videoUpdate` / `audioUpdate` が切ったときに飛ばないことがあり、
   // 画面の「カメラ オフ」が被らないまま黒い四角が残る（2026-08-26 E2E で検出）。
   async enableMicrophone(): Promise<void> {
+    await prepareMic(id => this.switchDevice('audioinput', id));
     await this.meeting?.self.enableAudio();
     this.notifyParticipantsChanged();
+    if (await enforceMic(this) === 'blocked') throw new Error(NO_ALLOWED_MIC_MESSAGE);
+  }
+
+  async enforceMicPolicy(): Promise<'ok' | 'switched' | 'blocked'> {
+    const result = await enforceMic(this);
+    if (result === 'blocked') {
+      this.handlers.onMicrophoneBlocked?.(NO_ALLOWED_MIC_MESSAGE);
+    }
+    return result;
+  }
+
+  private async checkMicPolicy(): Promise<void> {
+    try {
+      await this.enforceMicPolicy();
+    } catch (err) {
+      console.warn('[media] マイクの確認に失敗しました', err);
+    }
   }
 
   async disableMicrophone(): Promise<void> {
