@@ -5,6 +5,7 @@ import GoBoard from '../GoBoard';
 import { identityMatchesPlayer, studentIdentityCandidates } from '../../utils/identityUtils';
 import { useState } from 'react';
 import { Check, X, Clock } from 'lucide-react';
+import TsumegoRatingBadge from '../tsumego/TsumegoRatingBadge';
 
 interface ProblemMonitorPanelProps {
   problem: Problem;
@@ -169,7 +170,12 @@ export default function ProblemMonitorPanel({
               }`}
             >
               <span className="min-w-0">
-                <span className="block truncate">{row.displayName}</span>
+                <span className="flex items-center gap-1.5 truncate">
+                  <span className="truncate">{row.displayName}</span>
+                  {row.view?.ratingRankId && (
+                    <TsumegoRatingBadge rankId={row.view.ratingRankId} className="text-[10px] py-0 px-1.5" />
+                  )}
+                </span>
                 {row.view && row.view.problemNo !== undefined && (
                   <span data-testid="problem-monitor-progress" className="block text-xs text-muted">
                     {row.view.problemNo}問目・正解{row.view.solved ?? 0}・失敗{row.view.failed ?? 0}

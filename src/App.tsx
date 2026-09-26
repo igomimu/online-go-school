@@ -65,6 +65,16 @@ import ClassroomManager from './components/teacher/ClassroomManager';
 import ProblemBoard from './components/ProblemBoard';
 import ProblemMonitorPanel from './components/teacher/ProblemMonitorPanel';
 import type { ProblemResultView } from './types/problem';
+import type { TsumegoRatingState, RatingUpdateResult } from './types/tsumegoRating';
+import {
+  loadTsumegoRatingFromStorage,
+  saveTsumegoRatingToStorage,
+  createInitialRatingState,
+  pickRandomLevelForRank,
+} from './utils/tsumegoRating';
+import { fetchRandomTsumegoProblem } from './utils/tsumegoApi';
+import { tsumegoRowToProblem } from './utils/tsumegoConvert';
+import TsumegoInitialRankDialog from './components/tsumego/TsumegoInitialRankDialog';
 import { useChat } from './hooks/useChat';
 import { useNotificationSound } from './hooks/useNotificationSound';
 import { useParticipantLog } from './hooks/useParticipantLog';
@@ -379,6 +389,9 @@ function App() {
   const [problemResults, setProblemResults] = useState<Record<string, ProblemResultView>>({});
   // 先生用: 詰碁の出題先（null=全員）。配信終了の合図もここへだけ送る
   const [problemTargets, setProblemTargets] = useState<string[] | null>(null);
+  // 詰碁 格付けチャレンジ用
+  const [tsumegoRating, setTsumegoRating] = useState<TsumegoRatingState | null>(null);
+  const [showInitialRankDialog, setShowInitialRankDialog] = useState(false);
 
   // オーディオデバッグ
   const [audioDebug, setAudioDebug] = useState('');
@@ -437,6 +450,60 @@ function App() {
       .catch(err => console.warn('[roster] 生徒名簿を取得できませんでした:', err));
     return () => { alive = false; };
   }, [role, studentId]);
+
+  // 詰碁 格付けチャレンジのスコープキー
+  const tsumegoScope = studentId || rawStudentCode || userName;
+
+  // 生徒の格付けデータをlocalStorageから復元
+  useEffect(() => {
+    if (role === 'STUDENT') {
+      const saved = loadTsumegoRatingFromStorage(tsumegoScope);
+      if (saved) {
+        setTsumegoRating(saved);
+      }
+    }
+  }, [role, tsumegoScope]);
+
+  const startRatingProblem = useCallback(async (rating: TsumegoRatingState) => {
+    try {
+      const level = pickRandomLevelForRank(rating.rankId);
+      const row = await fetchRandomTsumegoProblem({ level, boardSize: 19 });
+      if (row) {
+        const p = tsumegoRowToProblem(row);
+        p.lives = 3;
+        setActiveProblem(p);
+        setViewMode('problem');
+      }
+    } catch (err) {
+      console.error('Failed to start rating problem:', err);
+    }
+  }, []);
+
+  const handleStartTsumegoRating = useCallback(async () => {
+    let rating = tsumegoRating;
+    if (!rating) {
+      rating = loadTsumegoRatingFromStorage(tsumegoScope);
+      if (rating) setTsumegoRating(rating);
+    }
+    if (!rating) {
+      setShowInitialRankDialog(true);
+      return;
+    }
+    await startRatingProblem(rating);
+  }, [tsumegoRating, tsumegoScope, startRatingProblem]);
+
+  const handleSelectInitialRank = useCallback(async (selectedRankId: string) => {
+    setShowInitialRankDialog(false);
+    const initial = createInitialRatingState(selectedRankId);
+    setTsumegoRating(initial);
+    saveTsumegoRatingToStorage(initial, tsumegoScope);
+    await startRatingProblem(initial);
+  }, [tsumegoScope, startRatingProblem]);
+
+  const handleTsumegoRatingUpdate = useCallback((result: RatingUpdateResult) => {
+    setTsumegoRating(result.nextState);
+    saveTsumegoRatingToStorage(result.nextState, tsumegoScope);
+  }, [tsumegoScope]);
 
   // 名簿を読み直したら、配る棋力表示も教室の設定に合わせる
   useEffect(() => {
@@ -2471,6 +2538,8 @@ function App() {
             onResumeGame={handleResumeGame}
             onSelectSavedGame={handleSelectSavedGame}
             onCreateRecord={openRecordStart}
+            tsumegoRatingState={tsumegoRating}
+            onStartTsumegoRating={handleStartTsumegoRating}
           />
         )}
 
@@ -2635,6 +2704,8 @@ function App() {
           <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4"><ErrorBoundary label="この画面">
             <ProblemBoard
               problem={activeProblem}
+              ratingState={tsumegoRating}
+              onRatingUpdate={handleTsumegoRatingUpdate}
               onBack={() => {
                 setViewMode('lobby');
                 setActiveProblem(null);
@@ -2652,6 +2723,8 @@ function App() {
                     solved: progress.solved,
                     failed: progress.failed,
                     timedOut: progress.timedOut,
+                    ratingRankId: tsumegoRating?.rankId,
+                    ratingPoints: tsumegoRating?.points,
                   },
                 });
               }}
@@ -2676,6 +2749,8 @@ function App() {
                       viewRange: problem.viewRange,
                       difficulty: problem.difficulty,
                     },
+                    ratingRankId: tsumegoRating?.rankId,
+                    ratingPoints: tsumegoRating?.points,
                   } satisfies import('./types/problem').ProblemResultPayload,
                 }, [TEACHER_IDENTITY]);
               }}
@@ -2798,6 +2873,14 @@ function App() {
           classrooms={classrooms}
           onDataChanged={reloadClassroomData}
           onClose={() => setShowStudentManager(false)}
+        />
+      )}
+
+      {/* 詰碁 初回格付けスタート選択ダイアログ */}
+      {showInitialRankDialog && (
+        <TsumegoInitialRankDialog
+          onSelectInitialRank={handleSelectInitialRank}
+          onClose={() => setShowInitialRankDialog(false)}
         />
       )}
     </div>

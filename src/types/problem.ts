@@ -44,6 +44,8 @@ export interface ProblemResultPayload {
   failed?: number;             // ライフが尽きた・時間切れの問題数
   timedOut?: boolean;          // この結果が時間切れによるものか
   current?: ProblemPreview;    // 問題が変わったときだけ付ける（生徒ごとに違う問題へ進むため）
+  ratingRankId?: string;       // 詰碁格付けランクID（例: 'bronze_3'）
+  ratingPoints?: number;       // 現在の勝ち点
 }
 
 /** 先生のモニターが生徒ごとに覚えておく最新の状況 */

@@ -134,4 +134,47 @@ describe('ProblemBoard のライフと次の問題', () => {
     render(<ProblemBoard problem={makeProblem('a', 3)} onBack={() => {}} />);
     expect(screen.queryByTestId('problem-timer')).toBeNull();
   });
+
+  it('格付けモードで正解するとゲージポイントが増加する', () => {
+    const onRatingUpdate = vi.fn();
+    const initialRating = {
+      rankId: 'bronze_4',
+      points: 2,
+      consecutiveWins: 1,
+      protectionCount: 0,
+      totalSolved: 10,
+      totalAttempts: 15,
+      highestRankId: 'bronze_4',
+      lastUpdated: new Date().toISOString(),
+    };
+
+    render(
+      <ProblemBoard
+        problem={makeProblem('a', 3)}
+        onBack={() => {}}
+        ratingState={initialRating}
+        onRatingUpdate={onRatingUpdate}
+      />
+    );
+
+    expect(screen.getByTestId('tsumego-rating-bar')).toBeInTheDocument();
+    expect(screen.getByText('ブロンズ棋士 Ⅳ')).toBeInTheDocument();
+    expect(screen.getByText('2/5 pt')).toBeInTheDocument();
+
+    // 正解の手を打つ
+    fireEvent.click(screen.getByText('正解の手'));
+
+    expect(onRatingUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'none',
+        nextState: expect.objectContaining({
+          rankId: 'bronze_4',
+          points: 3,
+          consecutiveWins: 2,
+          totalSolved: 11,
+        }),
+      })
+    );
+  });
 });
+

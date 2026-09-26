@@ -389,4 +389,41 @@ describe('Lobby', () => {
       expect(screen.getByTestId('participant-rank')).toHaveTextContent('R12');
     });
   });
+
+  describe('詰碁 格付けチャレンジ', () => {
+    it('生徒ロビーで格付けカードと開始ボタンが表示され、クリックできる', () => {
+      const onStart = vi.fn();
+      render(
+        <Lobby
+          role="STUDENT"
+          participants={mockParticipants}
+          localIdentity="たろう"
+          activeSpeakers={[]}
+          games={[]}
+          studentJoinInfo=""
+          onSelectGame={vi.fn()}
+          myIdentity="たろう"
+          onStartTsumegoRating={onStart}
+          tsumegoRatingState={{
+            rankId: 'silver_3',
+            points: 2,
+            consecutiveWins: 1,
+            protectionCount: 0,
+            totalSolved: 12,
+            totalAttempts: 18,
+            highestRankId: 'silver_3',
+            lastUpdated: new Date().toISOString(),
+          }}
+        />
+      );
+
+      expect(screen.getByText('詰碁 格付けチャレンジ')).toBeInTheDocument();
+      expect(screen.getByText('シルバー棋士 Ⅲ')).toBeInTheDocument();
+      const btn = screen.getByTestId('start-tsumego-rating-btn');
+      expect(btn).toHaveTextContent('格付けに挑戦する');
+      fireEvent.click(btn);
+      expect(onStart).toHaveBeenCalledTimes(1);
+    });
+  });
 });
+

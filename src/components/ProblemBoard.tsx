@@ -1,11 +1,15 @@
 import GoBoard from './GoBoard';
 import type { Problem } from '../types/problem';
+import type { TsumegoRatingState, RatingUpdateResult } from '../types/tsumegoRating';
 import { useProblemSession } from '../hooks/useProblemSession';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchRandomTsumegoProblem } from '../utils/tsumegoApi';
 import { tsumegoRowToProblem } from '../utils/tsumegoConvert';
+import { processRatingUpdate, pickRandomLevelForRank } from '../utils/tsumegoRating';
 import { Check, X, RotateCcw, Flag, Heart, Timer } from 'lucide-react';
 import TsumegoReportModal from './TsumegoReportModal';
+import TsumegoRatingBar from './tsumego/TsumegoRatingBar';
+import TsumegoRankTransitionModal from './tsumego/TsumegoRankTransitionModal';
 
 export interface ProblemProgress {
   attempt: number;          // この問題の何回目の挑戦か
@@ -23,6 +27,10 @@ interface ProblemBoardProps {
   /** 問題を解き始めたとき（最初の1問と、自動で次へ進んだとき）。先生のモニターへ知らせる */
   onProblemStart?: (problem: Problem, progress: ProblemProgress) => void;
   isTeacher?: boolean;
+  /** 格付けチャレンジモードの現在の状態 */
+  ratingState?: TsumegoRatingState | null;
+  /** 格付け変動時のコールバック */
+  onRatingUpdate?: (result: RatingUpdateResult) => void;
 }
 
 /** 結果を見せてから次の問題へ進むまでの間 */
@@ -44,11 +52,22 @@ export default function ProblemBoard({
   onResult,
   onProblemStart,
   isTeacher,
+  ratingState,
+  onRatingUpdate,
 }: ProblemBoardProps) {
   const { problemState, startProblem, makeMove, timeUp, retry } = useProblemSession();
   const [showReport, setShowReport] = useState(false);
   // いま解いている問題。ライフ付きの出題では、解けたら・ライフが尽きたら生徒ごとに次へ進む
   const [current, setCurrent] = useState<Problem>(problem);
+  // 格付けチャレンジの状態
+  const [currentRating, setCurrentRating] = useState<TsumegoRatingState | null>(ratingState ?? null);
+  const [transitionModal, setTransitionModal] = useState<{
+    event: 'promoted' | 'demoted';
+    prevRankId: string;
+    newRankId: string;
+  } | null>(null);
+  const hasRatedCurrentRef = useRef(false);
+
   // まちがえた回数。結果を送る effect から読むので ref も持つ（state を依存に入れると二重に送る）
   const [misses, setMisses] = useState(0);
   const missesRef = useRef(0);
@@ -57,7 +76,7 @@ export default function ProblemBoard({
   const [nextError, setNextError] = useState<string | null>(null);
   const [loadingNext, setLoadingNext] = useState(false);
   const lives = current.lives;
-  const autoNext = problem.lives !== undefined;
+  const autoNext = problem.lives !== undefined || !!ratingState;
   // 1問ごとの制限時間。やり直しても時計は戻さない（三村さん 2026-09-19）
   const [remainingSec, setRemainingSec] = useState<number | null>(null);
   const [timedOut, setTimedOut] = useState(false);
@@ -73,11 +92,18 @@ export default function ProblemBoard({
   }, [problem]);
 
   useEffect(() => {
+    if (ratingState !== undefined) {
+      setCurrentRating(ratingState);
+    }
+  }, [ratingState]);
+
+  useEffect(() => {
     missesRef.current = 0;
     setMisses(0);
     setNextError(null);
     timedOutRef.current = false;
     setTimedOut(false);
+    hasRatedCurrentRef.current = false;
     startProblem(current);
     // 🔴 これが無いと、先生には次の結果が出るまで前の問題の「正解」が残り、
     // 碁盤も最初に出題した1問目のままだった（2026-09-26 三村さん）
@@ -115,6 +141,18 @@ export default function ProblemBoard({
       timedOutRef.current = true;
       setTimedOut(true);
       if (autoNext) statsRef.current = { ...statsRef.current, failed: statsRef.current.failed + 1 };
+      
+      // 格付け更新（時間切れ失敗）
+      if (currentRating && !hasRatedCurrentRef.current) {
+        hasRatedCurrentRef.current = true;
+        const res = processRatingUpdate(currentRating, false);
+        setCurrentRating(res.nextState);
+        onRatingUpdate?.(res);
+        if (res.event !== 'none') {
+          setTransitionModal({ event: res.event, prevRankId: res.previousRankId, newRankId: res.nextState.rankId });
+        }
+      }
+
       onResult?.('incorrect', state?.movesMade.length ?? 0, {
         attempt: missesRef.current + 1,
         livesLeft: lives === undefined ? null : Math.max(0, lives - missesRef.current),
@@ -125,17 +163,22 @@ export default function ProblemBoard({
     }, 250);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current, timeUp]);
+  }, [current, timeUp, currentRating, onRatingUpdate]);
 
   const goNext = useCallback(async () => {
     setLoadingNext(true);
     setNextError(null);
     try {
       let row = null;
+      // 格付けモード時は現在の格に応じた難易度を自動選出
+      const targetLevel = currentRating
+        ? pickRandomLevelForRank(currentRating.rankId)
+        : baseLevel(current.difficulty);
+
       // 同じ問題を続けて引かないよう、数回まで引き直す
       for (let i = 0; i < 5; i++) {
         const candidate = await fetchRandomTsumegoProblem({
-          level: baseLevel(current.difficulty),
+          level: targetLevel,
           boardSize: current.boardSize,
         });
         if (!candidate) break;
@@ -154,7 +197,7 @@ export default function ProblemBoard({
     } finally {
       setLoadingNext(false);
     }
-  }, [current]);
+  }, [current, currentRating]);
 
   useEffect(() => {
     const status = problemState?.status;
@@ -172,9 +215,22 @@ export default function ProblemBoard({
         ? { ...statsRef.current, solved: statsRef.current.solved + 1 }
         : { ...statsRef.current, failed: statsRef.current.failed + 1 };
     }
+
+    // 格付け更新（正解、またはライフ切れ失敗）
+    if (currentRating && finished && !hasRatedCurrentRef.current) {
+      hasRatedCurrentRef.current = true;
+      const isCorrect = status === 'correct';
+      const res = processRatingUpdate(currentRating, isCorrect);
+      setCurrentRating(res.nextState);
+      onRatingUpdate?.(res);
+      if (res.event !== 'none') {
+        setTransitionModal({ event: res.event, prevRankId: res.previousRankId, newRankId: res.nextState.rankId });
+      }
+    }
+
     onResult?.(status, problemState?.movesMade.length ?? 0, { attempt, livesLeft, ...statsRef.current, timedOut: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [problemState?.status, problemState?.movesMade.length, onResult]);
+  }, [problemState?.status, problemState?.movesMade.length, onResult, currentRating, onRatingUpdate]);
 
   const livesLeft = lives === undefined ? null : Math.max(0, lives - misses);
   const outOfLives = livesLeft === 0;
@@ -216,6 +272,21 @@ export default function ProblemBoard({
 
   return (
     <div className="flex min-h-full flex-col gap-3">
+      {/* 昇格・降格モーダル */}
+      {transitionModal && (
+        <TsumegoRankTransitionModal
+          event={transitionModal.event}
+          previousRankId={transitionModal.prevRankId}
+          newRankId={transitionModal.newRankId}
+          onClose={() => setTransitionModal(null)}
+        />
+      )}
+
+      {/* 格付けチャレンジの進捗バー */}
+      {currentRating && (
+        <TsumegoRatingBar state={currentRating} className="shrink-0" />
+      )}
+
       {/* ヘッダー */}
       <div className="glass-panel shrink-0 px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
