@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   TSUMEGO_RANKS,
   getRankById,
-  getRankIndex,
   createInitialRatingState,
   processRatingUpdate,
   pickRandomLevelForRank,
@@ -51,7 +50,7 @@ describe('tsumegoRating', () => {
 
   it('protects against demotion immediately after promotion', () => {
     // 昇格直後（protectionCount = 2, points = 0）
-    let state = {
+    const state = {
       ...createInitialRatingState('bronze_3'),
       points: 0,
       protectionCount: 2,
