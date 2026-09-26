@@ -60,6 +60,8 @@ test('3連勝した生徒のランクが上がり、講師と本人の両方に�
           white_player: `sid:${TEST_STUDENT_B.code}`,
           board_size: 19,
           status: 'playing',
+          // 明示しないと「ランクに入れない」になる（既定値）
+          rating_excluded: false,
         })
         .select('id')
         .single();
