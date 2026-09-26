@@ -21,6 +21,15 @@ export interface UseLiveGameListResult {
 
 const EMPTY_GAMES: LiveGameRow[] = [];
 
+/** 端末とDBの時計のずれを見込んだ「いま終わった」の幅 */
+const RECENT_FINISH_MS = 2 * 60 * 1000;
+
+/** 終局したばかりの行か。終局時刻が無い古い行は更新時刻で見る */
+export function finishedRecently(row: Pick<LiveGameRow, 'finished_at' | 'updated_at'>, now = Date.now()): boolean {
+  const at = Date.parse(row.finished_at ?? row.updated_at);
+  return Number.isFinite(at) && now - at < RECENT_FINISH_MS;
+}
+
 export function useLiveGameList(classroomId: string | null): UseLiveGameListResult {
   const [games, setGames] = useState<LiveGameRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -84,6 +93,13 @@ export function useLiveGameList(classroomId: string | null): UseLiveGameListResu
           });
         },
         onUpdate: (row) => {
+          // 🔴 昔に終わった対局の行が書き換わっても「いま終局した」とは扱わない。
+          // 2026-09-26、全対局に列を足す更新で過去の時間切れ局の知らせが一斉に出て、
+          // 一覧にも戻ってきた。終局の時刻が古いものは、知らせも一覧への追加もしない
+          if (row.status === 'finished' && !finishedRecently(row)) {
+            setGames((prev) => prev.map((g) => (g.id === row.id ? row : g)));
+            return;
+          }
           if (row.status === 'finished') {
             if (!seenFinishedGameIdsRef.current.has(row.id)) {
               seenFinishedGameIdsRef.current.add(row.id);

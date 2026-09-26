@@ -41,8 +41,9 @@ function game(overrides: Partial<LiveGameRow> = {}): LiveGameRow {
     scoring_dead_stones: [],
     clock: null,
     undo_request: null,
-    created_at: '2026-08-15T00:00:00.000Z',
-    updated_at: '2026-08-15T00:00:00.000Z',
+    // 終局は「いま」起きたものとして扱う（古い行の書き換えは別のテストで見る）
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -69,7 +70,7 @@ describe('useLiveGameList finishedGameEvent', () => {
     expect(result.current.games).toHaveLength(0);
 
     // 同じfinished更新が重複しても、通知イベントを増やさない。
-    act(() => api.callbacks?.onUpdate({ ...finished, updated_at: '2026-08-15T00:01:00.000Z' }));
+    act(() => api.callbacks?.onUpdate({ ...finished, updated_at: new Date().toISOString() }));
     expect(result.current.finishedGameEvent?.sequence).toBe(1);
 
     act(() => api.callbacks?.onUpdate(game({ status: 'playing' })));
@@ -82,5 +83,22 @@ describe('useLiveGameList finishedGameEvent', () => {
     const { result } = renderHook(() => useLiveGameList('classroom-1'));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.finishedGameEvent).toBeNull();
+  });
+
+  it('昔に終わった対局の行が書き換わっても、時間切れの知らせを出さず一覧にも戻さない', async () => {
+    const { result } = renderHook(() => useLiveGameList('classroom-1'));
+    await waitFor(() => expect(api.callbacks).not.toBeNull());
+
+    // 2026-09-26: 全対局に列を足す更新で、先週の時間切れ局の知らせが一斉に出た
+    const old = game({
+      id: 'old-timeout',
+      status: 'finished',
+      result: 'W+T',
+      updated_at: '2026-09-19T08:00:00.000Z',
+      finished_at: null,
+    });
+    act(() => api.callbacks?.onUpdate(old));
+    expect(result.current.finishedGameEvent).toBeNull();
+    expect(result.current.games.map(g => g.id)).not.toContain('old-timeout');
   });
 });
