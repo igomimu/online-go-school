@@ -66,6 +66,8 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   private meeting: Meeting | null = null;
   private handlers: ClassroomEventHandler = {};
   private stopWatchingMics?: () => void;
+  /** SDK が知らせてきた、直近のマイク・カメラの開始失敗 */
+  private lastMediaError: Partial<Record<'audio' | 'video', string>> = {};
   private _videoElements = new Map<string, HTMLVideoElement>();
   private _audioElements = new Map<string, HTMLAudioElement>();
   private _state: ConnectionState = ConnectionState.Disconnected;
@@ -278,6 +280,14 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
         this.onVideoTrackChanged?.({ identity, element: el, isLocal: true });
       }
       this.notifyParticipantsChanged();
+    });
+
+    // 🔴 RealtimeKit はカメラ・マイクを開けなくても enableVideo/enableAudio で例外を出さず、
+    // このイベントで知らせるだけ。拾わないと、オンを押しても黙ってオフのまま残る
+    // （2026-09-26 授業中、先生のカメラが何度オンにしても映らなかった）。
+    meeting.self.on('mediaPermissionError', ({ message, kind }) => {
+      if (kind === 'audio' || kind === 'video') this.lastMediaError[kind] = String(message);
+      console.warn(`[media] ${kind} を開始できませんでした: ${message}`);
     });
 
     meeting.self.on('audioUpdate', () => {
@@ -587,8 +597,10 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   // 画面の「カメラ オフ」が被らないまま黒い四角が残る（2026-08-26 E2E で検出）。
   async enableMicrophone(): Promise<void> {
     await prepareMic(id => this.switchDevice('audioinput', id));
+    delete this.lastMediaError.audio;
     await this.meeting?.self.enableAudio();
     this.notifyParticipantsChanged();
+    await this.assertStarted('audio');
     if (await enforceMic(this) === 'blocked') throw new Error(NO_ALLOWED_MIC_MESSAGE);
   }
 
@@ -621,8 +633,26 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   }
 
   async enableCamera(): Promise<void> {
+    delete this.lastMediaError.video;
     await this.meeting?.self.enableVideo();
     this.notifyParticipantsChanged();
+    await this.assertStarted('video');
+  }
+
+  /**
+   * 点けたはずの機器が本当に点いたか確かめる。SDK は失敗を catch で握りつぶすので、
+   * 状態を見るしかない。連打で前の操作がまだ途中だと SDK は何もせずに返るため、
+   * 失敗の知らせが無いうちは少し待ってから判断する。
+   */
+  private async assertStarted(kind: 'audio' | 'video'): Promise<void> {
+    const on = () => {
+      const self = this.meeting?.self;
+      return !self || (kind === 'audio' ? self.audioEnabled : self.videoEnabled);
+    };
+    for (let waited = 0; !on() && !this.lastMediaError[kind] && waited < 1500; waited += 100) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (!on()) throw mediaStartError(this.lastMediaError[kind]);
   }
 
   async disableCamera(): Promise<void> {
@@ -717,5 +747,24 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     this.remoteAudioOverrides.clear();
     this.meeting?.leave().catch(() => {});
     this.meeting = null;
+  }
+}
+
+/**
+ * SDK の失敗理由を、getUserMedia と同じ名前の例外にする。
+ * 画面側（App の mediaErrorMessage）は例外の名前で日本語の案内を出し分けている。
+ */
+function mediaStartError(reason: string | undefined): Error {
+  switch (reason) {
+    case 'DENIED':
+      return new DOMException('ブラウザで許可されていません', 'NotAllowedError');
+    case 'SYSTEM_DENIED':
+      return new Error('Windows / macOS の設定で、ブラウザからの使用が許可されていません（プライバシー設定を確認してください）');
+    case 'NO_DEVICES_AVAILABLE':
+      return new DOMException('機器が見つかりません', 'NotFoundError');
+    case 'COULD_NOT_START':
+      return new DOMException('機器を開始できません', 'NotReadableError');
+    default:
+      return new Error(reason ? `理由: ${reason}` : '理由は分かりませんでした。機器を挿し直すか、ブラウザを開き直してください');
   }
 }
