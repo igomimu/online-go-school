@@ -18,6 +18,7 @@ export interface ProblemProgress {
   solved: number;           // 解けた問題数
   failed: number;           // ライフが尽きた・時間切れの問題数
   timedOut: boolean;        // この結果が時間切れによるものか
+  ratingState?: TsumegoRatingState | null; // 判定後の最新格付け（講師モニター同期用）
 }
 
 interface ProblemBoardProps {
@@ -55,12 +56,15 @@ export default function ProblemBoard({
   ratingState,
   onRatingUpdate,
 }: ProblemBoardProps) {
+  const ratingMode = problem.ratingMode === true;
   const { problemState, startProblem, makeMove, timeUp, retry } = useProblemSession();
   const [showReport, setShowReport] = useState(false);
   // いま解いている問題。ライフ付きの出題では、解けたら・ライフが尽きたら生徒ごとに次へ進む
   const [current, setCurrent] = useState<Problem>(problem);
   // 格付けチャレンジの状態
-  const [currentRating, setCurrentRating] = useState<TsumegoRatingState | null>(ratingState ?? null);
+  const [currentRating, setCurrentRating] = useState<TsumegoRatingState | null>(
+    ratingMode ? ratingState ?? null : null,
+  );
   const [transitionModal, setTransitionModal] = useState<{
     event: 'promoted' | 'demoted';
     prevRankId: string;
@@ -76,7 +80,7 @@ export default function ProblemBoard({
   const [nextError, setNextError] = useState<string | null>(null);
   const [loadingNext, setLoadingNext] = useState(false);
   const lives = current.lives;
-  const autoNext = problem.lives !== undefined || !!ratingState;
+  const autoNext = problem.lives !== undefined || (ratingMode && !!ratingState);
   // 1問ごとの制限時間。やり直しても時計は戻さない（三村さん 2026-09-19）
   const [remainingSec, setRemainingSec] = useState<number | null>(null);
   const [timedOut, setTimedOut] = useState(false);
@@ -92,10 +96,8 @@ export default function ProblemBoard({
   }, [problem]);
 
   useEffect(() => {
-    if (ratingState !== undefined) {
-      setCurrentRating(ratingState);
-    }
-  }, [ratingState]);
+    setCurrentRating(ratingMode ? ratingState ?? null : null);
+  }, [ratingMode, ratingState]);
 
   useEffect(() => {
     missesRef.current = 0;
@@ -112,6 +114,7 @@ export default function ProblemBoard({
       livesLeft: current.lives ?? null,
       ...statsRef.current,
       timedOut: false,
+      ratingState: currentRating,
     });
     // onProblemStart は親の再描画で作り直されるので依存に入れない（入れると同じ問題で何度も送る）
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -143,10 +146,12 @@ export default function ProblemBoard({
       if (autoNext) statsRef.current = { ...statsRef.current, failed: statsRef.current.failed + 1 };
       
       // 格付け更新（時間切れ失敗）
+      let ratingAfter = currentRating;
       if (currentRating && !hasRatedCurrentRef.current) {
         hasRatedCurrentRef.current = true;
         const res = processRatingUpdate(currentRating, false);
         setCurrentRating(res.nextState);
+        ratingAfter = res.nextState;
         onRatingUpdate?.(res);
         if (res.event !== 'none') {
           setTransitionModal({ event: res.event, prevRankId: res.previousRankId, newRankId: res.nextState.rankId });
@@ -158,6 +163,7 @@ export default function ProblemBoard({
         livesLeft: lives === undefined ? null : Math.max(0, lives - missesRef.current),
         ...statsRef.current,
         timedOut: true,
+        ratingState: ratingAfter,
       });
       timeUp();
     }, 250);
@@ -217,18 +223,26 @@ export default function ProblemBoard({
     }
 
     // 格付け更新（正解、またはライフ切れ失敗）
+    let ratingAfter = currentRating;
     if (currentRating && finished && !hasRatedCurrentRef.current) {
       hasRatedCurrentRef.current = true;
       const isCorrect = status === 'correct';
       const res = processRatingUpdate(currentRating, isCorrect);
       setCurrentRating(res.nextState);
+      ratingAfter = res.nextState;
       onRatingUpdate?.(res);
       if (res.event !== 'none') {
         setTransitionModal({ event: res.event, prevRankId: res.previousRankId, newRankId: res.nextState.rankId });
       }
     }
 
-    onResult?.(status, problemState?.movesMade.length ?? 0, { attempt, livesLeft, ...statsRef.current, timedOut: false });
+    onResult?.(status, problemState?.movesMade.length ?? 0, {
+      attempt,
+      livesLeft,
+      ...statsRef.current,
+      timedOut: false,
+      ratingState: ratingAfter,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problemState?.status, problemState?.movesMade.length, onResult, currentRating, onRatingUpdate]);
 

@@ -137,6 +137,7 @@ describe('ProblemBoard のライフと次の問題', () => {
 
   it('格付けモードで正解するとゲージポイントが増加する', () => {
     const onRatingUpdate = vi.fn();
+    const onResult = vi.fn();
     const initialRating = {
       rankId: 'bronze_4',
       points: 2,
@@ -150,8 +151,9 @@ describe('ProblemBoard のライフと次の問題', () => {
 
     render(
       <ProblemBoard
-        problem={makeProblem('a', 3)}
+        problem={{ ...makeProblem('a', 3), ratingMode: true }}
         onBack={() => {}}
+        onResult={onResult}
         ratingState={initialRating}
         onRatingUpdate={onRatingUpdate}
       />
@@ -175,6 +177,39 @@ describe('ProblemBoard のライフと次の問題', () => {
         }),
       })
     );
+    expect(onResult).toHaveBeenLastCalledWith(
+      'correct',
+      1,
+      expect.objectContaining({
+        ratingState: expect.objectContaining({ rankId: 'bronze_4', points: 3 }),
+      }),
+    );
+  });
+
+  it('格付け状態を持つ生徒でも、通常の指定問題では格付けを更新しない', () => {
+    const onRatingUpdate = vi.fn();
+    const initialRating = {
+      rankId: 'bronze_4',
+      points: 2,
+      consecutiveWins: 1,
+      protectionCount: 0,
+      totalSolved: 10,
+      totalAttempts: 15,
+      highestRankId: 'bronze_4',
+      lastUpdated: new Date().toISOString(),
+    };
+
+    render(
+      <ProblemBoard
+        problem={makeProblem('normal', 3)}
+        onBack={() => {}}
+        ratingState={initialRating}
+        onRatingUpdate={onRatingUpdate}
+      />
+    );
+
+    expect(screen.queryByTestId('tsumego-rating-bar')).toBeNull();
+    fireEvent.click(screen.getByText('正解の手'));
+    expect(onRatingUpdate).not.toHaveBeenCalled();
   });
 });
-

@@ -72,6 +72,10 @@ import {
   createInitialRatingState,
   pickRandomLevelForRank,
 } from './utils/tsumegoRating';
+import {
+  loadTsumegoRatingFromServer,
+  saveTsumegoRatingToServer,
+} from './utils/tsumegoRatingStore';
 import { fetchRandomTsumegoProblem } from './utils/tsumegoApi';
 import { tsumegoRowToProblem } from './utils/tsumegoConvert';
 import TsumegoInitialRankDialog from './components/tsumego/TsumegoInitialRankDialog';
@@ -393,6 +397,7 @@ function App() {
   // 詰碁 格付けチャレンジ用
   const [tsumegoRating, setTsumegoRating] = useState<TsumegoRatingState | null>(null);
   const [showInitialRankDialog, setShowInitialRankDialog] = useState(false);
+  const [tsumegoStartError, setTsumegoStartError] = useState('');
 
   // オーディオデバッグ
   const [audioDebug, setAudioDebug] = useState('');
@@ -455,44 +460,69 @@ function App() {
   // 詰碁 格付けチャレンジのスコープキー
   const tsumegoScope = studentId || rawStudentCode || userName;
 
-  // 生徒の格付けデータをlocalStorageから復元
+  // 生徒の格付けデータを復元。端末キャッシュを先に表示し、ログイン後は
+  // アカウント側と比べて新しい方を正本にする。別端末でも同じ続きから再開できる。
   useEffect(() => {
-    if (role === 'STUDENT') {
-      const saved = loadTsumegoRatingFromStorage(tsumegoScope);
-      if (saved) {
-        setTsumegoRating(saved);
-      }
-    }
-  }, [role, tsumegoScope]);
+    if (role !== 'STUDENT') return;
+    let alive = true;
+    const local = loadTsumegoRatingFromStorage(tsumegoScope);
+    // 同じブラウザで別の生徒へ切り替えたとき、前の生徒の格を引き継がない。
+    setTsumegoRating(local);
+    if (!studentId) return () => { alive = false; };
+
+    void loadTsumegoRatingFromServer(studentId)
+      .then(remote => {
+        if (!alive) return;
+        const localTime = local ? Date.parse(local.lastUpdated) : 0;
+        const remoteTime = remote ? Date.parse(remote.lastUpdated) : 0;
+        if (remote && remoteTime >= localTime) {
+          setTsumegoRating(remote);
+          saveTsumegoRatingToStorage(remote, tsumegoScope);
+        } else if (local) {
+          void saveTsumegoRatingToServer(local, studentId).catch(err => {
+            console.warn('[tsumego-rating] 端末の格付けをアカウントへ移せませんでした', err);
+          });
+        }
+      })
+      .catch(err => {
+        console.warn('[tsumego-rating] アカウントの格付けを取得できませんでした', err);
+      });
+    return () => { alive = false; };
+  }, [role, studentId, tsumegoScope]);
 
   // 講師から格付け出題が届いた時に保持するベース出題
   const pendingRatingProblemRef = useRef<import('./types/problem').Problem | null>(null);
 
   const startRatingProblem = useCallback(async (rating: TsumegoRatingState, baseProblem?: import('./types/problem').Problem) => {
+    setTsumegoStartError('');
     try {
       const level = pickRandomLevelForRank(rating.rankId);
       const row = await fetchRandomTsumegoProblem({ level, boardSize: 19 });
-      if (row) {
-        const p = tsumegoRowToProblem(row);
-        p.lives = baseProblem?.lives ?? 3;
-        p.timeLimitSec = baseProblem?.timeLimitSec;
-        p.ratingMode = true;
-        setActiveProblem(p);
-        setViewMode('problem');
+      if (!row) {
+        setTsumegoStartError('この格に合う詰碁が見つかりませんでした。先生に知らせてください。');
+        return;
       }
+      const p = tsumegoRowToProblem(row);
+      p.lives = baseProblem?.lives ?? 3;
+      p.timeLimitSec = baseProblem?.timeLimitSec;
+      p.ratingMode = true;
+      pendingRatingProblemRef.current = null;
+      setActiveProblem(p);
+      setViewMode('problem');
     } catch (err) {
       console.error('Failed to start rating problem:', err);
+      setTsumegoStartError('詰碁を取得できませんでした。通信を確認して、もう一度試してください。');
     }
   }, []);
 
   const handleIncomingRatingProblem = useCallback(async (baseProblem: import('./types/problem').Problem) => {
+    pendingRatingProblemRef.current = baseProblem;
     let rating = tsumegoRating;
     if (!rating) {
       rating = loadTsumegoRatingFromStorage(tsumegoScope);
       if (rating) setTsumegoRating(rating);
     }
     if (!rating) {
-      pendingRatingProblemRef.current = baseProblem;
       setShowInitialRankDialog(true);
       return;
     }
@@ -504,15 +534,24 @@ function App() {
     const initial = createInitialRatingState(selectedRankId);
     setTsumegoRating(initial);
     saveTsumegoRatingToStorage(initial, tsumegoScope);
+    if (studentId) {
+      void saveTsumegoRatingToServer(initial, studentId).catch(err => {
+        console.warn('[tsumego-rating] 格付けをアカウントへ保存できませんでした', err);
+      });
+    }
     const pending = pendingRatingProblemRef.current;
-    pendingRatingProblemRef.current = null;
     await startRatingProblem(initial, pending ?? undefined);
-  }, [tsumegoScope, startRatingProblem]);
+  }, [studentId, tsumegoScope, startRatingProblem]);
 
   const handleTsumegoRatingUpdate = useCallback((result: RatingUpdateResult) => {
     setTsumegoRating(result.nextState);
     saveTsumegoRatingToStorage(result.nextState, tsumegoScope);
-  }, [tsumegoScope]);
+    if (studentId) {
+      void saveTsumegoRatingToServer(result.nextState, studentId).catch(err => {
+        console.warn('[tsumego-rating] 格付けをアカウントへ保存できませんでした', err);
+      });
+    }
+  }, [studentId, tsumegoScope]);
 
   // 名簿を読み直したら、配る棋力表示も教室の設定に合わせる
   useEffect(() => {
@@ -879,6 +918,7 @@ function App() {
             [sender]: {
               result: p.result, moveCount: p.moveCount, attempt: p.attempt, livesLeft: p.livesLeft,
               problemNo: p.problemNo, solved: p.solved, failed: p.failed, timedOut: p.timedOut,
+              ratingRankId: p.ratingRankId, ratingPoints: p.ratingPoints,
               // 問題は変わったときにしか付いてこないので、結果だけの知らせでは前のものを残す
               current: p.current ?? prev[sender]?.current,
             },
@@ -2727,9 +2767,10 @@ function App() {
         {mainViewMode === 'problem' && activeProblem && role === 'STUDENT' && (
           <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4"><ErrorBoundary label="この画面">
             <ProblemBoard
+              key={activeProblem.id}
               problem={activeProblem}
-              ratingState={tsumegoRating}
-              onRatingUpdate={handleTsumegoRatingUpdate}
+              ratingState={activeProblem.ratingMode ? tsumegoRating : null}
+              onRatingUpdate={activeProblem.ratingMode ? handleTsumegoRatingUpdate : undefined}
               onBack={() => {
                 setViewMode('lobby');
                 setActiveProblem(null);
@@ -2747,8 +2788,8 @@ function App() {
                     solved: progress.solved,
                     failed: progress.failed,
                     timedOut: progress.timedOut,
-                    ratingRankId: tsumegoRating?.rankId,
-                    ratingPoints: tsumegoRating?.points,
+                    ratingRankId: progress.ratingState?.rankId,
+                    ratingPoints: progress.ratingState?.points,
                   },
                 });
               }}
@@ -2773,8 +2814,8 @@ function App() {
                       viewRange: problem.viewRange,
                       difficulty: problem.difficulty,
                     },
-                    ratingRankId: tsumegoRating?.rankId,
-                    ratingPoints: tsumegoRating?.points,
+                    ratingRankId: progress.ratingState?.rankId,
+                    ratingPoints: progress.ratingState?.points,
                   } satisfies import('./types/problem').ProblemResultPayload,
                 }, [TEACHER_IDENTITY]);
               }}
@@ -2906,6 +2947,35 @@ function App() {
           onSelectInitialRank={handleSelectInitialRank}
           onClose={() => setShowInitialRankDialog(false)}
         />
+      )}
+
+      {role === 'STUDENT' && tsumegoStartError && (
+        <div
+          role="alert"
+          data-testid="tsumego-start-error"
+          className="fixed left-1/2 top-4 z-[60] flex w-[min(92vw,36rem)] -translate-x-1/2 items-center gap-3 rounded-xl border border-alert/30 bg-card px-4 py-3 text-sm text-alert-text shadow-2xl"
+        >
+          <span className="flex-1">{tsumegoStartError}</span>
+          <button
+            type="button"
+            className="shrink-0 rounded-lg border border-alert/30 px-3 py-1.5 font-bold hover:bg-alert/10"
+            onClick={() => {
+              if (tsumegoRating) {
+                void startRatingProblem(tsumegoRating, pendingRatingProblemRef.current ?? undefined);
+              }
+            }}
+          >
+            もう一度試す
+          </button>
+          <button
+            type="button"
+            aria-label="詰碁取得エラーを閉じる"
+            className="shrink-0 rounded p-1 hover:bg-alert/10"
+            onClick={() => setTsumegoStartError('')}
+          >
+            ×
+          </button>
+        </div>
       )}
     </div>
   );

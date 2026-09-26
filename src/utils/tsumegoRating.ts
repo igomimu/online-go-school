@@ -244,13 +244,31 @@ export function pickRandomLevelForRank(rankId: string): string {
 
 const STORAGE_KEY_PREFIX = 'online_go_school_tsumego_rating_';
 
+export function isTsumegoRatingState(value: unknown): value is TsumegoRatingState {
+  if (!value || typeof value !== 'object') return false;
+  const state = value as Partial<TsumegoRatingState>;
+  return typeof state.rankId === 'string'
+    && rankIndexMap.has(state.rankId)
+    && Number.isInteger(state.points) && state.points! >= 0 && state.points! <= POINTS_TO_PROMOTE_DEFAULT
+    && Number.isInteger(state.consecutiveWins) && state.consecutiveWins! >= 0
+    && Number.isInteger(state.protectionCount) && state.protectionCount! >= 0
+    && state.protectionCount! <= PROMOTION_PROTECTION_ROUNDS
+    && Number.isInteger(state.totalSolved) && state.totalSolved! >= 0
+    && Number.isInteger(state.totalAttempts) && state.totalAttempts! >= state.totalSolved!
+    && typeof state.highestRankId === 'string'
+    && rankIndexMap.has(state.highestRankId)
+    && typeof state.lastUpdated === 'string'
+    && !Number.isNaN(Date.parse(state.lastUpdated));
+}
+
 export function loadTsumegoRatingFromStorage(studentId?: string): TsumegoRatingState | null {
   if (typeof window === 'undefined' || !window.localStorage) return null;
   const key = `${STORAGE_KEY_PREFIX}${studentId || 'guest'}`;
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
-    return JSON.parse(raw) as TsumegoRatingState;
+    const parsed: unknown = JSON.parse(raw);
+    return isTsumegoRatingState(parsed) ? parsed : null;
   } catch {
     return null;
   }

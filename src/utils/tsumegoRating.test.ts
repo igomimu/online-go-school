@@ -5,6 +5,7 @@ import {
   createInitialRatingState,
   processRatingUpdate,
   pickRandomLevelForRank,
+  isTsumegoRatingState,
 } from './tsumegoRating';
 
 describe('tsumegoRating', () => {
@@ -94,5 +95,10 @@ describe('tsumegoRating', () => {
 
     const bronzeLevel = pickRandomLevelForRank('bronze_1');
     expect(['11K', '10K']).toContain(bronzeLevel);
+  });
+
+  it('壊れた端末保存データを格付け状態として扱わない', () => {
+    expect(isTsumegoRatingState(createInitialRatingState('bronze_4'))).toBe(true);
+    expect(isTsumegoRatingState({ rankId: 'legend_0', points: 99 })).toBe(false);
   });
 });
