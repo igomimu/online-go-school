@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
-import type { Student } from '../types/classroom';
+import { displayRank, type Student } from '../types/classroom';
 import { findStudentByIdentity, getDisplayName, identityMatchesPlayer } from '../utils/identityUtils';
 import type { GameClock } from '../types/game';
 import { createNhkClock, DEFAULT_TIME_SETTINGS, timeSettingsToClock, type TimeSettings } from '../hooks/useGameClock';
@@ -103,7 +103,11 @@ export default function GameCreationDialog({
     });
   }, [uniqueStudents, studentVsStudent, primaryStudent]);
 
-  const getRank = (identity: string): string => findStudentByIdentity(identity, registeredStudents)?.rank || '';
+  // 置き石を決めるのに使うので、段ではなく道場のランク（R）を見せる。ランクの無い人だけ段（2026-09-26 三村さん）
+  const getRank = (identity: string): string => {
+    const student = findStudentByIdentity(identity, registeredStudents);
+    return student ? displayRank(student, 'rating') : '';
+  };
   const displayName = (identity: string): string => getDisplayName(identity, registeredStudents);
 
   const selfPlayer = studentVsStudent ? primaryStudent : teacherName;

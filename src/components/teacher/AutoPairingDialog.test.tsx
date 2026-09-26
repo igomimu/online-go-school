@@ -26,6 +26,17 @@ describe('AutoPairingDialog', () => {
     onCreateGames: vi.fn(),
   };
 
+  it('棋力は段ではなくランク（R）で見せ、ランクの無い人だけ段', () => {
+    const withRating = [
+      { ...makeStudent('s1', 'たろう', '1D'), internalRating: 'R20' },
+      makeStudent('s2', 'はなこ', '3K'),
+    ];
+    render(<AutoPairingDialog {...defaultProps} students={withRating} />);
+    expect(screen.getByText('R20')).toBeTruthy();
+    expect(screen.queryByText('初段')).toBeNull();
+    expect(screen.getByText('3級')).toBeTruthy();
+  });
+
   it('持ち時間を項目ごとに設定するUIが表示される', () => {
     render(<AutoPairingDialog {...defaultProps} />);
     expect(screen.getByText('対局時計（全対局共通）')).toBeTruthy();

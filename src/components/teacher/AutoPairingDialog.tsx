@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Student } from '../../types/classroom';
 import type { GameClock } from '../../types/game';
-import { rankToNumber, suggestHandicap } from '../../types/classroom';
+import { displayRank, rankToNumber, suggestHandicap } from '../../types/classroom';
 import type { TimeSettings } from '../../hooks/useGameClock';
 import { DEFAULT_TIME_SETTINGS, timeSettingsToClock } from '../../hooks/useGameClock';
 import { findStudentByIdentity, getDisplayName, identityMatchesPlayer } from '../../utils/identityUtils';
@@ -110,6 +110,11 @@ export default function AutoPairingDialog({
     id !== teacherIdentity && !unavailablePlayers.some(player => identityMatchesPlayer(id, player)),
   );
   const [pairs, setPairs] = useState<PairingPair[]>(() => autoPair(studentIdentities, students));
+  // 置き石を決める目安として、段ではなく道場のランク（R）を見せる（2026-09-26 三村さん）
+  const shownRank = (identity: string): string => {
+    const student = findStudentByIdentity(identity, students);
+    return student ? displayRank(student, 'rating') : '';
+  };
   const [unpairedIdentity] = useState<string | null>(() => (
     studentIdentities.length % 2 === 1
       ? studentIdentities[studentIdentities.length - 1]
@@ -228,7 +233,7 @@ export default function AutoPairingDialog({
                     <td style={{ ...cellStyle, textAlign: 'left', fontWeight: 'bold' }}>
                       ● {p.blackName}
                     </td>
-                    <td style={{ ...cellStyle, color: 'var(--color-accent-text)' }}>{p.blackRank || '?'}</td>
+                    <td style={{ ...cellStyle, color: 'var(--color-accent-text)' }}>{shownRank(p.blackIdentity) || '?'}</td>
                     <td style={cellStyle}>
                       <button
                         onClick={() => swapColors(i)}
@@ -242,7 +247,7 @@ export default function AutoPairingDialog({
                     <td style={{ ...cellStyle, textAlign: 'left', fontWeight: 'bold' }}>
                       ○ {p.whiteName}
                     </td>
-                    <td style={{ ...cellStyle, color: 'var(--color-accent-text)' }}>{p.whiteRank || '?'}</td>
+                    <td style={{ ...cellStyle, color: 'var(--color-accent-text)' }}>{shownRank(p.whiteIdentity) || '?'}</td>
                     <td style={cellStyle}>
                       <select
                         value={handicapKeyOf(p.handicap, p.komi)}
