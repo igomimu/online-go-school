@@ -201,7 +201,7 @@ async function kickStaleConnection(
  * 最初から繋がせないので、参加者分を1分も使わない。
  *
  * active-session は人数しか返さないので、セッションIDを取ってから
- * 参加者を検索し、まだ出ていない（left_at が空）先生が居るかを見る。
+ * 参加者を検索し、まだ出ていない先生の接続が残っているかを見る。
  *
  * 🔴 誰も入っていない meeting の active-session は **404**、先生が入った直後の
  * 立ち上がりかけは **500** を返す。これを例外にすると呼び出し側の fail-open に
@@ -236,16 +236,50 @@ async function lookUpTeacherPresence(
   );
   if (!session?.id || session.status !== 'LIVE') return false;
 
+  const sessionPath = `/sessions/${session.id}/participants`;
   const result = await callRealtimeKit<{ participants?: Array<{
+    id?: string;
     custom_participant_id?: string;
     left_at?: string | null;
   }> }>(
     cfg,
-    `/sessions/${session.id}/participants?search=${encodeURIComponent(TEACHER_IDENTITY)}&per_page=100`,
+    `${sessionPath}?search=${encodeURIComponent(TEACHER_IDENTITY)}&per_page=100`,
   );
-
-  return (result?.participants ?? []).some(p =>
-    !p.left_at &&
+  const teachers = (result?.participants ?? []).filter(p =>
     (p.custom_participant_id ?? '').replace(/^sid:/, '') === TEACHER_IDENTITY,
   );
+  if (teachers.some(p => !p.left_at)) return true;
+
+  // 🔴 left_at は「その名前の接続がどれか1本抜けた時刻」で、残っている接続があっても立つ。
+  // 先生が別タブ・別端末で同じ名前の接続をもう1本張って閉じると、元の接続が生きたまま
+  // left_at が入り、生徒が「先生がまだ教室を開いていません」で締め出された
+  // （2026-09-27 授業中。17:40 の接続が生きているのに 17:43 の2本目の退室で不在扱い）。
+  // 接続（socket）ごとの出入りを見て、入ったきり出ていない接続が1本でもあれば在室とする。
+  for (const t of teachers) {
+    if (!t.id) continue;
+    const detail = await callRealtimeKit<{ participant?: { peer_events?: PeerEvent[] } }>(
+      cfg,
+      `${sessionPath}/${t.id}?include_peer_events=true`,
+    );
+    if (hasOpenConnection(detail?.participant?.peer_events ?? [])) return true;
+  }
+  return false;
+}
+
+interface PeerEvent {
+  event_name?: string;
+  socket_session_id?: string;
+  created_at?: string;
+}
+
+/** 接続ごとに最後の出来事を見て、入ったまま出ていない接続があるか */
+export function hasOpenConnection(events: PeerEvent[]): boolean {
+  const last = new Map<string, PeerEvent>();
+  for (const e of events) {
+    const key = e.socket_session_id;
+    if (!key) continue;
+    const prev = last.get(key);
+    if (!prev || (e.created_at ?? '') >= (prev.created_at ?? '')) last.set(key, e);
+  }
+  return [...last.values()].some(e => e.event_name === 'PEER_JOINING');
 }

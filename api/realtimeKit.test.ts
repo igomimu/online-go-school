@@ -30,7 +30,7 @@ vi.mock('@supabase/supabase-js', () => ({
   }),
 }));
 
-const { resolveMeetingId } = await import('./realtimeKit');
+const { resolveMeetingId, hasOpenConnection } = await import('./realtimeKit');
 
 const cfg = { accountId: 'acc', appId: 'app', apiToken: 'tok' };
 const call = () => resolveMeetingId(cfg, 'https://example.supabase.co', 'service-role-key', 'go-CLASS1');
@@ -72,5 +72,24 @@ describe('resolveMeetingId', () => {
     selectResults = [{ data: { realtime_meeting_id: null }, error: null }];
     updateResult = { data: null, error: { message: 'permission denied' } };
     await expect(call()).rejects.toThrow('permission denied');
+  });
+});
+
+describe('hasOpenConnection', () => {
+  // 2026-09-27 授業中の実データ。17:40 の接続（a59f）が生きたまま、2本目（0d2c）の退室で不在扱いになっていた
+  const events = [
+    { created_at: '2026-09-27T08:39:49.982Z', event_name: 'PEER_JOINING', socket_session_id: 'c60f' },
+    { created_at: '2026-09-27T08:39:58.000Z', event_name: 'PEER_LEAVING', socket_session_id: 'c60f' },
+    { created_at: '2026-09-27T08:40:22.288Z', event_name: 'PEER_JOINING', socket_session_id: 'a59f' },
+    { created_at: '2026-09-27T08:43:29.585Z', event_name: 'PEER_JOINING', socket_session_id: '0d2c' },
+    { created_at: '2026-09-27T08:43:39.000Z', event_name: 'PEER_LEAVING', socket_session_id: '0d2c' },
+  ];
+
+  it('別の接続が抜けても、残っている接続があれば在室', () => {
+    expect(hasOpenConnection(events)).toBe(true);
+  });
+
+  it('全部の接続が抜けていれば不在', () => {
+    expect(hasOpenConnection(events.filter(e => e.socket_session_id !== 'a59f'))).toBe(false);
   });
 });
