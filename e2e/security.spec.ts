@@ -131,6 +131,13 @@ test.describe('セキュリティ・認可バリデーション検証 (Stage 9)'
       whitePlayer: 'teacher',
     });
 
+    // 自分の持ち時間を書き換えることはできない
+    const clockRes = await callAction(request, jwtA, {
+      action: 'update_clock', game_id: game.id,
+      params: { clock: { blackTimeLeft: 99999, whiteTimeLeft: 1 } },
+    });
+    expect(clockRes.status()).toBe(403);
+
     // 黒（生徒A）の勝ちは書けない
     for (const result of ['B+R', 'B+T', 'B+10.5']) {
       const res = await callAction(request, jwtA, { action: 'finish', game_id: game.id, params: { result } });

@@ -234,7 +234,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'enter_scoring') {
-      let query = supabase
+      const query = supabase
         .from('go_school_live_games')
         .update({
           status: 'scoring',
@@ -243,10 +243,10 @@ Deno.serve(async (req) => {
           scoring_proposed_result: null,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', game_id)
-      // 🔴 生徒は対局中の対局しか整地に入れない。終局済みを整地へ戻せると、
-      // その対局で起きたランクの変更がトリガーで取り消されてしまう
-      if (!isTeacher && !isServiceRole) query = query.eq('status', 'playing')
+        // 🔴 整地に入れるのは対局中の対局だけ（講師も同じ）。終局済みを整地へ戻せると、
+        // その対局で起きたランクの変更がトリガーで取り消されてしまう。
+        // 終局済みをやり直すのは「再開」「リセット」で、取り消しは講師に通知される
+        .eq('status', 'playing')
 
       const { error } = await query
 
@@ -539,6 +539,11 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'update_clock') {
+      // 時計の書き換えは講師だけ（アプリからは呼んでいない）。生徒が呼べると
+      // 自分の持ち時間を好きなだけ増やして時間切れを避けられた（2026-09-27）
+      if (!isTeacher && !isServiceRole) {
+        return json({ error: 'Forbidden: Only teachers can update the clock' }, 403)
+      }
       const { clock } = params || {}
       const { error } = await supabase
         .from('go_school_live_games')
