@@ -515,6 +515,19 @@ function App() {
     }
   }, []);
 
+  // 格の無い生徒の格付けを、指定の格から始めて保存する
+  const beginTsumegoRating = useCallback((rankId: string) => {
+    const initial = createInitialRatingState(rankId);
+    setTsumegoRating(initial);
+    saveTsumegoRatingToStorage(initial, tsumegoScope);
+    if (studentId) {
+      void saveTsumegoRatingToServer(initial, studentId).catch(err => {
+        console.warn('[tsumego-rating] 格付けをアカウントへ保存できませんでした', err);
+      });
+    }
+    return initial;
+  }, [studentId, tsumegoScope]);
+
   const handleIncomingRatingProblem = useCallback(async (baseProblem: import('./types/problem').Problem) => {
     pendingRatingProblemRef.current = baseProblem;
     let rating = tsumegoRating;
@@ -523,25 +536,23 @@ function App() {
       if (rating) setTsumegoRating(rating);
     }
     if (!rating) {
-      setShowInitialRankDialog(true);
-      return;
+      // 開始の格は講師が選んで出題に載せてくる。載っていない（古い講師画面からの）出題だけ本人に選ばせる
+      if (baseProblem.ratingStartRankId) {
+        rating = beginTsumegoRating(baseProblem.ratingStartRankId);
+      } else {
+        setShowInitialRankDialog(true);
+        return;
+      }
     }
     await startRatingProblem(rating, baseProblem);
-  }, [tsumegoRating, tsumegoScope, startRatingProblem]);
+  }, [tsumegoRating, tsumegoScope, startRatingProblem, beginTsumegoRating]);
 
   const handleSelectInitialRank = useCallback(async (selectedRankId: string) => {
     setShowInitialRankDialog(false);
-    const initial = createInitialRatingState(selectedRankId);
-    setTsumegoRating(initial);
-    saveTsumegoRatingToStorage(initial, tsumegoScope);
-    if (studentId) {
-      void saveTsumegoRatingToServer(initial, studentId).catch(err => {
-        console.warn('[tsumego-rating] 格付けをアカウントへ保存できませんでした', err);
-      });
-    }
+    const initial = beginTsumegoRating(selectedRankId);
     const pending = pendingRatingProblemRef.current;
     await startRatingProblem(initial, pending ?? undefined);
-  }, [studentId, tsumegoScope, startRatingProblem]);
+  }, [beginTsumegoRating, startRatingProblem]);
 
   const handleTsumegoRatingUpdate = useCallback((result: RatingUpdateResult) => {
     setTsumegoRating(result.nextState);

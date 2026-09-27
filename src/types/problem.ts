@@ -15,6 +15,7 @@ export interface Problem {
   lives?: number;              // 出題時に講師が決めたライフ（1〜5）。まちがえるたびに1減り0で終わり。未設定=無制限
   timeLimitSec?: number;       // 1問ごとの制限時間（秒）。切れたらその問題は失敗で次へ。未設定=なし
   ratingMode?: boolean;        // 格付け出題モード（生徒各自の格に応じた難易度が自動出題・昇降格）
+  ratingStartRankId?: string;  // 格付け出題で、まだ格の無い生徒が始める格（講師が選ぶ）。既に格のある生徒はその続きから
 }
 
 export interface ProblemAttempt {

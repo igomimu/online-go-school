@@ -5,6 +5,7 @@ import type { Problem } from '../../types/problem';
 import { fetchRandomTsumegoProblem } from '../../utils/tsumegoApi';
 import { tsumegoRowToProblem } from '../../utils/tsumegoConvert';
 import { createEmptyBoard } from '../../utils/gameLogic';
+import { TSUMEGO_START_OPTIONS, DEFAULT_START_RANK_ID } from '../tsumego/tsumegoStartOptions';
 
 /** 出題先の候補（接続中の生徒） */
 export interface TsumegoRecipient {
@@ -40,8 +41,11 @@ const DEFAULT_LIVES = 3;
 const TIME_LIMIT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: TsumegoPickerDialogProps) {
-  // 出題形式: 格付け出題（生徒各自の実力連動）or 指定の1問
-  const [deliveryMode, setDeliveryMode] = useState<'rating' | 'specific'>('specific');
+  // 出題形式: 格付け出題（生徒各自の実力連動）or 指定の1問。
+  // 講師ホームから配るときは格付け連動が既定（三村さん 2026-09-27）。検討盤からは1問だけ
+  const [deliveryMode, setDeliveryMode] = useState<'rating' | 'specific'>(recipients ? 'rating' : 'specific');
+  // まだ格の無い生徒が始める格。生徒に選ばせず講師が決める（三村さん 2026-09-27）
+  const [startRankId, setStartRankId] = useState(DEFAULT_START_RANK_ID);
   const [level, setLevel] = useState<string | null>(null);
   const [boardSize, setBoardSize] = useState(19);
   const [loading, setLoading] = useState(false);
@@ -101,6 +105,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
         lives,
         ...(timeLimitMin ? { timeLimitSec: timeLimitMin * 60 } : {}),
         ratingMode: true,
+        ratingStartRankId: startRankId,
       };
       onAssign(ratingProblem, targets);
       onClose();
@@ -174,6 +179,32 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
               接続中の生徒それぞれに、現在保持している格（石ころ棋士〜伝説の棋士）に応じた問題が自動で出題されます。
               正解・不正解で各生徒の格付けゲージが増減し、昇格・降格します。
             </p>
+          </div>
+        )}
+
+        {deliveryMode === 'rating' && (
+          <div>
+            <label className="block text-sm text-muted mb-1.5">開始の格（まだ格の無い生徒）</label>
+            <div className="flex flex-wrap gap-1.5">
+              {TSUMEGO_START_OPTIONS.map((opt) => (
+                <button
+                  key={opt.rankId}
+                  type="button"
+                  data-testid={`tsumego-start-rank-${opt.rankId}`}
+                  onClick={() => setStartRankId(opt.rankId)}
+                  title={opt.recommendedFor}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors duration-150 ${
+                    startRankId === opt.rankId
+                      ? 'bg-accent border-accent text-accent-ink'
+                      : 'bg-ink/5 border-line text-muted hover:text-ink'
+                  }`}
+                >
+                  {opt.badgeEmoji} {opt.segment}
+                  <span className="ml-1 font-normal opacity-80">{opt.levelDesc.replace('レベル', '')}</span>
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-muted">すでに格のある生徒は、その格の続きから出題されます。</p>
           </div>
         )}
 

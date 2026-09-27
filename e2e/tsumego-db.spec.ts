@@ -43,6 +43,8 @@ test('詰碁データベースから配信した問題が生徒側で解答可�
     // 先生: 詰碁DBダイアログを開く
     await clickToolbarMenuItem(teacherPage, '教材', '詰碁出題');
     await teacherPage.getByRole('heading', { name: '詰碁出題' }).waitFor({ timeout: 5_000 });
+    // 格付け連動が既定なので、指定の1問に切り替える
+    await teacherPage.getByTestId('delivery-mode-specific').click();
 
     // 9路で絞り込んでランダム取得(候補座標を絞りやすくするため)
     await teacherPage.getByRole('button', { name: '9路', exact: true }).click();
@@ -144,6 +146,8 @@ test('問題のまちがい報告ボタンでモーダルが開閉する', async
 
     await clickToolbarMenuItem(teacherPage, '教材', '詰碁出題');
     await teacherPage.getByRole('heading', { name: '詰碁出題' }).waitFor({ timeout: 5_000 });
+    // 格付け連動が既定なので、指定の1問に切り替える
+    await teacherPage.getByTestId('delivery-mode-specific').click();
     await teacherPage.getByRole('button', { name: 'ランダムに1問取得' }).click();
     await teacherPage.getByTestId('go-board').waitFor({ timeout: 15_000 });
     await teacherPage.getByRole('button', { name: /この問題を出題/ }).click();

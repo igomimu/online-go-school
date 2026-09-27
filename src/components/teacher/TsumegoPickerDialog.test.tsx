@@ -23,6 +23,8 @@ const recipients = [
 ];
 
 async function drawOne() {
+  // 講師ホームからは格付け連動が既定。1問だけ出すときは切り替える
+  if (screen.queryByTestId('delivery-mode-specific')) fireEvent.click(screen.getByTestId('delivery-mode-specific'));
   fireEvent.click(screen.getByRole('button', { name: /ランダムに1問取得/ }));
   await screen.findByText('テスト詰碁');
 }
@@ -75,9 +77,11 @@ describe('TsumegoPickerDialog の出題先', () => {
     const onAssign = vi.fn();
     render(<TsumegoPickerDialog onAssign={onAssign} onClose={() => {}} recipients={recipients} />);
 
-    // 格付け連動タブをクリック
-    fireEvent.click(screen.getByTestId('delivery-mode-rating'));
+    // 講師ホームから開くと格付け連動が既定
     expect(screen.getByText('生徒各自の格付けに合わせた問題が届きます')).toBeInTheDocument();
+
+    // 開始の格を講師が選ぶ
+    fireEvent.click(screen.getByTestId('tsumego-start-rank-silver_4'));
 
     // ライフを5に設定
     fireEvent.click(screen.getByTestId('tsumego-lives-5'));
@@ -89,6 +93,7 @@ describe('TsumegoPickerDialog の出題先', () => {
       expect.objectContaining({
         title: '詰碁 格付けチャレンジ',
         ratingMode: true,
+        ratingStartRankId: 'silver_4',
         lives: 5,
       }),
       null
