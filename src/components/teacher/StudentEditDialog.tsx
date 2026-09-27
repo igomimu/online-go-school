@@ -3,6 +3,7 @@ import type { Student } from '../../types/classroom';
 import { RANK_OPTIONS, RATING_OPTIONS, normalizeRank, normalizeStudentTypes } from '../../types/classroom';
 import { upsertStudent } from '../../utils/classroomStore';
 import { resolveGrade } from '../../utils/gradeCalc';
+import { resetTsumegoRatingOnServer } from '../../utils/tsumegoRatingStore';
 
 interface StudentEditDialogProps {
   student: Student;
@@ -21,6 +22,7 @@ export default function StudentEditDialog({ student, studentTypes, onClose, onSa
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tsumegoResetNote, setTsumegoResetNote] = useState<string | null>(null);
   const typeOptions = normalizeStudentTypes([...studentTypes, form.type]);
 
   const handleSave = async () => {
@@ -52,6 +54,19 @@ export default function StudentEditDialog({ student, studentTypes, onClose, onSa
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setSaving(false);
+    }
+  };
+
+  // 詰碁の格付けは生徒が選んだ初期格から始まるので、合っていなければ講師が消して選び直させる
+  const handleResetTsumego = async () => {
+    if (!confirm(`${student.name} さんの詰碁の格付けを消します。次の格付け出題で、最初の格を選び直します。よろしいですか？`)) return;
+    setError(null);
+    setTsumegoResetNote(null);
+    try {
+      await resetTsumegoRatingOnServer(student.id);
+      setTsumegoResetNote('詰碁の格付けを消しました');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -170,9 +185,18 @@ export default function StudentEditDialog({ student, studentTypes, onClose, onSa
         </div>
 
         <div style={{
-          display: 'flex', justifyContent: 'flex-end', gap: 8,
+          display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8,
           padding: '8px 12px', background: 'var(--color-raised)', borderTop: '1px solid var(--color-line)',
         }}>
+          <button
+            data-testid="reset-tsumego-rating"
+            onClick={handleResetTsumego}
+            disabled={saving}
+            style={{ marginRight: 'auto', padding: '4px 10px', fontSize: 12, background: 'var(--color-ground)', color: 'var(--color-ink)', border: '1px solid var(--color-line)', cursor: 'pointer' }}
+          >
+            詰碁の格付けを消す
+          </button>
+          {tsumegoResetNote && <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{tsumegoResetNote}</span>}
           <button onClick={onClose} disabled={saving} style={{ padding: '4px 14px', fontSize: 12, background: 'var(--color-ground)', border: '1px solid var(--color-line)', cursor: 'pointer' }}>
             キャンセル
           </button>

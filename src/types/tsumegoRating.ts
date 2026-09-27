@@ -40,4 +40,6 @@ export interface RatingUpdateResult {
   nextState: TsumegoRatingState;
   event: 'none' | 'promoted' | 'demoted';
   previousRankId: string;
+  /** この結果が正解だったか（アカウントへ送るのは結果だけ。格はサーバーが計算する） */
+  isCorrect: boolean;
 }

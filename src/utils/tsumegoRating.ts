@@ -231,7 +231,7 @@ export function processRatingUpdate(
     lastUpdated: new Date().toISOString(),
   };
 
-  return { nextState, event, previousRankId };
+  return { nextState, event, previousRankId, isCorrect };
 }
 
 /** そのランクで出題する詰碁難易度レベルをランダムに1つ選ぶ */
