@@ -401,6 +401,20 @@ export async function interruptAllGames(classroomId: string): Promise<void> {
   await executeGameAction('interrupt_all', undefined, { classroom_id: classroomId });
 }
 
+/**
+ * 前の日以前に始まって、まだ進行中のままの対局か。
+ * 教室は1日ごとに閉じるので、日をまたいで打ち続けている対局は無い。
+ */
+export function isLeftOverFromEarlierDay(
+  row: Pick<LiveGameRow, 'status' | 'created_at'>,
+  now = new Date(),
+): boolean {
+  if (row.status !== 'playing' && row.status !== 'scoring') return false;
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const created = Date.parse(row.created_at);
+  return Number.isFinite(created) && created < startOfToday;
+}
+
 export async function updateClock(gameId: string, clock: GameClock): Promise<void> {
   await executeGameAction('update_clock', gameId, { clock });
 }

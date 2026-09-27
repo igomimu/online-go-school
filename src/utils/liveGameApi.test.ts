@@ -8,7 +8,7 @@ vi.mock('@supabase/supabase-js', () => ({
   }),
 }));
 
-import { deleteSavedGames } from './liveGameApi';
+import { deleteSavedGames, isLeftOverFromEarlierDay } from './liveGameApi';
 
 describe('deleteSavedGames（棋譜の一括削除）', () => {
   beforeEach(() => {
@@ -58,5 +58,24 @@ describe('deleteSavedGames（棋譜の一括削除）', () => {
 
     expect(result).toEqual({ deleted: [], failed: [] });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('isLeftOverFromEarlierDay（前の日以前から残っている対局）', () => {
+  const now = new Date(2026, 8, 27, 17, 30);
+
+  it('前の日に始まって対局中のままなら残りもの', () => {
+    expect(isLeftOverFromEarlierDay({ status: 'playing', created_at: new Date(2026, 6, 15, 5, 35).toISOString() }, now)).toBe(true);
+    expect(isLeftOverFromEarlierDay({ status: 'scoring', created_at: new Date(2026, 8, 26, 23, 59).toISOString() }, now)).toBe(true);
+  });
+
+  it('今日始まった対局は残りものではない', () => {
+    expect(isLeftOverFromEarlierDay({ status: 'playing', created_at: new Date(2026, 8, 27, 0, 1).toISOString() }, now)).toBe(false);
+  });
+
+  it('終わった対局・中断した対局は対象にしない', () => {
+    const old = new Date(2026, 6, 15).toISOString();
+    expect(isLeftOverFromEarlierDay({ status: 'finished', created_at: old }, now)).toBe(false);
+    expect(isLeftOverFromEarlierDay({ status: 'interrupted', created_at: old }, now)).toBe(false);
   });
 });

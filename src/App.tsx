@@ -25,7 +25,7 @@ import { readStudentCodeFromParams } from './utils/studentLoginLink';
 import { runSingleFlight } from './utils/singleFlight';
 import { ConnectionState } from './utils/classroomRtc';
 import { useLiveGameList } from './hooks/useLiveGameList';
-import { liveRowToSession, interruptAllGames, interruptGame, resumeLiveGame, subscribeRankChanges } from './utils/liveGameApi';
+import { liveRowToSession, interruptAllGames, interruptGame, isLeftOverFromEarlierDay, resumeLiveGame, subscribeRankChanges } from './utils/liveGameApi';
 import { isTimeoutResult, timedOutColorFromResult } from './utils/scoring';
 import { speakGameResultOnce } from './utils/byoyomiVoice';
 import {
@@ -644,6 +644,23 @@ function App() {
   const effectiveClassroomId =
     role === 'TEACHER' ? selectedClassroomId : studentClassroomId;
   const liveGameList = useLiveGameList(effectiveClassroomId);
+
+  // 前の日以前の対局が「対局中」のまま残っていたら、講師が教室を開いたときに中断にする。
+  // 教室を閉じるときの一括中断は「退出」を押したときしか動かず、タブを閉じて終えた日の
+  // 対局が残る。7/15 の対局が 9/26 まで対局中と表示されていた（2026-09-27）。
+  const leftOverTriedRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (role !== 'TEACHER' || connectionState !== ConnectionState.Connected) return;
+    const leftOver = liveGameList.games.filter(g =>
+      isLeftOverFromEarlierDay(g) && !leftOverTriedRef.current.has(g.id),
+    );
+    for (const g of leftOver) {
+      leftOverTriedRef.current.add(g.id);
+      void interruptGame(g.id).catch(err => {
+        console.error('[live-games] 前日以前の対局を中断にできませんでした:', g.id, err);
+      });
+    }
+  }, [role, connectionState, liveGameList.games]);
 
   // Supabase Realtimeで終局を受けたら、講師にだけ1回チャイムを鳴らす。
   // 現行対局はfinished更新と同時に一覧から消えるため、旧GAME_ENDEDメッセージ待ちでは検知できない。
