@@ -848,7 +848,13 @@ const GoBoard = forwardRef<SVGSVGElement, GoBoardProps>(({
             xmlns="http://www.w3.org/2000/svg"
             className={`select-none mx-auto block w-full max-w-[800px] ${className}`}
             style={{
-                aspectRatio: '1 / 1',
+                // 部分盤（詰碁）は見せる範囲が長方形。枠を正方形のままにすると viewBox との差が
+                // 上下/左右の余白になり、そこだけ木目が敷かれず盤が塗り切れていなかった。
+                // 枠の縦横比を見せる範囲に合わせ、高さで詰まる場合は幅も同じ比率で絞る。
+                aspectRatio: `${viewBoxData.w} / ${viewBoxData.h}`,
+                ...(viewBoxData.w !== viewBoxData.h && {
+                    maxWidth: `min(800px, 100%, calc(${maxHeight} * ${viewBoxData.w / viewBoxData.h}))`,
+                }),
                 maxHeight,
                 touchAction: 'none',
                 borderRadius: '6px',
