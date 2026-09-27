@@ -8,6 +8,8 @@ import {
   createNewTournament,
   updateMatchResult,
   calculateRoundRobinStandings,
+  matchResultFromGame,
+  isLinkedGameId,
 } from './pairing';
 import type { TournamentParticipant, TournamentSettings } from '../../types/tournament';
 
@@ -173,6 +175,54 @@ describe('pairing.ts', () => {
       expect(standings[2].participant.identity).toBe('id_c');
       expect(standings[2].wins).toBe(0);
       expect(standings[2].rank).toBe(3);
+    });
+  });
+
+  describe('トーナメントの黒番（置石をもらう側）', () => {
+    it('1回戦も勝ち上がり先も、弱い方が player1（黒）に並ぶ', () => {
+      let t = createNewTournament({
+        id: 't1', classroomId: 'c1', name: 'T', type: 'single_elimination',
+        participants: [pA, pB, pC, pD], settings: defaultSettings,
+      });
+      for (const m of t.matches.filter(x => x.round === 1)) {
+        const h = determineMatchHandicap(m.player1!, m.player2!, true);
+        expect(m.player1!.identity).toBe(h.black.identity);
+      }
+      // 1回戦はどちらも強い方（五段・初段）が勝ち、決勝は五段 vs 初段 → 初段が黒
+      for (const m of t.matches.filter(x => x.round === 1)) {
+        const strong = [m.player1!, m.player2!].find(p => p.identity === 'id_a' || p.identity === 'id_b')!;
+        t = updateMatchResult(t, m.id, strong.identity, 'W+R');
+      }
+      const final = t.matches.find(m => m.round === 2)!;
+      expect(final.player1?.identity).toBe('id_b');
+      expect(final.player2?.identity).toBe('id_a');
+      expect(final.handicap).toBeGreaterThan(0);
+    });
+  });
+
+  describe('matchResultFromGame（対局の結果を大会の勝敗へ）', () => {
+    const match = { player1: pB, player2: pA };
+    const byId = (identity: string, player: string) => player.replace(/^sid:/, '') === identity;
+    const game = (result: string | null, status = 'finished') => ({
+      status, result, black_player: 'sid:id_b', white_player: 'sid:id_a',
+    });
+
+    it('投了・時間切れ・目数を勝者と表示に直す', () => {
+      expect(matchResultFromGame(match, game('B+R'), byId)).toEqual({ kind: 'decided', winnerId: 'id_b', resultDetail: '黒中押し勝ち' });
+      expect(matchResultFromGame(match, game('W+T'), byId)).toEqual({ kind: 'decided', winnerId: 'id_a', resultDetail: '白時間切れ勝ち' });
+      expect(matchResultFromGame(match, game('W+3.5'), byId)).toEqual({ kind: 'decided', winnerId: 'id_a', resultDetail: '白3.5目勝ち' });
+    });
+
+    it('終わっていなければ null、勝敗の無い終局は void', () => {
+      expect(matchResultFromGame(match, game(null, 'playing'), byId)).toBeNull();
+      expect(matchResultFromGame(match, game('取消'), byId)).toEqual({ kind: 'void' });
+      expect(matchResultFromGame(match, game('B+0'), byId)).toEqual({ kind: 'void' });
+    });
+
+    it('以前の版の仮の ID は対局に結び付かない', () => {
+      expect(isLinkedGameId('created_1')).toBe(false);
+      expect(isLinkedGameId(undefined)).toBe(false);
+      expect(isLinkedGameId('3f1e...')).toBe(true);
     });
   });
 });

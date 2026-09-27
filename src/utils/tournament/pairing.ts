@@ -42,6 +42,19 @@ export function determineMatchHandicap(
 }
 
 /** 2の累乗で最も近い以上の数を返す（最小4） */
+/**
+ * 対戦の2人が決まったときに手合割を決め、player1（黒）を置石をもらう側にする。
+ * 🔴 以前は手合割だけ計算して並びを変えず、強い方が黒で石を置く対局が作られえた（2026-09-27）
+ */
+function setMatchPlayers(match: TournamentMatch, autoHandicap: boolean): void {
+  if (!match.player1 || !match.player2) return;
+  const h = determineMatchHandicap(match.player1, match.player2, autoHandicap);
+  match.player1 = h.black;
+  match.player2 = h.white;
+  match.handicap = h.handicap;
+  match.komi = h.komi;
+}
+
 export function getBracketSize(participantCount: number): number {
   let size = 4;
   while (size < participantCount) {
@@ -125,18 +138,25 @@ export function generateSingleEliminationMatches(
           isBye = true;
           winnerId = p2.identity;
           resultDetail = '不戦勝';
-        } else if (p1 && p2) {
+        }
+
+        // 対局を作るとき player1 が黒になる。置石をもらう側（弱い方）を黒に並べる
+        let black = p1;
+        let white = p2;
+        if (p1 && p2) {
           const h = determineMatchHandicap(p1, p2, settings.autoHandicap);
           handicap = h.handicap;
           komi = h.komi;
+          black = h.black;
+          white = h.white;
         }
 
         matches.push({
           id: matchId,
           round: r,
           matchIndex: m,
-          player1: p1,
-          player2: p2,
+          player1: black,
+          player2: white,
           winnerId,
           resultDetail,
           handicap,
@@ -174,11 +194,7 @@ export function generateSingleEliminationMatches(
         if (m.nextMatchSlot === 1) nextMatch.player1 = winner;
         else nextMatch.player2 = winner;
 
-        if (nextMatch.player1 && nextMatch.player2) {
-          const h = determineMatchHandicap(nextMatch.player1, nextMatch.player2, settings.autoHandicap);
-          nextMatch.handicap = h.handicap;
-          nextMatch.komi = h.komi;
-        }
+        if (nextMatch.player1 && nextMatch.player2) setMatchPlayers(nextMatch, settings.autoHandicap);
       }
     }
   }
@@ -319,11 +335,7 @@ export function updateMatchResult(
       }
 
       // 相手が既に決まっていれば手合割を再計算
-      if (nextMatch.player1 && nextMatch.player2) {
-        const h = determineMatchHandicap(nextMatch.player1, nextMatch.player2, tournament.settings.autoHandicap);
-        nextMatch.handicap = h.handicap;
-        nextMatch.komi = h.komi;
-      }
+      if (nextMatch.player1 && nextMatch.player2) setMatchPlayers(nextMatch, tournament.settings.autoHandicap);
     }
   }
 
@@ -428,4 +440,48 @@ export function calculateRoundRobinStandings(
     ...item,
     rank: idx + 1,
   }));
+}
+
+/** 対局に結び付いた ID か（2026-09-27 より前の版が入れた仮の値ではない） */
+export function isLinkedGameId(id: string | undefined): id is string {
+  return !!id && !id.startsWith('created_');
+}
+
+/** 終局した対局の結果を、大会の勝敗に読み替える */
+export interface FinishedGameForMatch {
+  status: string;
+  result: string | null;
+  black_player: string;
+  white_player: string;
+}
+
+/**
+ * 対局の結果から、その対戦の勝者と表示用の結果を決める。
+ * - 'decided': 勝敗がついた
+ * - 'void': 終局したが勝敗が無い（取消・持碁など）。対局を作り直すか手で入れてもらう
+ * - null: まだ終わっていない
+ */
+export function matchResultFromGame(
+  match: Pick<TournamentMatch, 'player1' | 'player2'>,
+  game: FinishedGameForMatch,
+  matchesPlayer: (identity: string, player: string) => boolean,
+): { kind: 'decided'; winnerId: string; resultDetail: string } | { kind: 'void' } | null {
+  if (game.status !== 'finished') return null;
+  const m = /^([BW])\+(R|T|[0-9]+(?:\.[0-9]+)?)$/i.exec((game.result ?? '').trim());
+  if (!m || (/^[0-9]/.test(m[2]) && Number(m[2]) === 0)) return { kind: 'void' };
+
+  const winnerPlayer = m[1].toUpperCase() === 'B' ? game.black_player : game.white_player;
+  const winner = [match.player1, match.player2].find(p => p && matchesPlayer(p.identity, winnerPlayer));
+  if (!winner) return { kind: 'void' };
+
+  const color = m[1].toUpperCase() === 'B' ? '黒' : '白';
+  const how = m[2].toUpperCase() === 'R' ? '中押し勝ち' : m[2].toUpperCase() === 'T' ? '時間切れ勝ち' : `${m[2]}目勝ち`;
+  return { kind: 'decided', winnerId: winner.identity, resultDetail: `${color}${how}` };
+}
+
+/** 対戦の手合割の表示 */
+export function handicapLabel(match: Pick<TournamentMatch, 'handicap' | 'komi'>): string {
+  if (match.handicap > 0) return `${match.handicap}子（コミ${match.komi}目）`;
+  if (match.komi === 0.5) return '先相先（コミ半目）';
+  return `互先（コミ${match.komi}目）`;
 }

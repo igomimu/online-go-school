@@ -17,8 +17,12 @@ export interface TournamentMatch {
   player1: TournamentParticipant | null;
   player2: TournamentParticipant | null;
   winnerId: string | null;
-  resultDetail?: string; // 例: "B+R", "W+3.5", "不戦勝"
-  liveGameId?: string; // 作成された live_game の ID
+  resultDetail?: string; // 例: "黒中押し勝ち", "白3.5目勝ち", "不戦勝"
+  /**
+   * 作成した対局（go_school_live_games.id）。終局すると勝敗を自動で反映する。
+   * 2026-09-27 より前の版は仮の値（created_...）を入れていた。それは対局に結び付かない
+   */
+  liveGameId?: string;
   handicap: number;
   komi: number;
   boardSize: number;
@@ -31,11 +35,8 @@ export interface TournamentMatch {
 export interface TournamentSettings {
   boardSize: number;
   autoHandicap: boolean; // 段級位差から手合割を自動判定するか
-  timeSettings?: {
-    mainTimeMinutes: number;
-    byoyomiSeconds: number;
-    byoyomiPeriods: number;
-  };
+  /** 持ち時間。未設定なら時計なし */
+  timeControl?: import('../hooks/useGameClock').TimeSettings | null;
 }
 
 export interface Tournament {

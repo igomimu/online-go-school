@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, Trophy, X } from 'lucide-react';
 import type { Student } from '../../types/classroom';
 import type { GameClock } from '../../types/game';
 import type {
@@ -9,17 +10,34 @@ import type {
 } from '../../types/tournament';
 import {
   createNewTournament,
+  isLinkedGameId,
+  matchResultFromGame,
   updateMatchResult,
 } from '../../utils/tournament/pairing';
 import {
-  getTournaments,
-  saveTournament,
   deleteTournament,
+  getTournaments,
+  loadTournaments,
+  newerTournament,
+  saveTournament,
 } from '../../utils/tournament/tournamentStore';
-import { identityMatchesPlayer } from '../../utils/identityUtils';
+import { fetchLiveGameResults } from '../../utils/liveGameApi';
+import { identityMatchesPlayer, makeStudentIdentity } from '../../utils/identityUtils';
+import { DEFAULT_BYOYOMI_TIME_SETTINGS, timeSettingsToClock, type TimeSettings } from '../../hooks/useGameClock';
+import TimeControlPicker from '../TimeControlPicker';
 import TournamentTree from './TournamentTree';
 import RoundRobinTable from './RoundRobinTable';
 import TournamentCelebration from './TournamentCelebration';
+
+export interface TournamentGamePair {
+  blackPlayer: string;
+  whitePlayer: string;
+  boardSize: number;
+  handicap: number;
+  komi: number;
+  clock?: GameClock;
+  ratingExcluded: boolean;
+}
 
 interface TournamentManagerDialogProps {
   classroomId?: string | null;
@@ -27,19 +45,32 @@ interface TournamentManagerDialogProps {
   isTeacher: boolean;
   students: Student[];
   connectedIdentities: string[];
+  /** 教室の対局一覧。変わるたびに、大会の対局が終わっていないか確かめる */
+  liveGames?: { id: string; status: string }[];
   onClose: () => void;
   onSelectGame?: (gameId: string) => void;
-  onCreateGames?: (
-    pairs: {
-      blackPlayer: string;
-      whitePlayer: string;
-      boardSize: number;
-      handicap: number;
-      komi: number;
-      clock?: GameClock;
-      ratingExcluded: boolean;
-    }[],
-  ) => void;
+  /** 対局を作る。作れた対局の ID を pairs と同じ順で返す（作れなかったものは null） */
+  onCreateGames?: (pairs: TournamentGamePair[]) => Promise<(string | null)[]>;
+}
+
+const inputClass = 'w-full bg-ink/5 text-ink border border-field-line rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent';
+const primaryButton = 'rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-accent-ink transition-colors duration-150 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50';
+const secondaryButton = 'rounded-md border border-line px-3 py-1.5 text-sm text-ink transition-colors duration-150 hover:bg-raised';
+
+/** 対局の黒白に入れる値。名簿の生徒は `sid:` 付きで入れる（ほかの対局作成と同じ形） */
+function toPlayerIdentity(identity: string): string {
+  return identity.startsWith('sid:') ? identity : makeStudentIdentity(identity);
+}
+
+function typeLabel(type: TournamentType): string {
+  return type === 'single_elimination' ? 'トーナメント' : 'リーグ戦';
+}
+
+function timeControlLabel(t: TimeSettings | null | undefined): string {
+  if (!t) return '持ち時間なし';
+  const main = t.mainMinutes > 0 ? `${t.mainMinutes}分` : '';
+  const byo = t.byoyomiEnabled ? `秒読み${t.byoyomiSeconds}秒×${t.byoyomiPeriods}回` : '';
+  return [main, byo].filter(Boolean).join('・') || '持ち時間なし';
 }
 
 export default function TournamentManagerDialog({
@@ -48,16 +79,25 @@ export default function TournamentManagerDialog({
   isTeacher,
   students,
   connectedIdentities,
+  liveGames = [],
   onClose,
   onSelectGame,
   onCreateGames,
 }: TournamentManagerDialogProps) {
-  const [tournaments, setTournaments] = useState<Tournament[]>(() => getTournaments(classroomId));
+  const roomId = classroomId || 'default';
+  // 開いた直後は端末キャッシュを出し、アカウントから読めたら入れ替える
+  const [tournaments, setTournaments] = useState<Tournament[]>(() => getTournaments(roomId));
   const [activeTournamentId, setActiveTournamentId] = useState<string | null>(
-    () => getTournaments(classroomId)[0]?.id ?? null,
+    () => getTournaments(roomId)[0]?.id ?? null,
   );
   const [isCreating, setIsCreating] = useState(false);
   const [celebrationWinner, setCelebrationWinner] = useState<TournamentParticipant | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  // アカウントから読み終わった（または読めなかった）。勝敗の自動反映はこの後に始める
+  const [loaded, setLoaded] = useState(false);
+  const tournamentsRef = useRef(tournaments);
+  useEffect(() => { tournamentsRef.current = tournaments; }, [tournaments]);
 
   // 新規作成フォームの状態
   const [name, setName] = useState('');
@@ -65,15 +105,48 @@ export default function TournamentManagerDialog({
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [boardSize, setBoardSize] = useState<number>(19);
   const [autoHandicap, setAutoHandicap] = useState(true);
+  const [useTimeControl, setUseTimeControl] = useState(true);
+  const [timeControl, setTimeControl] = useState<TimeSettings>(DEFAULT_BYOYOMI_TIME_SETTINGS);
 
-  // 大会一覧の読み込み
-  const reloadTournaments = () => {
-    const list = getTournaments(classroomId);
-    setTournaments(list);
-    if (list.length > 0 && !activeTournamentId) {
-      setActiveTournamentId(list[0].id);
+  useEffect(() => {
+    let alive = true;
+    loadTournaments(roomId)
+      .then(list => {
+        if (!alive) return;
+        // 読んでいる間に画面で変えた大会は、新しい方を残す
+        const current = new Map(tournamentsRef.current.map(t => [t.id, t]));
+        const merged = list.map(t => (current.has(t.id) ? newerTournament(current.get(t.id)!, t) : t));
+        const ids = new Set(merged.map(t => t.id));
+        const next = [...merged, ...tournamentsRef.current.filter(t => !ids.has(t.id))];
+        tournamentsRef.current = next;
+        setTournaments(next);
+        setActiveTournamentId(prev => (prev && next.some(t => t.id === prev) ? prev : next[0]?.id ?? null));
+      })
+      .catch(err => {
+        console.warn('[tournament] 大会を読み込めませんでした', err);
+        if (alive) setNotice('大会をアカウントから読み込めませんでした。この端末に残っている分を表示しています。');
+      })
+      .finally(() => { if (alive) setLoaded(true); });
+    return () => { alive = false; };
+  }, [roomId]);
+
+  // 画面にはすぐ出し、アカウントへ保存する。失敗したら知らせる（端末には残る）
+  const persist = useCallback((changed: Tournament) => {
+    const updated = { ...changed, updatedAt: new Date().toISOString() };
+    tournamentsRef.current = tournamentsRef.current.map(t => (t.id === updated.id ? updated : t));
+    setTournaments(tournamentsRef.current);
+    saveTournament(updated).catch(err => {
+      console.warn('[tournament] 大会を保存できませんでした', err);
+      setNotice('大会をアカウントへ保存できませんでした。通信を確認してください（この端末には残っています）。');
+    });
+  }, []);
+
+  const showWinnerIfCompleted = useCallback((before: Tournament, after: Tournament) => {
+    if (before.status !== 'completed' && after.status === 'completed' && after.winnerId) {
+      const winner = after.participants.find(p => p.identity === after.winnerId);
+      if (winner) setCelebrationWinner(winner);
     }
-  };
+  }, []);
 
   // 新規作成ダイアログを開いた際、接続中の生徒を初期選択
   const startCreate = () => {
@@ -107,30 +180,39 @@ export default function TournamentManagerDialog({
 
     const newTournament = createNewTournament({
       id: `t_${Date.now()}`,
-      classroomId: classroomId || 'default',
+      classroomId: roomId,
       name: name.trim(),
       type,
       participants,
       settings: {
         boardSize,
         autoHandicap,
+        timeControl: useTimeControl ? timeControl : null,
       },
     });
 
-    saveTournament(newTournament);
-    reloadTournaments();
+    tournamentsRef.current = [newTournament, ...tournamentsRef.current];
+    setTournaments(tournamentsRef.current);
     setActiveTournamentId(newTournament.id);
     setIsCreating(false);
+    saveTournament(newTournament).catch(err => {
+      console.warn('[tournament] 大会を保存できませんでした', err);
+      setNotice('大会をアカウントへ保存できませんでした。通信を確認してください（この端末には残っています）。');
+    });
   };
 
   const handleDelete = (id: string) => {
     if (!confirm('この大会を削除しますか？')) return;
-    deleteTournament(id);
     const updated = tournaments.filter(t => t.id !== id);
+    tournamentsRef.current = updated;
     setTournaments(updated);
     if (activeTournamentId === id) {
       setActiveTournamentId(updated.length > 0 ? updated[0].id : null);
     }
+    deleteTournament(id).catch(err => {
+      console.warn('[tournament] 大会を削除できませんでした', err);
+      setNotice('大会をアカウントから削除できませんでした。通信を確認してください。');
+    });
   };
 
   const activeTournament = tournaments.find(t => t.id === activeTournamentId);
@@ -139,86 +221,124 @@ export default function TournamentManagerDialog({
   const handleSetMatchResult = (matchId: string, winnerId: string, resultDetail: string) => {
     if (!activeTournament) return;
     const updated = updateMatchResult(activeTournament, matchId, winnerId, resultDetail);
-    saveTournament(updated);
-    setTournaments(prev => prev.map(t => (t.id === updated.id ? updated : t)));
-
-    // 優勝者が決定した場合
-    if (updated.status === 'completed' && updated.winnerId) {
-      const winner = updated.participants.find(p => p.identity === updated.winnerId);
-      if (winner) {
-        setCelebrationWinner(winner);
-      }
-    }
+    persist(updated);
+    showWinnerIfCompleted(activeTournament, updated);
   };
 
-  // 単一マッチの対局作成
-  const handleCreateGameForMatch = (match: TournamentMatch) => {
-    if (!onCreateGames || !match.player1 || !match.player2 || !activeTournament) return;
-
-    onCreateGames([
-      {
-        blackPlayer: match.player1.identity,
-        whitePlayer: match.player2.identity,
-        boardSize: match.boardSize,
-        handicap: match.handicap,
-        komi: match.komi,
-        // 大会の対局は道場ランクの連勝・連敗に数えない（2026-09-27）
-        ratingExcluded: true,
-      },
-    ]);
-
-    // マッチに対局作成フラグを設定（仮のID）
-    const updatedMatches = activeTournament.matches.map(m =>
-      m.id === match.id ? { ...m, liveGameId: `created_${Date.now()}` } : m,
-    );
-    const updated = { ...activeTournament, matches: updatedMatches };
-    saveTournament(updated);
-    setTournaments(prev => prev.map(t => (t.id === updated.id ? updated : t)));
-  };
-
-  // ラウンド一括対局作成
-  const handleCreateRoundGames = (roundNumber: number) => {
-    if (!onCreateGames || !activeTournament) return;
-    const roundMatches = activeTournament.matches.filter(
-      m => m.round === roundNumber && !m.winnerId && !m.liveGameId && m.player1 && m.player2,
-    );
-
-    if (roundMatches.length === 0) {
-      alert('作成対象の未対局がありません');
-      return;
-    }
-
-    const pairs = roundMatches.map(m => ({
-      blackPlayer: m.player1!.identity,
-      whitePlayer: m.player2!.identity,
+  // 対局を作り、作れた対局の ID を対戦に結び付ける（終局したら勝敗を自動で反映する）
+  const createGames = async (tournament: Tournament, targets: TournamentMatch[]) => {
+    if (!onCreateGames || targets.length === 0 || busy) return;
+    const clock = tournament.settings.timeControl
+      ? timeSettingsToClock(tournament.settings.timeControl)
+      : undefined;
+    const pairs: TournamentGamePair[] = targets.map(m => ({
+      blackPlayer: toPlayerIdentity(m.player1!.identity),
+      whitePlayer: toPlayerIdentity(m.player2!.identity),
       boardSize: m.boardSize,
       handicap: m.handicap,
       komi: m.komi,
+      clock,
       // 大会の対局は道場ランクの連勝・連敗に数えない（2026-09-27）
       ratingExcluded: true,
     }));
 
-    onCreateGames(pairs);
+    setBusy(true);
+    let ids: (string | null)[] = [];
+    try {
+      ids = await onCreateGames(pairs);
+    } catch (err) {
+      console.warn('[tournament] 対局を作れませんでした', err);
+    } finally {
+      setBusy(false);
+    }
 
-    const matchIds = new Set(roundMatches.map(m => m.id));
-    const updatedMatches = activeTournament.matches.map(m =>
-      matchIds.has(m.id) ? { ...m, liveGameId: `created_${Date.now()}_${m.id}` } : m,
-    );
-    const updated = { ...activeTournament, matches: updatedMatches };
-    saveTournament(updated);
-    setTournaments(prev => prev.map(t => (t.id === updated.id ? updated : t)));
+    const idByMatch = new Map(targets.map((m, i) => [m.id, ids[i] ?? null]));
+    const latest = tournamentsRef.current.find(t => t.id === tournament.id) ?? tournament;
+    const updated: Tournament = {
+      ...latest,
+      status: latest.status === 'setup' ? 'in_progress' : latest.status,
+      matches: latest.matches.map(m => {
+        const id = idByMatch.get(m.id);
+        return id ? { ...m, liveGameId: id } : m;
+      }),
+    };
+    persist(updated);
+
+    const failed = targets.filter(m => !idByMatch.get(m.id)).length;
+    setNotice(failed > 0 ? `${failed}局を作れませんでした。同じ生徒の対局が進行中でないか確かめてください。` : null);
   };
 
+  const handleCreateGameForMatch = (match: TournamentMatch) => {
+    if (!activeTournament || !match.player1 || !match.player2) return;
+    void createGames(activeTournament, [match]);
+  };
+
+  const handleCreateRoundGames = (roundNumber: number) => {
+    if (!activeTournament) return;
+    const roundMatches = activeTournament.matches.filter(
+      m => m.round === roundNumber && !m.winnerId && !m.liveGameId && m.player1 && m.player2,
+    );
+    if (roundMatches.length === 0) {
+      alert('作成対象の未対局がありません');
+      return;
+    }
+    void createGames(activeTournament, roundMatches);
+  };
+
+  // 結び付いた対局が終わっていたら勝敗を反映する。教室の対局一覧が変わるたび（終局で一覧から消える）
+  // と、開いた直後に確かめる。取消・持碁などで勝敗が無ければ結び付きを外し、作り直せるようにする
+  const pendingGameIds = useMemo(() => tournaments
+    .flatMap(t => t.matches)
+    .filter(m => !m.winnerId && isLinkedGameId(m.liveGameId))
+    .map(m => m.liveGameId!)
+    .sort(), [tournaments]);
+  const pendingKey = pendingGameIds.join(',');
+  const liveSignal = liveGames.map(g => `${g.id}:${g.status}`).join(',');
+
+  useEffect(() => {
+    if (!loaded || !pendingKey) return;
+    let alive = true;
+    fetchLiveGameResults(pendingKey.split(','))
+      .then(rows => {
+        if (!alive) return;
+        const byId = new Map(rows.map(r => [r.id, r]));
+        for (const before of tournamentsRef.current) {
+          let updated = before;
+          for (const m of before.matches) {
+            if (m.winnerId || !isLinkedGameId(m.liveGameId)) continue;
+            const game = byId.get(m.liveGameId);
+            if (!game) continue;
+            const outcome = matchResultFromGame(m, game, identityMatchesPlayer);
+            if (!outcome) continue;
+            if (outcome.kind === 'decided') {
+              updated = updateMatchResult(updated, m.id, outcome.winnerId, outcome.resultDetail);
+            } else {
+              updated = {
+                ...updated,
+                matches: updated.matches.map(x => (x.id === m.id ? { ...x, liveGameId: undefined } : x)),
+              };
+            }
+          }
+          if (updated !== before) {
+            persist(updated);
+            if (before.id === activeTournamentId) showWinnerIfCompleted(before, updated);
+          }
+        }
+      })
+      .catch(err => console.warn('[tournament] 対局の結果を確かめられませんでした', err));
+    return () => { alive = false; };
+  }, [loaded, pendingKey, liveSignal, persist, showWinnerIfCompleted, activeTournamentId]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden text-stone-900 dark:text-stone-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3" role="dialog" aria-label="大会">
+      <div className="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-line bg-surface text-ink shadow-lg">
         {/* ヘッダー */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-800/60">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🏆</span>
-            <div>
-              <h2 className="text-lg font-bold">大会システム（トーナメント・リーグ戦）</h2>
-              <p className="text-xs text-stone-500">
+        <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <Trophy className="h-5 w-5 shrink-0 text-accent-text" strokeWidth={1.5} />
+            <div className="min-w-0">
+              <h2 className="text-base font-bold">大会</h2>
+              <p className="truncate text-xs text-muted">
                 {classroomId ? `教室: ${classroomName || classroomId}` : '全大会管理'}
               </p>
             </div>
@@ -226,181 +346,180 @@ export default function TournamentManagerDialog({
 
           <div className="flex items-center gap-2">
             {isTeacher && !isCreating && (
-              <button
-                onClick={startCreate}
-                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow-sm transition-colors"
-              >
-                ＋ 新しい大会を開催
+              <button onClick={startCreate} className={`${primaryButton} flex items-center gap-1`}>
+                <Plus className="h-4 w-4" />
+                新しい大会
               </button>
             )}
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
-            >
-              ✕
+            <button onClick={onClose} aria-label="閉じる" className="rounded-md p-1.5 text-muted transition-colors duration-150 hover:bg-raised hover:text-ink">
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
+        {notice && (
+          <div role="alert" className="flex items-start gap-2 border-b border-alert/40 bg-surface px-4 py-2 text-sm text-alert-text">
+            <span className="flex-1">{notice}</span>
+            <button onClick={() => setNotice(null)} aria-label="知らせを閉じる" className="shrink-0">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {/* メインエリア */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* 左サイドバー: 大会一覧 */}
+        <div className="flex flex-1 flex-col overflow-hidden sm:flex-row">
+          {/* 左: 大会一覧（狭い画面では上に並べる） */}
           {!isCreating && tournaments.length > 0 && (
-            <div className="w-64 border-r border-stone-200 dark:border-stone-800 p-3 flex flex-col gap-2 overflow-y-auto bg-stone-50/50 dark:bg-stone-950/20">
-              <div className="text-xs font-bold text-stone-500 px-2 py-1">開催中の大会</div>
+            <div className="flex max-h-28 w-full shrink-0 flex-col gap-1 overflow-y-auto border-b border-line p-2 sm:max-h-none sm:w-60 sm:border-b-0 sm:border-r">
+              <div className="px-2 py-1 text-xs font-semibold text-muted">大会一覧</div>
               {tournaments.map(t => (
                 <div
                   key={t.id}
                   onClick={() => setActiveTournamentId(t.id)}
-                  className={`p-2.5 rounded-xl cursor-pointer text-xs transition-all border ${
-                    activeTournamentId === t.id
-                      ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700/60 shadow-sm'
-                      : 'border-transparent hover:bg-stone-100 dark:hover:bg-stone-800'
+                  className={`cursor-pointer rounded-md border px-2.5 py-2 text-xs transition-colors duration-150 ${
+                    activeTournamentId === t.id ? 'border-accent bg-raised' : 'border-transparent hover:bg-raised'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold truncate text-stone-900 dark:text-stone-100">
-                      {t.name}
-                    </span>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="truncate font-semibold text-ink">{t.name}</span>
                     {isTeacher && (
                       <button
                         onClick={e => {
                           e.stopPropagation();
                           handleDelete(t.id);
                         }}
-                        className="text-stone-400 hover:text-rose-500 ml-1"
+                        className="shrink-0 text-muted hover:text-alert-text"
                         title="削除"
+                        aria-label={`${t.name}を削除`}
                       >
-                        ✕
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5 mt-1 text-[11px] text-stone-500">
-                    <span className="px-1.5 py-0.5 rounded bg-stone-200 dark:bg-stone-700 font-medium">
-                      {t.type === 'single_elimination' ? 'トーナメント' : 'リーグ戦'}
-                    </span>
+                  <div className="mt-1 flex items-center gap-2 text-[11px] text-muted">
+                    <span>{typeLabel(t.type)}</span>
                     <span>{t.participants.length}名</span>
-                    {t.status === 'completed' && (
-                      <span className="text-emerald-600 font-bold ml-auto">終了</span>
-                    )}
+                    {t.status === 'completed' && <span className="ml-auto font-semibold text-accent-text">終了</span>}
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* 右コンテンツ */}
-          <div className="flex-1 flex flex-col overflow-y-auto">
+          {/* 右: 本体 */}
+          <div className="flex flex-1 flex-col overflow-y-auto">
             {isCreating ? (
-              /* 新規作成画面 */
-              <div className="p-8 max-w-2xl mx-auto w-full">
-                <h3 className="text-xl font-bold mb-6">新規大会の作成</h3>
-                <form onSubmit={handleCreateSubmit} className="flex flex-col gap-6">
+              <div className="mx-auto w-full max-w-2xl p-6">
+                <h3 className="mb-5 text-lg font-bold">新しい大会</h3>
+                <form onSubmit={handleCreateSubmit} className="flex flex-col gap-5">
                   <div>
-                    <label className="block text-xs font-bold text-stone-600 dark:text-stone-400 mb-1">
-                      大会名
-                    </label>
+                    <label htmlFor="tournament-name" className="mb-1 block text-xs font-semibold text-muted">大会名</label>
                     <input
+                      id="tournament-name"
                       type="text"
                       value={name}
                       onChange={e => setName(e.target.value)}
                       required
-                      className="w-full px-3 py-2 border rounded-lg dark:bg-stone-800 dark:border-stone-700"
+                      className={inputClass}
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-stone-600 dark:text-stone-400 mb-2">
-                      大会形式
-                    </label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div
-                        onClick={() => setType('round_robin')}
-                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                          type === 'round_robin'
-                            ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
-                            : 'border-stone-200 dark:border-stone-700 hover:border-stone-400'
-                        }`}
-                      >
-                        <div className="font-bold mb-1">📊 リーグ戦（総当たり）</div>
-                        <div className="text-xs text-stone-500">
-                          全員が最後まで複数局打てる方式。星取表で順位を競います。
-                        </div>
-                      </div>
-
-                      <div
-                        onClick={() => setType('single_elimination')}
-                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                          type === 'single_elimination'
-                            ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
-                            : 'border-stone-200 dark:border-stone-700 hover:border-stone-400'
-                        }`}
-                      >
-                        <div className="font-bold mb-1">🌳 トーナメント（勝ち残り）</div>
-                        <div className="text-xs text-stone-500">
-                          勝ち上がりの樹形図（ブラケット）。決勝戦に向けて盛り上がります。
-                        </div>
-                      </div>
+                  <fieldset>
+                    <legend className="mb-2 text-xs font-semibold text-muted">形式</legend>
+                    <div className="grid grid-cols-2 gap-3">
+                      {([
+                        ['round_robin', 'リーグ戦（総当たり）', '全員が同じ数だけ打ち、星取表で順位を決めます。'],
+                        ['single_elimination', 'トーナメント（勝ち残り）', '勝った人が次の回戦へ進みます。'],
+                      ] as const).map(([value, title, desc]) => (
+                        <label
+                          key={value}
+                          className={`cursor-pointer rounded-md border p-3 transition-colors duration-150 ${
+                            type === value ? 'border-accent bg-raised' : 'border-line hover:bg-raised'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="tournament-type"
+                            value={value}
+                            checked={type === value}
+                            onChange={() => setType(value)}
+                            className="sr-only"
+                          />
+                          <div className="mb-1 text-sm font-semibold">{title}</div>
+                          <div className="text-xs text-muted">{desc}</div>
+                        </label>
+                      ))}
                     </div>
-                  </div>
+                  </fieldset>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-stone-600 dark:text-stone-400 mb-1">
-                        路数
-                      </label>
+                      <label htmlFor="tournament-board-size" className="mb-1 block text-xs font-semibold text-muted">路数</label>
                       <select
+                        id="tournament-board-size"
                         value={boardSize}
                         onChange={e => setBoardSize(Number(e.target.value))}
-                        className="w-full px-3 py-2 border rounded-lg dark:bg-stone-800 dark:border-stone-700"
+                        className={inputClass}
                       >
                         <option value={19}>19路盤</option>
                         <option value={13}>13路盤</option>
                         <option value={9}>9路盤</option>
                       </select>
                     </div>
-
                     <div>
-                      <label className="block text-xs font-bold text-stone-600 dark:text-stone-400 mb-1">
-                        手合割
-                      </label>
-                      <label className="flex items-center gap-2 mt-2 text-sm cursor-pointer">
+                      <span className="mb-1 block text-xs font-semibold text-muted">手合割</span>
+                      <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm">
                         <input
                           type="checkbox"
                           checked={autoHandicap}
                           onChange={e => setAutoHandicap(e.target.checked)}
-                          className="w-4 h-4 rounded text-amber-500"
+                          className="h-4 w-4 accent-[var(--color-accent)]"
                         />
-                        <span>段級位差から置石・コミを自動計算</span>
+                        段級位差から置石・コミを決める
                       </label>
                     </div>
                   </div>
 
+                  <fieldset className="flex flex-col gap-2">
+                    <legend className="mb-1 text-xs font-semibold text-muted">持ち時間</legend>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        data-testid="tournament-use-time-control"
+                        checked={useTimeControl}
+                        onChange={e => setUseTimeControl(e.target.checked)}
+                        className="h-4 w-4 accent-[var(--color-accent)]"
+                      />
+                      持ち時間を使う
+                    </label>
+                    {useTimeControl && (
+                      <TimeControlPicker value={timeControl} onChange={setTimeControl} variant="dark" />
+                    )}
+                  </fieldset>
+
                   <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="text-xs font-bold text-stone-600 dark:text-stone-400">
-                        参加生徒の選択 ({selectedStudentIds.length}名選択中)
-                      </label>
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted">
+                        参加する生徒（{selectedStudentIds.length}名）
+                      </span>
                       <button
                         type="button"
                         onClick={() => setSelectedStudentIds(students.map(s => s.id))}
-                        className="text-xs text-amber-600 hover:underline"
+                        className="text-xs text-accent-text hover:underline"
                       >
-                        全員選択
+                        全員選ぶ
                       </button>
                     </div>
 
-                    <div className="max-h-48 overflow-y-auto border rounded-xl p-3 grid grid-cols-2 gap-2 dark:border-stone-700">
+                    <div className="grid max-h-48 grid-cols-2 gap-1.5 overflow-y-auto rounded-md border border-line p-2">
                       {students.map(s => {
                         const isConnected = connectedIdentities.some(connId => identityMatchesPlayer(connId, s.id));
                         const isChecked = selectedStudentIds.includes(s.id);
                         return (
                           <label
                             key={s.id}
-                            className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border text-xs ${
-                              isChecked
-                                ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700'
-                                : 'border-stone-200 dark:border-stone-700'
+                            className={`flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-xs ${
+                              isChecked ? 'border-accent bg-raised' : 'border-line'
                             }`}
                           >
                             <input
@@ -413,52 +532,44 @@ export default function TournamentManagerDialog({
                                   setSelectedStudentIds(prev => prev.filter(id => id !== s.id));
                                 }
                               }}
-                              className="rounded text-amber-500"
+                              className="accent-[var(--color-accent)]"
                             />
-                            <div className="truncate flex-1">
-                              <span className="font-bold">{s.name || s.id}</span>
-                              <span className="text-stone-400 ml-1">({s.rank || '初段'})</span>
+                            <div className="min-w-0 flex-1 truncate">
+                              <span className="font-semibold">{s.name || s.id}</span>
+                              <span className="ml-1 text-muted">（{s.rank || '初段'}）</span>
                             </div>
-                            {isConnected && (
-                              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="接続中" />
-                            )}
+                            {isConnected && <span className="text-[11px] text-accent-text">入室中</span>}
                           </label>
                         );
                       })}
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-3 pt-4 border-t dark:border-stone-800">
-                    <button
-                      type="button"
-                      onClick={() => setIsCreating(false)}
-                      className="px-4 py-2 border rounded-lg text-sm hover:bg-stone-100 dark:hover:bg-stone-800"
-                    >
+                  <div className="flex justify-end gap-2 border-t border-line pt-4">
+                    <button type="button" onClick={() => setIsCreating(false)} className={secondaryButton}>
                       キャンセル
                     </button>
-                    <button
-                      type="submit"
-                      className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-sm shadow-md"
-                    >
-                      大会を作成して開始
+                    <button type="submit" className={primaryButton}>
+                      大会を作る
                     </button>
                   </div>
                 </form>
               </div>
             ) : activeTournament ? (
-              /* 大会進行画面 */
-              <div className="flex-1 flex flex-col h-full overflow-hidden">
-                <div className="p-4 border-b border-stone-200 dark:border-stone-800 flex justify-between items-center bg-stone-50/50 dark:bg-stone-900">
-                  <div>
-                    <h3 className="text-base font-bold flex items-center gap-2">
-                      <span>{activeTournament.name}</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 font-semibold">
-                        {activeTournament.type === 'single_elimination' ? 'トーナメント' : 'リーグ戦'}
+              <div className="flex h-full flex-1 flex-col overflow-hidden">
+                <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+                  <div className="min-w-0">
+                    <h3 className="flex items-center gap-2 text-base font-bold">
+                      <span className="truncate">{activeTournament.name}</span>
+                      <span className="shrink-0 rounded border border-line px-1.5 py-0.5 text-xs font-medium text-muted">
+                        {typeLabel(activeTournament.type)}
                       </span>
                     </h3>
-                    <div className="text-xs text-stone-500 mt-0.5">
-                      参加者: {activeTournament.participants.length}名 / {activeTournament.settings.boardSize}路盤 /{' '}
-                      {activeTournament.settings.autoHandicap ? '手合割自動' : '互先'}
+                    <div className="mt-0.5 text-xs text-muted">
+                      {activeTournament.participants.length}名 / {activeTournament.settings.boardSize}路 /{' '}
+                      {activeTournament.settings.autoHandicap ? '手合割あり' : '互先'} /{' '}
+                      {timeControlLabel(activeTournament.settings.timeControl)}
+                      {busy && ' / 対局を作っています…'}
                     </div>
                   </div>
 
@@ -470,10 +581,10 @@ export default function TournamentManagerDialog({
                         );
                         if (winner) setCelebrationWinner(winner);
                       }}
-                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold shadow transition-colors flex items-center gap-1"
+                      className={`${secondaryButton} flex shrink-0 items-center gap-1`}
                     >
-                      <span>🏆</span>
-                      <span>優勝者を表示</span>
+                      <Trophy className="h-4 w-4 text-accent-text" strokeWidth={1.5} />
+                      優勝者
                     </button>
                   )}
                 </div>
@@ -484,7 +595,7 @@ export default function TournamentManagerDialog({
                       tournament={activeTournament}
                       isTeacher={isTeacher}
                       onSelectGame={onSelectGame}
-                      onCreateGameForMatch={handleCreateGameForMatch}
+                      onCreateGameForMatch={onCreateGames ? handleCreateGameForMatch : undefined}
                       onSetMatchResult={handleSetMatchResult}
                     />
                   ) : (
@@ -492,27 +603,23 @@ export default function TournamentManagerDialog({
                       tournament={activeTournament}
                       isTeacher={isTeacher}
                       onSelectGame={onSelectGame}
-                      onCreateGameForMatch={handleCreateGameForMatch}
-                      onCreateRoundGames={handleCreateRoundGames}
+                      onCreateGameForMatch={onCreateGames ? handleCreateGameForMatch : undefined}
+                      onCreateRoundGames={onCreateGames ? handleCreateRoundGames : undefined}
                       onSetMatchResult={handleSetMatchResult}
                     />
                   )}
                 </div>
               </div>
             ) : (
-              /* 大会がない時 */
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                <div className="text-5xl mb-4">🏆</div>
-                <h3 className="text-lg font-bold mb-2">大会がまだ作成されていません</h3>
-                <p className="text-sm text-stone-500 max-w-sm mb-6">
-                  トーナメント戦や総当たりリーグ戦を作成して、生徒同士の対局イベントを開催できます。
+              <div className="flex flex-1 flex-col items-start justify-center gap-3 p-8">
+                <h3 className="text-base font-bold">大会はまだありません</h3>
+                <p className="max-w-sm text-sm text-muted">
+                  リーグ戦やトーナメントを作ると、対戦表から対局を作れます。終局すると勝敗が自動で入ります。
                 </p>
                 {isTeacher && (
-                  <button
-                    onClick={startCreate}
-                    className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-sm shadow-md"
-                  >
-                    ＋ 最初の大会を作成する
+                  <button onClick={startCreate} className={`${primaryButton} flex items-center gap-1`}>
+                    <Plus className="h-4 w-4" />
+                    最初の大会を作る
                   </button>
                 )}
               </div>

@@ -66,7 +66,8 @@ interface TeacherDashboardProps {
   onReloadGames?: () => void | Promise<void>;
   /** 棋力表示を切り替えたことを生徒へ配る（名簿を読み直さない生徒のため） */
   onRankDisplayChanged?: (value: RankDisplay) => void;
-  onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number; clock?: import('../../types/game').GameClock; ratingExcluded: boolean }[]) => void;
+  /** 対局を作る。作れた対局の ID を pairs と同じ順で返す（作れなかったものは null） */
+  onCreateGames: (pairs: { blackPlayer: string; whitePlayer: string; boardSize: number; handicap: number; komi: number; clock?: import('../../types/game').GameClock; ratingExcluded: boolean }[]) => Promise<(string | null)[]>;
   onProblemAssign?: (problem: import('../../types/problem').Problem, targets: string[] | null) => void;
   onClearAudioM?: () => void;
   onClearAudioS?: () => void;
@@ -776,6 +777,7 @@ export default function TeacherDashboard({
           isTeacher={true}
           students={filteredStudents}
           connectedIdentities={participants.map(p => p.identity)}
+          liveGames={liveGames}
           onClose={() => setShowTournament(false)}
           onSelectGame={gameId => {
             onResumeGame?.(gameId);

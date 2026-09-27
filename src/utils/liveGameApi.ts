@@ -214,6 +214,19 @@ export async function createLiveGame(opts: CreateLiveGameOpts): Promise<LiveGame
  */
 export const TIMEOUT_GAME_VISIBLE_MS = 3 * 60 * 60 * 1000;
 
+/** 指定した対局の今の状態と結果（大会の勝敗を反映するため。終局した対局も返す） */
+export async function fetchLiveGameResults(
+  ids: string[],
+): Promise<Pick<LiveGameRow, 'id' | 'status' | 'result' | 'black_player' | 'white_player'>[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await getSupabase()
+    .from('go_school_live_games')
+    .select('id, status, result, black_player, white_player')
+    .in('id', ids);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Pick<LiveGameRow, 'id' | 'status' | 'result' | 'black_player' | 'white_player'>[];
+}
+
 export async function fetchLiveGames(classroomId: string): Promise<LiveGameRow[]> {
   const supabase = getSupabase();
   const { data, error } = await supabase

@@ -2464,9 +2464,19 @@ function App() {
               ) {
                 openTeacherGameWindow(selectedClassroomId);
               }
+              const ids: (string | null)[] = [];
               for (const p of pairs) {
-                await liveGameList.createGame(p);
+                const row = await liveGameList.createGame(p);
+                ids.push(row?.id ?? null);
+                // 1局ずつ作るときと同じく、Realtime を取り逃した生徒にも新しい対局を知らせる
+                if (row) {
+                  void classroomRef.current?.broadcast({
+                    type: 'GAME_CREATED',
+                    payload: { game: liveRowToSession(row) },
+                  });
+                }
               }
+              return ids;
             }}
             onProblemAssign={handleProblemAssign}
             onClearAudioM={handleClearAudioM}
