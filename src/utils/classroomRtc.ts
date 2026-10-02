@@ -160,7 +160,7 @@ export interface ClassroomRtc {
   readonly isMicrophoneEnabled: boolean;
   readonly isCameraEnabled: boolean;
 
-  switchDevice(kind: 'audioinput' | 'videoinput' | 'audiooutput', deviceId: string): Promise<void>;
+  switchDevice(kind: 'audioinput' | 'videoinput', deviceId: string): Promise<void>;
   applySavedDevices(): Promise<void>;
   /** 除外したマイクを拾っていないか確かめ、拾っていれば切り替えるか切る */
   enforceMicPolicy(): Promise<'ok' | 'switched' | 'blocked'>;

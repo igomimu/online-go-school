@@ -347,22 +347,15 @@ export class ClassroomLiveKit implements ClassroomRtc {
    * 使用する機器を切り替える。まだ配信していない種類でも、次に ON にしたとき
    * この選択が使われる（LiveKit が Room の既定機器として覚える）。
    */
-  async switchDevice(kind: 'audioinput' | 'videoinput' | 'audiooutput', deviceId: string): Promise<void> {
-    if (kind === 'audiooutput' && typeof HTMLMediaElement !== 'undefined' && !('setSinkId' in HTMLMediaElement.prototype)) {
-      console.warn('[media] このブラウザはスピーカー（setSinkId）の切り替えに対応していません');
-      return;
-    }
+  async switchDevice(kind: 'audioinput' | 'videoinput', deviceId: string): Promise<void> {
     await this.room.switchActiveDevice(kind, deviceId);
   }
 
   /** 保存してある選択を今の Room に当てる。回線復旧で Room を作り直したあとにも呼ぶ */
   async applySavedDevices(): Promise<void> {
-    for (const kind of ['audioinput', 'videoinput', 'audiooutput'] as const) {
+    for (const kind of ['audioinput', 'videoinput'] as const) {
       const saved = getSavedDeviceId(kind);
       if (!saved) continue;
-      if (kind === 'audiooutput' && typeof HTMLMediaElement !== 'undefined' && !('setSinkId' in HTMLMediaElement.prototype)) {
-        continue;
-      }
       try {
         await this.room.switchActiveDevice(kind, saved);
       } catch (err) {

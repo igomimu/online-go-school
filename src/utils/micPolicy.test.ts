@@ -1,12 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  chooseMic,
-  getExcludedMics,
-  isBuiltinExcludedMic,
-  isExcludedMic,
-  isTrackOnExcludedMic,
-  setMicExcluded,
-} from './mediaDevices';
+import { chooseMic, getExcludedMics, isExcludedMic, setMicExcluded } from './mediaDevices';
 
 const mic = (deviceId: string, label: string, groupId: string) =>
   ({ deviceId, label, groupId, kind: 'audioinput' as const });
@@ -75,59 +68,5 @@ describe('除外リストの保存', () => {
   it('壊れた保存値でも落ちない', () => {
     localStorage.setItem('go-school-excluded-mics', '{bad');
     expect(getExcludedMics()).toEqual([]);
-  });
-});
-
-describe('Logi C270 の組み込み除外', () => {
-  it('C270 を含む各種表記をマイク除外対象と判定する', () => {
-    expect(isBuiltinExcludedMic({ label: 'HD Webcam C270' })).toBe(true);
-    expect(isBuiltinExcludedMic({ label: 'Logi C270' })).toBe(true);
-    expect(isBuiltinExcludedMic({ label: 'Logicool HD Webcam C270' })).toBe(true);
-    expect(isBuiltinExcludedMic({ label: 'Logitech HD Webcam C270' })).toBe(true);
-    expect(isBuiltinExcludedMic({ label: 'C270 HD WebCam' })).toBe(true);
-    expect(isBuiltinExcludedMic({ label: 'マイク (HD Webcam C270)' })).toBe(true);
-    expect(isBuiltinExcludedMic({ label: 'C270' })).toBe(true);
-
-    // 一般マイク・別カメラは除外しない
-    expect(isBuiltinExcludedMic({ label: 'ヤマハ AG03' })).toBe(false);
-    expect(isBuiltinExcludedMic({ label: '内蔵マイク' })).toBe(false);
-    expect(isBuiltinExcludedMic({ label: 'Logicool C920' })).toBe(false);
-    expect(isBuiltinExcludedMic({ label: '' })).toBe(false);
-  });
-
-  it('isExcludedMic は手動除外が空でも C270 を除外と判定する', () => {
-    expect(isExcludedMic({ label: 'HD Webcam C270' }, [])).toBe(true);
-    expect(isExcludedMic({ label: 'ヤマハ AG03' }, [])).toBe(false);
-  });
-
-  it('OS の既定が C270 の場合、C270 を避けて実用マイクを選ぶ', () => {
-    const devices = [
-      mic('default', '既定 - HD Webcam C270', 'g-c270'),
-      mic('c270', 'HD Webcam C270', 'g-c270'),
-      mic('yamaha', 'ヤマハ AG03', 'g-yamaha'),
-    ];
-    expect(chooseMic(devices, null, [])).toEqual({ kind: 'device', deviceId: 'yamaha' });
-  });
-
-  it('C270 しか繋がっていない場合は none を返す', () => {
-    const devices = [
-      mic('default', '既定 - HD Webcam C270', 'g-c270'),
-      mic('c270', 'HD Webcam C270', 'g-c270'),
-    ];
-    expect(chooseMic(devices, null, [])).toEqual({ kind: 'none' });
-  });
-
-  it('音声トラックが C270 の場合は isTrackOnExcludedMic が true を返す', async () => {
-    const track = {
-      label: 'HD Webcam C270',
-      getSettings: () => ({ deviceId: 'c270' }),
-    } as unknown as MediaStreamTrack;
-    expect(await isTrackOnExcludedMic(track)).toBe(true);
-
-    const normalTrack = {
-      label: 'ヤマハ AG03',
-      getSettings: () => ({ deviceId: 'yamaha' }),
-    } as unknown as MediaStreamTrack;
-    expect(await isTrackOnExcludedMic(normalTrack)).toBe(false);
   });
 });
