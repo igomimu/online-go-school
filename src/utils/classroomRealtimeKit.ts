@@ -568,9 +568,14 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     this.enqueue(msg, participantIds);
   }
 
-  async switchDevice(kind: 'audioinput' | 'videoinput', deviceId: string): Promise<void> {
+  async switchDevice(kind: 'audioinput' | 'videoinput' | 'audiooutput', deviceId: string): Promise<void> {
     const meeting = this.meeting;
     if (!meeting) return;
+    if (kind === 'audiooutput') {
+      const device = await meeting.self.getDeviceById?.(deviceId, 'speaker');
+      if (device) await meeting.self.setDevice?.(device);
+      return;
+    }
     const device = await meeting.self.getDeviceById(
       deviceId,
       kind === 'audioinput' ? 'audio' : 'video',
@@ -580,7 +585,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   }
 
   async applySavedDevices(): Promise<void> {
-    for (const kind of ['audioinput', 'videoinput'] as const) {
+    for (const kind of ['audioinput', 'videoinput', 'audiooutput'] as const) {
       const saved = getSavedDeviceId(kind);
       if (!saved) continue;
       try {

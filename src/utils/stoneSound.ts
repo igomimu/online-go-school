@@ -7,6 +7,8 @@
 //    最初のクリック/タップで unlock する（unlockStoneSound を1度だけ登録）。
 //  - ON/OFF は localStorage に永続化（端末ごとの設定）。
 
+import { getSavedDeviceId } from './mediaDevices';
+
 const STORAGE_KEY = 'ogs.stoneSoundEnabled';
 const VOLUME = 0.6;
 
@@ -51,10 +53,28 @@ function getContext(): AudioContext | null {
   if (!Ctor) return null;
   try {
     ctx = new Ctor();
+    const saved = getSavedDeviceId('audiooutput');
+    if (saved && 'setSinkId' in ctx && typeof (ctx as any).setSinkId === 'function') {
+      void (ctx as any).setSinkId(saved).catch(() => {});
+    }
   } catch {
     return null;
   }
   return ctx;
+}
+
+export async function applySpeakerSinkId(deviceId?: string | null): Promise<void> {
+  const c = getContext();
+  if (!c) return;
+  const target = deviceId ?? getSavedDeviceId('audiooutput');
+  if (!target || target === 'default') return;
+  if ('setSinkId' in c && typeof (c as any).setSinkId === 'function') {
+    try {
+      await (c as any).setSinkId(target);
+    } catch (err) {
+      console.warn('[stoneSound] スピーカーの切り替えに失敗しました', err);
+    }
+  }
 }
 
 /** 音源のデコードを開始する（多重呼び出し可）。 */

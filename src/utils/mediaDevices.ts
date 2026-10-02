@@ -8,7 +8,7 @@
  * 選んだ機器は端末ごとに localStorage へ残す。「回線復旧」は Room を作り直すので、
  * 覚えておかないと復旧のたびに既定機器へ戻ってしまう。
  */
-export type DeviceKind = 'audioinput' | 'videoinput';
+export type DeviceKind = 'audioinput' | 'videoinput' | 'audiooutput';
 
 export interface MediaDeviceChoice {
   deviceId: string;
@@ -19,11 +19,13 @@ export interface MediaDeviceChoice {
 const STORAGE_KEY: Record<DeviceKind, string> = {
   audioinput: 'go-school-device-mic',
   videoinput: 'go-school-device-camera',
+  audiooutput: 'go-school-device-speaker',
 };
 
 export const DEVICE_LABEL: Record<DeviceKind, string> = {
   audioinput: 'マイク',
   videoinput: 'カメラ',
+  audiooutput: 'スピーカー（出力先）',
 };
 
 /** 端末に保存した選択（未選択なら null＝ブラウザの既定にまかせる） */

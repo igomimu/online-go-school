@@ -156,6 +156,57 @@ describe('MediaDeviceSettings', () => {
     // 「使わないマイク」一覧にも C270 は出ない
     expect(screen.queryByTestId('exclude-mic-mic-c270')).not.toBeInTheDocument();
   });
+
+  it('マイクとスピーカーの両方でヘッドセットを選択でき、LiveKit切り替えと端末保存が行われる', async () => {
+    const devicesWithHeadset: MediaDeviceInfo[] = [
+      { deviceId: 'mic-headset', kind: 'audioinput', label: 'ヘッドセット マイク (Logicool G435)', groupId: 'g-headset' } as MediaDeviceInfo,
+      { deviceId: 'spk-headset', kind: 'audiooutput', label: 'ヘッドホン (Logicool G435)', groupId: 'g-headset' } as MediaDeviceInfo,
+      { deviceId: 'spk-pc', kind: 'audiooutput', label: 'スピーカー (Realtek Audio)', groupId: 'g-pc' } as MediaDeviceInfo,
+      { deviceId: 'cam-pc', kind: 'videoinput', label: 'Webカメラ', groupId: 'g-cam' } as MediaDeviceInfo,
+    ];
+    (navigator.mediaDevices.enumerateDevices as ReturnType<typeof vi.fn>).mockResolvedValue(devicesWithHeadset);
+    const switchDevice = vi.fn().mockResolvedValue(undefined);
+
+    render(<MediaDeviceSettings classroom={{ switchDevice } as unknown as ClassroomRtc} />);
+    fireEvent.click(screen.getByTestId('media-device-settings'));
+
+    // マイクとスピーカー両方の選択肢がある
+    await waitFor(() => expect(screen.getByText('スピーカー（出力先）')).toBeInTheDocument());
+    expect(screen.getByText('ヘッドセット マイク (Logicool G435)')).toBeInTheDocument();
+    expect(screen.getByText('ヘッドホン (Logicool G435)')).toBeInTheDocument();
+
+    // マイクでヘッドセットを選択
+    fireEvent.change(screen.getByTestId('device-select-audioinput'), { target: { value: 'mic-headset' } });
+    await waitFor(() => expect(switchDevice).toHaveBeenCalledWith('audioinput', 'mic-headset'));
+    expect(localStorage.getItem('go-school-device-mic')).toBe('mic-headset');
+
+    // スピーカーで同じヘッドセットを選択
+    fireEvent.change(screen.getByTestId('device-select-audiooutput'), { target: { value: 'spk-headset' } });
+    await waitFor(() => expect(switchDevice).toHaveBeenCalledWith('audiooutput', 'spk-headset'));
+    expect(localStorage.getItem('go-school-device-speaker')).toBe('spk-headset');
+  });
+
+  it('機器名が未取得のとき「機器名を表示する（許可）」ボタンで許可を要求できる', async () => {
+    (navigator.mediaDevices.enumerateDevices as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { deviceId: 'mic-headset', kind: 'audioinput', label: '', groupId: 'g1' } as MediaDeviceInfo,
+    ]);
+    const mockTrack = { stop: vi.fn() };
+    const mockStream = { getTracks: vi.fn().mockReturnValue([mockTrack]) };
+    const getUserMedia = vi.fn().mockResolvedValue(mockStream);
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+      configurable: true,
+      value: getUserMedia,
+    });
+
+    render(<MediaDeviceSettings classroom={null} />);
+    fireEvent.click(screen.getByTestId('media-device-settings'));
+
+    const permitBtn = await screen.findByRole('button', { name: '機器名を表示する（許可）' });
+    fireEvent.click(permitBtn);
+
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalled());
+    expect(mockTrack.stop).toHaveBeenCalled();
+  });
 });
 
 describe('自分の映像の左右反転', () => {

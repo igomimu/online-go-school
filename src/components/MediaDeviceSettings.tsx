@@ -19,6 +19,7 @@ import {
   type MediaDeviceChoice,
 } from '../utils/mediaDevices';
 import { useMirrorLocalVideo } from '../hooks/useMirrorLocalVideo';
+import { applySpeakerSinkId } from '../utils/stoneSound';
 
 interface Props {
   classroom: ClassroomRtc | null;
@@ -39,37 +40,64 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
   const [devices, setDevices] = useState<Record<DeviceKind, MediaDeviceChoice[]>>({
     audioinput: [],
     videoinput: [],
+    audiooutput: [],
   });
   const [selected, setSelected] = useState<Record<DeviceKind, string>>({
     audioinput: getSavedDeviceId('audioinput') ?? '',
     videoinput: getSavedDeviceId('videoinput') ?? '',
+    audiooutput: getSavedDeviceId('audiooutput') ?? '',
   });
   const [excludedMics, setExcludedMics] = useState<ExcludedMic[]>(getExcludedMics);
   const [needsPermission, setNeedsPermission] = useState(false);
+  const [requestingPermission, setRequestingPermission] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const mirrorLocalVideo = useMirrorLocalVideo();
 
   const reload = useCallback(async () => {
     try {
-      const [mics, cams, micUnnamed, camUnnamed] = await Promise.all([
+      const [mics, cams, speakers, micUnnamed, camUnnamed, speakerUnnamed] = await Promise.all([
         listDevices('audioinput'),
         listDevices('videoinput'),
+        listDevices('audiooutput'),
         needsPermissionForLabels('audioinput'),
         needsPermissionForLabels('videoinput'),
+        needsPermissionForLabels('audiooutput'),
       ]);
-      setDevices({ audioinput: mics, videoinput: cams });
-      setNeedsPermission(micUnnamed || camUnnamed);
+      setDevices({ audioinput: mics, videoinput: cams, audiooutput: speakers });
+      setNeedsPermission(micUnnamed || camUnnamed || speakerUnnamed);
       const savedMic = getSavedDeviceId('audioinput');
       if (savedMic && !mics.some(m => m.deviceId === savedMic)) {
         setSelected(prev => ({ ...prev, audioinput: '' }));
         saveDeviceId('audioinput', null);
+      }
+      const savedSpeaker = getSavedDeviceId('audiooutput');
+      if (savedSpeaker && speakers.length > 0 && !speakers.some(s => s.deviceId === savedSpeaker)) {
+        setSelected(prev => ({ ...prev, audiooutput: '' }));
+        saveDeviceId('audiooutput', null);
       }
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : '機器の一覧を取得できませんでした');
     }
   }, []);
+
+  const requestLabelsPermission = useCallback(async () => {
+    setRequestingPermission(true);
+    setError('');
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) return;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true }).catch(() =>
+        navigator.mediaDevices.getUserMedia({ audio: true })
+      );
+      stream.getTracks().forEach(t => t.stop());
+      await reload();
+    } catch (err) {
+      setError('マイク・カメラの許可が得られませんでした');
+    } finally {
+      setRequestingPermission(false);
+    }
+  }, [reload]);
 
   useEffect(() => {
     if (!open) return;
@@ -99,6 +127,9 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
   const choose = useCallback(async (kind: DeviceKind, deviceId: string) => {
     setSelected(prev => ({ ...prev, [kind]: deviceId }));
     saveDeviceId(kind, deviceId || null);
+    if (kind === 'audiooutput') {
+      void applySpeakerSinkId(deviceId || null);
+    }
     if (!deviceId || !classroom) return;
     try {
       await classroom.switchDevice(kind, deviceId);
@@ -197,9 +228,19 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
               </div>
 
               {needsPermission && (
-                <p className="text-xs text-muted">
-                  機器の名前は、マイクかカメラを一度オンにすると出ます。
-                </p>
+                <div className="rounded-md border border-line bg-raised p-2.5 text-xs space-y-2" data-testid="permission-guide">
+                  <p className="text-muted leading-relaxed">
+                    機器の名前は、マイクかカメラを一度オンにすると出ます（下のボタンで許可して表示することもできます）。
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void requestLabelsPermission()}
+                    disabled={requestingPermission}
+                    className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  >
+                    {requestingPermission ? '確認中…' : '機器名を表示する（許可）'}
+                  </button>
+                </div>
               )}
 
               {renderRow('audioinput')}
@@ -235,6 +276,7 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
                   </p>
                 </fieldset>
               )}
+              {devices.audiooutput.length > 0 && renderRow('audiooutput')}
               {renderRow('videoinput')}
 
               {/* 自分の映像の向き。生徒に届くのは常に実像で、ここは手元の見え方だけを変える */}
