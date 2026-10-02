@@ -6,7 +6,8 @@ import type {
   RatingUpdateResult,
 } from '../types/tsumegoRating';
 
-export const POINTS_TO_PROMOTE_DEFAULT = 5;
+// 2026-10-02: 正式運用前のテストで5ptでは昇格が早すぎたため、10倍の50ptへ変更。
+export const POINTS_TO_PROMOTE_DEFAULT = 50;
 export const PROMOTION_PROTECTION_ROUNDS = 2;
 
 const SEGMENT_CONFIGS: {

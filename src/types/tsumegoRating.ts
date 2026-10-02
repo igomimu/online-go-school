@@ -21,7 +21,7 @@ export interface TsumegoRankDefinition {
   name: string;                    // 例: '石ころ棋士 Ⅳ', 'ブロンズ棋士 Ⅲ'
   badgeEmoji: string;              // 例: '🪨', '🥉'
   targetLevels: string[];          // 出題対象の難易度（例: ['14K', '14K+']）
-  pointsToPromote: number;         // 昇格に必要な勝ち点（規定: 5pt）
+  pointsToPromote: number;         // 昇格に必要な勝ち点（規定: 50pt）
   canDemote: boolean;              // 降格があるか（石ころ棋士はfalse）
 }
 

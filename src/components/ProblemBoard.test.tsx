@@ -161,7 +161,7 @@ describe('ProblemBoard のライフと次の問題', () => {
 
     expect(screen.getByTestId('tsumego-rating-bar')).toBeInTheDocument();
     expect(screen.getByText('ブロンズ棋士 Ⅳ')).toBeInTheDocument();
-    expect(screen.getByText('2/5 pt')).toBeInTheDocument();
+    expect(screen.getByText('2/50 pt')).toBeInTheDocument();
 
     // 正解の手を打つ
     fireEvent.click(screen.getByText('正解の手'));
