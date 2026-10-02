@@ -6,6 +6,7 @@ import {
   DEVICE_LABEL,
   getExcludedMics,
   getSavedDeviceId,
+  isBuiltinExcludedMic,
   isExcludedMic,
   isPseudoDevice,
   listDevices,
@@ -59,6 +60,11 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
       ]);
       setDevices({ audioinput: mics, videoinput: cams });
       setNeedsPermission(micUnnamed || camUnnamed);
+      const savedMic = getSavedDeviceId('audioinput');
+      if (savedMic && !mics.some(m => m.deviceId === savedMic)) {
+        setSelected(prev => ({ ...prev, audioinput: '' }));
+        saveDeviceId('audioinput', null);
+      }
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : '機器の一覧を取得できませんでした');
@@ -109,7 +115,7 @@ export default function MediaDeviceSettings({ classroom, className = '', iconOnl
   const micIsExcluded = (d: MediaDeviceChoice) => isExcludedMic(realMicOf(d), excludedMics);
   const physicalMics = devices.audioinput.filter(d => !isPseudoDevice(d.deviceId));
   // いまは挿さっていないが除外してある機器も、外せるように並べる
-  const absentExcluded = excludedMics.filter(m => !physicalMics.some(d => isExcludedMic(d, [m])));
+  const absentExcluded = excludedMics.filter(m => !isBuiltinExcludedMic(m) && !physicalMics.some(d => isExcludedMic(d, [m])));
 
   const toggleExcluded = useCallback(async (mic: ExcludedMic, excluded: boolean) => {
     const next = setMicExcluded(mic, excluded);

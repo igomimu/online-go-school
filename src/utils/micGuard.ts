@@ -1,5 +1,4 @@
 import {
-  getExcludedMics,
   isTrackOnExcludedMic,
   NO_ALLOWED_MIC_MESSAGE,
   resolveMic,
@@ -19,7 +18,6 @@ export interface MicGuardTarget {
  * 除外が無いときは何もしない＝これまでどおり。
  */
 export async function prepareMic(select: (deviceId: string) => Promise<void>): Promise<void> {
-  if (getExcludedMics().length === 0) return;
   const choice = await resolveMic();
   if (choice.kind === 'none') throw new Error(NO_ALLOWED_MIC_MESSAGE);
   if (choice.kind === 'device') await select(choice.deviceId);

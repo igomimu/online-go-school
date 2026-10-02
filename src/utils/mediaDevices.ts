@@ -78,6 +78,17 @@ export function saveMirrorLocalVideo(on: boolean): void {
 }
 
 /**
+ * 教室でマイクとして使用しない機器（Webカメラ内蔵マイクなど）。
+ *
+ * 例: Logi C270 (HD Webcam C270)。
+ * カメラとしては使用するが、マイクとしては音質・ノイズ・誤選択防止のため
+ * マイク設定（audioinput）から除外する。
+ */
+export function isBuiltinExcludedMic(device: { label?: string }): boolean {
+  return !!device.label && /(?:^|[^a-z0-9])c270(?:[^a-z0-9]|$)/i.test(device.label);
+}
+
+/**
  * つながっている機器の一覧。
  * 名前（label）は、一度でもマイク・カメラの許可を出すまで空で返る仕様なので、
  * 空のときは呼び出し側で「一度オンにしてください」と案内する。
@@ -87,6 +98,7 @@ export async function listDevices(kind: DeviceKind): Promise<MediaDeviceChoice[]
   const all = await navigator.mediaDevices.enumerateDevices();
   return all
     .filter((d) => d.kind === kind && d.deviceId)
+    .filter((d) => kind !== 'audioinput' || !isBuiltinExcludedMic(d))
     .map((d, i) => ({
       deviceId: d.deviceId,
       label: d.label || `${DEVICE_LABEL[kind]} ${i + 1}`,
@@ -149,8 +161,12 @@ function sameMic(a: ExcludedMic, b: ExcludedMic): boolean {
   return !!a.label && a.label === b.label;
 }
 
-export function isExcludedMic(mic: ExcludedMic, excluded: ExcludedMic[] = getExcludedMics()): boolean {
-  return excluded.some((m) => sameMic(m, mic));
+export function isExcludedMic(
+  mic: { deviceId?: string; label?: string },
+  excluded: ExcludedMic[] = getExcludedMics(),
+): boolean {
+  if (isBuiltinExcludedMic(mic)) return true;
+  return excluded.some((m) => sameMic(m, mic as ExcludedMic));
 }
 
 /** Chrome の「既定」「通信」は実機の別名。実体を見ないと除外を判定できない */
@@ -192,7 +208,8 @@ export function chooseMic(
   excluded: ExcludedMic[],
 ): MicChoice {
   const mics = all.filter((d) => d.kind === 'audioinput' && d.deviceId);
-  if (excluded.length === 0) return saved ? { kind: 'device', deviceId: saved } : { kind: 'browser' };
+  const hasExclusions = excluded.length > 0 || mics.some(isBuiltinExcludedMic);
+  if (!hasExclusions) return saved ? { kind: 'device', deviceId: saved } : { kind: 'browser' };
   if (mics.length === 0 || mics.every((d) => !d.label)) {
     return all.some((d) => d.kind === 'audioinput') ? { kind: 'unknown' } : { kind: 'none' };
   }
@@ -215,8 +232,9 @@ export async function resolveMic(): Promise<MicChoice> {
 
 /** いま音を拾っているトラックが除外した機器か */
 export async function isTrackOnExcludedMic(track: MediaStreamTrack | undefined): Promise<boolean> {
+  if (!track) return false;
+  if (isBuiltinExcludedMic({ label: track.label })) return true;
   const excluded = getExcludedMics();
-  if (!track || excluded.length === 0) return false;
   const deviceId = track.getSettings?.().deviceId ?? '';
   const all = navigator.mediaDevices?.enumerateDevices
     ? await navigator.mediaDevices.enumerateDevices()

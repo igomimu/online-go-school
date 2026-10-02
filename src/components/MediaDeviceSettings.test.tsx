@@ -127,6 +127,35 @@ describe('MediaDeviceSettings', () => {
       expect(screen.getByText(/一度オンにすると出ます/)).toBeInTheDocument()
     );
   });
+
+  it('Logi C270 はカメラに表示され、マイク設定からは除外される', async () => {
+    const devicesWithC270: MediaDeviceInfo[] = [
+      { deviceId: 'mic-a', kind: 'audioinput', label: 'ヤマハ AG03', groupId: 'g1' } as MediaDeviceInfo,
+      { deviceId: 'mic-c270', kind: 'audioinput', label: 'HD Webcam C270', groupId: 'g-c270' } as MediaDeviceInfo,
+      { deviceId: 'cam-c270', kind: 'videoinput', label: 'HD Webcam C270', groupId: 'g-c270' } as MediaDeviceInfo,
+    ];
+    (navigator.mediaDevices.enumerateDevices as ReturnType<typeof vi.fn>).mockResolvedValue(devicesWithC270);
+    // 過去に C270 がマイクとして保存されていた場合は解除される
+    localStorage.setItem('go-school-device-mic', 'mic-c270');
+
+    render(<MediaDeviceSettings classroom={null} />);
+    fireEvent.click(screen.getByTestId('media-device-settings'));
+
+    // カメラ選択肢には C270 がある
+    await waitFor(() => expect(screen.getByText('HD Webcam C270')).toBeInTheDocument());
+    const camSelect = screen.getByTestId('device-select-videoinput');
+    expect(camSelect.querySelector('option[value="cam-c270"]')).not.toBeNull();
+
+    // マイク選択肢には C270 がない（ヤマハ AG03 のみ）
+    const micSelect = screen.getByTestId('device-select-audioinput') as HTMLSelectElement;
+    expect(micSelect.querySelector('option[value="mic-c270"]')).toBeNull();
+    expect(micSelect.querySelector('option[value="mic-a"]')).not.toBeNull();
+    expect(micSelect.value).toBe('');
+    expect(localStorage.getItem('go-school-device-mic')).toBeNull();
+
+    // 「使わないマイク」一覧にも C270 は出ない
+    expect(screen.queryByTestId('exclude-mic-mic-c270')).not.toBeInTheDocument();
+  });
 });
 
 describe('自分の映像の左右反転', () => {
