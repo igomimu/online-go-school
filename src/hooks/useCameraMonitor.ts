@@ -43,7 +43,9 @@ export function useCameraMonitor(
     setRecovering(true);
     try {
       await classroom.disableCamera();
-      await classroom.applySavedDevices();
+      // カメラだけ選び直す。マイクまで選び直すと授業中にマイクを開き直すことになり、
+      // Bluetooth イヤホンが通話モードへ切り替わって音量が急に変わる（2026-10-03）
+      await classroom.applySavedDevices(['videoinput']);
       await classroom.enableCamera();
       if (!disposedRef.current) {
         setWarning('カメラ映像が止まったため、自動で再起動しました。映像を確認してください。');

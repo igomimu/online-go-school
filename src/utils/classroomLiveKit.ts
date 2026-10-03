@@ -352,8 +352,8 @@ export class ClassroomLiveKit implements ClassroomRtc {
   }
 
   /** 保存してある選択を今の Room に当てる。回線復旧で Room を作り直したあとにも呼ぶ */
-  async applySavedDevices(): Promise<void> {
-    for (const kind of ['audioinput', 'videoinput'] as const) {
+  async applySavedDevices(kinds: readonly ('audioinput' | 'videoinput')[] = ['audioinput', 'videoinput']): Promise<void> {
+    for (const kind of kinds) {
       const saved = getSavedDeviceId(kind);
       if (!saved) continue;
       try {

@@ -579,8 +579,8 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     await meeting.self.setDevice(device);
   }
 
-  async applySavedDevices(): Promise<void> {
-    for (const kind of ['audioinput', 'videoinput'] as const) {
+  async applySavedDevices(kinds: readonly ('audioinput' | 'videoinput')[] = ['audioinput', 'videoinput']): Promise<void> {
+    for (const kind of kinds) {
       const saved = getSavedDeviceId(kind);
       if (!saved) continue;
       try {

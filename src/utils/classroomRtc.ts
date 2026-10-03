@@ -161,7 +161,8 @@ export interface ClassroomRtc {
   readonly isCameraEnabled: boolean;
 
   switchDevice(kind: 'audioinput' | 'videoinput', deviceId: string): Promise<void>;
-  applySavedDevices(): Promise<void>;
+  /** 保存してある機器を当てる。kinds を絞ると、その種類だけ選び直す（他の機器は開き直さない） */
+  applySavedDevices(kinds?: readonly ('audioinput' | 'videoinput')[]): Promise<void>;
   /** 除外したマイクを拾っていないか確かめ、拾っていれば切り替えるか切る */
   enforceMicPolicy(): Promise<'ok' | 'switched' | 'blocked'>;
 

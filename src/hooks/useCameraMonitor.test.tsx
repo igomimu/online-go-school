@@ -26,6 +26,7 @@ describe('useCameraMonitor', () => {
 
     expect(classroom.disableCamera).toHaveBeenCalledTimes(1);
     expect(classroom.applySavedDevices).toHaveBeenCalledTimes(1);
+    expect(classroom.applySavedDevices).toHaveBeenCalledWith(['videoinput']);
     expect(classroom.enableCamera).toHaveBeenCalledTimes(1);
     expect(result.current.warning).toContain('自動で再起動しました');
   });
