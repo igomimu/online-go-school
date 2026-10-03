@@ -4,23 +4,11 @@ import type { Student } from '../types/classroom';
 const DOJO_URL = import.meta.env.VITE_DOJO_SUPABASE_URL;
 const DOJO_KEY = import.meta.env.VITE_DOJO_SUPABASE_KEY;
 
-// dojo-appのrank(数値) → 棋力表示
-function dojoRankToDisplay(rank: string | null): string {
-  if (!rank) return '';
-  const n = parseInt(rank);
-  if (isNaN(n) || n <= 0) return '';
-  if (n === 1) return '1D';
-  return `${n}K`;
-}
-
-// dojo-appのkakuzuke → 内部レーティング表記
-function kakuzukeToRating(kakuzuke: string | null): string {
-  switch (kakuzuke) {
-    case 'tatsujin': return '達人';
-    case 'shikkarisan': return 'しっかり';
-    case 'minarai': return '見習い';
-    default: return '';
-  }
+// dojo-appのrank(数値) は道場ランク（R0が最強）。棋力（級・段）ではない
+function dojoRankToRating(rank: string | null): string {
+  const n = Number(rank?.trim());
+  if (!rank?.trim() || !Number.isInteger(n) || n < 0 || n > 60) return '';
+  return `R${n}`;
 }
 
 interface DojoStudent {
@@ -79,8 +67,8 @@ export async function fetchDojoNetStudents(): Promise<{ students: Student[]; err
     const students: Student[] = data.map(d => ({
       id: d.id,
       name: d.name,
-      rank: dojoRankToDisplay(d.rank),
-      internalRating: kakuzukeToRating(d.kakuzuke),
+      rank: '',
+      internalRating: dojoRankToRating(d.rank),
       type: 'ネット生',
       grade: d.grade || '',
       country: d.address || '',
