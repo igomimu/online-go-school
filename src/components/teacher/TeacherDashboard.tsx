@@ -465,7 +465,8 @@ export default function TeacherDashboard({
           ref={videoStripRef}
           data-testid="teacher-video-strip"
           style={{
-            flexShrink: 0,
+            flexShrink: 1,
+            minHeight: 64,
             height: videoStrip.height ?? undefined,
             background: '#000',
             borderBottom: '1px solid var(--color-line)',
@@ -536,7 +537,8 @@ export default function TeacherDashboard({
           height: roster.height ?? undefined,
           maxHeight: roster.height === null ? 'min(35vh, 260px)' : undefined,
           overflowY: 'auto',
-          flexShrink: 0,
+          flexShrink: 1,
+          minHeight: 72,
         }}
       >
         <StudentTable
@@ -567,7 +569,9 @@ export default function TeacherDashboard({
       />
 
       {/* 中央: 碁盤グリッド/観戦 + 右サイドバー（音声設定+チャット） */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+      {/* 碁盤の欄は潰させない。上の映像・生徒一覧が伸びても最低限の高さを残し、足りないぶんは上が縮む。
+          詰碁の出題中に碁盤の欄が高さ0になり、対局が見えなくなった（2026-10-03 三村さん） */}
+      <div style={{ flex: 1, display: 'flex', minHeight: 'min(45vh, 360px)' }}>
         {/* 碁盤エリア: サムネイルグリッド or 観戦パネル（対局は常に講師専用の別ウィンドウで行うため、教室ホーム画面には対局盤を埋め込まない）。
             高さは生徒一覧のリサイザー次第で半端になるので、盤の行に吸着させて
             「下段が途中で切れたまま」にならないようにする。 */}
