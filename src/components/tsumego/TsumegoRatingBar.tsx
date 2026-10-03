@@ -51,21 +51,19 @@ export default function TsumegoRatingBar({ state, className = '' }: TsumegoRatin
 
       {/* 昇格ゲージ */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1">
-          {Array.from({ length: totalSlots }).map((_, i) => {
-            const isFilled = i < state.points;
-            return (
-              <div
-                key={i}
-                className={`w-5 h-2.5 rounded-sm transition-all duration-300 ${
-                  isFilled
-                    ? 'bg-amber-500 shadow-sm scale-105'
-                    : 'bg-muted border border-border/60'
-                }`}
-                title={`勝ち点: ${state.points} / ${totalSlots}`}
-              />
-            );
-          })}
+        <div
+          className="h-2.5 w-40 overflow-hidden rounded-full border border-border/60 bg-muted"
+          title={`勝ち点: ${state.points} / ${totalSlots}`}
+          role="progressbar"
+          aria-label="昇格までの勝ち点"
+          aria-valuemin={0}
+          aria-valuemax={totalSlots}
+          aria-valuenow={state.points}
+        >
+          <div
+            className="h-full bg-amber-500 transition-[width] duration-300"
+            style={{ width: `${Math.min(100, (state.points / totalSlots) * 100)}%` }}
+          />
         </div>
         <span className="text-xs font-mono font-medium text-muted-foreground ml-1">
           {state.points}/{totalSlots} pt

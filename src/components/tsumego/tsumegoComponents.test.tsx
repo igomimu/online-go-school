@@ -19,7 +19,7 @@ describe('Tsumego Components', () => {
       const state = { ...createInitialRatingState('silver_2'), points: 3 };
       render(<TsumegoRatingBadge state={state} showPoints />);
       expect(screen.getByText('シルバー棋士 Ⅱ')).toBeInTheDocument();
-      expect(screen.getByText('(3/5pt)')).toBeInTheDocument();
+      expect(screen.getByText('(3/50pt)')).toBeInTheDocument();
     });
   });
 
@@ -34,7 +34,9 @@ describe('Tsumego Components', () => {
       render(<TsumegoRatingBar state={state} />);
       expect(screen.getByTestId('tsumego-rating-bar')).toBeInTheDocument();
       expect(screen.getByText('ゴールド棋士 Ⅰ')).toBeInTheDocument();
-      expect(screen.getByText('4/5 pt')).toBeInTheDocument();
+      expect(screen.getByText('4/50 pt')).toBeInTheDocument();
+      expect(screen.getByRole('progressbar', { name: '昇格までの勝ち点' }))
+        .toHaveAttribute('aria-valuemax', '50');
       expect(screen.getByText('3連勝')).toBeInTheDocument();
       expect(screen.getByText('保護1')).toBeInTheDocument();
     });

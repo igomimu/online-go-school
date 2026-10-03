@@ -161,7 +161,7 @@ describe('ProblemBoard のライフと次の問題', () => {
 
     expect(screen.getByTestId('tsumego-rating-bar')).toBeInTheDocument();
     expect(screen.getByText('ブロンズ棋士 Ⅳ')).toBeInTheDocument();
-    expect(screen.getByText('2/5 pt')).toBeInTheDocument();
+    expect(screen.getByText('2/50 pt')).toBeInTheDocument();
 
     // 正解の手を打つ
     fireEvent.click(screen.getByText('正解の手'));
@@ -211,5 +211,32 @@ describe('ProblemBoard のライフと次の問題', () => {
     expect(screen.queryByTestId('tsumego-rating-bar')).toBeNull();
     fireEvent.click(screen.getByText('正解の手'));
     expect(onRatingUpdate).not.toHaveBeenCalled();
+  });
+
+  it('中断データから再開された場合、渡されたinitialProgressの問数・正解数を引き継ぐ', () => {
+    const onProblemStart = vi.fn();
+    const onResult = vi.fn();
+    render(
+      <ProblemBoard
+        problem={makeProblem('resume-prob', 3)}
+        onBack={() => {}}
+        onProblemStart={onProblemStart}
+        onResult={onResult}
+        initialProgress={{ problemNo: 4, solved: 3, failed: 0 }}
+      />
+    );
+
+    expect(screen.getByTestId('problem-number')).toHaveTextContent('4問目');
+    expect(onProblemStart).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 'resume-prob' }),
+      expect.objectContaining({ problemNo: 4, solved: 3, failed: 0 }),
+    );
+
+    fireEvent.click(screen.getByText('正解の手'));
+    expect(onResult).toHaveBeenLastCalledWith(
+      'correct',
+      1,
+      expect.objectContaining({ problemNo: 4, solved: 4, failed: 0 }),
+    );
   });
 });

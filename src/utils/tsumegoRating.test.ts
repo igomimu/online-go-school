@@ -6,6 +6,9 @@ import {
   processRatingUpdate,
   pickRandomLevelForRank,
   isTsumegoRatingState,
+  POINTS_TO_PROMOTE_DEFAULT,
+  loadTsumegoRatingFromStorage,
+  saveTsumegoRatingToStorage,
 } from './tsumegoRating';
 
 describe('tsumegoRating', () => {
@@ -27,26 +30,26 @@ describe('tsumegoRating', () => {
     expect(stone4.canDemote).toBe(false);
   });
 
-  it('promotes when reaching required points (5pt)', () => {
+  it('promotes when reaching required points (50pt)', () => {
     let state = createInitialRatingState('bronze_4');
     expect(state.points).toBe(0);
 
-    // 4問正解
-    for (let i = 0; i < 4; i++) {
+    // 49問正解
+    for (let i = 0; i < POINTS_TO_PROMOTE_DEFAULT - 1; i++) {
       const { nextState, event } = processRatingUpdate(state, true);
       expect(event).toBe('none');
       expect(nextState.rankId).toBe('bronze_4');
       state = nextState;
     }
-    expect(state.points).toBe(4);
+    expect(state.points).toBe(49);
 
-    // 5問目正解で昇格
+    // 50問目正解で昇格
     const { nextState, event } = processRatingUpdate(state, true);
     expect(event).toBe('promoted');
     expect(nextState.rankId).toBe('bronze_3');
     expect(nextState.points).toBe(0);
     expect(nextState.protectionCount).toBe(2);
-    expect(nextState.totalSolved).toBe(5);
+    expect(nextState.totalSolved).toBe(50);
   });
 
   it('protects against demotion immediately after promotion', () => {
@@ -74,7 +77,7 @@ describe('tsumegoRating', () => {
     result = processRatingUpdate(result.nextState, false);
     expect(result.event).toBe('demoted');
     expect(result.nextState.rankId).toBe('bronze_4');
-    expect(result.nextState.points).toBe(4); // 降格直後は4pt（あと1問で再昇格）
+    expect(result.nextState.points).toBe(49); // 降格直後は49pt（あと1問で再昇格）
   });
 
   it('does not demote stone rank (beginner protection)', () => {
@@ -99,6 +102,31 @@ describe('tsumegoRating', () => {
 
   it('壊れた端末保存データを格付け状態として扱わない', () => {
     expect(isTsumegoRatingState(createInitialRatingState('bronze_4'))).toBe(true);
+    expect(isTsumegoRatingState({
+      ...createInitialRatingState('bronze_4'),
+      points: 50,
+    })).toBe(true);
+    expect(isTsumegoRatingState({
+      ...createInitialRatingState('bronze_4'),
+      points: 51,
+    })).toBe(false);
     expect(isTsumegoRatingState({ rankId: 'legend_0', points: 99 })).toBe(false);
+  });
+});
+
+describe('格付けの端末キャッシュ', () => {
+  it('リセット前に保存された格付けは読まず、端末から消す（アカウントへ書き戻させない）', () => {
+    localStorage.clear();
+    const old = { ...createInitialRatingState('diamond_2'), totalAttempts: 96, lastUpdated: '2026-10-02T09:42:08.099Z' };
+    saveTsumegoRatingToStorage(old, '1023');
+    expect(loadTsumegoRatingFromStorage('1023')).toBeNull();
+    expect(localStorage.getItem('online_go_school_tsumego_rating_1023')).toBeNull();
+  });
+
+  it('リセット後の格付けはそのまま読める', () => {
+    localStorage.clear();
+    const state = { ...createInitialRatingState('stone_4'), lastUpdated: '2026-10-03T07:02:39.139Z' };
+    saveTsumegoRatingToStorage(state, '1001');
+    expect(loadTsumegoRatingFromStorage('1001')).toEqual(state);
   });
 });

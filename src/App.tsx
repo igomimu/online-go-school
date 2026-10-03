@@ -36,6 +36,7 @@ import {
 } from './utils/unloadInterrupt';
 import { fetchRoster, loadStudents, loadClassrooms, loadStudentTypes } from './utils/classroomStore';
 import { clearRecordDraft, loadRecordDraft, saveRecordDraft, type RecordDraft } from './utils/recordDraft';
+import { clearTsumegoDraft, loadTsumegoDraft, saveTsumegoDraft, type TsumegoDraft, type TsumegoProgress } from './utils/tsumegoDraft';
 import { getReviewTimeline, nodeAtReviewIndex } from './utils/reviewTimeline';
 import { shouldAutoReload } from './utils/appUpdatePolicy';
 import { insertGameRecord } from './utils/savedGames';
@@ -390,6 +391,8 @@ function App() {
 
   // 詰碁モード用
   const [activeProblem, setActiveProblem] = useState<import('./types/problem').Problem | null>(null);
+  const [tsumegoDraft, setTsumegoDraft] = useState<TsumegoDraft | null>(null);
+  const [tsumegoResumeProgress, setTsumegoResumeProgress] = useState<TsumegoProgress | undefined>(undefined);
   // 先生用: 生徒identityごとの解答状況(PROBLEM_RESULT受信結果)
   const [problemResults, setProblemResults] = useState<Record<string, ProblemResultView>>({});
   // 先生用: 詰碁の出題先（null=全員）。配信終了の合図もここへだけ送る
@@ -490,6 +493,20 @@ function App() {
     return () => { alive = false; };
   }, [role, studentId, tsumegoScope]);
 
+  // 詰碁下書き（中断データ）の復元
+  useEffect(() => {
+    if (role !== 'STUDENT') return;
+    setTsumegoDraft(loadTsumegoDraft(tsumegoScope));
+  }, [role, tsumegoScope]);
+
+  const handleResumeTsumego = useCallback(() => {
+    const draft = loadTsumegoDraft(tsumegoScope);
+    if (!draft) return;
+    setTsumegoResumeProgress(draft.progress);
+    setActiveProblem(draft.problem);
+    setViewMode('problem');
+  }, [tsumegoScope]);
+
   // 講師から格付け出題が届いた時に保持するベース出題
   const pendingRatingProblemRef = useRef<import('./types/problem').Problem | null>(null);
 
@@ -507,6 +524,7 @@ function App() {
       p.timeLimitSec = baseProblem?.timeLimitSec;
       p.ratingMode = true;
       pendingRatingProblemRef.current = null;
+      setTsumegoResumeProgress(undefined);
       setActiveProblem(p);
       setViewMode('problem');
     } catch (err) {
@@ -543,6 +561,14 @@ function App() {
         setShowInitialRankDialog(true);
         return;
       }
+    }
+    // 中断データがあり、格付け連動なら同じ未クリア問題から再開
+    const draft = loadTsumegoDraft(tsumegoScope);
+    if (draft && draft.problem.ratingMode) {
+      setTsumegoResumeProgress(draft.progress);
+      setActiveProblem(draft.problem);
+      setViewMode('problem');
+      return;
     }
     await startRatingProblem(rating, baseProblem);
   }, [tsumegoRating, tsumegoScope, startRatingProblem, beginTsumegoRating]);
@@ -933,7 +959,14 @@ function App() {
           if (p.problem.ratingMode) {
             void handleIncomingRatingProblem(p.problem);
           } else {
-            setActiveProblem(p.problem);
+            const draft = loadTsumegoDraft(tsumegoScope);
+            if (draft && draft.problem.id === p.problem.id) {
+              setTsumegoResumeProgress(draft.progress);
+              setActiveProblem(draft.problem);
+            } else {
+              setTsumegoResumeProgress(undefined);
+              setActiveProblem(p.problem);
+            }
             setViewMode('problem');
           }
         }
@@ -1015,6 +1048,14 @@ function App() {
           setSyncedNode(null);
           setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null, hoveredCandidateRank: null, allowStudentInteraction: false });
           setActiveProblem(null);
+          setTsumegoResumeProgress(undefined);
+          // 先生が詰碁の配信を終えたときは続きを残さない。検討などで中断されたときだけ再開できるようにする
+          if ((msg.payload as { problemEnded?: boolean } | undefined)?.problemEnded) {
+            clearTsumegoDraft(tsumegoScope);
+            setTsumegoDraft(null);
+          } else {
+            setTsumegoDraft(loadTsumegoDraft(tsumegoScope));
+          }
         }
 
         // 音声制御（生徒用）
@@ -1740,7 +1781,8 @@ function App() {
   // 詰碁: 配信終了（先生用）。出題した生徒にだけREVIEW_ENDを送って詰碁モードから戻す。
   const handleProblemMonitorBack = () => {
     setActiveProblem(null);
-    void classroomRef.current?.sendToOrAll({ type: 'REVIEW_END', payload: {} }, problemTargets);
+    // problemEnded: 中断ではなく終わり。生徒は「詰碁を再開」を出さない
+    void classroomRef.current?.sendToOrAll({ type: 'REVIEW_END', payload: { problemEnded: true } }, problemTargets);
     setProblemTargets(null);
   };
 
@@ -2636,6 +2678,8 @@ function App() {
             onResumeGame={handleResumeGame}
             onSelectSavedGame={handleSelectSavedGame}
             onCreateRecord={openRecordStart}
+            tsumegoDraft={tsumegoDraft}
+            onResumeTsumego={handleResumeTsumego}
           />
         )}
 
@@ -2810,11 +2854,19 @@ function App() {
               problem={activeProblem}
               ratingState={activeProblem.ratingMode ? tsumegoRating : null}
               onRatingUpdate={activeProblem.ratingMode ? handleTsumegoRatingUpdate : undefined}
+              initialProgress={tsumegoResumeProgress}
               onBack={() => {
                 setViewMode('lobby');
                 setActiveProblem(null);
+                setTsumegoResumeProgress(undefined);
+                setTsumegoDraft(loadTsumegoDraft(tsumegoScope));
               }}
               onResult={(result, moveCount, progress) => {
+                const finished = result === 'correct' || progress.livesLeft === 0;
+                if (finished && !activeProblem.lives && !activeProblem.ratingMode) {
+                  clearTsumegoDraft(tsumegoScope);
+                  setTsumegoDraft(null);
+                }
                 classroomRef.current?.broadcast({
                   type: 'PROBLEM_RESULT',
                   payload: {
@@ -2833,6 +2885,18 @@ function App() {
                 });
               }}
               onProblemStart={(problem, progress) => {
+                const newDraft: TsumegoDraft = {
+                  problem,
+                  progress: {
+                    problemNo: progress.problemNo,
+                    solved: progress.solved,
+                    failed: progress.failed,
+                  },
+                  savedAt: Date.now(),
+                };
+                saveTsumegoDraft(newDraft, tsumegoScope);
+                setTsumegoDraft(newDraft);
+
                 void classroomRef.current?.sendTo({
                   type: 'PROBLEM_RESULT',
                   payload: {

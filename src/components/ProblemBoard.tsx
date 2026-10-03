@@ -32,6 +32,8 @@ interface ProblemBoardProps {
   ratingState?: TsumegoRatingState | null;
   /** 格付け変動時のコールバック */
   onRatingUpdate?: (result: RatingUpdateResult) => void;
+  /** 中断から再開したときの初期進捗 */
+  initialProgress?: { problemNo: number; solved: number; failed: number };
 }
 
 /** 結果を見せてから次の問題へ進むまでの間 */
@@ -55,6 +57,7 @@ export default function ProblemBoard({
   isTeacher,
   ratingState,
   onRatingUpdate,
+  initialProgress,
 }: ProblemBoardProps) {
   const ratingMode = problem.ratingMode === true;
   const { problemState, startProblem, makeMove, timeUp, retry } = useProblemSession();
@@ -75,7 +78,7 @@ export default function ProblemBoard({
   // まちがえた回数。結果を送る effect から読むので ref も持つ（state を依存に入れると二重に送る）
   const [misses, setMisses] = useState(0);
   const missesRef = useRef(0);
-  const statsRef = useRef({ problemNo: 1, solved: 0, failed: 0 });
+  const statsRef = useRef(initialProgress ?? { problemNo: 1, solved: 0, failed: 0 });
   const seenIdsRef = useRef<Set<string>>(new Set([problem.id]));
   const [nextError, setNextError] = useState<string | null>(null);
   const [loadingNext, setLoadingNext] = useState(false);
@@ -88,12 +91,12 @@ export default function ProblemBoard({
   const problemStateRef = useRef(problemState);
   problemStateRef.current = problemState;
 
-  // 先生が新しく出題したら最初から
+  // 先生が新しく出題したら初期化（再開時は initialProgress を優先）
   useEffect(() => {
-    statsRef.current = { problemNo: 1, solved: 0, failed: 0 };
+    statsRef.current = initialProgress ?? { problemNo: 1, solved: 0, failed: 0 };
     seenIdsRef.current = new Set([problem.id]);
     setCurrent(problem);
-  }, [problem]);
+  }, [problem, initialProgress]);
 
   useEffect(() => {
     setCurrentRating(ratingMode ? ratingState ?? null : null);
