@@ -9,6 +9,8 @@ import type {
 // 2026-10-02: 正式運用前のテストで5ptでは昇格が早すぎたため、10倍の50ptへ変更。
 export const POINTS_TO_PROMOTE_DEFAULT = 50;
 export const PROMOTION_PROTECTION_ROUNDS = 2;
+// 2026-10-03 正式開始。これより前の格付け（テスト期間）は端末に残っていても使わない
+export const TSUMEGO_RATING_RESET_AT = '2026-10-03T00:00:00+09:00';
 
 const SEGMENT_CONFIGS: {
   segment: TsumegoSegment;
@@ -269,7 +271,14 @@ export function loadTsumegoRatingFromStorage(studentId?: string): TsumegoRatingS
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    return isTsumegoRatingState(parsed) ? parsed : null;
+    if (!isTsumegoRatingState(parsed)) return null;
+    // リセット前の記録は使わない。アカウント側の行を消しても、端末に残った記録が
+    // 「端末の方が新しい」としてアカウントへ書き戻されてしまうため
+    if (Date.parse(parsed.lastUpdated) < Date.parse(TSUMEGO_RATING_RESET_AT)) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }

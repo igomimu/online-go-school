@@ -1049,7 +1049,13 @@ function App() {
           setSyncedAiAnalysis({ enabled: false, nodeId: null, result: null, isLoading: false, error: null, hoveredCandidateRank: null, allowStudentInteraction: false });
           setActiveProblem(null);
           setTsumegoResumeProgress(undefined);
-          setTsumegoDraft(loadTsumegoDraft(tsumegoScope));
+          // 先生が詰碁の配信を終えたときは続きを残さない。検討などで中断されたときだけ再開できるようにする
+          if ((msg.payload as { problemEnded?: boolean } | undefined)?.problemEnded) {
+            clearTsumegoDraft(tsumegoScope);
+            setTsumegoDraft(null);
+          } else {
+            setTsumegoDraft(loadTsumegoDraft(tsumegoScope));
+          }
         }
 
         // 音声制御（生徒用）
@@ -1775,7 +1781,8 @@ function App() {
   // 詰碁: 配信終了（先生用）。出題した生徒にだけREVIEW_ENDを送って詰碁モードから戻す。
   const handleProblemMonitorBack = () => {
     setActiveProblem(null);
-    void classroomRef.current?.sendToOrAll({ type: 'REVIEW_END', payload: {} }, problemTargets);
+    // problemEnded: 中断ではなく終わり。生徒は「詰碁を再開」を出さない
+    void classroomRef.current?.sendToOrAll({ type: 'REVIEW_END', payload: { problemEnded: true } }, problemTargets);
     setProblemTargets(null);
   };
 

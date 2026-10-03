@@ -7,6 +7,8 @@ import {
   pickRandomLevelForRank,
   isTsumegoRatingState,
   POINTS_TO_PROMOTE_DEFAULT,
+  loadTsumegoRatingFromStorage,
+  saveTsumegoRatingToStorage,
 } from './tsumegoRating';
 
 describe('tsumegoRating', () => {
@@ -109,5 +111,22 @@ describe('tsumegoRating', () => {
       points: 51,
     })).toBe(false);
     expect(isTsumegoRatingState({ rankId: 'legend_0', points: 99 })).toBe(false);
+  });
+});
+
+describe('格付けの端末キャッシュ', () => {
+  it('リセット前に保存された格付けは読まず、端末から消す（アカウントへ書き戻させない）', () => {
+    localStorage.clear();
+    const old = { ...createInitialRatingState('diamond_2'), totalAttempts: 96, lastUpdated: '2026-10-02T09:42:08.099Z' };
+    saveTsumegoRatingToStorage(old, '1023');
+    expect(loadTsumegoRatingFromStorage('1023')).toBeNull();
+    expect(localStorage.getItem('online_go_school_tsumego_rating_1023')).toBeNull();
+  });
+
+  it('リセット後の格付けはそのまま読める', () => {
+    localStorage.clear();
+    const state = { ...createInitialRatingState('stone_4'), lastUpdated: '2026-10-03T07:02:39.139Z' };
+    saveTsumegoRatingToStorage(state, '1001');
+    expect(loadTsumegoRatingFromStorage('1001')).toEqual(state);
   });
 });

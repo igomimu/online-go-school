@@ -9,6 +9,8 @@ import type { Problem } from '../types/problem';
  */
 
 const KEY_PREFIX = 'go-school-tsumego-draft';
+/** これより古い続きは出さない（翌週の授業に先週の詰碁が「中断中」で出ないように） */
+export const TSUMEGO_DRAFT_TTL_MS = 12 * 60 * 60 * 1000;
 
 export interface TsumegoProgress {
   problemNo: number;
@@ -43,6 +45,10 @@ export function loadTsumegoDraft(scope?: string): TsumegoDraft | null {
     const parsed = JSON.parse(raw) as Partial<TsumegoDraft>;
     if (!parsed?.problem || typeof parsed.problem.id !== 'string') return null;
     if (!parsed.progress || typeof parsed.progress.problemNo !== 'number') return null;
+    if (typeof parsed.savedAt !== 'number' || Date.now() - parsed.savedAt > TSUMEGO_DRAFT_TTL_MS) {
+      localStorage.removeItem(key);
+      return null;
+    }
     return {
       problem: parsed.problem,
       progress: {
@@ -50,7 +56,7 @@ export function loadTsumegoDraft(scope?: string): TsumegoDraft | null {
         solved: parsed.progress.solved ?? 0,
         failed: parsed.progress.failed ?? 0,
       },
-      savedAt: parsed.savedAt ?? 0,
+      savedAt: parsed.savedAt,
     };
   } catch {
     return null;
