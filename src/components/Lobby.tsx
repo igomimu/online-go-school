@@ -53,6 +53,10 @@ interface LobbyProps {
   onResumeGame?: (gameId: string) => void;
   /** 棋譜作成（SGFの読み込み・盤に入力して保存） */
   onCreateRecord?: () => void;
+  /** 中断中の詰碁下書き */
+  tsumegoDraft?: import('../utils/tsumegoDraft').TsumegoDraft | null;
+  /** 中断中の詰碁を再開 */
+  onResumeTsumego?: () => void;
 }
 
 export default function Lobby({
@@ -81,6 +85,8 @@ export default function Lobby({
   onChatSend,
   onResumeGame,
   onCreateRecord,
+  tsumegoDraft,
+  onResumeTsumego,
 }: LobbyProps) {
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -157,6 +163,33 @@ export default function Lobby({
                   className="premium-button text-sm"
                 >
                   碁盤を開く
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 取組中の詰碁があればハイライト */}
+        {role === 'STUDENT' && !myGame && tsumegoDraft && onResumeTsumego && (
+          <div className="glass-panel border-l-2 border-l-accent p-4" data-testid="lobby-resume-tsumego-banner">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-accent-text">
+                  {tsumegoDraft.problem.ratingMode ? '詰碁 格付けチャレンジ（中断中）' : '詰碁（中断中）'}
+                </h3>
+                <p className="text-sm text-muted">
+                  {tsumegoDraft.progress.problemNo}問目
+                  {tsumegoDraft.progress.solved > 0 && `・正解 ${tsumegoDraft.progress.solved}問`}
+                  {tsumegoDraft.progress.failed > 0 && `・失敗 ${tsumegoDraft.progress.failed}問`}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={onResumeTsumego}
+                  className="premium-button text-sm flex items-center gap-1.5"
+                  data-testid="lobby-resume-tsumego-btn"
+                >
+                  <BookOpen className="w-4 h-4" /> 詰碁を再開
                 </button>
               </div>
             </div>

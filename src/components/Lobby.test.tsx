@@ -389,4 +389,72 @@ describe('Lobby', () => {
       expect(screen.getByTestId('participant-rank')).toHaveTextContent('R12');
     });
   });
+
+  describe('詰碁の再開バナー', () => {
+    const mockProblem = {
+      id: 'prob-resume-1',
+      title: '基本詰碁',
+      boardSize: 19,
+      initialBoard: [],
+      correctColor: 'BLACK' as const,
+      sgfTree: { children: [] },
+      createdAt: new Date().toISOString(),
+      ratingMode: true,
+    };
+
+    it('中断データがある生徒には再開バナーが表示され、ボタン押下で再開が呼ばれる', () => {
+      const onResumeTsumego = vi.fn();
+      render(
+        <Lobby
+          role="STUDENT"
+          participants={mockParticipants}
+          localIdentity="たろう"
+          activeSpeakers={[]}
+          games={[]}
+          studentJoinInfo=""
+          onSelectGame={vi.fn()}
+          myIdentity="たろう"
+          tsumegoDraft={{
+            problem: mockProblem,
+            progress: { problemNo: 3, solved: 2, failed: 0 },
+            savedAt: Date.now(),
+          }}
+          onResumeTsumego={onResumeTsumego}
+        />
+      );
+
+      const banner = screen.getByTestId('lobby-resume-tsumego-banner');
+      expect(banner).toBeInTheDocument();
+      expect(banner).toHaveTextContent('詰碁 格付けチャレンジ（中断中）');
+      expect(banner).toHaveTextContent('3問目・正解 2問');
+
+      const resumeBtn = screen.getByTestId('lobby-resume-tsumego-btn');
+      fireEvent.click(resumeBtn);
+      expect(onResumeTsumego).toHaveBeenCalledTimes(1);
+    });
+
+    it('対局中の生徒には詰碁再開バナーを出さず対局を優先する', () => {
+      render(
+        <Lobby
+          role="STUDENT"
+          participants={mockParticipants}
+          localIdentity="たろう"
+          activeSpeakers={[]}
+          games={[mockGame]}
+          studentJoinInfo=""
+          onSelectGame={vi.fn()}
+          myIdentity="たろう"
+          tsumegoDraft={{
+            problem: mockProblem,
+            progress: { problemNo: 3, solved: 2, failed: 0 },
+            savedAt: Date.now(),
+          }}
+          onResumeTsumego={vi.fn()}
+        />
+      );
+
+      expect(screen.queryByTestId('lobby-resume-tsumego-banner')).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '対局中' })).toBeInTheDocument();
+    });
+  });
 });
