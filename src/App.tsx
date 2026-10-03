@@ -2549,7 +2549,11 @@ function App() {
       )}
 
       {/* メインコンテンツ */}
-      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+      <div
+        className="flex-1 min-h-0 overflow-y-auto flex flex-col"
+        // 右の詰碁欄の下にホームが潜らないよう、その幅だけ空ける
+        style={problemMonitorOpen && problemWindowBlocked ? { paddingRight: 'min(560px, 50vw)' } : undefined}
+      >
         {/* ロビー: 教師はTeacherDashboard、生徒はLobby */}
         {mainViewMode === 'lobby' && role === 'TEACHER' && (
           <TeacherDashboard
@@ -2787,7 +2791,14 @@ function App() {
               {monitor}
             </PopupPortal>
           ) : (
-            <div className="fixed inset-0 z-50 bg-ground overflow-y-auto p-2 sm:p-4">{monitor}</div>
+            // 別ウィンドウを塞がれたときは右の欄に出す。全面に出すと教室ホームの
+            // 碁盤一覧が隠れ、出題中に対局を見られなくなる（2026-10-03 三村さん）
+            <div
+              data-testid="problem-monitor-side"
+              className="fixed top-0 right-0 bottom-0 z-40 w-[560px] max-w-[50vw] border-l border-line bg-ground overflow-y-auto p-2"
+            >
+              {monitor}
+            </div>
           );
         })()}
 
