@@ -68,6 +68,7 @@ import ProblemMonitorPanel from './components/teacher/ProblemMonitorPanel';
 import type { ProblemResultView } from './types/problem';
 import type { TsumegoRatingState, RatingUpdateResult } from './types/tsumegoRating';
 import {
+  changeTsumegoRatingRank,
   loadTsumegoRatingFromStorage,
   saveTsumegoRatingToStorage,
   createInitialRatingState,
@@ -533,17 +534,19 @@ function App() {
     }
   }, []);
 
-  // 格の無い生徒の格付けを、指定の格から始めて保存する
-  const beginTsumegoRating = useCallback((rankId: string) => {
-    const initial = createInitialRatingState(rankId);
-    setTsumegoRating(initial);
-    saveTsumegoRatingToStorage(initial, tsumegoScope);
+  // 格の無い生徒は指定の格から開始する。講師が明示したときは、通算成績を残して現在の格を変更する。
+  const beginTsumegoRating = useCallback((rankId: string, current?: TsumegoRatingState | null) => {
+    const next = current
+      ? changeTsumegoRatingRank(current, rankId)
+      : createInitialRatingState(rankId);
+    setTsumegoRating(next);
+    saveTsumegoRatingToStorage(next, tsumegoScope);
     if (studentId) {
-      void saveTsumegoRatingToServer(initial, studentId).catch(err => {
+      void saveTsumegoRatingToServer(next, studentId).catch(err => {
         console.warn('[tsumego-rating] 格付けをアカウントへ保存できませんでした', err);
       });
     }
-    return initial;
+    return next;
   }, [studentId, tsumegoScope]);
 
   const handleIncomingRatingProblem = useCallback(async (baseProblem: import('./types/problem').Problem) => {
@@ -553,7 +556,14 @@ function App() {
       rating = loadTsumegoRatingFromStorage(tsumegoScope);
       if (rating) setTsumegoRating(rating);
     }
-    if (!rating) {
+    const resetExisting = baseProblem.ratingResetExisting === true && !!baseProblem.ratingStartRankId;
+    if (resetExisting) {
+      rating = beginTsumegoRating(baseProblem.ratingStartRankId!, rating);
+      // 変更前の格で始めた問題を再開すると、古い格付けを再び保存してしまうため破棄する。
+      clearTsumegoDraft(tsumegoScope);
+      setTsumegoDraft(null);
+      setTsumegoResumeProgress(undefined);
+    } else if (!rating) {
       // 開始の格は講師が選んで出題に載せてくる。載っていない（古い講師画面からの）出題だけ本人に選ばせる
       if (baseProblem.ratingStartRankId) {
         rating = beginTsumegoRating(baseProblem.ratingStartRankId);
@@ -563,7 +573,7 @@ function App() {
       }
     }
     // 中断データがあり、格付け連動なら同じ未クリア問題から再開
-    const draft = loadTsumegoDraft(tsumegoScope);
+    const draft = resetExisting ? null : loadTsumegoDraft(tsumegoScope);
     if (draft && draft.problem.ratingMode) {
       setTsumegoResumeProgress(draft.progress);
       setActiveProblem(draft.problem);

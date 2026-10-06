@@ -3,6 +3,7 @@ import {
   TSUMEGO_RANKS,
   getRankById,
   createInitialRatingState,
+  changeTsumegoRatingRank,
   processRatingUpdate,
   pickRandomLevelForRank,
   isTsumegoRatingState,
@@ -98,6 +99,36 @@ describe('tsumegoRating', () => {
 
     const bronzeLevel = pickRandomLevelForRank('bronze_1');
     expect(['11K', '10K']).toContain(bronzeLevel);
+  });
+
+  it('講師が格を変更しても通算成績と過去最高を残す', () => {
+    const current = {
+      ...createInitialRatingState('bronze_3'),
+      points: 18,
+      consecutiveWins: 10,
+      protectionCount: 1,
+      totalSolved: 35,
+      totalAttempts: 36,
+      highestRankId: 'gold_4',
+    };
+
+    const changed = changeTsumegoRatingRank(current, 'silver_4');
+
+    expect(changed).toMatchObject({
+      rankId: 'silver_4',
+      points: 0,
+      consecutiveWins: 0,
+      protectionCount: 0,
+      totalSolved: 35,
+      totalAttempts: 36,
+      highestRankId: 'gold_4',
+    });
+    expect(Date.parse(changed.lastUpdated)).toBeGreaterThanOrEqual(Date.parse(current.lastUpdated));
+  });
+
+  it('講師が過去最高より上へ変更したら過去最高も更新する', () => {
+    const current = createInitialRatingState('bronze_4');
+    expect(changeTsumegoRatingRank(current, 'silver_4').highestRankId).toBe('silver_4');
   });
 
   it('壊れた端末保存データを格付け状態として扱わない', () => {

@@ -16,6 +16,7 @@ export interface Problem {
   timeLimitSec?: number;       // 1問ごとの制限時間（秒）。切れたらその問題は失敗で次へ。未設定=なし
   ratingMode?: boolean;        // 格付け出題モード（生徒各自の格に応じた難易度が自動出題・昇降格）
   ratingStartRankId?: string;  // 格付け出題で、まだ格の無い生徒が始める格（講師が選ぶ）。既に格のある生徒はその続きから
+  ratingResetExisting?: boolean; // 設定済みの生徒も ratingStartRankId へ変更する（講師が明示した時だけ）
 }
 
 export interface ProblemAttempt {

@@ -163,6 +163,30 @@ export function createInitialRatingState(initialRankId = 'stone_4'): TsumegoRati
 }
 
 /**
+ * 講師の指定で現在の格を変更する。
+ * 通算成績と過去最高は残し、その格で使うポイント・連勝・保護だけを初期化する。
+ */
+export function changeTsumegoRatingRank(
+  current: TsumegoRatingState,
+  rankId: string,
+): TsumegoRatingState {
+  const nextRank = getRankById(rankId);
+  const highestRankId = getRankIndex(nextRank.id) > getRankIndex(current.highestRankId)
+    ? nextRank.id
+    : current.highestRankId;
+
+  return {
+    ...current,
+    rankId: nextRank.id,
+    points: 0,
+    consecutiveWins: 0,
+    protectionCount: 0,
+    highestRankId,
+    lastUpdated: new Date().toISOString(),
+  };
+}
+
+/**
  * 解答結果（正解/不正解）を反映して新しい格付け状態を計算する。
  */
 export function processRatingUpdate(

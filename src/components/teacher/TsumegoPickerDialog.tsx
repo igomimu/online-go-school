@@ -46,6 +46,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
   const [deliveryMode, setDeliveryMode] = useState<'rating' | 'specific'>(recipients ? 'rating' : 'specific');
   // まだ格の無い生徒が始める格。生徒に選ばせず講師が決める（三村さん 2026-09-27）
   const [startRankId, setStartRankId] = useState(DEFAULT_START_RANK_ID);
+  const [resetExisting, setResetExisting] = useState(false);
   const [level, setLevel] = useState<string | null>(null);
   const [boardSize, setBoardSize] = useState(19);
   const [loading, setLoading] = useState(false);
@@ -106,6 +107,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
         ...(timeLimitMin ? { timeLimitSec: timeLimitMin * 60 } : {}),
         ratingMode: true,
         ratingStartRankId: startRankId,
+        ...(resetExisting ? { ratingResetExisting: true } : {}),
       };
       onAssign(ratingProblem, targets);
       onClose();
@@ -184,7 +186,7 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
 
         {deliveryMode === 'rating' && (
           <div>
-            <label className="block text-sm text-muted mb-1.5">開始の格（まだ格の無い生徒）</label>
+            <label className="block text-sm text-muted mb-1.5">開始の格</label>
             <div className="flex flex-wrap gap-1.5">
               {TSUMEGO_START_OPTIONS.map((opt) => (
                 <button
@@ -204,7 +206,21 @@ export default function TsumegoPickerDialog({ onAssign, onClose, recipients }: T
                 </button>
               ))}
             </div>
-            <p className="mt-1.5 text-xs text-muted">すでに格のある生徒は、その格の続きから出題されます。</p>
+            <label className="mt-3 flex items-start gap-2 text-xs text-ink cursor-pointer">
+              <input
+                type="checkbox"
+                data-testid="tsumego-reset-existing"
+                checked={resetExisting}
+                onChange={(event) => setResetExisting(event.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                設定済みの生徒も、選んだ格に変更する
+                <span className="block mt-0.5 text-muted">
+                  オフの場合は現在の格の続きから出題します。オンの場合はポイントを0に戻します。
+                </span>
+              </span>
+            </label>
           </div>
         )}
 

@@ -98,6 +98,24 @@ describe('TsumegoPickerDialog の出題先', () => {
       }),
       null
     );
+    expect(onAssign.mock.calls[0][0].ratingResetExisting).toBeUndefined();
+  });
+
+  it('設定済みの格を選択した格へ変更して配信できる', () => {
+    const onAssign = vi.fn();
+    render(<TsumegoPickerDialog onAssign={onAssign} onClose={() => {}} recipients={recipients} />);
+
+    fireEvent.click(screen.getByTestId('tsumego-start-rank-silver_4'));
+    fireEvent.click(screen.getByTestId('tsumego-reset-existing'));
+    fireEvent.click(screen.getByTestId('assign-rating-problems-btn'));
+
+    expect(onAssign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ratingMode: true,
+        ratingStartRankId: 'silver_4',
+        ratingResetExisting: true,
+      }),
+      null,
+    );
   });
 });
-
