@@ -133,7 +133,7 @@ function dispatchVercelStyle(
   });
 }
 
-const PORT = 5176;
+const PORT = Number(process.env.DEV_API_PORT) || 5176;
 server.listen(PORT, () => {
   console.log(`[API Server] Running on http://localhost:${PORT}`);
 });

@@ -102,7 +102,7 @@ export default defineConfig({
     allowedHosts: ['online.mimura15.jp'],
     proxy: {
       '/api': {
-        target: 'http://localhost:5176',
+        target: `http://localhost:${process.env.DEV_API_PORT || 5176}`,
         changeOrigin: true,
       },
     },

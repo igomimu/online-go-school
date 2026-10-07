@@ -62,6 +62,16 @@ type QueuedMessage = { msg: ClassroomMessage; participantIds?: string[]; retried
  *     盤面は二次元配列を含むので JSON 文字列にして 1 項目へ詰める。
  *     1通あたり 128KB までは実測で通っている（19路の盤面は 2KB 弱）。
  */
+/**
+ * 直前の接続の退室が終わるのを待つための約束。
+ *
+ * 🔴 同じ端末で「切断 → 別の生徒でログイン」すると、前の接続の leave() を待たずに
+ * 次の init() が走っていた。前の接続の後始末と新しい接続が重なり、井町さんで入り直した
+ * のに碁盤が「観戦中」になって打てず、講師の画面にはしばらく前の生徒（金子さん）の
+ * 名前が残った（2026-10-07 授業中）。次の接続は、前の退室を待ってから始める。
+ */
+let pendingLeave: Promise<unknown> = Promise.resolve();
+
 export class ClassroomRealtimeKit implements ClassroomRtc {
   private meeting: Meeting | null = null;
   private handlers: ClassroomEventHandler = {};
@@ -71,6 +81,8 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   private _videoElements = new Map<string, HTMLVideoElement>();
   private _audioElements = new Map<string, HTMLAudioElement>();
   private _state: ConnectionState = ConnectionState.Disconnected;
+  /** destroy 済み。以後の知らせは捨てる */
+  private destroyed = false;
   /** 生徒側で「先生の声を止める」を効かせるための現在値 */
   private remoteAudioEnabled = true;
   private remoteAudioOverrides = new Map<string, boolean>();
@@ -85,6 +97,9 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
 
   async connect({ token }: ClassroomConnectOptions): Promise<void> {
     this.setState(ConnectionState.Connecting);
+    // 前の接続が抜け切るまで待つ（上の pendingLeave を参照）。数秒で諦めて進む
+    await Promise.race([pendingLeave, new Promise(resolve => setTimeout(resolve, 5000))]);
+    if (this.destroyed) return;
     const meeting = await RealtimeKitClient.init({
       authToken: token,
       defaults: {
@@ -101,6 +116,10 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
         },
       },
     });
+    if (this.destroyed) {
+      // 待っている間に捨てられた（もう一度切断・回線復旧が押された）。入らずに終える
+      return;
+    }
     this.meeting = meeting;
     this.setupEventListeners(meeting);
 
@@ -302,6 +321,9 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
   private watchPeerMedia(p: RemotePeer) {
     const identity = this.identityOf(p);
     p.on('videoUpdate', ({ videoEnabled, videoTrack }) => {
+      // 退室した人の知らせが遅れて届いても、映像の枠を作り直さない。
+      // 作り直すと名簿の名前（前に入っていた生徒）の枠が残り続ける
+      if (!this.isPeerPresent(p.id)) return;
       // 切られても枠は残す（上に「カメラ オフ」が被る）。消すのは退室のとき
       if (videoEnabled && videoTrack) {
         const el = this.ensureVideoElement(identity, videoTrack);
@@ -310,6 +332,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
       this.notifyParticipantsChanged();
     });
     p.on('audioUpdate', ({ audioEnabled, audioTrack }) => {
+      if (!this.isPeerPresent(p.id)) return;
       if (audioEnabled && audioTrack) this.ensureAudioElement(identity, audioTrack);
       else this.removeAudioElement(identity);
       this.onAudioTracksChanged?.();
@@ -349,6 +372,9 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     el.srcObject = null;
     el.remove();
     this._videoElements.delete(identity);
+    // 🔴 画面側（App）も映像の一覧を持っている。ここで知らせないと、退室した生徒の
+    // 黒い枠が名簿の名前のまま残る（2026-10-07 授業中、金子さんの枠が残り続けた）
+    this.onVideoTrackChanged?.({ identity, element: null, isLocal: identity === this.localIdentity });
   }
 
   private ensureAudioElement(identity: string, track: MediaStreamTrack): HTMLAudioElement {
@@ -731,7 +757,20 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     };
   }
 
+  private isPeerPresent(peerId: string): boolean {
+    return this.remotePeers().some(peer => peer.id === peerId);
+  }
+
+  /** いま居ない人の映像・音声を片付ける。退室の知らせを取り逃しても枠が残らないように */
+  private pruneAbsentMedia() {
+    if (!this.meeting) return;
+    const present = new Set([this.localIdentity, ...this.remotePeers().map(p => this.identityOf(p))]);
+    [...this._videoElements.keys()].filter(id => !present.has(id)).forEach(id => this.removeVideoElement(id));
+    [...this._audioElements.keys()].filter(id => !present.has(id)).forEach(id => this.removeAudioElement(id));
+  }
+
   private notifyParticipantsChanged() {
+    this.pruneAbsentMedia();
     this.handlers.onParticipantsChanged?.(this.participants);
   }
 
@@ -745,7 +784,16 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     this._audioElements.forEach((el) => { el.srcObject = null; el.remove(); });
     this._audioElements.clear();
     this.remoteAudioOverrides.clear();
-    this.meeting?.leave().catch(() => {});
+    // 捨てた接続から遅れて届く知らせ（退室・切断など）を、新しい接続の画面へ流さない
+    this.destroyed = true;
+    this.handlers = {};
+    this.onVideoTrackChanged = undefined;
+    this.onAudioTracksChanged = undefined;
+    this.onSendError = undefined;
+    this.stopWatchingMics?.();
+    this.stopWatchingMics = undefined;
+    const leaving = this.meeting?.leave().catch(() => {});
+    if (leaving) pendingLeave = leaving;
     this.meeting = null;
   }
 }
