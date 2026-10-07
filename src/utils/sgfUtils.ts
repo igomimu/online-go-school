@@ -308,6 +308,8 @@ export function parseSGF(sgfContent: string): ParsedSGF {
 
 export interface SgfTreeNode {
     move?: SgfMove;
+    /** このノードに着手がない場合の次の手番（SGFのPL、または置き碁の白番） */
+    toPlay?: StoneColor;
     setup?: { ab: string[], aw: string[], ae: string[] };
     markers?: { x: number, y: number, type: string, value: string }[];
     comment?: string;
@@ -338,6 +340,27 @@ export function parseSGFTree(sgfContent: string): ParsedSGFTree {
     const getTag = (tag: string) => {
         const m = sgfContent.match(new RegExp(`${tag}\\[([^\\]]*)\\]`));
         return m ? m[1] : undefined;
+    };
+
+    const getRootTag = (tag: string) => {
+        const rootStart = sgfContent.indexOf(';', sgfContent.indexOf('('));
+        if (rootStart < 0) return undefined;
+        let pos = rootStart + 1;
+        let inBracket = false;
+        while (pos < sgfContent.length) {
+            const ch = sgfContent[pos];
+            if (inBracket) {
+                if (ch === '\\') pos++;
+                else if (ch === ']') inBracket = false;
+            } else {
+                if (ch === '[') inBracket = true;
+                else if (ch === ';' || ch === '(' || ch === ')') break;
+            }
+            pos++;
+        }
+        const properties = sgfContent.slice(rootStart + 1, pos);
+        const match = properties.match(new RegExp(`${tag}\\[([^\\]]*)\\]`));
+        return match ? match[1] : undefined;
     };
 
     const metadata: SgfMetadata = {
@@ -388,7 +411,16 @@ export function parseSGFTree(sgfContent: string): ParsedSGFTree {
     }
 
     // 4. Parse tree structure
-    const root: SgfTreeNode = { children: [] };
+    const explicitToPlay = getRootTag('PL');
+    const handicap = Number(metadata.handicap);
+    const root: SgfTreeNode = {
+        children: [],
+        toPlay: explicitToPlay === 'W'
+            ? 'WHITE'
+            : explicitToPlay === 'B'
+                ? 'BLACK'
+                : (Number.isFinite(handicap) && handicap >= 2 ? 'WHITE' : 'BLACK'),
+    };
 
     // Find the main content after first (; 
     const startIdx = sgfContent.indexOf('(');
@@ -434,6 +466,9 @@ export function parseSGFTree(sgfContent: string): ParsedSGFTree {
             // Extract move from propBuffer
             const bMatch = propBuffer.match(/B\[([a-zA-Z]*)\]/);
             const wMatch = propBuffer.match(/W\[([a-zA-Z]*)\]/);
+            const plMatch = propBuffer.match(/PL\[([BW])\]/);
+
+            if (plMatch) node.toPlay = plMatch[1] === 'W' ? 'WHITE' : 'BLACK';
 
             if (bMatch) {
                 const coord = bMatch[1];

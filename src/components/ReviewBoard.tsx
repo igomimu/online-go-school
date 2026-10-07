@@ -6,7 +6,7 @@ import { getMainPath, removeNode, withBranchNumbers } from '../utils/treeUtilsV2
 import { getReviewTimeline } from '../utils/reviewTimeline';
 import { generateSGFTree } from '../utils/sgfUtils';
 import { copyBoardToClipboard, copySgfToClipboard, downloadBoardAsPNG, downloadSgf } from '../utils/boardExport';
-import { playReviewMove } from '../utils/reviewMove';
+import { getReviewNextColor, playReviewMove } from '../utils/reviewMove';
 import { moveStone } from '../utils/moveStone';
 import { isSharingTarget, toggleSharingTarget, type SharingTargets } from '../utils/sharingTargets';
 import { findNearestDrawingIndex, roundPoint, shouldAppendPoint } from '../utils/drawingUtils';
@@ -636,9 +636,7 @@ export default function ReviewBoard({
 
   // KataGoの勝率・目数差は「次に打つ側」基準。白番局面では黒基準へ反転するため、
   // 現局面の次手を明示する。置き碁の初期局面は白番から始まる。
-  const aiToPlay: 'BLACK' | 'WHITE' = currentNode.move
-    ? (currentNode.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
-    : (initialStones.some(stone => stone.color === 'BLACK') ? 'WHITE' : currentNode.activeColor);
+  const aiToPlay = getReviewNextColor(currentNode);
 
   const aiAnalysis = useAiAnalysis(currentNode, moveHistory, {
     boardSize,
@@ -781,15 +779,12 @@ export default function ReviewBoard({
     });
   }, [candidatesOnBoard, displayedAi.enabled, displayedAi.result, boardSize]);
 
-  const currentMoveColor = currentNode.move?.color;
   const pvOverlay = useMemo<PvStone[] | undefined>(() => {
     if (!candidatesOnBoard) return undefined;
     if (hoveredCandidateIndex === null || !displayedAi.enabled || !displayedAi.result) return undefined;
     const candidate = displayedAi.result.topMoves[hoveredCandidateIndex];
     if (!candidate?.pv?.length) return undefined;
-    let color: 'B' | 'W' = currentMoveColor
-      ? (currentMoveColor === 'BLACK' ? 'W' : 'B')
-      : (currentNode.activeColor === 'BLACK' ? 'B' : 'W');
+    let color: 'B' | 'W' = getReviewNextColor(currentNode) === 'BLACK' ? 'B' : 'W';
     const seen = new Set<string>();
     const stones: PvStone[] = [];
     candidate.pv.forEach((gtp, index) => {
@@ -802,7 +797,7 @@ export default function ReviewBoard({
       color = color === 'B' ? 'W' : 'B';
     });
     return stones.length > 0 ? stones : undefined;
-  }, [candidatesOnBoard, hoveredCandidateIndex, displayedAi.enabled, displayedAi.result, currentMoveColor, currentNode.activeColor, boardSize]);
+  }, [candidatesOnBoard, hoveredCandidateIndex, displayedAi.enabled, displayedAi.result, aiToPlay, boardSize]);
 
   // Build win rate graph data from main path
   const winRateData = useMemo(() => {

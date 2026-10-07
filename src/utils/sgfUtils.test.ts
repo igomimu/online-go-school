@@ -101,6 +101,22 @@ describe('parseSGF → generateSGF ラウンドトリップ', () => {
 });
 
 describe('parseSGFTree', () => {
+  it('置き碁は白番から始まる', () => {
+    const result = parseSGFTree('(;GM[1]FF[4]SZ[19]HA[2]AB[pd][dp])');
+    expect(result.root.toPlay).toBe('WHITE');
+  });
+
+  it('PL指定を置き碁の既定手番より優先する', () => {
+    const result = parseSGFTree('(;GM[1]FF[4]SZ[19]HA[2]PL[B]AB[pd][dp])');
+    expect(result.root.toPlay).toBe('BLACK');
+  });
+
+  it('途中ノードのPL指定を初期手番に使わない', () => {
+    const result = parseSGFTree('(;GM[1]FF[4]SZ[19];B[pd]PL[W])');
+    expect(result.root.toPlay).toBe('BLACK');
+    expect(result.root.children[0].toPlay).toBe('WHITE');
+  });
+
   it('基本的なツリーをパース', () => {
     const sgf = '(;GM[1]SZ[9];B[ee];W[dd])';
     const result = parseSGFTree(sgf);

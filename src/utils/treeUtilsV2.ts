@@ -206,7 +206,8 @@ export const convertSgfToGameTree = (
 
     // Apply Move if any
     let nextNum = startNumber;
-    let actColor: StoneColor = parent ? (parent.activeColor === 'BLACK' ? 'WHITE' : 'BLACK') : 'BLACK';
+    let actColor: StoneColor = sgfNode.toPlay
+        ?? (parent ? (parent.activeColor === 'BLACK' ? 'WHITE' : 'BLACK') : 'BLACK');
 
     if (sgfNode.move) {
         const { x, y, color } = sgfNode.move;

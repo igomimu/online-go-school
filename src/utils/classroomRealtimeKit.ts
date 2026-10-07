@@ -124,6 +124,11 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     this.setupEventListeners(meeting);
 
     await meeting.join();
+    if (this.destroyed || this.meeting !== meeting) {
+      // join待ちの間にログアウト・回線復旧された。古い接続を以後の処理へ進ませない。
+      await this.leaveStaleMeeting(meeting);
+      return;
+    }
     meeting.participants.updateRateLimits(RATE_LIMIT_PER_SEC, RATE_LIMIT_WINDOW_SEC);
 
     // トークン発行前のkickだけでは、別タブから同時に入った競合を防げない。
@@ -132,6 +137,10 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
 
     // 「回線復旧」で作り直しても、選んだマイク・カメラを使い続ける
     await this.applySavedDevices();
+    if (this.destroyed || this.meeting !== meeting) {
+      await this.leaveStaleMeeting(meeting);
+      return;
+    }
     this.stopWatchingMics?.();
     this.stopWatchingMics = watchMicDevices(() => void this.checkMicPolicy());
 
@@ -761,6 +770,12 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     return this.remotePeers().some(peer => peer.id === peerId);
   }
 
+  private async leaveStaleMeeting(meeting: Meeting): Promise<void> {
+    const leaving = meeting.leave().catch(() => {});
+    pendingLeave = leaving;
+    await leaving;
+  }
+
   /** いま居ない人の映像・音声を片付ける。退室の知らせを取り逃しても枠が残らないように */
   private pruneAbsentMedia() {
     if (!this.meeting) return;
@@ -795,6 +810,7 @@ export class ClassroomRealtimeKit implements ClassroomRtc {
     const leaving = this.meeting?.leave().catch(() => {});
     if (leaving) pendingLeave = leaving;
     this.meeting = null;
+    this.setState(ConnectionState.Disconnected);
   }
 }
 

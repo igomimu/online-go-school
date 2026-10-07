@@ -2,6 +2,13 @@ import type { StoneColor } from '../components/GoBoard';
 import { checkCapture, isLegalMove } from './gameLogic';
 import { addMove, type GameNode } from './treeUtilsV2';
 
+/** 検討盤の現在局面で次に打つ色。着手のない初期局面はSGF由来の手番を使う。 */
+export function getReviewNextColor(node: GameNode): StoneColor {
+  return node.move
+    ? (node.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
+    : node.activeColor;
+}
+
 /**
  * 検討盤に一手打つ。
  *
@@ -17,9 +24,7 @@ export function playReviewMove(node: GameNode, x: number, y: number, size?: numb
   if (x < 1 || y < 1 || x > boardSize || y > boardSize) return null;
   if (node.board[y - 1]?.[x - 1]) return null;
 
-  const nextColor: StoneColor = node.move
-    ? (node.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
-    : 'BLACK';
+  const nextColor = getReviewNextColor(node);
 
   // 対局盤と同じ判定を通す。検討でも着手禁止点には置けない
   if (!isLegalMove(node.board, x, y, nextColor, boardSize)) return null;

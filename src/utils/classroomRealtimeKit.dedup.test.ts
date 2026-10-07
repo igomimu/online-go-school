@@ -66,6 +66,12 @@ function createMeeting(peers: ReturnType<typeof createPeer>[]) {
   return { meeting, joinedEvents };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 describe('ClassroomRealtimeKit 同一生徒の二重接続排他', () => {
   beforeEach(() => {
     sdk.init.mockReset();
@@ -108,5 +114,24 @@ describe('ClassroomRealtimeKit 同一生徒の二重接続排他', () => {
     peers.splice(peers.indexOf(newPeer), 1);
     joinedEvents.emit('participantLeft', newPeer as never);
     expect(onParticipantLeft).toHaveBeenCalledWith('sid:1001', '影山 陽翔');
+  });
+
+  it('join待ちの間にdestroyされた接続は、接続済みとして復活しない', async () => {
+    const join = deferred<void>();
+    const { meeting } = createMeeting([]);
+    meeting.join.mockImplementation(() => join.promise);
+    sdk.init.mockResolvedValue(meeting);
+
+    const classroom = new ClassroomRealtimeKit();
+    const connecting = classroom.connect({ token: 'student-token' });
+    await vi.waitFor(() => expect(meeting.join).toHaveBeenCalled());
+
+    classroom.destroy();
+    join.resolve();
+    await connecting;
+
+    expect(meeting.leave).toHaveBeenCalled();
+    expect(meeting.participants.updateRateLimits).not.toHaveBeenCalled();
+    expect(classroom.isConnected).toBe(false);
   });
 });

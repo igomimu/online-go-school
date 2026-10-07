@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { createNode } from './treeUtilsV2';
+import { convertSgfToGameTree, createNode } from './treeUtilsV2';
 import { createEmptyBoard } from './gameLogic';
 import { playReviewMove } from './reviewMove';
+import { parseSGFTree } from './sgfUtils';
 
 function makeRoot(size = 9) {
   return createNode(null, createEmptyBoard(size), 1, 'BLACK', size);
@@ -23,6 +24,26 @@ describe('playReviewMove', () => {
     const black = playReviewMove(root, 5, 5)!;
     const white = playReviewMove(black, 5, 6)!;
     expect(white.move?.color).toBe('WHITE');
+  });
+
+  it('置き碁の初期局面では白から始まる', () => {
+    const root = createNode(null, createEmptyBoard(9), 1, 'WHITE', 9);
+    root.board[2][6] = { color: 'BLACK' };
+    root.board[6][2] = { color: 'BLACK' };
+
+    const white = playReviewMove(root, 5, 5);
+
+    expect(white?.move).toEqual({ x: 5, y: 5, color: 'WHITE' });
+  });
+
+  it('置き碁SGFを読み込んだ直後の検討手は白になる', () => {
+    const parsed = parseSGFTree('(;GM[1]FF[4]SZ[19]HA[2]AB[pd][dp])');
+    const root = convertSgfToGameTree(parsed.root, null, parsed.size, 1, parsed.board);
+
+    const white = playReviewMove(root, 10, 10);
+
+    expect(root.activeColor).toBe('WHITE');
+    expect(white?.move?.color).toBe('WHITE');
   });
 
   it('石のある場所には打てない', () => {

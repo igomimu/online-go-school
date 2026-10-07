@@ -3,7 +3,7 @@ import type { Drawing, NumberMode } from './components/GoBoard';
 import type { GameNode } from './utils/treeUtilsV2';
 import { convertSgfToGameTree, getMainPath, removeNode, withBranchNumbers } from './utils/treeUtilsV2';
 import { generateSGFTree, parseSGFTree } from './utils/sgfUtils';
-import { playReviewMove } from './utils/reviewMove';
+import { getReviewNextColor, playReviewMove } from './utils/reviewMove';
 import {
   getSharingTargetChanges,
   isSharingTarget,
@@ -139,9 +139,7 @@ function sendTeacherAudioPermission(
 }
 
 function reviewBoardUpdatePayload(node: GameNode, boardSize: number, numberMode: NumberMode = 'off', branchStartId: string | null = null) {
-  const nextColor = node.move
-    ? (node.move.color === 'BLACK' ? 'WHITE' : 'BLACK')
-    : 'BLACK';
+  const nextColor = getReviewNextColor(node);
   // 生徒の盤は親を持たない写しなので、手順の位置は数えられない。先生の盤で数えて配る
   const timeline = getReviewTimeline(node);
   return {
@@ -1197,7 +1195,10 @@ function App() {
       });
 
       await classroom.connect({ url: livekitUrl, token: connectToken });
+      // 接続待ちの間にログアウト・回線復旧された古いインスタンスは、画面状態を更新しない。
+      if (classroomRef.current !== classroom || !classroom.isConnected) return;
       await restoreMediaIntent(classroom, connectRole);
+      if (classroomRef.current !== classroom || !classroom.isConnected) return;
       if (connectRole === 'STUDENT') {
         // 検討の途中なら、今の盤を先生に頼む（rejoinReviewRef の説明を参照）
         void classroom.sendTo({ type: 'REVIEW_SYNC_REQUEST', payload: {} }, [TEACHER_IDENTITY]);
