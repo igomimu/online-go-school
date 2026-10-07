@@ -112,7 +112,7 @@ describe('VideoTiles', () => {
     expect(requestFullscreen).toHaveBeenCalledOnce();
   });
 
-  it('講師が映像列を広げた高さに合わせ、16対9のままタイルを拡大する', () => {
+  it('講師が映像列を広げたら、16対9のまま枠の高さいっぱいにタイルを広げる', () => {
     const studentVideo = document.createElement('video');
     render(
       <VideoTiles
@@ -120,12 +120,14 @@ describe('VideoTiles', () => {
         localIdentity="teacher"
         participants={participants}
         variant="classroom"
-        classroomTileHeight={180}
+        fillHeight
       />,
     );
 
     const tile = studentVideo.parentElement?.parentElement as HTMLElement;
-    expect(tile).toHaveStyle({ height: '180px', width: '320px' });
+    // 横スクロールバーの分を差し引けるよう、数値でなく親いっぱいで指定する
+    expect(tile).toHaveStyle({ height: '100%', width: 'auto' });
+    expect(tile).toHaveClass('aspect-video');
     expect(studentVideo.parentElement).toHaveClass('[&>video]:object-contain');
   });
 

@@ -11,8 +11,12 @@ interface VideoTilesProps {
   participants?: ParticipantInfo[];
   students?: Student[];
   variant?: 'compact' | 'classroom';
-  /** 講師画面の可変映像高。未指定なら従来の16:9既定サイズ。 */
-  classroomTileHeight?: number;
+  /**
+   * 講師画面で映像列の高さを変えたとき、親の高さいっぱいにタイルを広げる。
+   * 高さを数値で渡すと、映像が横にあふれたときの横スクロールバーの分だけ
+   * はみ出し、スクロールバーが下の生徒一覧に隠れて右の映像へ行けなかった（2026-10-07）。
+   */
+  fillHeight?: boolean;
   /** 自分のカメラが動いているか。一度も点けていないと映像そのものが無いので、代わりに枠を置く */
   isCameraEnabled?: boolean;
 }
@@ -54,7 +58,7 @@ function VideoTile({
   isLocal,
   mirror,
   variant,
-  classroomTileHeight,
+  fillHeight,
   cameraOn,
   micOn,
 }: {
@@ -64,7 +68,7 @@ function VideoTile({
   /** 自分の映像を鏡像で見る（設定で切り替える。既定は実像） */
   mirror: boolean;
   variant: 'compact' | 'classroom';
-  classroomTileHeight?: number;
+  fillHeight?: boolean;
   cameraOn: boolean;
   micOn: boolean;
 }) {
@@ -174,10 +178,7 @@ function VideoTile({
     return (
       <div
         className="group relative shrink-0 w-[168px] sm:w-[192px] aspect-video bg-black overflow-hidden border border-white/15"
-        style={classroomTileHeight === undefined ? undefined : {
-          height: classroomTileHeight,
-          width: classroomTileHeight * (16 / 9),
-        }}
+        style={fillHeight ? { height: '100%', width: 'auto' } : undefined}
       >
         <div
           ref={containerRef}
@@ -244,7 +245,7 @@ export default function VideoTiles({
   participants = [],
   students = [],
   variant = 'compact',
-  classroomTileHeight,
+  fillHeight,
   isCameraEnabled,
 }: VideoTilesProps) {
   // フックは早い return より前で呼ぶ
@@ -286,10 +287,10 @@ export default function VideoTiles({
 
   return (
     <div
-      className={variant === 'classroom' ? 'w-full overflow-x-auto bg-black px-3 py-2' : 'w-full overflow-x-auto px-4 py-2'}
+      className={variant === 'classroom' ? `w-full overflow-x-auto bg-black px-3 py-2 ${fillHeight ? 'h-full' : ''}` : 'w-full overflow-x-auto px-4 py-2'}
       aria-label="参加者映像"
     >
-      <div className={`flex w-max min-w-full gap-2 ${variant === 'classroom' ? 'justify-start' : 'justify-center'}`}>
+      <div className={`flex w-max min-w-full gap-2 ${variant === 'classroom' ? 'justify-start' : 'justify-center'} ${fillHeight ? 'h-full' : ''}`}>
         {showSelfPlaceholder && <SelfCameraOffTile />}
         {sortedEntries.map(([identity, element]) => {
           const { cameraOn, micOn } = stateFor(identity);
@@ -301,7 +302,7 @@ export default function VideoTiles({
               isLocal={identity === localIdentity}
               mirror={mirrorLocalVideo}
               variant={variant}
-              classroomTileHeight={classroomTileHeight}
+              fillHeight={fillHeight}
               cameraOn={cameraOn}
               micOn={micOn}
             />

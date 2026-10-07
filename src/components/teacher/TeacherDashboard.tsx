@@ -459,15 +459,23 @@ export default function TeacherDashboard({
       color: 'var(--color-ink)',
       fontSize: 12,
     }}>
+      {/* ツールバーより上はまとめて縦にスクロールできる。映像や生徒一覧を広げても
+          碁盤欄は潰れずに下へ押し出され、スクロールすれば見える（2026-10-07 三村さん報告:
+          映像が生徒一覧に隠れ、碁盤欄を下げることもできなかった）。 */}
+      <div
+        data-testid="teacher-home-scroll"
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
+      >
       {/* 参加者映像は教室全体を見渡せるよう、細い右欄ではなく上部へ横一列に置く。 */}
       {videoElements.size > 0 && (
         <div
           ref={videoStripRef}
           data-testid="teacher-video-strip"
           style={{
-            flexShrink: 1,
-            minHeight: 64,
+            flexShrink: 0,
             height: videoStrip.height ?? undefined,
+            display: 'flex',
+            flexDirection: 'column',
             background: '#000',
             borderBottom: '1px solid var(--color-line)',
             overflow: 'hidden',
@@ -479,7 +487,7 @@ export default function TeacherDashboard({
             participants={participants}
             students={allStudents}
             variant="classroom"
-            classroomTileHeight={videoStrip.height === null ? undefined : Math.max(64, videoStrip.height - 16)}
+            fillHeight={videoStrip.height !== null}
           />
         </div>
       )}
@@ -537,8 +545,7 @@ export default function TeacherDashboard({
           height: roster.height ?? undefined,
           maxHeight: roster.height === null ? 'min(35vh, 260px)' : undefined,
           overflowY: 'auto',
-          flexShrink: 1,
-          minHeight: 72,
+          flexShrink: 0,
         }}
       >
         <StudentTable
@@ -569,9 +576,10 @@ export default function TeacherDashboard({
       />
 
       {/* 中央: 碁盤グリッド/観戦 + 右サイドバー（音声設定+チャット） */}
-      {/* 碁盤の欄は潰させない。上の映像・生徒一覧が伸びても最低限の高さを残し、足りないぶんは上が縮む。
-          詰碁の出題中に碁盤の欄が高さ0になり、対局が見えなくなった（2026-10-03 三村さん） */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 'min(45vh, 360px)' }}>
+      {/* 碁盤の欄は潰させない。詰碁の出題中に高さ0になり対局が見えなくなった（2026-10-03）。
+          上の映像・生徒一覧は縮めず、はみ出したぶんは外枠のスクロールで見せる。
+          上を縮める作りだと、広げた映像が生徒一覧の下に隠れた（2026-10-07） */}
+      <div data-testid="teacher-home-main" style={{ flex: 1, display: 'flex', minHeight: 240 }}>
         {/* 碁盤エリア: サムネイルグリッド or 観戦パネル（対局は常に講師専用の別ウィンドウで行うため、教室ホーム画面には対局盤を埋め込まない）。
             高さは生徒一覧のリサイザー次第で半端になるので、盤の行に吸着させて
             「下段が途中で切れたまま」にならないようにする。 */}
@@ -685,6 +693,7 @@ export default function TeacherDashboard({
             />
           </div>
         </div>
+      </div>
       </div>
 
       {/* ツールバー（IGC最下部） */}
