@@ -72,6 +72,9 @@ async function access(req: VercelRequest, res: VercelResponse) {
     .is('revoked_at', null)
     .maybeSingle();
   if (!own) return res.status(404).json({ error: 'このリンクは使えません。購入時のメールのリンクを開いてください' });
+  // 開いた日時を残す（Systeme から移した購入者が新しいページを開いたかを確かめる）。失敗しても視聴は止めない
+  await supabase.from('course_purchases').update({ last_viewed_at: new Date().toISOString() })
+    .eq('access_token_hash', tokenHash(token)).then(() => undefined, () => undefined);
 
   // 同じメールアドレスで買った講座はまとめて見せる（2本買った人がリンクを2つ持たなくていいように）
   const { data: rows, error } = await supabase

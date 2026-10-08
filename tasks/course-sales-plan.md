@@ -27,5 +27,6 @@
 - [x] テスト用 Stripe で本番 URL まで通し（決済→記録→メール→視聴、webhook 配達0件残り）2026-10-09
 - [x] 三村さんがテストカードで1回購入して確認（2026-10-09）
 - [x] 本番の鍵に切り替え（2026-10-09 07:59。webhook we_1UOQFXL4nVnsEDppn3MH4HK5、Vercel 再書き出し）
-- [ ] mimura15.jp/ishinokatachi の「購入する」を新しいページへ
-- [ ] 既存の3人に視聴リンクを送る → 見られたのを確かめて Systeme を閉じる
+- [x] mimura15.jp/ishinokatachi に第2回を足し「購入する」を新しいページへ（marketing-ai b29e325b）
+- [x] 既存の3人（岩本・OKA・豊田）に視聴リンクを送った 2026-10-09 08:13（scripts/course/grant.py、Resend 配達済み）
+- [ ] 3人が開いたのを last_viewed_at で確かめて Systeme を閉じる（www.mimura15.jp の向き先も確認）
