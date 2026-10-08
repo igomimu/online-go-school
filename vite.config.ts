@@ -48,7 +48,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        navigateFallbackDenylist: [/^\/api\//],
+        // /course は教室とは別の入口（講座の販売と視聴）。教室の index.html に差し替えない
+        navigateFallbackDenylist: [/^\/api\//, /^\/course/],
         runtimeCaching: [
           // Supabase API: 常にネットワーク（認証/RLSが効くデータをキャッシュしない）
           {
@@ -96,6 +97,15 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      // 講座の販売と視聴は別の入口（tasks/course-sales-plan.md）
+      input: {
+        main: 'index.html',
+        course: 'course/index.html',
+      },
+    },
+  },
   server: {
     host: true,
     port: 5175,

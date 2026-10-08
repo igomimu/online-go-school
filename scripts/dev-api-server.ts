@@ -4,12 +4,21 @@ import fs from 'fs';
 import path from 'path';
 import tokenHandler from '../api/token';
 import katagoAnalyzeHandler from '../api/katago-analyze';
+import courseProductsHandler from '../api/course-products';
+import courseCheckoutHandler from '../api/course-checkout';
+import courseClaimHandler from '../api/course-claim';
+import courseAccessHandler from '../api/course-access';
 
 type VercelStyleHandler = (req: any, res: any) => Promise<unknown>;
 
 const ROUTES: Record<string, VercelStyleHandler> = {
   '/api/token': tokenHandler,
   '/api/katago-analyze': katagoAnalyzeHandler,
+  // 講座の販売と視聴（course-webhook は生の本文と Stripe の署名が要るので手元では動かさない）
+  '/api/course-products': courseProductsHandler,
+  '/api/course-checkout': courseCheckoutHandler,
+  '/api/course-claim': courseClaimHandler,
+  '/api/course-access': courseAccessHandler,
 };
 
 function loadEnvFile(filePath: string) {
@@ -45,6 +54,12 @@ loadEnvFile(path.join(process.env.HOME || '', '.secrets', 'supabase-dojo-service
 loadEnvFile(path.join(process.env.HOME || '', '.secrets', 'online-go-school-katago.env'));
 // ~/.secrets/cloudflare-realtime.env (RealtimeKit の account_id / app_id / API トークン)
 loadEnvFile(path.join(process.env.HOME || '', '.secrets', 'cloudflare-realtime.env'));
+// 講座: 個人 Stripe の鍵・R2・視聴リンクの秘密（~/.secrets/course-sales.env）とメール（resend.env）
+loadEnvFile(path.join(process.env.HOME || '', '.secrets', 'course-sales.env'));
+loadEnvFile(path.join(process.env.HOME || '', '.secrets', 'resend.env'));
+// 手元では必ずテスト用の鍵（本番の鍵で手元から決済を作らない）
+process.env.STRIPE_COURSE_SECRET_KEY = process.env.STRIPE_KOJIN_TEST_KEY;
+process.env.COURSE_SITE_URL ||= 'http://localhost:5175';
 
 // --- dev 専用 env エイリアス ---
 // 本番(Vercel)では LIVEKIT_API_KEY 等の「VITE_ 接頭辞なし」サーバー側名を直接設定する。

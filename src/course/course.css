@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+:root { --font-sans: 'Inter', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', system-ui, sans-serif; }
+html:lang(ja) { line-break: strict; word-break: normal; overflow-wrap: anywhere; }
+body { font-family: var(--font-sans); background: #f9fafb; color: #111827; }
+:lang(ja) h1, :lang(ja) h2 { word-break: auto-phrase; }
+:lang(ja) h1 { line-height: 1.35; }
+:lang(ja) h2 { line-height: 1.4; }
+.prose-ja p { line-height: 1.8; }
