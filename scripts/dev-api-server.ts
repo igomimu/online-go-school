@@ -4,10 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import tokenHandler from '../api/token';
 import katagoAnalyzeHandler from '../api/katago-analyze';
-import courseProductsHandler from '../api/course-products';
-import courseCheckoutHandler from '../api/course-checkout';
-import courseClaimHandler from '../api/course-claim';
-import courseAccessHandler from '../api/course-access';
+import courseHandler from '../api/course';
 
 type VercelStyleHandler = (req: any, res: any) => Promise<unknown>;
 
@@ -15,10 +12,7 @@ const ROUTES: Record<string, VercelStyleHandler> = {
   '/api/token': tokenHandler,
   '/api/katago-analyze': katagoAnalyzeHandler,
   // 講座の販売と視聴（course-webhook は生の本文と Stripe の署名が要るので手元では動かさない）
-  '/api/course-products': courseProductsHandler,
-  '/api/course-checkout': courseCheckoutHandler,
-  '/api/course-claim': courseClaimHandler,
-  '/api/course-access': courseAccessHandler,
+  '/api/course': courseHandler,
 };
 
 function loadEnvFile(filePath: string) {

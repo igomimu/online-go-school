@@ -36,13 +36,13 @@ export default function CoursePage() {
   const [busy, setBusy] = useState<string | null>(sessionId ? 'claim' : null);
 
   useEffect(() => {
-    getJson<{ products: Product[] }>('/api/course-products').then(r => setProducts(r.products)).catch(e => setError(e.message));
+    getJson<{ products: Product[] }>('/api/course?action=products').then(r => setProducts(r.products)).catch(e => setError(e.message));
   }, []);
 
   // 決済から戻ってきた → 支払いを確かめて視聴リンクの鍵を受け取る
   useEffect(() => {
     if (!sessionId) return;
-    getJson<{ token: string }>(`/api/course-claim?session_id=${encodeURIComponent(sessionId)}`)
+    getJson<{ token: string }>(`/api/course?action=claim&session_id=${encodeURIComponent(sessionId)}`)
       .then(r => {
         saveToken(r.token);
         setToken(r.token);
@@ -56,7 +56,7 @@ export default function CoursePage() {
   useEffect(() => {
     if (!token) return;
     saveToken(token);
-    getJson<{ courses: Owned[] }>(`/api/course-access?t=${encodeURIComponent(token)}`)
+    getJson<{ courses: Owned[] }>(`/api/course?action=access&t=${encodeURIComponent(token)}`)
       .then(r => setOwned(r.courses))
       .catch(e => setError(e.message));
   }, [token]);
@@ -65,7 +65,7 @@ export default function CoursePage() {
     setBusy(productId);
     setError(null);
     try {
-      const r = await getJson<{ url: string }>('/api/course-checkout', {
+      const r = await getJson<{ url: string }>('/api/course?action=checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId }),

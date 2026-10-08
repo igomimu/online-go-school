@@ -4,7 +4,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type Stripe from 'stripe';
-import { recordPurchase, stripe } from './courseCore.js';
+import { recordPurchase, stripe } from './_courseCore.js';
 
 export const config = { api: { bodyParser: false } };
 
