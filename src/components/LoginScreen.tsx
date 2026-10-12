@@ -16,7 +16,10 @@ import type { SavedAccount } from '../utils/authStore';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import { installCopy } from '../utils/installCopy';
 import { fetchClassroomRoster, type ClassroomRoster } from '../utils/classroomRoster';
-import { getTeacherDisplayName, setTeacherDisplayName } from '../utils/identityUtils';
+import { setTeacherDisplayName } from '../utils/identityUtils';
+
+// 前回のログインIDを覚えておく（講師は各自の端末で入るので、毎回打たせない）
+const TEACHER_LOGIN_ID_KEY = 'go-school-teacher-login-id';
 
 interface LoginScreenProps {
   onStudentLogin: (studentId: string, classroomId: string, rawCode?: string, displayName?: string) => void;
@@ -65,7 +68,9 @@ export default function LoginScreen({
   // 先生
   const [teacherPw, setTeacherPw] = useState('');
   const [teacherError, setTeacherError] = useState('');
-  const [teacherDisplayName, setTeacherDisplayNameState] = useState(() => getTeacherDisplayName());
+  const [teacherLoginId, setTeacherLoginId] = useState(() => {
+    try { return localStorage.getItem(TEACHER_LOGIN_ID_KEY) ?? ''; } catch { return ''; }
+  });
 
   useEffect(() => {
     const saved = loadAccounts();
@@ -247,7 +252,7 @@ export default function LoginScreen({
     // （旧実装はローカル照合が先に走り、サーバー側のPW変更後に正しいPWでも
     //   「パスワードが違います」で弾かれてログイン不能になった）
     setSubmitting(true);
-    const res = await supabaseSignInTeacher(teacherPw);
+    const res = await supabaseSignInTeacher(teacherPw, 'global', teacherLoginId);
     setSubmitting(false);
     if (!res.ok) {
       setTeacherError(res.error || 'サーバー認証に失敗しました');
@@ -256,7 +261,14 @@ export default function LoginScreen({
 
     // 認証成功 → ローカルキャッシュをサーバーと同期
     await setTeacherPassword(teacherPw);
-    setTeacherDisplayName(teacherDisplayName);
+    // 講師アカウントの名前を、ビデオ・盤・チャットに出す名前にする
+    if (res.accountDisplayName) setTeacherDisplayName(res.accountDisplayName);
+    try {
+      if (teacherLoginId.trim()) localStorage.setItem(TEACHER_LOGIN_ID_KEY, teacherLoginId.trim());
+      else localStorage.removeItem(TEACHER_LOGIN_ID_KEY);
+    } catch {
+      // 覚えられなくても次回入力するだけ
+    }
     onTeacherLogin();
   };
 
@@ -274,8 +286,22 @@ export default function LoginScreen({
           </div>
 
           <form onSubmit={handleTeacherSubmit} className="space-y-4" autoComplete="on">
-            {/* ブラウザのパスワード保存を有効にするための隠しユーザー名 */}
-            <input type="hidden" name="username" autoComplete="username" value="teacher" />
+            <div>
+              <label className="field-label">ログインID</label>
+              <input
+                data-testid="teacher-login-id-input"
+                type="text"
+                name="username"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                value={teacherLoginId}
+                onChange={e => setTeacherLoginId(e.target.value)}
+                className="field-input"
+                autoFocus={!teacherLoginId}
+              />
+            </div>
+
             <div>
               <label className="field-label">パスワード</label>
               <input
@@ -286,19 +312,7 @@ export default function LoginScreen({
                 value={teacherPw}
                 onChange={e => setTeacherPw(e.target.value)}
                 className="field-input"
-                autoFocus
-              />
-            </div>
-
-            <div>
-              <label className="field-label">講師表示名</label>
-              <input
-                data-testid="teacher-display-name-input"
-                type="text"
-                value={teacherDisplayName}
-                onChange={e => setTeacherDisplayNameState(e.target.value)}
-                placeholder="三村九段"
-                className="field-input"
+                autoFocus={!!teacherLoginId}
               />
             </div>
 

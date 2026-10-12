@@ -125,6 +125,8 @@ export interface SupabaseSessionResult {
   ok: boolean;
   error?: string;
   displayName?: string;
+  /** 講師アカウントの表示名（共通パスワードで入ったときは無い） */
+  accountDisplayName?: string;
   studentId?: string; // UUID（validate_student_session が返す student.id）
   classroomId?: string;
   classroomName?: string;
@@ -220,6 +222,8 @@ export async function supabaseSignInStudent(
 export async function supabaseSignInTeacher(
   password: string,
   classroomId: string = 'global',
+  /** 講師アカウントのログインID。空なら共通パスワードで照合する（2026-10-12〜） */
+  loginId: string = '',
 ): Promise<SupabaseSessionResult> {
   try {
     const supabase = getSupabase();
@@ -241,7 +245,7 @@ export async function supabaseSignInTeacher(
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ password, classroomId }),
+      body: JSON.stringify({ password, classroomId, loginId: loginId.trim() || undefined }),
     });
     
     if (!res.ok) {
@@ -252,12 +256,12 @@ export async function supabaseSignInTeacher(
       return {
         ok: false,
         error: res.status === 403
-          ? 'パスワードがサーバーと一致しません'
+          ? (loginId.trim() ? 'ログインIDかパスワードが違います' : 'パスワードがサーバーと一致しません')
           : `先生認証に失敗しました（${errBody.error || res.status}）`,
       };
     }
 
-    const teacherResult = await res.json().catch(() => ({} as { is_guest?: boolean }));
+    const teacherResult = await res.json().catch(() => ({} as { is_guest?: boolean; display_name?: string | null }));
     setGuestTeacher(teacherResult.is_guest === true);
 
     // 3. セッションを更新して新しい JWT を取得 (メタデータ反映)
@@ -269,7 +273,9 @@ export async function supabaseSignInTeacher(
 
     return {
       ok: true,
-      displayName: '先生',
+      // 講師アカウントで入ったときだけ名前が返る。共通パスワードなら端末の表示名のまま
+      displayName: teacherResult.display_name || '先生',
+      accountDisplayName: teacherResult.display_name || undefined,
     };
   } catch (err) {
     console.error('[Supabase Auth] Unexpected error in teacher sign-in:', err);

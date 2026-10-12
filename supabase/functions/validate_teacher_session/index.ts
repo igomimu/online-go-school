@@ -7,13 +7,15 @@
 //   1. フロントが supabase.auth.signInAnonymously() で anon user 作成
 //   2. その JWT を Authorization: Bearer ヘッダーで本関数に POST
 //   3. 本関数が JWT を検証 → sub (anon user uuid) 取得
-//   4. body の password をハッシュ化して環境変数 TEACHER_PASSWORD_HASH と照合
+//   4. loginId があれば講師アカウント（go_school_teachers）と照合。
+//      無ければ従来の共通パスワード（環境変数 TEACHER_PASSWORD_HASH）と照合
 //   5. service_role で auth.admin.updateUserById により app_metadata を上書き
 //   6. フロントが supabase.auth.refreshSession() で metadata 反映済み JWT を受ける
 //   7. custom_access_token_hook が app_metadata を JWT claim に昇格
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { versionResponse } from '../_shared/version.ts'
+import { verifyTeacherPassword } from '../_shared/teacherPassword.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,6 +26,8 @@ const corsHeaders = {
 interface ValidateRequest {
   password?: string
   classroomId?: string
+  /** 講師アカウントのログインID（2026-10-12〜）。無ければ共通パスワードで照合する */
+  loginId?: string
 }
 
 // ゲスト先生を閉じ込めるデモ教室。フロント側 classroomStore.ts と同じ値。
@@ -94,23 +98,46 @@ Deno.serve(async (req) => {
     return json({ error: 'Only anonymous sessions can be validated' }, 403)
   }
 
-  // パスワード照合。ゲストPWで入った先生はデモ教室に固定し、実データを見せない。
-  const hashedInput = await sha256(body.password)
-  const isGuest = hashedInput !== expectedHash && !!guestHash && hashedInput === guestHash
-  if (hashedInput !== expectedHash && !isGuest) {
-    return json({ error: 'Invalid teacher password' }, 403)
+  const admin = createClient(supabaseUrl, serviceRoleKey)
+
+  // 講師アカウントで入る。IDが無い・止めてある・パスワード違いは、どれも同じ 403 にする
+  // （どのIDが存在するかを外から探れないように）
+  const loginId = body.loginId?.trim()
+  let account: { id: string; display_name: string } | null = null
+  let isGuest = false
+  if (loginId) {
+    const { data: row, error: rowErr } = await admin
+      .from('go_school_teachers')
+      .select('id, display_name, password_hash, active')
+      .ilike('login_id', loginId.replace(/[\\%_]/g, '\\$&'))
+      .maybeSingle()
+    if (rowErr) {
+      return json({ error: 'Failed to read teacher account' }, 500)
+    }
+    if (!row || !row.active || !(await verifyTeacherPassword(body.password, row.password_hash))) {
+      return json({ error: 'Invalid teacher password' }, 403)
+    }
+    account = { id: row.id, display_name: row.display_name }
+  } else {
+    // 共通パスワード。ゲストPWで入った先生はデモ教室に固定し、実データを見せない。
+    const hashedInput = await sha256(body.password)
+    isGuest = hashedInput !== expectedHash && !!guestHash && hashedInput === guestHash
+    if (hashedInput !== expectedHash && !isGuest) {
+      return json({ error: 'Invalid teacher password' }, 403)
+    }
   }
 
   // 役割は app_metadata に書く。user_metadata は本人が auth.updateUser({data}) で
   // 書き換えられるため、パスワードを通らずに teacher を名乗れてしまう
   // （2026-09-07 Codex レビュー #1）。app_metadata は service_role でしか書けない。
-  const admin = createClient(supabaseUrl, serviceRoleKey)
   const { error: updateErr } = await admin.auth.admin.updateUserById(user.id, {
     app_metadata: {
       teacher_id: user.id, // teacher_id として自身の UUID をセット
       classroom_id: isGuest ? DEMO_CLASSROOM_ID : (body.classroomId ?? 'global'),
       app_role: 'teacher',
       is_guest: isGuest,
+      teacher_account_id: account?.id ?? null,
+      teacher_name: account?.display_name ?? null,
     },
   })
   if (updateErr) {
@@ -122,5 +149,6 @@ Deno.serve(async (req) => {
     teacher_id: user.id,
     app_role: 'teacher',
     is_guest: isGuest,
+    display_name: account?.display_name ?? null,
   })
 })
