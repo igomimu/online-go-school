@@ -20,7 +20,7 @@ import type { ViewMode, AudioPermissions, SavedGame, RankDisplayPayload } from '
 import type { Student, Classroom, RankDisplay } from './types/classroom';
 import { DEFAULT_RANK_DISPLAY } from './types/classroom';
 import { fetchToken, TeacherAbsentError } from './utils/livekitToken';
-import { findStudentByIdentity, getDisplayName, getTeacherDisplayName, identityMatchesPlayer, makeStudentIdentity, TEACHER_IDENTITY } from './utils/identityUtils';
+import { findStudentByIdentity, getDisplayName, getTeacherDisplayName, identityMatchesPlayer, isTeacherIdentity, makeStudentIdentity, setRoomTeacherName, TEACHER_IDENTITY } from './utils/identityUtils';
 import { readStudentCodeFromParams } from './utils/studentLoginLink';
 import { runSingleFlight } from './utils/singleFlight';
 import { ConnectionState } from './utils/classroomRtc';
@@ -810,6 +810,8 @@ function App() {
   const runConnectLiveKit = useCallback(async (connectRole: Role, connectUserName: string, overrideRoomName?: string, overrideClassroomId?: string) => {
     const effectiveRoomName = overrideRoomName || roomName;
     const effectiveClassroomId = overrideClassroomId ?? selectedClassroomId ?? '';
+    // 前の教室の先生名を持ち越さない。先生の端末は自分の表示名を使う
+    setRoomTeacherName(null);
     if (connectRole === 'TEACHER') {
       const restored = loadTeacherAudioPermissions(effectiveClassroomId);
       audioPermissionsRef.current = restored;
@@ -1137,6 +1139,13 @@ function App() {
         if (connectRole === 'TEACHER') pushAlert({ kind: 'disconnect', identity });
       },
       onParticipantsChanged: (p: ParticipantInfo[]) => {
+        // 先生は三村さんと芳織先生の交代制で、identity はどちらも teacher。
+        // 生徒の盤・ロビーに出す先生名を、いま来ている先生の名乗りに合わせる。
+        // 先生が退室しても消さない（終局後の盤に名前を残すため）
+        if (connectRole === 'STUDENT') {
+          const teacher = p.find(x => isTeacherIdentity(x.identity) && x.name);
+          if (teacher) setRoomTeacherName(teacher.name);
+        }
         setParticipants(p);
       },
       onConnectionStateChanged: (state: ConnectionState) => {

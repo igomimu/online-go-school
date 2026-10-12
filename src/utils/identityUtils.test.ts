@@ -6,6 +6,7 @@ import {
   getDisplayName,
   identityMatchesPlayer,
   resolvePlayerName,
+  setRoomTeacherName,
   setTeacherDisplayName,
   studentIdentityCandidates,
 } from './identityUtils';
@@ -75,5 +76,24 @@ describe('identityUtils', () => {
 
   it('保存された対局者名が同姓同名で曖昧な場合は特定生徒へ寄せない', () => {
     expect(resolvePlayerName('同じ名前', students)).toBe('同じ名前');
+  });
+});
+
+describe('教室にいる先生の名前（交代制の先生）', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setRoomTeacherName(null);
+  });
+
+  it('生徒の端末では、来ている先生の名乗りで teacher を表示する', () => {
+    setRoomTeacherName('かおり先生');
+    expect(getDisplayName('teacher', students)).toBe('かおり先生');
+    expect(resolvePlayerName('sid:teacher', students)).toBe('かおり先生');
+  });
+
+  it('先生の名乗りが無ければ従来どおり端末の表示名（既定は三村九段）', () => {
+    expect(getDisplayName('teacher', students)).toBe('三村九段');
+    setRoomTeacherName('  ');
+    expect(resolvePlayerName('teacher', students)).toBe('三村九段');
   });
 });

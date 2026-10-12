@@ -14,6 +14,21 @@ export function getTeacherDisplayName(): string {
   }
 }
 
+// 生徒の端末から見た「いま教室にいる先生」の名前（2026-10-12 三村さん）。
+// 先生は三村さんと芳織先生が交代で担当するが、identity はどちらも `teacher`。
+// 表示名は先生の端末の localStorage にしか無いので、生徒の端末で `teacher` を
+// 名前に直すと既定の「三村九段」になってしまう。接続中の先生が名乗った名前
+// （参加者の name）をここに置き、生徒の端末ではそれを優先する。
+let roomTeacherName: string | null = null;
+
+export function setRoomTeacherName(name: string | null | undefined): void {
+  roomTeacherName = name?.trim() || null;
+}
+
+function teacherNameForDisplay(): string {
+  return roomTeacherName ?? getTeacherDisplayName();
+}
+
 export function setTeacherDisplayName(name: string): void {
   if (typeof localStorage === 'undefined') return;
   try {
@@ -80,7 +95,7 @@ export function parseIdentity(identity: string): { type: 'student'; studentId: s
 }
 
 export function getDisplayName(identity: string, students: Student[]): string {
-  if (isTeacherIdentity(identity)) return getTeacherDisplayName();
+  if (isTeacherIdentity(identity)) return teacherNameForDisplay();
 
   const parsed = parseIdentity(identity);
   if (parsed.type === 'student') {
@@ -97,7 +112,7 @@ export function getDisplayName(identity: string, students: Student[]): string {
  */
 export function resolvePlayerName(raw: string | null | undefined, students: Student[]): string {
   if (!raw) return '';
-  if (isTeacherIdentity(raw)) return getTeacherDisplayName();
+  if (isTeacherIdentity(raw)) return teacherNameForDisplay();
 
   const stripped = stripSid(raw);
   const foundById = students.find(s => s.id === stripped || s.studentCode === stripped);
