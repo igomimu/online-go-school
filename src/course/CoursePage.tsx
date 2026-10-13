@@ -3,7 +3,7 @@
  * 教室の画面（App.tsx）とは別の入口。ログインは無く、購入者は「視聴リンク」（?t=…）で見る。
  * tasks/course-sales-plan.md
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface Product { id: string; title: string; subtitle: string | null; price_jpy: number; minutes: number | null; available: boolean }
 interface Owned { id: string; title: string; subtitle: string | null; minutes: number | null; videoUrl: string | null }
@@ -29,6 +29,9 @@ export default function CoursePage() {
   const [token, setToken] = useState<string | null>(params.get('t'));
   const sessionId = params.get('session_id');
   const canceled = params.get('canceled');
+  // 案内ページ（mimura15.jp/ishinokatachi）の「〜を購入する」から来た → 一覧を挟まず決済画面へ
+  const buyParam = sessionId || canceled ? null : params.get('buy');
+  const autoBuyStarted = useRef(false);
   const [justBought, setJustBought] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [owned, setOwned] = useState<Owned[] | null>(null);
@@ -68,14 +71,24 @@ export default function CoursePage() {
       const r = await getJson<{ url: string }>('/api/course?action=checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId }),
+        // 視聴リンクの鍵があれば渡す → 決済画面に同じメールアドレスが入る
+        body: JSON.stringify({ productId, token: token ?? loadToken() }),
       });
+      // ?buy= を消しておく（決済画面から「戻る」で来たとき、また決済画面へ飛ばさない）
+      if (buyParam) window.history.replaceState({}, '', '/course/');
       window.location.assign(r.url);
     } catch (e) {
       setError((e as Error).message);
       setBusy(null);
     }
   }
+
+  useEffect(() => {
+    if (!buyParam || autoBuyStarted.current) return;
+    autoBuyStarted.current = true;
+    void buy(buyParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 開いたときに1回だけ
+  }, [buyParam]);
 
   const ownedIds = new Set((owned ?? []).map(o => o.id));
   const remembered = !token ? loadToken() : null;

@@ -3,6 +3,7 @@
  * Vercel 無料プランは1回の書き出しで関数12個までなので、4つを1つにまとめた（通知だけ course-webhook）。
  *   products … 講座の一覧（誰でも見られる情報だけ）
  *   checkout … 「購入する」→ Stripe の決済画面（1回払い）を作って URL を返す（POST）
+ *              視聴リンクの鍵も届いたら、そのメールアドレスを入れておく（2本目が別のリンクに分かれないように）
  *   claim    … 決済後の画面から。支払い済みを Stripe に確かめて購入を記録し、視聴リンクの鍵を返す
  *   access   … 視聴リンクの鍵 → その人が買った講座と、数時間で切れる動画 URL
  */
@@ -27,10 +28,25 @@ async function checkout(req: VercelRequest, res: VercelResponse) {
   const productId = String((req.body as { productId?: unknown } | undefined)?.productId ?? '');
   const product = await getProduct(productId);
   if (!product || !product.video_key) return res.status(404).json({ error: 'この講座はまだ購入できません' });
+  const token = String((req.body as { token?: unknown } | undefined)?.token ?? '');
+  const email = token.length >= 20 ? await ownerEmail(token) : null;
+  if (email) {
+    const { data: owned } = await db()
+      .from('course_purchases')
+      .select('id')
+      .eq('email', email)
+      .eq('product_id', product.id)
+      .is('revoked_at', null)
+      .limit(1);
+    if (owned && owned.length > 0) {
+      return res.status(409).json({ error: 'この講座は購入済みです。「購入済みの講座を見る」から視聴できます' });
+    }
+  }
 
   const session = await stripe().checkout.sessions.create({
     mode: 'payment',
     locale: 'ja',
+    ...(email ? { customer_email: email } : {}),
     line_items: [{
       quantity: 1,
       price_data: {
@@ -45,6 +61,17 @@ async function checkout(req: VercelRequest, res: VercelResponse) {
     cancel_url: `${siteUrl()}/course/?canceled=${product.id}`,
   });
   return res.json({ url: session.url });
+}
+
+/** 視聴リンクの鍵 → 購入したメールアドレス（使えない鍵なら null） */
+async function ownerEmail(token: string): Promise<string | null> {
+  const { data } = await db()
+    .from('course_purchases')
+    .select('email')
+    .eq('access_token_hash', tokenHash(token))
+    .is('revoked_at', null)
+    .maybeSingle();
+  return data?.email ?? null;
 }
 
 async function claim(req: VercelRequest, res: VercelResponse) {
@@ -65,13 +92,8 @@ async function access(req: VercelRequest, res: VercelResponse) {
   const token = String(req.query.t ?? '');
   if (token.length < 20) return res.status(400).json({ error: 'リンクが正しくありません' });
   const supabase = db();
-  const { data: own } = await supabase
-    .from('course_purchases')
-    .select('email')
-    .eq('access_token_hash', tokenHash(token))
-    .is('revoked_at', null)
-    .maybeSingle();
-  if (!own) return res.status(404).json({ error: 'このリンクは使えません。購入時のメールのリンクを開いてください' });
+  const email = await ownerEmail(token);
+  if (!email) return res.status(404).json({ error: 'このリンクは使えません。購入時のメールのリンクを開いてください' });
   // 開いた日時を残す（Systeme から移した購入者が新しいページを開いたかを確かめる）。失敗しても視聴は止めない
   await supabase.from('course_purchases').update({ last_viewed_at: new Date().toISOString() })
     .eq('access_token_hash', tokenHash(token)).then(() => undefined, () => undefined);
@@ -80,7 +102,7 @@ async function access(req: VercelRequest, res: VercelResponse) {
   const { data: rows, error } = await supabase
     .from('course_purchases')
     .select('product_id, course_products(id,title,subtitle,minutes,video_key,sort_order)')
-    .eq('email', own.email)   // 保存時に小文字へそろえてある。ilike だと _ や % が任意の文字扱いになる
+    .eq('email', email)   // 保存時に小文字へそろえてある。ilike だと _ や % が任意の文字扱いになる
     .is('revoked_at', null);
   if (error) return res.status(500).json({ error: '講座を読めませんでした' });
 
