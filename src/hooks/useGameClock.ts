@@ -87,6 +87,80 @@ export function timeSettingsToClock(s: TimeSettings): GameClock | undefined {
   return createClock(main, byoSec, byoPer);
 }
 
+// --- 再開のときに講師が持ち時間を決め直す（2026-10-14 三村さん「時間状況に合わせて」） ---
+// 授業の残り時間に合わせて、黒白それぞれの残りと秒読みを選び直してから続きを打つ。
+export interface ResumeTimeSettings {
+  blackSeconds: number;     // 黒の残りの持ち時間（秒）。0なら秒読みから
+  whiteSeconds: number;     // 白の残りの持ち時間（秒）
+  byoyomiEnabled: boolean;
+  byoyomiSeconds: number;
+  byoyomiPeriods: number;
+}
+
+/** いまの時計から、決め直しの入力欄の初期値を作る（秒読み中の側は持ち時間0） */
+export function resumeTimeSettingsFromClock(clock: GameClock | null | undefined): ResumeTimeSettings {
+  if (!clock) {
+    return { blackSeconds: 0, whiteSeconds: 0, byoyomiEnabled: false, byoyomiSeconds: 30, byoyomiPeriods: 3 };
+  }
+  const remain = (left: number, inByoyomi?: boolean) => (inByoyomi ? 0 : Math.max(0, Math.round(left)));
+  const hasByoyomi = clock.timeSystem !== 'NHK' && clock.byoyomiPeriods > 0 && clock.byoyomiSeconds > 0;
+  return {
+    blackSeconds: clock.timeSystem === 'NHK' ? 0 : remain(clock.blackTimeLeft, clock.blackInByoyomi),
+    whiteSeconds: clock.timeSystem === 'NHK' ? 0 : remain(clock.whiteTimeLeft, clock.whiteInByoyomi),
+    byoyomiEnabled: clock.timeSystem === 'NHK' || hasByoyomi,
+    byoyomiSeconds: hasByoyomi ? clock.byoyomiSeconds : 30,
+    byoyomiPeriods: hasByoyomi ? clock.byoyomiPeriods : 3,
+  };
+}
+
+/** 決め直しが打てる設定か。持ち時間0で秒読みも無い側は、再開した瞬間に切れてしまう */
+export function resumeTimeSettingsError(s: ResumeTimeSettings): string | null {
+  if (s.byoyomiEnabled) return null;
+  if (s.blackSeconds === 0 && s.whiteSeconds === 0) return null; // 両方0・秒読みなし＝時間無制限
+  if (s.blackSeconds === 0 || s.whiteSeconds === 0) {
+    return '秒読みなしのときは、黒・白とも持ち時間を1秒以上にしてください（両方0なら時間無制限）';
+  }
+  return null;
+}
+
+/**
+ * 決め直した設定から時計を作る。null は時間無制限。
+ * 秒読みの設定（秒数・回数）が前と同じなら、使った回数は戻さない。変えたら新しい回数から。
+ */
+export function clockFromResumeTimeSettings(
+  s: ResumeTimeSettings,
+  previous?: GameClock | null,
+): GameClock | null {
+  const byoSec = s.byoyomiEnabled ? s.byoyomiSeconds : 0;
+  const byoPer = s.byoyomiEnabled ? Math.max(1, Math.floor(s.byoyomiPeriods || 0)) : 0;
+  const black = Math.max(0, Math.floor(s.blackSeconds || 0));
+  const white = Math.max(0, Math.floor(s.whiteSeconds || 0));
+  if (black === 0 && white === 0 && byoPer === 0) return null;
+
+  const sameByoyomi = !!previous && previous.timeSystem !== 'NHK'
+    && previous.byoyomiSeconds === byoSec && previous.byoyomiPeriods === byoPer;
+  const periodsLeft = (prevLeft: number | undefined) =>
+    sameByoyomi && prevLeft !== undefined ? Math.min(byoPer, Math.max(1, prevLeft)) : byoPer;
+  const side = (main: number, prevLeft: number | undefined) => main > 0
+    ? { timeLeft: main, inByoyomi: false, byoyomiLeft: byoPer }
+    : { timeLeft: byoSec, inByoyomi: true, byoyomiLeft: periodsLeft(prevLeft) };
+  const b = side(black, previous?.blackByoyomiLeft);
+  const w = side(white, previous?.whiteByoyomiLeft);
+  return {
+    timeSystem: 'STANDARD',
+    mainTimeSeconds: Math.max(black, white),
+    byoyomiSeconds: byoSec,
+    byoyomiPeriods: byoPer,
+    blackTimeLeft: b.timeLeft,
+    whiteTimeLeft: w.timeLeft,
+    blackByoyomiLeft: b.byoyomiLeft,
+    whiteByoyomiLeft: w.byoyomiLeft,
+    blackInByoyomi: b.inByoyomi,
+    whiteInByoyomi: w.inByoyomi,
+    lastTickTime: null,
+  };
+}
+
 // 相手の着手が自分の端末に届くまでの遅れは、次に打つ人の考慮時間から引かない。
 // 計時は「着手した端末の時刻」ではなく「その着手を受け取った時刻」から始める。
 // ただし戻すのは最大この値まで（再入場・復帰で、使ったはずの時間が回復しないように）。

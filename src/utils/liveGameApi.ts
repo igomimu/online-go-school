@@ -549,6 +549,10 @@ export async function resetLiveGame(gameId: string): Promise<void> {
 }
 
 /** 中断または終了した対局を再開する（先生または対局者） */
-export async function resumeLiveGame(gameId: string): Promise<void> {
-  await executeGameAction('resume', gameId);
+/**
+ * 中断・終局した対局を再開する。clock を渡すと、その持ち時間で再開する（講師のみ。
+ * null は時間無制限）。渡さなければ保存してある時計のまま。
+ */
+export async function resumeLiveGame(gameId: string, clock?: GameClock | null): Promise<void> {
+  await executeGameAction('resume', gameId, clock === undefined ? undefined : { clock });
 }

@@ -74,3 +74,20 @@ export function startClock(
 ): StoredClock | null {
   return clock ? { ...clock, lastTickTime: startedAt } : null
 }
+
+/**
+ * 中断・終局から再開するときの時計。
+ * 講師が持ち時間を決め直した（override あり）ならそれを使い、時間切れの戻しはしない
+ * （決め直した値が上書きされてしまうため）。null を渡すと時間無制限で再開する。
+ * 決め直していなければ、保存してある時計を止めた状態から時間切れの戻しをかける。
+ * どちらも、動かし始める時刻（lastTickTime）は呼び出し側の startClock で入れる。
+ */
+export function clockForResume(
+  stored: StoredClock | null | undefined,
+  result: string | null | undefined,
+  override?: { clock: StoredClock | null },
+): StoredClock | null {
+  if (override) return override.clock ? { ...override.clock, lastTickTime: null } : null
+  const paused = stored ? { ...stored, lastTickTime: null } : null
+  return restoreClockForTimeout(paused, result)
+}

@@ -2,9 +2,12 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
   CLOCK_LAG_ALLOWANCE_MS,
+  clockFromResumeTimeSettings,
   createClock,
   createNhkClock,
   formatTime,
+  resumeTimeSettingsError,
+  resumeTimeSettingsFromClock,
   shouldDeclareTimeUp,
   startClockOnReceipt,
   switchClock,
@@ -222,5 +225,62 @@ describe('shouldDeclareTimeUp（0になった瞬間には切らない）', () =>
 
   it('残っているうちは当然切らない', () => {
     expect(shouldDeclareTimeUp(3)).toBe(false);
+  });
+});
+
+describe('再開のときの持ち時間の決め直し', () => {
+  // 30分・秒読みなしで始め、黒25分・白23分残して中断した対局（2026-10-14 の授業）
+  const noByoyomi: GameClock = {
+    timeSystem: 'STANDARD', mainTimeSeconds: 1800, byoyomiSeconds: 0, byoyomiPeriods: 0,
+    blackTimeLeft: 1501.3, whiteTimeLeft: 1377.4, blackByoyomiLeft: 0, whiteByoyomiLeft: 0,
+    blackInByoyomi: false, whiteInByoyomi: false, lastTickTime: null,
+  };
+
+  it('入力欄の初期値は、いまの残り（秒）と秒読みの設定', () => {
+    expect(resumeTimeSettingsFromClock(noByoyomi)).toEqual({
+      blackSeconds: 1501, whiteSeconds: 1377, byoyomiEnabled: false, byoyomiSeconds: 30, byoyomiPeriods: 3,
+    });
+  });
+
+  it('持ち時間0で秒読みを付ければ、両者ともすぐ秒読みから', () => {
+    const clock = clockFromResumeTimeSettings(
+      { blackSeconds: 0, whiteSeconds: 0, byoyomiEnabled: true, byoyomiSeconds: 30, byoyomiPeriods: 3 },
+      noByoyomi,
+    )!;
+    expect(clock).toMatchObject({
+      byoyomiSeconds: 30, byoyomiPeriods: 3,
+      blackTimeLeft: 30, whiteTimeLeft: 30, blackInByoyomi: true, whiteInByoyomi: true,
+      blackByoyomiLeft: 3, whiteByoyomiLeft: 3, lastTickTime: null,
+    });
+  });
+
+  it('残りを各5分にして秒読みを付ける（授業の残り時間に合わせる）', () => {
+    const clock = clockFromResumeTimeSettings(
+      { blackSeconds: 300, whiteSeconds: 300, byoyomiEnabled: true, byoyomiSeconds: 30, byoyomiPeriods: 1 },
+      noByoyomi,
+    )!;
+    expect(clock).toMatchObject({
+      blackTimeLeft: 300, whiteTimeLeft: 300, blackInByoyomi: false, whiteInByoyomi: false,
+      byoyomiPeriods: 1, blackByoyomiLeft: 1,
+    });
+  });
+
+  it('秒読みの設定が前と同じなら、使った回数は戻さない', () => {
+    const inByoyomi: GameClock = {
+      ...noByoyomi, byoyomiSeconds: 30, byoyomiPeriods: 3,
+      blackTimeLeft: 12, blackInByoyomi: true, blackByoyomiLeft: 1,
+    };
+    const settings = resumeTimeSettingsFromClock(inByoyomi);
+    expect(settings.blackSeconds).toBe(0);
+    const clock = clockFromResumeTimeSettings(settings, inByoyomi)!;
+    expect(clock.blackByoyomiLeft).toBe(1);
+    expect(clock.blackTimeLeft).toBe(30);
+  });
+
+  it('両方0・秒読みなしは時間無制限、片方だけ0は打てない', () => {
+    const unlimited = { blackSeconds: 0, whiteSeconds: 0, byoyomiEnabled: false, byoyomiSeconds: 30, byoyomiPeriods: 3 };
+    expect(clockFromResumeTimeSettings(unlimited)).toBeNull();
+    expect(resumeTimeSettingsError(unlimited)).toBeNull();
+    expect(resumeTimeSettingsError({ ...unlimited, blackSeconds: 300 })).not.toBeNull();
   });
 });

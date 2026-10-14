@@ -1,6 +1,6 @@
 import { describe, it } from "https://deno.land/std@0.224.0/testing/bdd.ts";
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { restoreClockForTimeout, startClock, timedOutColorFromResult, type StoredClock } from './clock.ts';
+import { clockForResume, restoreClockForTimeout, startClock, timedOutColorFromResult, type StoredClock } from './clock.ts';
 
 const expect = (actual: any) => ({
   toBe: (expected: any) => assertEquals(actual, expected),
@@ -101,5 +101,22 @@ describe('startClock', () => {
 
   it('時間無制限（clockなし）でも壊れない', () => {
     expect(startClock(null, 1_786_430_000_000)).toBe(null);
+  });
+});
+
+describe('clockForResume', () => {
+  it('講師が決め直した時計は、時間切れの戻しをかけずにそのまま使う', () => {
+    const chosen = baseClock({ blackTimeLeft: 300, whiteTimeLeft: 120, lastTickTime: 123 });
+    const next = clockForResume(baseClock(), 'B+T', { clock: chosen });
+    expect(next).toEqual({ ...chosen, lastTickTime: null });
+  });
+
+  it('決め直しで null を渡すと時間無制限', () => {
+    expect(clockForResume(baseClock(), null, { clock: null })).toBe(null);
+  });
+
+  it('決め直していなければ、保存してある時計に時間切れの戻しをかける', () => {
+    const stored = baseClock({ lastTickTime: 999 });
+    expect(clockForResume(stored, 'B+T')).toEqual(restoreClockForTimeout({ ...stored, lastTickTime: null }, 'B+T'));
   });
 });

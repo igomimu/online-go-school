@@ -2,7 +2,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { studentMatchesPlayer, toStudentIdentity, playersMatchPair, resolvePlayerColor, stripSid, TEACHER_IDENTITY } from '../_shared/identity.ts'
 import { readSessionRole } from '../_shared/sessionRole.ts'
 import { exportLiveGameToSgf, formatTokyoSgfDate } from '../_shared/sgf.ts'
-import { restoreClockForTimeout, startClock, timedOutColorFromResult } from '../_shared/clock.ts'
+import { clockForResume, startClock, timedOutColorFromResult } from '../_shared/clock.ts'
 import { NEW_GAME_BLOCKING_STATUSES, shouldCloseLiveGameWhenDeletingHistory } from '../_shared/game_lifecycle.ts'
 import { applyScoringConfirmation } from '../_shared/scoring_confirm.ts'
 import { versionResponse } from '../_shared/version.ts'
@@ -650,11 +650,21 @@ Deno.serve(async (req) => {
         return json({ error: 'Forbidden: only the teacher can resume a finished game' }, 403)
       }
 
-      // 時間切れ（"B+T"/"W+T"）で終わった対局は、切れた側の時計を戻さないと
-      // 再開直後にまた切れてしまう。秒読みがあれば規定回数ぶん復活させ、
-      // 秒読みなしの設定なら持ち時間を戻す。
+      // 講師は再開のときに持ち時間を決め直せる（授業の残り時間に合わせて、
+      // 秒読みなしから秒読みへ切り替えるなど。2026-10-14 三村さん）。生徒には許さない。
+      const hasClockOverride = params != null && Object.prototype.hasOwnProperty.call(params, 'clock')
+      if (hasClockOverride && !isTeacher && !isServiceRole) {
+        return json({ error: 'Forbidden: only the teacher can change the time control' }, 403)
+      }
+
+      // 決め直していなければ、時間切れ（"B+T"/"W+T"）で終わった対局は切れた側の時計を
+      // 戻す（戻さないと再開直後にまた切れる）。clockForResume を参照。
       const clock = startClock(
-        restoreClockForTimeout(pauseClock(gameToResume.clock), gameToResume.result),
+        clockForResume(
+          gameToResume.clock,
+          gameToResume.result,
+          hasClockOverride ? { clock: params.clock ?? null } : undefined,
+        ),
       )
 
       const { error } = await supabase

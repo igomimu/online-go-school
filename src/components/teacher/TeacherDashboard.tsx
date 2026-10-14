@@ -28,6 +28,7 @@ import GameObserverPanel from './GameObserverPanel';
 import StudentEditDialog from './StudentEditDialog';
 import TsumegoPickerDialog, { type TsumegoRecipient } from './TsumegoPickerDialog';
 import RankDisplaySwitcher from './RankDisplaySwitcher';
+import ResumeTimeDialog from './ResumeTimeDialog';
 import { updateClassroomRankDisplay, upsertClassroom } from '../../utils/classroomStore';
 import { applyLiveBoardSnapshotsToSessions, useLiveBoards } from '../../hooks/useLiveBoards';
 
@@ -139,6 +140,8 @@ export default function TeacherDashboard({
 
   // 棋譜履歴表示用のステート
   const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
+  // 持ち時間を決め直して再開する対局（棋譜履歴から開く）
+  const [resumeTimeGame, setResumeTimeGame] = useState<{ id: string; blackName: string; whiteName: string } | null>(null);
   const [historyGames, setHistoryGames] = useState<SavedGame[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [deletingHistoryGameId, setDeletingHistoryGameId] = useState<string | null>(null);
@@ -782,6 +785,18 @@ export default function TeacherDashboard({
       )}
 
       {/* 大会マネージャー（トーナメント・リーグ戦） */}
+      {resumeTimeGame && (
+        <ResumeTimeDialog
+          gameId={resumeTimeGame.id}
+          blackName={resumeTimeGame.blackName}
+          whiteName={resumeTimeGame.whiteName}
+          onClose={() => setResumeTimeGame(null)}
+          onResumed={() => {
+            setResumeTimeGame(null);
+            setHistoryStudent(null);
+          }}
+        />
+      )}
       {showTournament && (
         <TournamentManagerDialog
           classroomId={selectedClassroomId}
@@ -1013,6 +1028,32 @@ export default function TeacherDashboard({
                                 }}
                               >
                                 再開
+                              </button>
+                            )}
+                            {resumable && (
+                              <button
+                                type="button"
+                                data-testid={`history-resume-time-${game.id}`}
+                                title="持ち時間を変えて再開（棋譜はそのまま）"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setResumeTimeGame({
+                                    id: game.id,
+                                    blackName: resolvePlayerName(game.blackPlayer, allStudents),
+                                    whiteName: resolvePlayerName(game.whitePlayer, allStudents),
+                                  });
+                                }}
+                                style={{
+                                  background: 'var(--color-raised)',
+                                  border: '1px solid var(--color-line)',
+                                  color: 'var(--color-ink)',
+                                  fontSize: 11,
+                                  fontWeight: 'bold',
+                                  padding: '1px 8px',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                時間を変えて再開
                               </button>
                             )}
                             <button
