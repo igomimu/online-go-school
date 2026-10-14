@@ -136,6 +136,31 @@ describe('switchClock', () => {
     expect(next.whiteTimeLeft).toBe(400);
     expect(next.whiteInByoyomi).toBe(false);
   });
+
+  it('次に打つ側が秒読み中なら、古い残りが残っていても満タンから始める', () => {
+    // 白が20秒使って打ったが、黒の端末はその保存結果を取りこぼし、白の残り10秒のまま
+    const stale = { ...base, blackTimeLeft: 12, whiteTimeLeft: 10, whiteInByoyomi: true };
+    const next = switchClock(stale, 'BLACK');
+    expect(next.whiteTimeLeft).toBe(30);
+    expect(next.whiteByoyomiLeft).toBe(3);
+  });
+
+  it('次に打つ側が持ち時間中なら、その残りはそのまま', () => {
+    const next = switchClock(base, 'BLACK');
+    expect(next.whiteTimeLeft).toBe(600);
+  });
+
+  it('NHK杯方式では次に打つ側も30秒・考慮時間外から始める', () => {
+    const nhk: GameClock = {
+      ...base, timeSystem: 'NHK', considerationSeconds: 60,
+      blackInByoyomi: true, whiteInByoyomi: true,
+      whiteTimeLeft: 41, whiteInConsideration: true,
+    };
+    const next = switchClock(nhk, 'BLACK');
+    expect(next.whiteTimeLeft).toBe(30);
+    expect(next.whiteInConsideration).toBe(false);
+    expect(next.blackTimeLeft).toBe(30);
+  });
 });
 
 describe('startClockOnReceipt（通信の遅れを手番側に負わせない）', () => {

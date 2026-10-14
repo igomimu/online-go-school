@@ -259,12 +259,12 @@ export function switchClock(clock: GameClock, color: 'BLACK' | 'WHITE'): GameClo
   const now = Date.now();
   const isBlack = color === 'BLACK';
   if (clock.timeSystem === 'NHK') {
+    // 次に打つ側も毎手30秒から始まる。前の手で戻っているはずだが、ここでも揃える（下の説明）
     return {
       ...clock,
       lastTickTime: now,
-      ...(isBlack
-        ? { blackTimeLeft: 30, blackInByoyomi: true, blackInConsideration: false }
-        : { whiteTimeLeft: 30, whiteInByoyomi: true, whiteInConsideration: false }),
+      blackTimeLeft: 30, blackInByoyomi: true, blackInConsideration: false,
+      whiteTimeLeft: 30, whiteInByoyomi: true, whiteInConsideration: false,
     };
   }
   const moverInByoyomi = isBlack ? clock.blackInByoyomi : clock.whiteInByoyomi;
@@ -278,10 +278,19 @@ export function switchClock(clock: GameClock, color: 'BLACK' | 'WHITE'): GameClo
     timeLeft = clock.byoyomiSeconds;
   }
 
-  // 相手側は自分の手番開始時点の値のまま（秒読みなら前手で満タンに戻っている）。
+  // 次に打つ側が秒読み中なら、満タン（B秒）から始める。
+  // 前の手で本人の端末が満タンに戻して保存しているが、こちらの端末がその保存結果を
+  // 取りこぼすと（回線が不安定なとき）、本人の手番中にこちらで数えた古い残りが残る。
+  // それをそのまま書くと「20秒で打ったのに、次の手番が21秒から始まる」
+  // （2026-10-14 井町さんの報告）。秒読みの手番は必ず満タンで始まるので、ここで揃える。
+  const nextInByoyomi = isBlack ? clock.whiteInByoyomi : clock.blackInByoyomi;
+  const nextReset = nextInByoyomi
+    ? (isBlack ? { whiteTimeLeft: clock.byoyomiSeconds } : { blackTimeLeft: clock.byoyomiSeconds })
+    : {};
   return {
     ...clock,
     lastTickTime: now,
     ...(isBlack ? { blackTimeLeft: timeLeft } : { whiteTimeLeft: timeLeft }),
+    ...nextReset,
   };
 }
