@@ -1043,13 +1043,24 @@ export function useLiveGame(
   }, [activeGame, effectivePlayer, isMyTurn, classroom]);
 
   const enterScoringFn = useCallback(async () => {
-    if (!activeGame) return;
-    try {
-      await apiEnterScoring(activeGame.id);
-    } catch (e) {
-      setError(String(e));
-    }
-  }, [activeGame]);
+    if (!isTeacher || !activeGame || activeGame.status !== 'playing' || activeGame.undo_request) return;
+    // 講師の最後の着手がまだ送信中でも、その保存を待ってから計算へ進む。
+    await enqueueSubmit(async () => {
+      try {
+        await apiEnterScoring(activeGame.id);
+        setGame((prev) => prev ? {
+          ...prev,
+          status: 'scoring',
+          scoring_dead_stones: [],
+          scoring_confirmed: [],
+        } : null);
+        // 連続パスと同じ死石下書きを使い、完了を待たずに確認画面を開く。
+        void draftDeadStonesRef.current();
+      } catch (e) {
+        setError(String(e));
+      }
+    });
+  }, [activeGame, isTeacher, enqueueSubmit]);
 
   // 「待った」申請（対局者どうしの同意制、先生の強制介入は不可）
   const requestUndoFn = useCallback(async () => {

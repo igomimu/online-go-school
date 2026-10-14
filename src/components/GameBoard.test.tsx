@@ -45,6 +45,7 @@ describe('GameBoard', () => {
   const mockSubmitMove = vi.fn();
   const mockSubmitPass = vi.fn();
   const mockSubmitResign = vi.fn();
+  const mockEnterScoring = vi.fn();
   const mockSetDeadStones = vi.fn();
   const mockFinishWithResult = vi.fn();
   const mockConfirmScoring = vi.fn();
@@ -82,6 +83,7 @@ describe('GameBoard', () => {
       scoring_dead_stones: scoringDeadStones,
       scoring_confirmed: rawGame.scoring_confirmed ?? [],
       result: rawGame.result,
+      undo_request: rawGame.undo_request ?? null,
     } : null;
 
     const mockResult = {
@@ -101,7 +103,7 @@ describe('GameBoard', () => {
       submitMove: mockSubmitMove,
       submitPass: mockSubmitPass,
       submitResign: mockSubmitResign,
-      enterScoring: vi.fn(),
+      enterScoring: mockEnterScoring,
       setDeadStones: mockSetDeadStones,
       finishWithResult: mockFinishWithResult,
       confirmScoring: mockConfirmScoring,
@@ -342,6 +344,58 @@ describe('GameBoard', () => {
     );
     // 盤はロックされ、クリック可能なセルが存在しない
     expect(container.querySelector('[data-cell]')).toBeNull();
+  });
+
+  it('講師はダメが残った生徒同士の対局をパスなしで計算へ進められる', async () => {
+    const board = createEmptyBoard(9);
+    board[0][0] = { color: 'BLACK' };
+    board[0][8] = { color: 'WHITE' };
+    setupMock({ game: createMockGame({ blackPlayer: '生徒A', whitePlayer: '生徒B', boardState: board }) });
+    render(<GameBoard gameId="game-1" myIdentity="先生" isTeacher />);
+
+    expect(screen.getByRole('button', { name: '計算', exact: true })).toBeEnabled();
+    fireEvent.click(screen.getByTestId('enter-scoring'));
+    await waitFor(() => expect(mockEnterScoring).toHaveBeenCalledTimes(1));
+    expect(mockSubmitPass).not.toHaveBeenCalled();
+    expect(mockConfirmScoring).not.toHaveBeenCalled();
+  });
+
+  it('対局者の講師も相手の手番に計算できる', () => {
+    setupMock({ game: createMockGame({ currentColor: 'WHITE' }) });
+    render(<GameBoard gameId="game-1" myIdentity="たろう" isTeacher />);
+    expect(screen.getByTestId('enter-scoring')).toBeEnabled();
+  });
+
+  it('生徒には対局中の計算ボタンを出さない', () => {
+    setupMock();
+    render(<GameBoard gameId="game-1" myIdentity="たろう" />);
+    expect(screen.queryByTestId('enter-scoring')).not.toBeInTheDocument();
+  });
+
+  it('計算開始の送信中は二度押せない', async () => {
+    let resolve!: () => void;
+    mockEnterScoring.mockReturnValueOnce(new Promise<void>((done) => { resolve = done; }));
+    setupMock();
+    render(<GameBoard gameId="game-1" myIdentity="先生" isTeacher />);
+    const button = screen.getByTestId('enter-scoring');
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(mockEnterScoring).toHaveBeenCalledTimes(1);
+    resolve();
+    await waitFor(() => expect(button).toBeEnabled());
+  });
+
+  it('待ったの返答待ちには計算を開始しない', () => {
+    setupMock({ game: { ...createMockGame(), undo_request: { requested_by: 'たろう', requested_color: 'BLACK', target_move_number: 1 } } });
+    render(<GameBoard gameId="game-1" myIdentity="先生" isTeacher />);
+    expect(screen.queryByTestId('enter-scoring')).not.toBeInTheDocument();
+  });
+
+  it.each(['scoring', 'finished', 'interrupted'] as const)('%sでは講師の計算開始ボタンを出さない', (status) => {
+    setupMock({ game: createMockGame({ status }) });
+    render(<GameBoard gameId="game-1" myIdentity="先生" isTeacher />);
+    expect(screen.queryByTestId('enter-scoring')).not.toBeInTheDocument();
   });
 
   // ── 整地は対局者が行う（IGCと同じ。講師は操作できない子の代行） ──
