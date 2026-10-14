@@ -105,6 +105,9 @@ import { Settings, X } from 'lucide-react';
 const TEACHER_REVIEW_WINDOW_NAME = 'teacher-review-window';
 // 講師専用の詰碁モニター別ウィンドウ。出題中も教室ホームを使えるようにする
 const TEACHER_PROBLEM_WINDOW_NAME = 'teacher-problem-window';
+// 検討の開始を取りこぼした生徒が、先生へ頼み直す間隔
+const REVIEW_SYNC_RETRY_MS = 3000;
+
 // ツールバーの「検討」を白紙から始めるときの盤の大きさ（授業モードの既定と同じ）
 const LECTURE_BOARD_SIZE = 19;
 
@@ -279,6 +282,8 @@ function App() {
   const reviewSourceSgfRef = useRef<string | null>(null);
   // 生徒側: 先生が検討を閉じてから次に開くまで。この間に遅れて届いた盤は受け取らない
   const reviewClosedRef = useRef(false);
+  // 生徒側: 検討の開始を取りこぼしたときに、先生へ頼み直した時刻
+  const lastReviewSyncRequestAtRef = useRef(0);
   // 生徒が自分の対局を持っているか。LiveKitのメッセージ処理は接続時に作った関数の中で
   // 走るので、そこから最新の状態を見るために ref に写す
   const myLiveGameIdRef = useRef<string | null>(null);
@@ -850,6 +855,18 @@ function App() {
         // REVIEW_END より後に着くと、外された生徒の画面が「授業モード」で盤ごと戻っていた
         // （2026-09-26 RealtimeKit の E2E で3回に2回再現）。次の REVIEW_START で受け付けを再開する。
         if (msg.type === 'BOARD_UPDATE' && connectRole === 'STUDENT' && reviewClosedRef.current) return;
+        // 🔴 盤だけ届いて検討の開始（棋譜ごと送る大きい合図）を取りこぼした生徒は、
+        // 使われなくなった「授業モード」の小さい盤に落ちていた（2026-10-14 古橋君
+        // 「授業モードで盤面が表示されない、10回に9回」。回線切れが多い端末）。
+        // 開始を受け取っていなければ、先生に今の検討を頼み直す。届かない回線で
+        // 頼み続けないよう、間隔を空ける。
+        if (msg.type === 'BOARD_UPDATE' && connectRole === 'STUDENT' && reviewSourceSgfRef.current === null) {
+          const now = Date.now();
+          if (now - lastReviewSyncRequestAtRef.current > REVIEW_SYNC_RETRY_MS) {
+            lastReviewSyncRequestAtRef.current = now;
+            void classroom.sendTo({ type: 'REVIEW_SYNC_REQUEST', payload: {} }, [TEACHER_IDENTITY]);
+          }
+        }
         if (msg.type === 'BOARD_UPDATE' && connectRole === 'STUDENT' && msg.payload) {
           const p = msg.payload as {
             boardState: GameNode['board'];
