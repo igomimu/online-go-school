@@ -4,7 +4,8 @@ import type { Problem, ProblemResultView } from '../../types/problem';
 import GoBoard from '../GoBoard';
 import { identityMatchesPlayer, studentIdentityCandidates } from '../../utils/identityUtils';
 import { useState } from 'react';
-import { Check, X, Clock } from 'lucide-react';
+import { Check, X, Clock, Flame, Snowflake } from 'lucide-react';
+import { peerMood } from '../../utils/tsumegoPeers';
 import TsumegoRatingBadge from '../tsumego/TsumegoRatingBadge';
 
 interface ProblemMonitorPanelProps {
@@ -156,21 +157,31 @@ export default function ProblemMonitorPanel({
           {rows.length === 0 && (
             <div className="text-sm text-muted text-center py-4">生徒がいません</div>
           )}
-          {rows.map(row => (
+          {rows.map(row => {
+            // 生徒の画面と同じ炎・氷。3問続けて正解＝炎、同じ問題で2回まちがえ＝氷
+            const mood = row.view ? peerMood(row.view) : null;
+            return (
             <button
               type="button"
               key={row.identity}
               data-testid="problem-monitor-row"
+              data-mood={mood ?? 'none'}
               onClick={() => setSelectedIdentity(prev => (prev === row.identity ? null : row.identity))}
               aria-pressed={row.identity === selectedIdentity}
-              className={`flex w-full items-center justify-between gap-2 px-3 py-2 rounded-lg text-left text-sm transition-colors duration-150 ${
+              className={`flex w-full items-center justify-between gap-2 px-3 py-2 rounded-lg border text-left text-sm transition-colors duration-150 ${
+                mood === 'fire' ? 'border-alert-text' : mood === 'ice' ? 'border-sky-500/70' : 'border-transparent'
+              } ${
                 row.identity === selectedIdentity
                   ? 'bg-accent/15 ring-1 ring-accent'
-                  : row.isConnected ? 'bg-ink/5 hover:bg-ink/10' : 'bg-ink/[0.03] text-muted/75 hover:bg-ink/5'
+                  : mood === 'fire' ? 'bg-alert/15 hover:bg-alert/20'
+                    : mood === 'ice' ? 'bg-sky-500/15 hover:bg-sky-500/20'
+                      : row.isConnected ? 'bg-ink/5 hover:bg-ink/10' : 'bg-ink/[0.03] text-muted/75 hover:bg-ink/5'
               }`}
             >
               <span className="min-w-0">
                 <span className="flex items-center gap-1.5 truncate">
+                  {mood === 'fire' && <Flame className="h-4 w-4 shrink-0 text-alert-text" aria-label="3問つづけて正解中" />}
+                  {mood === 'ice' && <Snowflake className="h-4 w-4 shrink-0 text-sky-500" aria-label="この問題で苦戦中" />}
                   <span className="truncate">{row.displayName}</span>
                   {row.view?.ratingRankId && (
                     <TsumegoRatingBadge rankId={row.view.ratingRankId} className="text-[10px] py-0 px-1.5" />
@@ -201,7 +212,8 @@ export default function ProblemMonitorPanel({
                 </span>
               )}
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

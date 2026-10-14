@@ -43,4 +43,25 @@ describe('ProblemMonitorPanel', () => {
     fireEvent.click(screen.getByText('出題した問題に戻す'));
     expect(screen.getByTestId('monitor-board')).toHaveTextContent('9路');
   });
+  it('3問続けて正解の生徒は炎、同じ問題で2回まちがえた生徒は氷', () => {
+    render(
+      <ProblemMonitorPanel
+        problem={assigned}
+        students={[]}
+        participants={[
+          { identity: 'teacher', name: '先生' } as never,
+          { identity: 'sid:1', name: '太郎' } as never,
+          { identity: 'sid:2', name: '花子' } as never,
+        ]}
+        results={{
+          'sid:1': { result: 'correct', moveCount: 1, solved: 3, streak: 3 },
+          'sid:2': { result: 'incorrect', moveCount: 1, solved: 0, attempt: 2, streak: 0, livesLeft: 1 },
+        }}
+        localIdentity="teacher"
+        onBack={() => {}}
+      />,
+    );
+    const moods = screen.getAllByTestId('problem-monitor-row').map(row => row.getAttribute('data-mood'));
+    expect(moods).toEqual(['fire', 'ice']);
+  });
 });
