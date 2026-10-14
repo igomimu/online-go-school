@@ -210,9 +210,11 @@ function VideoTile({
   return (
     <div className="flex flex-col items-center gap-1 shrink-0">
       <div className="relative h-[90px] w-[120px]">
+        {/* 枠に合わせて切り取らず、映像の全体を収める。切り取ると縦長のカメラ
+            （スマホ・タブレット）は頭の上と下が見切れていた（2026-10-14 三村さん報告）。 */}
         <div
           ref={containerRef}
-          className={`h-full w-full overflow-hidden rounded-lg bg-black/30 [&>video]:h-full [&>video]:w-full [&>video]:rounded-lg [&>video]:object-cover ${isLocal && mirror ? '[&>video]:scale-x-[-1]' : ''}`}
+          className={`h-full w-full overflow-hidden rounded-lg bg-black [&>video]:h-full [&>video]:w-full [&>video]:object-contain ${isLocal && mirror ? '[&>video]:scale-x-[-1]' : ''}`}
         />
         {!cameraOn && <CameraOffCover variant="compact" />}
         {!micOn && <MicOffBadge variant="compact" />}
