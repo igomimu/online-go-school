@@ -2,6 +2,9 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LiveGameRow, LiveMoveRow } from '../utils/liveGameApi';
 import { useLiveGame } from './useLiveGame';
+import { fetchDeadStoneDraft } from '../utils/deadStoneDraft';
+
+vi.mock('../utils/deadStoneDraft', () => ({ fetchDeadStoneDraft: vi.fn() }));
 
 const api = vi.hoisted(() => ({
   fetchLiveGame: vi.fn(),
@@ -55,12 +58,75 @@ describe('useLiveGame の着手再照合', () => {
     api.fetchLiveMoves.mockReset()
       .mockResolvedValueOnce([])
       .mockResolvedValue([blackMove]);
+    api.enterScoring.mockReset().mockResolvedValue(undefined);
+    api.updateDeadStones.mockReset().mockResolvedValue(undefined);
+    api.submitMove.mockReset().mockResolvedValue({ ok: true });
+    vi.mocked(fetchDeadStoneDraft).mockReset().mockResolvedValue([]);
     api.ensureRealtimeAuth.mockClear();
     api.subscribeLiveGame.mockClear();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('講師は連続パスなしで整地へ進み死石の下書きを作る', async () => {
+    api.fetchLiveGame.mockResolvedValue({ ...game, white_player: 'sid:white' });
+    api.fetchLiveMoves.mockReset().mockResolvedValue([blackMove]);
+    vi.mocked(fetchDeadStoneDraft).mockResolvedValue(['4,4']);
+    const view = renderHook(() => useLiveGame('game-1', 'teacher', true));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => { await view.result.current.enterScoring(); });
+    expect(api.enterScoring).toHaveBeenCalledWith('game-1');
+    expect(view.result.current.game?.status).toBe('scoring');
+    expect(view.result.current.game?.scoring_confirmed).toEqual([]);
+    expect(fetchDeadStoneDraft).toHaveBeenCalledTimes(1);
+    expect(api.updateDeadStones).toHaveBeenCalledWith('game-1', ['4,4']);
+    expect(api.submitMove).not.toHaveBeenCalled();
+  });
+
+  it('計算開始に失敗したら対局を続け下書きは作らない', async () => {
+    api.enterScoring.mockRejectedValue(new Error('計算開始失敗'));
+    const view = renderHook(() => useLiveGame('game-1', 'teacher', true));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => { await view.result.current.enterScoring(); });
+    expect(view.result.current.game?.status).toBe('playing');
+    expect(view.result.current.error).toContain('計算開始失敗');
+    expect(fetchDeadStoneDraft).not.toHaveBeenCalled();
+  });
+
+  it('講師の最後の着手の保存が済んでから計算へ進む', async () => {
+    api.fetchLiveMoves.mockReset().mockResolvedValue([blackMove]);
+    let finishMove!: (value: { ok: boolean }) => void;
+    api.submitMove.mockReturnValueOnce(new Promise((resolve) => { finishMove = resolve; }));
+    const view = renderHook(() => useLiveGame('game-1', 'teacher', true));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    let pendingMove!: Promise<void>;
+    await act(async () => { pendingMove = view.result.current.submitMove(5, 5); });
+    let pendingScoring!: Promise<void>;
+    await act(async () => { pendingScoring = view.result.current.enterScoring(); });
+    expect(api.enterScoring).not.toHaveBeenCalled();
+    await act(async () => {
+      finishMove({ ok: true });
+      await pendingMove;
+      await pendingScoring;
+    });
+    expect(api.enterScoring).toHaveBeenCalledTimes(1);
+    expect(view.result.current.game?.status).toBe('scoring');
+    expect(fetchDeadStoneDraft).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining([expect.objectContaining({ x: 5, y: 5, color: 'WHITE' })]),
+      expect.anything(),
+      'BLACK',
+    );
+  });
+
+  it('生徒は講師用の計算開始操作を使えない', async () => {
+    const view = renderHook(() => useLiveGame('game-1', 'sid:black', false));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    await act(async () => { await view.result.current.enterScoring(); });
+    expect(api.enterScoring).not.toHaveBeenCalled();
+    expect(view.result.current.game?.status).toBe('playing');
   });
 
   it('Realtime INSERTとgames UPDATEを両方取り逃しても定期照合で相手の手へ追いつく', async () => {

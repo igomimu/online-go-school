@@ -70,6 +70,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     submitMove,
     submitPass,
     submitResign,
+    enterScoring,
     setDeadStones,
     finishWithResult,
     confirmScoring,
@@ -84,6 +85,7 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
   } = live;
 
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
+  const [enteringScoring, setEnteringScoring] = useState(false);
   const [pendingTap, setPendingTap] = useState<{ x: number; y: number } | null>(null);
   const isTouch = useIsTouchDevice();
   const getLastPointerType = useLastPointerType();
@@ -260,6 +262,16 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
     // 対局者は双方が押した時点で終局する。講師が押したときは代行として即終局。
     void confirmScoring(resultStr);
   }, [scoringResult, confirmScoring]);
+
+  const handleCalculateClick = useCallback(async () => {
+    if (!isTeacher || game?.status !== 'playing' || undoRequest || enteringScoring) return;
+    setEnteringScoring(true);
+    try {
+      await enterScoring();
+    } finally {
+      setEnteringScoring(false);
+    }
+  }, [isTeacher, game?.status, undoRequest, enteringScoring, enterScoring]);
 
   const handleInterruptClick = useCallback(async () => {
     if (!isTeacher) return;
@@ -836,6 +848,17 @@ function GameBoardContent({ gameId, myIdentity, isTeacher, onBack, onMoveSubmitt
                 className="flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-[11px] text-muted transition-colors duration-150 hover:bg-raised hover:text-ink"
               >
                 <Undo2 className="h-3.5 w-3.5" /> 待った
+              </button>
+            )}
+            {isTeacher && !undoRequest && (
+              <button
+                data-testid="enter-scoring"
+                onClick={() => { void handleCalculateClick(); }}
+                disabled={enteringScoring}
+                title="ダメを詰めなくても地合いを計算できます。死石を確認してから確定してください"
+                className="secondary-button flex items-center gap-1.5 text-xs px-3 py-1.5 disabled:opacity-55"
+              >
+                <Calculator className="h-3.5 w-3.5" /> {enteringScoring ? '計算中…' : '計算'}
               </button>
             )}
             {isTeacher && !undoRequest && (

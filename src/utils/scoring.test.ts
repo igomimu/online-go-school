@@ -11,6 +11,24 @@ function makeBoard(size: number, stones: { x: number; y: number; color: 'BLACK' 
 }
 
 describe('calculateTerritory', () => {
+  it('ダメを詰めても詰めなくても地と勝敗は同じ', () => {
+    const stones = Array.from({ length: 5 }, (_, i) => [
+      { x: 2, y: i + 1, color: 'BLACK' as const },
+      { x: 4, y: i + 1, color: 'WHITE' as const },
+    ]).flat();
+    const unfilled = calculateTerritory(makeBoard(5, stones), 5, new Set(), 2, 1, 6.5);
+    const filled = calculateTerritory(makeBoard(5, [
+      ...stones,
+      ...Array.from({ length: 5 }, (_, i) => ({ x: 3, y: i + 1, color: i % 2 === 0 ? 'BLACK' as const : 'WHITE' as const })),
+    ]), 5, new Set(), 2, 1, 6.5);
+    expect(unfilled.blackTerritory).toBe(5);
+    expect(unfilled.whiteTerritory).toBe(5);
+    expect(unfilled.territoryMap.every((row) => row[2] === null)).toBe(true);
+    expect(unfilled.blackTotal).toBe(filled.blackTotal);
+    expect(unfilled.whiteTotal).toBe(filled.whiteTotal);
+    expect(formatScoringResult(unfilled)).toBe(formatScoringResult(filled));
+  });
+
   it('空盤はダメ（どちらの地でもない）', () => {
     const board = makeBoard(9, []);
     const result = calculateTerritory(board, 9, new Set(), 0, 0, 6.5);
