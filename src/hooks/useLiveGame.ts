@@ -865,7 +865,9 @@ export function useLiveGame(
           }
         } else {
           const duration = inConsideration ? (prev.considerationSeconds ?? 60) : prev.byoyomiSeconds;
-          const elapsedSec = Math.round(duration - newTimeLeft);
+          // 画面（GameBoard の getByoyomiElapsed）と同じく切り捨てで数える。
+          // 四捨五入だと、tick が x.5 秒より後ろにずれた端末で声が数字より1秒早くなる。
+          const elapsedSec = Math.floor(duration - newTimeLeft);
           const phrase = getNhkAnnouncement(elapsedSec, newByoyomiLeft, inConsideration);
           const key = `${derived.currentColor}:nhk:${inConsideration ? 'consideration' : 'main'}:${newByoyomiLeft}:${elapsedSec}`;
           if (phrase && lastByoyomiSpeakRef.current !== key) {
@@ -952,6 +954,14 @@ export function useLiveGame(
           if (newByoyomiLeft <= 0 && !shouldDeclareTimeUp(newTimeLeft)) {
             // 0になった瞬間には切らない。猶予のあいだは秒読みの回数も減らさず、
             // 打てる状態のまま待つ（ここで打てば次の秒読みに入る）。
+            // 秒読みは切り捨てで数えるので、最後の「10」はここで読む（画面も B 秒になる）。
+            // キーは秒ごとの読み上げと同じ形にし、時間切れ時に「10」を重ねない。
+            const finalKey = `${derived.currentColor}:1:${Math.floor(prev.byoyomiSeconds)}`;
+            const finalPhrase = getByoyomiAnnouncement(prev.byoyomiSeconds, prev.byoyomiSeconds, 1);
+            if (finalPhrase && lastByoyomiSpeakRef.current !== finalKey) {
+              lastByoyomiSpeakRef.current = finalKey;
+              speakByoyomi(finalPhrase);
+            }
             commit({
               ...prev,
               lastTickTime: now,
@@ -990,7 +1000,10 @@ export function useLiveGame(
 
       // 秒読み中の各秒の読み上げ（10秒・20秒・25秒・1〜9 等）
       if (newInByoyomi && newTimeLeft > 0) {
-        const elapsedSec = Math.round(prev.byoyomiSeconds - newTimeLeft);
+        // 画面（GameBoard の getByoyomiElapsed）と同じく切り捨てで数える。
+        // 四捨五入だと、tick が x.5 秒より後ろにずれた端末で声が画面の数字より1秒早かった
+        // （2026-10-14 古橋君の報告「秒読みの音が早い」）。
+        const elapsedSec = Math.floor(prev.byoyomiSeconds - newTimeLeft);
         const phrase = getByoyomiAnnouncement(prev.byoyomiSeconds, elapsedSec, newByoyomiLeft);
         const key = `${derived.currentColor}:${newByoyomiLeft}:${elapsedSec}`;
         if (phrase && lastByoyomiSpeakRef.current !== key) {
