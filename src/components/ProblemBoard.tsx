@@ -6,7 +6,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchRandomTsumegoProblem } from '../utils/tsumegoApi';
 import { tsumegoRowToProblem } from '../utils/tsumegoConvert';
 import { processRatingUpdate, pickRandomLevelForRank } from '../utils/tsumegoRating';
-import { Check, X, RotateCcw, Flag, Heart, Timer } from 'lucide-react';
+import { Check, X, RotateCcw, Flag, Heart, Timer, Flame, Snowflake } from 'lucide-react';
+import type { TsumegoPeer } from '../utils/tsumegoPeers';
 import TsumegoReportModal from './TsumegoReportModal';
 import TsumegoRatingBar from './tsumego/TsumegoRatingBar';
 import TsumegoRankTransitionModal from './tsumego/TsumegoRankTransitionModal';
@@ -34,6 +35,10 @@ interface ProblemBoardProps {
   onRatingUpdate?: (result: RatingUpdateResult) => void;
   /** 中断から再開したときの初期進捗 */
   initialProgress?: { problemNo: number; solved: number; failed: number };
+  /** 一緒に解いている仲間（講師の端末から届く。下の名前・正解数・炎/氷） */
+  peers?: TsumegoPeer[];
+  /** 自分の identity。仲間の一覧で自分の札を見分ける */
+  selfIdentity?: string;
 }
 
 /** 結果を見せてから次の問題へ進むまでの間 */
@@ -58,6 +63,8 @@ export default function ProblemBoard({
   ratingState,
   onRatingUpdate,
   initialProgress,
+  peers = [],
+  selfIdentity,
 }: ProblemBoardProps) {
   const ratingMode = problem.ratingMode === true;
   const { problemState, startProblem, makeMove, timeUp, retry } = useProblemSession();
@@ -381,14 +388,42 @@ export default function ProblemBoard({
         />
       )}
 
-      {/* 碁盤 */}
+      {/* 仲間の様子。3問続けて正解で炎、同じ問題で2回まちがえると氷（2026-10-14 三村さん） */}
+      {peers.length > 0 && (
+        <div className="shrink-0 flex gap-1.5 overflow-x-auto" aria-label="いっしょに解いている仲間" data-testid="tsumego-peers">
+          {peers.map(peer => {
+            const isSelf = peer.identity === selfIdentity;
+            const face = peer.mood === 'fire'
+              ? 'border-alert-text bg-alert/15'
+              : peer.mood === 'ice'
+                ? 'border-sky-500/70 bg-sky-500/15'
+                : 'border-line bg-raised';
+            return (
+              <div
+                key={peer.identity}
+                data-testid={`tsumego-peer-${peer.identity}`}
+                data-mood={peer.mood ?? 'none'}
+                title={peer.mood === 'fire' ? '3問つづけて正解中' : peer.mood === 'ice' ? 'この問題で苦戦中' : undefined}
+                className={`flex shrink-0 items-center gap-1 rounded-md border px-2.5 py-1 text-sm ${face} ${isSelf ? 'font-bold ring-1 ring-accent' : ''}`}
+              >
+                {peer.mood === 'fire' && <Flame className="h-4 w-4 text-alert-text" aria-label="炎" />}
+                {peer.mood === 'ice' && <Snowflake className="h-4 w-4 text-sky-500" aria-label="氷" />}
+                <span className="max-w-[6em] truncate">{isSelf ? 'じぶん' : peer.name}</span>
+                <span className="tabular-nums text-muted" aria-label={`正解${peer.solved}問`}>{peer.solved}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 碁盤。仲間の一覧が出ているときは、その高さぶん小さくする */}
       <div className="glass-panel flex flex-1 min-h-0 justify-center items-center p-2 sm:p-3 shadow-2xl">
         <GoBoard
           boardState={problemState.boardState}
           boardSize={current.boardSize}
           viewRange={current.viewRange}
-          className="max-w-[min(100%,calc(100dvh-8.5rem))]"
-          maxHeight="calc(100dvh - 8.5rem)"
+          className={peers.length > 0 ? 'max-w-[min(100%,calc(100dvh-11rem))]' : 'max-w-[min(100%,calc(100dvh-8.5rem))]'}
+          maxHeight={peers.length > 0 ? 'calc(100dvh - 11rem)' : 'calc(100dvh - 8.5rem)'}
           onCellClick={problemState.status === 'solving' ? handleCellClick : undefined}
           readOnly={problemState.status !== 'solving'}
         />

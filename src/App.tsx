@@ -66,6 +66,8 @@ import ClassroomManager from './components/teacher/ClassroomManager';
 import ProblemBoard from './components/ProblemBoard';
 import ProblemMonitorPanel from './components/teacher/ProblemMonitorPanel';
 import type { ProblemResultView } from './types/problem';
+import { buildTsumegoPeers, nextStreak, type TsumegoPeer, type TsumegoPeersPayload } from './utils/tsumegoPeers';
+import { resolvePlayerName } from './utils/identityUtils';
 import type { TsumegoRatingState, RatingUpdateResult } from './types/tsumegoRating';
 import {
   changeTsumegoRatingRank,
@@ -403,6 +405,8 @@ function App() {
   const [tsumegoResumeProgress, setTsumegoResumeProgress] = useState<TsumegoProgress | undefined>(undefined);
   // 先生用: 生徒identityごとの解答状況(PROBLEM_RESULT受信結果)
   const [problemResults, setProblemResults] = useState<Record<string, ProblemResultView>>({});
+  // 生徒側: 一緒に詰碁を解いている仲間の様子（講師から届く）
+  const [tsumegoPeers, setTsumegoPeers] = useState<TsumegoPeer[]>([]);
   // 先生用: 詰碁の出題先（null=全員）。配信終了の合図もここへだけ送る
   const [problemTargets, setProblemTargets] = useState<string[] | null>(null);
   // 詰碁 格付けチャレンジ用
@@ -985,6 +989,7 @@ function App() {
         }
         // 詰碁配信（生徒用）
         if (msg.type === 'PROBLEM_ASSIGN' && connectRole === 'STUDENT' && msg.payload) {
+          setTsumegoPeers([]);
           stashRecordDraft();
           const p = msg.payload as import('./types/problem').ProblemAssignPayload;
           if (p.problem.ratingMode) {
@@ -1002,6 +1007,12 @@ function App() {
           }
         }
 
+        // 詰碁の仲間の様子（生徒用）。講師の端末がまとめて配ってくる
+        if (msg.type === 'PROBLEM_BOARD' && connectRole === 'STUDENT' && msg.payload) {
+          const p = msg.payload as TsumegoPeersPayload;
+          if (Array.isArray(p.peers)) setTsumegoPeers(p.peers);
+        }
+
         // 詰碁の解答結果（先生用: 生徒ごとの挑戦中/正解/不正解を集計する）
         if (msg.type === 'PROBLEM_RESULT' && connectRole === 'TEACHER' && msg.payload && sender) {
           const p = msg.payload as import('./types/problem').ProblemResultPayload;
@@ -1013,6 +1024,8 @@ function App() {
               ratingRankId: p.ratingRankId, ratingPoints: p.ratingPoints,
               // 問題は変わったときにしか付いてこないので、結果だけの知らせでは前のものを残す
               current: p.current ?? prev[sender]?.current,
+              // 続けて正解した数。仲間の炎に使う（生徒は数えていないので講師の端末で数える）
+              streak: nextStreak(prev[sender]?.streak, p.result),
             },
           }));
         }
@@ -1800,6 +1813,19 @@ function App() {
     setShowGameCreation(false);
     setInitialGameCreationPlayer(undefined);
   };
+
+  // 詰碁: 仲間の様子を出題先の生徒へ配る（下の名前・正解数・炎/氷）。
+  // 結果が続けて届いても送りすぎないよう、少しまとめてから最新の一覧だけを送る。
+  useEffect(() => {
+    if (role !== 'TEACHER' || !activeProblem) return;
+    const timer = setTimeout(() => {
+      const payload: TsumegoPeersPayload = {
+        peers: buildTsumegoPeers(problemResults, identity => resolvePlayerName(identity, students)),
+      };
+      void classroomRef.current?.sendToOrAll({ type: 'PROBLEM_BOARD', payload }, problemTargets);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [role, activeProblem, problemResults, problemTargets, students]);
 
   // 詰碁: 配信
   // 出題先は選んだ生徒だけ（null=全員）。対局中の生徒を詰碁へ引き剥がさない（2026-09-19）
@@ -2895,6 +2921,8 @@ function App() {
               ratingState={activeProblem.ratingMode ? tsumegoRating : null}
               onRatingUpdate={activeProblem.ratingMode ? handleTsumegoRatingUpdate : undefined}
               initialProgress={tsumegoResumeProgress}
+              peers={tsumegoPeers}
+              selfIdentity={classroomRef.current?.localIdentity}
               onBack={() => {
                 setViewMode('lobby');
                 setActiveProblem(null);

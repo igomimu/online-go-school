@@ -52,4 +52,7 @@ export interface ProblemResultPayload {
 }
 
 /** 先生のモニターが生徒ごとに覚えておく最新の状況 */
-export type ProblemResultView = Omit<ProblemResultPayload, 'problemId'>;
+export type ProblemResultView = Omit<ProblemResultPayload, 'problemId'> & {
+  /** 続けて正解した数（講師の端末が数える。仲間の炎の判定に使う） */
+  streak?: number;
+};

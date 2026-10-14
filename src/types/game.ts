@@ -98,6 +98,7 @@ export type GameMessageType =
   | 'SCORING_UPDATE'
   | 'PROBLEM_ASSIGN'
   | 'PROBLEM_RESULT'
+  | 'PROBLEM_BOARD'
   | 'REVIEW_START'
   | 'REVIEW_END'
   | 'NIGIRI_DRAW'
