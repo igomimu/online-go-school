@@ -208,10 +208,18 @@ export default function ProblemBoard({
     }
   }, [current, currentRating]);
 
+  // 数え終えた結果。親（App）は onResult を描き直すたびに作り直すので、この effect は
+  // 同じ結果のまま何度も走る。印が無いと、まちがえた画面を見ているあいだの描き直しの
+  // たびにミスを数え直し、1回のミスでライフが尽きていた（2026-10-14 授業で報告）。
+  const handledResultRef = useRef<object | null>(null);
+
   useEffect(() => {
     const status = problemState?.status;
     if (status !== 'correct' && status !== 'incorrect') return;
     if (timedOutRef.current) return; // 時間切れはタイマー側で送り済み
+    // 1つの結果（problemState は着手のたびに作り直される）は1回だけ数える
+    if (handledResultRef.current === problemState) return;
+    handledResultRef.current = problemState;
     const attempt = missesRef.current + 1;
     if (status === 'incorrect') {
       missesRef.current = attempt;

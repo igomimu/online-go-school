@@ -56,6 +56,19 @@ describe('ProblemBoard のライフと次の問題', () => {
     expect(onResult).toHaveBeenLastCalledWith('correct', 1, expect.objectContaining({ attempt: 2, livesLeft: 1, solved: 1 }));
   });
 
+  it('まちがえた画面のまま親が描き直されても、ライフは1つしか減らない', () => {
+    // 2026-10-14「1ミスでライフが無くなる」。親（App）は onResult を毎回作り直すので、
+    // 授業中の描き直しのたびに同じ不正解を数え直していた
+    const problem = makeProblem('a', 3);
+    const { rerender } = render(<ProblemBoard problem={problem} onBack={() => {}} onResult={vi.fn()} />);
+    fireEvent.click(screen.getByText('まちがいの手'));
+    const onResult = vi.fn();
+    rerender(<ProblemBoard problem={problem} onBack={() => {}} onResult={onResult} />);
+    rerender(<ProblemBoard problem={problem} onBack={() => {}} onResult={vi.fn()} />);
+    expect(screen.getByLabelText('ライフ 残り2')).toBeInTheDocument();
+    expect(onResult).not.toHaveBeenCalled();
+  });
+
   it('ライフが尽きたらやり直せず、同じレベルの次の問題へ進む', async () => {
     const onResult = vi.fn();
     render(<ProblemBoard problem={makeProblem('a', 1)} onBack={() => {}} onResult={onResult} />);
