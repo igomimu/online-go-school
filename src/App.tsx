@@ -91,7 +91,7 @@ import type { ChatMessagePayload } from './types/chat';
 import type { AiAnalysisSyncPayload } from './types/ai';
 import { resolveEffectiveViewMode } from './utils/viewMode';
 import { applyMediaIntent, loadMediaIntent, saveMediaIntent, type MediaIntent } from './utils/mediaIntent';
-import { audioPermissionFor, setStudentAudioPermission } from './utils/audioPermissions';
+import { audioPermissionFor, setStudentAudioPermission, withActualMicState } from './utils/audioPermissions';
 import { loadTeacherAudioPermissions, saveTeacherAudioPermissions } from './utils/teacherAudioPermissions';
 import {
   buildTeacherGameWindowUrl,
@@ -117,23 +117,20 @@ function reviewKomiFromSgf(value: string | undefined, fallback = 6.5): number {
 /** 検討の盤を配る間隔。手を早送りしても最後の一枚は必ず届く */
 const REVIEW_BOARD_INTERVAL_MS = 120;
 
-function sendTeacherAudioPermission(
+/**
+ * 入室・再接続のときに、講師が決めた「先生の声を届けるか」を生徒へ送り直す。
+ * 生徒のマイクは送り直さない。生徒は自分でも入れたり切ったりするので、講師の端末の
+ * 古い記録を送ると、講師のリロードや生徒の入り直しのたびに生徒のマイクが勝手に
+ * 切り替わっていた（2026-10-14 三村さん）。講師がその場で切った分は生徒側に保存され、
+ * 生徒の入り直し後も残る（rememberMediaIntent）。
+ */
+function sendTeacherHearPermission(
   classroom: ClassroomRtc,
   identity: string,
   permission: AudioPermissions[string],
 ): void {
   void classroom.sendTo(
     { type: 'AUDIO_CONTROL', payload: { canHear: permission.canHear } },
-    [identity],
-  );
-  void classroom.sendTo(
-    {
-      type: 'MEDIA_CONTROL',
-      payload: {
-        micAllowed: permission.micAllowed,
-        cameraAllowed: permission.cameraAllowed,
-      },
-    },
     [identity],
   );
 }
@@ -240,6 +237,11 @@ function App() {
 
   // 参加者
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
+  // 講師画面に出す音声の状態。生徒のマイクは実際の状態を正とする
+  const shownAudioPermissions = useMemo(
+    () => withActualMicState(audioPermissions, participants),
+    [audioPermissions, participants],
+  );
   const [activeSpeakers, setActiveSpeakers] = useState<string[]>([]);
 
   // ビデオ要素
@@ -1125,7 +1127,7 @@ function App() {
         if (connectRole === 'TEACHER') {
           pushAlert({ kind: 'rejoin', identity });
           const permission = audioPermissionsRef.current[identity];
-          if (permission) sendTeacherAudioPermission(classroom, identity, permission);
+          if (permission) sendTeacherHearPermission(classroom, identity, permission);
           // 後から入った生徒にも、今の棋力の見せ方を伝える
           void classroom.broadcast({
             type: 'RANK_DISPLAY',
@@ -1215,7 +1217,7 @@ function App() {
         // 接続時点ですでに居る生徒は ParticipantJoined が発火しないため、ここで復元する。
         classroom.remoteIdentities.forEach(identity => {
           const permission = audioPermissionsRef.current[identity];
-          if (permission) sendTeacherAudioPermission(classroom, identity, permission);
+          if (permission) sendTeacherHearPermission(classroom, identity, permission);
           rejoinReviewRef.current(identity);
         });
       }
@@ -2166,8 +2168,10 @@ function App() {
   };
 
   const handleToggleStudentMic = (identity: string) => {
+    // 押したら、いま画面に出ている状態（＝生徒のマイクの実際）の逆にする
     const current = audioPermissionFor(audioPermissionsRef.current, identity);
-    const permission = { ...current, micAllowed: !current.micAllowed };
+    const shown = audioPermissionFor(shownAudioPermissions, identity);
+    const permission = { ...current, micAllowed: !shown.micAllowed };
     commitTeacherAudioPermissions({
       ...audioPermissionsRef.current,
       [identity]: permission,
@@ -2628,7 +2632,7 @@ function App() {
             onSelectClassroom={setSelectedClassroomId}
             games={games}
             liveGames={liveGameList.games}
-            audioPermissions={audioPermissions}
+            audioPermissions={shownAudioPermissions}
             onToggleHear={handleToggleHear}
             onToggleMic={handleToggleStudentMic}
             chatMessages={chat.messages}
@@ -2954,7 +2958,7 @@ function App() {
           <MediaControlPanel
             participants={participants}
             localIdentity={classroomRef.current?.localIdentity ?? ''}
-            audioPermissions={audioPermissions}
+            audioPermissions={shownAudioPermissions}
             onToggleHear={handleToggleHear}
             onToggleMic={handleToggleStudentMic}
           />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { setStudentAudioPermission } from './audioPermissions';
+import { setStudentAudioPermission, withActualMicState } from './audioPermissions';
 
 describe('setStudentAudioPermission', () => {
   it('Mクリアは参加中の全生徒のマイクだけをOFFにする', () => {
@@ -25,5 +25,18 @@ describe('setStudentAudioPermission', () => {
     );
 
     expect(result.a).toEqual({ canHear: false, micAllowed: false, cameraAllowed: false });
+  });
+});
+
+describe('withActualMicState', () => {
+  it('在室している生徒のマイクは、講師の記録ではなく実際の状態で出す', () => {
+    const recorded = { 'sid:1': { canHear: false, micAllowed: false, cameraAllowed: true } };
+    const shown = withActualMicState(recorded, [{ identity: 'sid:1', audioEnabled: true }]);
+    expect(shown['sid:1']).toEqual({ canHear: false, micAllowed: true, cameraAllowed: true });
+  });
+
+  it('在室していない生徒は記録のまま', () => {
+    const recorded = { 'sid:2': { canHear: true, micAllowed: false, cameraAllowed: true } };
+    expect(withActualMicState(recorded, [])).toEqual(recorded);
   });
 });
