@@ -4,8 +4,9 @@ import type { Problem, ProblemResultView } from '../../types/problem';
 import GoBoard from '../GoBoard';
 import { identityMatchesPlayer, studentIdentityCandidates } from '../../utils/identityUtils';
 import { useState } from 'react';
-import { Check, X, Clock, Flame, Snowflake } from 'lucide-react';
+import { Check, X, Clock } from 'lucide-react';
 import { peerMood } from '../../utils/tsumegoPeers';
+import TsumegoMoodIcon from '../tsumego/TsumegoMoodIcon';
 import TsumegoRatingBadge from '../tsumego/TsumegoRatingBadge';
 
 interface ProblemMonitorPanelProps {
@@ -180,8 +181,10 @@ export default function ProblemMonitorPanel({
             >
               <span className="min-w-0">
                 <span className="flex items-center gap-1.5 truncate">
-                  {mood === 'fire' && <Flame className="h-4 w-4 shrink-0 text-alert-text" aria-label="3問つづけて正解中" />}
-                  {mood === 'ice' && <Snowflake className="h-4 w-4 shrink-0 text-sky-500" aria-label="この問題で苦戦中" />}
+                  <TsumegoMoodIcon
+                    mood={mood}
+                    label={mood === 'fire' ? '3問つづけて正解中' : 'この問題で苦戦中'}
+                  />
                   <span className="truncate">{row.displayName}</span>
                   {row.view?.ratingRankId && (
                     <TsumegoRatingBadge rankId={row.view.ratingRankId} className="text-[10px] py-0 px-1.5" />

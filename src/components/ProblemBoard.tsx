@@ -6,8 +6,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchRandomTsumegoProblem } from '../utils/tsumegoApi';
 import { tsumegoRowToProblem } from '../utils/tsumegoConvert';
 import { processRatingUpdate, pickRandomLevelForRank } from '../utils/tsumegoRating';
-import { Check, X, RotateCcw, Flag, Heart, Timer, Flame, Snowflake } from 'lucide-react';
+import { Check, X, RotateCcw, Flag, Heart, Timer } from 'lucide-react';
 import type { TsumegoPeer } from '../utils/tsumegoPeers';
+import TsumegoMoodIcon from './tsumego/TsumegoMoodIcon';
 import TsumegoReportModal from './TsumegoReportModal';
 import TsumegoRatingBar from './tsumego/TsumegoRatingBar';
 import TsumegoRankTransitionModal from './tsumego/TsumegoRankTransitionModal';
@@ -406,8 +407,7 @@ export default function ProblemBoard({
                 title={peer.mood === 'fire' ? '3問つづけて正解中' : peer.mood === 'ice' ? 'この問題で苦戦中' : undefined}
                 className={`flex shrink-0 items-center gap-1 rounded-md border px-2.5 py-1 text-sm ${face} ${isSelf ? 'font-bold ring-1 ring-accent' : ''}`}
               >
-                {peer.mood === 'fire' && <Flame className="h-4 w-4 text-alert-text" aria-label="炎" />}
-                {peer.mood === 'ice' && <Snowflake className="h-4 w-4 text-sky-500" aria-label="氷" />}
+                <TsumegoMoodIcon mood={peer.mood} />
                 <span className="max-w-[6em] truncate">{isSelf ? 'じぶん' : peer.name}</span>
                 <span className="tabular-nums text-muted" aria-label={`正解${peer.solved}問`}>{peer.solved}</span>
               </div>
