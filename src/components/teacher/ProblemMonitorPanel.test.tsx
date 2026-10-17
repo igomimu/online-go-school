@@ -64,4 +64,28 @@ describe('ProblemMonitorPanel', () => {
     const moods = screen.getAllByTestId('problem-monitor-row').map(row => row.getAttribute('data-mood'));
     expect(moods).toEqual(['fire', 'ice']);
   });
+  it('教室にいる参加者だけを並べる（欠席・途中退出の生徒は出さない）', () => {
+    render(
+      <ProblemMonitorPanel
+        problem={assigned}
+        students={[
+          { id: 's1', name: '太郎' } as never,
+          { id: 's2', name: '欠席の次郎' } as never,
+          { id: 's3', name: '途中退出の三郎' } as never,
+        ]}
+        participants={[
+          { identity: 'teacher', name: '先生' } as never,
+          { identity: 's1', name: '太郎' } as never,
+        ]}
+        results={{ s3: { result: 'correct', moveCount: 1 } }}
+        localIdentity="teacher"
+        onBack={() => {}}
+      />,
+    );
+    const names = screen.getAllByTestId('problem-monitor-row').map(row => row.textContent);
+    expect(names.some(n => n?.includes('太郎'))).toBe(true);
+    expect(names.some(n => n?.includes('途中退出の三郎'))).toBe(false);
+    expect(names.some(n => n?.includes('欠席の次郎'))).toBe(false);
+    expect(names).toHaveLength(1);
+  });
 });

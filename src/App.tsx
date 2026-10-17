@@ -1819,13 +1819,16 @@ function App() {
   useEffect(() => {
     if (role !== 'TEACHER' || !activeProblem) return;
     const timer = setTimeout(() => {
+      // 講師の画面と同じく、教室にいる参加者だけを配る
+      const present = new Set(participants.map(p => p.identity));
+      const presentResults = Object.fromEntries(Object.entries(problemResults).filter(([identity]) => present.has(identity)));
       const payload: TsumegoPeersPayload = {
-        peers: buildTsumegoPeers(problemResults, identity => resolvePlayerName(identity, students)),
+        peers: buildTsumegoPeers(presentResults, identity => resolvePlayerName(identity, students)),
       };
       void classroomRef.current?.sendToOrAll({ type: 'PROBLEM_BOARD', payload }, problemTargets);
     }, 400);
     return () => clearTimeout(timer);
-  }, [role, activeProblem, problemResults, problemTargets, students]);
+  }, [role, activeProblem, problemResults, problemTargets, students, participants]);
 
   // 詰碁: 配信
   // 出題先は選んだ生徒だけ（null=全員）。対局中の生徒を詰碁へ引き剥がさない（2026-09-19）

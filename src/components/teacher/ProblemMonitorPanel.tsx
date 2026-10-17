@@ -88,7 +88,9 @@ export default function ProblemMonitorPanel({
   targets = null,
   onBack,
 }: ProblemMonitorPanelProps) {
+  // 教室にいる参加者だけを並べる。全登録生徒を出すと間が空いて見比べられない（2026-10-17）
   const rows = buildRows(students, participants, results, localIdentity)
+    .filter(r => r.isConnected)
     .filter(r => targets === null || targets.includes(r.identity));
   const correctCount = rows.filter(r => r.result === 'correct').length;
   // 生徒は各自のペースで別の問題へ進む。押した生徒がいま解いている問題を盤に映す
@@ -156,7 +158,7 @@ export default function ProblemMonitorPanel({
         {/* 生徒一覧: 解答状況 */}
         <div className="glass-panel w-72 shrink-0 overflow-y-auto p-2 space-y-1">
           {rows.length === 0 && (
-            <div className="text-sm text-muted text-center py-4">生徒がいません</div>
+            <div className="text-sm text-muted text-center py-4">参加者がいません</div>
           )}
           {rows.map(row => {
             // 生徒の画面と同じ炎・氷。3問続けて正解＝炎、同じ問題で2回まちがえ＝氷
